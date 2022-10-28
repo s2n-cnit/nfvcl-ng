@@ -1,0 +1,2 @@
+filebeat modules disable system
+service filebeat stop

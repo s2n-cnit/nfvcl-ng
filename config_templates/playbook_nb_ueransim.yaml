@@ -1,0 +1,16 @@
+---
+- hosts: all
+  tasks:
+  - name: Install screen
+    apt:
+      name:
+      - screen
+  - name: remove old gnb process
+    shell: |
+       ps ax | grep \.nb | grep SCREEN | awk '{ print $1}' | xargs kill
+    ignore_errors: yes
+  - name: starting gnb
+    shell: |
+        screen -S nb -d -m bash -c '/root/UERANSIM/build/nr-gnb -c {{ confvar.conf_file }}'
+        sleep 1
+...

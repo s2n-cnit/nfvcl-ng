@@ -1,0 +1,15 @@
+.idea/*
+nsd_packages/*
+vnf_packages/*
+day2_files/*
+vnf_charms/flexcharm/lib/*
+vnf_charms/flexcharm/mod/*
+vnf_charms/flexcharmvyos/mod/*
+vnf_charms/flexcharmvyos/lib/*
+*.pyo
+*.pyc
+*.log
+/vnf_packages/
+/.idea/
+/docs/*
+

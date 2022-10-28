@@ -1,0 +1,66 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+   - name: Intilizing Kubernetes Cluster
+     command: kubeadm init --pod-network-cidr "{{ pod_network_cidr }}"  --apiserver-advertise-address "{{ k8s_master_ip }}"
+   - pause: seconds=30
+   - name: Create directory for kube config.
+     file: 
+       path: /root/.kube
+       state: directory
+       owner: root
+       group: root
+       mode: 0755
+   - name: Copy /etc/kubernetes/admin.conf to user home directory /home/ansible_user/.kube/config.
+     copy:
+       src: /etc/kubernetes/admin.conf
+       dest: /root/.kube/config
+       remote_src: yes
+       owner: root
+       group: root
+       mode: '0644'
+   - pause: seconds=10
+   - name: Remove the cache directory.
+     file: 
+       path: /root/.kube/cache
+       state: absent
+   - name: Create Pod Network
+     command: "{{ item }}"
+     with_items:
+       - kubectl apply -f kube_cni.yaml
+   - name: Calico custom manifest
+     command: "{{ item }}"
+     with_items:
+        - kubectl apply -f kube_calico_custom.yaml
+     when: cni == "calico"
+   - name: Create Pod Network, RBAC, Storage Classes and Load Balancer.
+     command: "{{ item }}"
+     with_items: 
+        - kubectl apply -f openebs_operator.yaml
+        - kubectl apply -f default_storageclass.yaml
+        - kubectl apply -f metallb_manifest.yaml
+        - kubectl apply -f "{{ metallb_configmap_file }}"
+        - kubectl apply -f regcred.yaml
+        - kubectl create clusterrolebinding tiller-cluster-admin --clusterrole=cluster-admin  --serviceaccount=kube-system:default
+   - name: Install linkerd sidecars
+     command: "{{ item }}"
+     with_items:
+        - curl -sL https://run.linkerd.io/install | sh
+        - linkerd install | kubectl apply -f -
+        - linkerd viz install | kubectl apply -f -
+     when: linkerd is defined
+   - pause: seconds=30
+   - name: Get the token for joining the nodes with Kuberentes master.
+     shell: kubeadm token create  --print-join-command
+     register: kubernetes_join_command
+   - name: worker join key
+     debug:
+       msg: "{{ kubernetes_join_command.stdout }}"
+   - name: Get k8s credential file
+     shell: cat /root/.kube/config
+     register: credentials_file
+   - name: k8s credentials
+     debug:
+       msg: "{{ credentials_file }}"

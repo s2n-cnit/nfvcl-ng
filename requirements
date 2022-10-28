@@ -1,0 +1,8 @@
+fastapi
+pymongo
+requests
+ruamel.yaml
+python-neutronclient
+paramiko
+traceback
+jinja2_ansible_filters

@@ -1,0 +1,8 @@
+---
+- hosts: all
+  tasks:
+  - name: starting ue process in a screen shell
+    shell: |
+       screen -S sim_{{ confvar.sim_id }} -d -m bash -c '/root/UERANSIM/build/nr-ue -c {{ confvar.conf_file }}'
+       sleep 1
+...

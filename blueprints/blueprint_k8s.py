@@ -282,7 +282,7 @@ class K8s(BlueprintBase):
         configurator.add_worker_label(workers_to_label)
         return configurator.dump()
 
-    def del_worker(self, msg: dict) -> list:
+    def del_worker(self, msg: dict) -> List[str]:
         logger.info("Deleting worker from K8S blueprint " + str(self.get_id()))
         nsi_to_delete = []
         for area in msg['del_areas']:
@@ -317,7 +317,7 @@ class K8s(BlueprintBase):
 
         return nsi_to_delete
 
-    def add_worker(self, msg: dict) -> list:
+    def add_worker(self, msg: dict) -> List[str]:
         logger.info("Adding worker to K8S blueprint " + str(self.get_id()))
         nsd_names = []
         for area in msg['add_areas']:

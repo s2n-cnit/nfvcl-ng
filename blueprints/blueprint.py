@@ -295,6 +295,11 @@ class BlueprintBase(abc.ABC):
         else:
             return next((item for item in pdus if item['area'] == area), None)
 
+    def topology_get_pdu_by_area_and_type(self, area_id: str, pdu_type: str) -> dict:
+        topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
+        pdus = topology.get_pdus()
+        return next((item for item in pdus if item['area'] == area_id and item['type'] == pdu_type), None)
+
     def topology_get_vim_by_area(self, area):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         if type(area) is dict:
@@ -340,7 +345,7 @@ class BlueprintBase(abc.ABC):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         return topology.release_ranges(self.get_id())
 
-    def get_vim_name(self, area: Union[List[int], List[dict]]) -> str:
+    def get_vim_name(self, area: Union[int, dict]) -> str:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         if type(area) == int:
             return topology.get_vim_name_from_area_id(area)

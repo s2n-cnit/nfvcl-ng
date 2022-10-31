@@ -6,11 +6,9 @@ import time
 import subprocess
 import traceback
 from typing import List
-from blueprints.db_blue_model import DbBlue
 from utils import persistency
-from blueprints import BlueprintBase
+from blueprints import BlueprintBase, DbBlue, ShortBlueModel, DetailedBlueModel
 from nfvo import NbiUtil, get_nsd_name
-from .rest_blue import ShortBlueModel, DetailedBlueModel
 from utils.util import *
 
 logger = create_logger('BlueLCMWorker')

@@ -16,3 +16,6 @@ pnf_manager = PNFmanager()
 
 Process(target=topology_worker, args=(db, nbiUtil, topology_msg_queue, topology_lock)).start()
 # topology = Topology.from_db(db=db, nbiutil=nbiUtil)
+
+blueprint_type_catalog = []
+pdu_type_catalog = []

@@ -1,6 +1,5 @@
 import datetime
 import json
-# import pickle
 import queue
 import threading
 import time
@@ -8,12 +7,10 @@ import subprocess
 import traceback
 from typing import List
 from blueprints.db_blue_model import DbBlue
-# from bson.binary import Binary
 from utils import persistency
-from blueprints.blueprint import BlueprintBase
-from nfvo.nsd_manager import get_nsd_name
-from nfvo.osm_nbi_util import NbiUtil
-from models.rest_blue import ShortBlueModel, DetailedBlueModel
+from blueprints import BlueprintBase
+from nfvo import NbiUtil, get_nsd_name
+from .rest_blue import ShortBlueModel, DetailedBlueModel
 from utils.util import *
 
 logger = create_logger('BlueLCMWorker')
@@ -22,40 +19,7 @@ db = persistency.db()
 
 
 def get_blue_by_filter(blue_filter: dict) -> List[DbBlue]:
-    """res = []
-    for element in db.find_DB("blueprint_slice_intent", blue_filter):
-
-        try:
-            res.append(pickle.loads(element['blueprint_object']))
-        except pickle.UnpicklingError as e:
-            logger.error("UnpicklingError")
-            logger.error(e)
-            # normal, somewhat expected
-            continue
-        except (AttributeError, EOFError, ImportError, IndexError) as e:
-            # secondary errors
-            logger.error(e)
-            logger.debug("deleting non-working blue instance {}".format(element['id']))
-            db.delete_DB("blueprint_slice_intent", {'id': element['id']})
-            continue
-        except Exception as e:
-            # everything else, possibly fatal
-            logger.error("General Error")
-            logger.error(e)
-            raise ValueError("general error in deplicking blue")
-    return res"""
     return db.find_DB("blueprint-instances", blue_filter)
-
-
-"""def unpickle_one_blue_by_id(blue_id):
-    pickle_blues = get_blue_by_filter({"id": blue_id})
-    if not pickle_blues:
-        logger.info('deleting item {} in blueprint-instances collection'.format(blue_id))
-        db.delete_DB("blueprint-instances", {'conf.blueprint_instance_id': blue_id})
-        raise ValueError('Blue {} not available'.format(blue_id))
-    if len(pickle_blues) > 1:
-        raise ValueError("found more than one blue with the same id!!")
-    return pickle_blues[0]"""
 
 
 class LCMWorkers:

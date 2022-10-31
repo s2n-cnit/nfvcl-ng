@@ -1,11 +1,9 @@
 from utils.util import *
 from blueprints import LCMWorkers
-from nfvo.pnf_manager import PNFmanager
-from nfvo.osm_nbi_util import NbiUtil
+from nfvo import PNFmanager, NbiUtil
 from multiprocessing import Process
 from utils import persistency
-from topology.worker import topology_worker
-from topology.topology import topology_lock, topology_msg_queue
+from topology import topology_worker, topology_lock, topology_msg_queue
 
 
 logger = create_logger('Main')

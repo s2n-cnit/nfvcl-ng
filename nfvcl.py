@@ -1,13 +1,12 @@
 #!/usr/bin/python3
 
 from main import *
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI
 from rest_endpoints.topology import topology_router
 from rest_endpoints.blue import blue_router
 from rest_endpoints.day2action import day2_router
 from rest_endpoints.k8s import k8s_router
 from fastapi.staticfiles import StaticFiles
-# from utils.helm_repository import helm_url_prefix
 
 
 logger = create_logger('NFVCL')
@@ -21,19 +20,10 @@ api.add_resource(pduAPI, '/nfvcl/api/pdu')
 api.add_resource(pnfAPI, '/nfvcl/api/pnf')
 api.add_resource(vimAPI, '/nfvcl/api/vim')
 # api.add_resource(k8sAPI, '/nfvcl/api/k8s')
-# api.add_resource(TopologyAPI, '/nfvcl/api/topology')
 api.add_resource(UeDbAPI, '/nfvcl/api/uedb')
-# api.add_resource(BlueAPI, '/nfvcl/api/blue')
 api.add_resource(BluetypeAPI, '/nfvcl/api/bluetype')
 api.add_resource(BlueMetrics, '/nfvcl/bluemetrics')
 
-# service rest interfaces
-# api.add_resource(RequestFile, '/nfvcl_day2/<string:file_type>/<string:file_id>')
-api.add_resource(HelmRepo, helm_url_prefix + '<string:chart_type>/<string:chart_file>')
-api.add_resource(HelmIndex, helm_url_prefix + '<string:file>')
-api.add_resource(HelmOnboard, helm_url_prefix)
-# api.add_resource(Actions, '/nfvcl_day2/actions')
-api.add_resource(NfvoRESTcallback, '/nfvcl/callback')
 api.add_resource(VoApi, '/nfvcl/vo')  # /<string:arg>
 """
 

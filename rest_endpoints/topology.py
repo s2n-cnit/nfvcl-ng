@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
-from models.rest_topology import TopologyModel, VimModel, NetworkModel, RouterModel, UpdateVimModel, PduModel, K8sModel
-from models.rest_callback import RestAnswer202, CallbackRequest
+from topology.rest_topology_model import TopologyModel, VimModel, NetworkModel, RouterModel, UpdateVimModel, PduModel
+from rest_endpoints.rest_callback import RestAnswer202, CallbackRequest
 from rest_endpoints.nfvcl_callback import callback_router
 from topology.topology import Topology, topology_msg_queue, topology_lock
 from main import db, nbiUtil

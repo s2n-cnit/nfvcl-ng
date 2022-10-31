@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
 from blueprints.rest_blue import ShortBlueModel, DetailedBlueModel
-from models.rest_callback import RestAnswer202
+from rest_endpoints.rest_callback import RestAnswer202
 from rest_endpoints.nfvcl_callback import callback_router
 from typing import Union, List
 import datetime

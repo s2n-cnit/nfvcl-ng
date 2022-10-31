@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from main import create_logger
-from models.rest_callback import CallbackModel
+from rest_endpoints.rest_callback import CallbackModel
 
 logger = create_logger("Callback Router")
 

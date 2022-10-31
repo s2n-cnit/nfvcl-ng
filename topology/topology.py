@@ -1,7 +1,7 @@
 from utils.util import create_logger
 from utils.ipam import *
 from topology.vim_terraform import VimTerraformer
-from models.rest_topology import TopologyModel, PduModel, K8sModel
+from topology.rest_topology_model import TopologyModel, PduModel
 from utils.persistency import OSSdb
 from nfvo.osm_nbi_util import NbiUtil
 import typing

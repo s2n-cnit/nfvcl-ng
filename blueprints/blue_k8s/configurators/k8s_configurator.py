@@ -39,69 +39,64 @@ class ConfiguratorK8s(Configurator_Flex):
         if self.role == 'worker':
             ansible_vars = [{'master_key': master_key}]
 
-        self.addPlaybook('config_templates/playbook_kubernetes_common.yaml', vars_=ansible_vars)
+        self.addPlaybook('blueprints/blue_K8s/config_scripts/playbook_kubernetes_common.yaml', vars_=ansible_vars)
 
         if self.role == 'master':
             if args['config']['cni'] == 'flannel':
                 self.addJinjaTemplateFile(
-                    {'template': 'config_templates/k8s_kube_flannel.yaml',
+                    {'template': 'blueprints/blue_K8s/config_scripts/k8s_kube_flannel.yaml',
                      'path': '~/',
                      'transfer_name': "flannel_config_{}.yaml".format(blue_id),
                      'name': "kube_cni.yaml"
                      }, jinja_vars)
             if args['config']['cni'] == 'calico':
                 self.addJinjaTemplateFile(
-                    {'template': 'config_templates/k8s_calico.yaml',
+                    {'template': 'blueprints/blue_K8s/config_scripts/k8s_calico.yaml',
                      'path': '~/',
                      'transfer_name': "calico_config_{}.yaml".format(blue_id),
                      'name': "kube_cni.yaml"
                      }, jinja_vars)
                 self.addJinjaTemplateFile(
-                    {'template': 'config_templates/k8s_calico_custom.yaml',
+                    {'template': 'blueprints/blue_K8s/config_scripts/k8s_calico_custom.yaml',
                      'path': '~/',
                      'transfer_name': "calico_config_{}.yaml".format(blue_id),
                      'name': "kube_calico_custom.yaml"
                      }, jinja_vars)
 
             self.addJinjaTemplateFile(
-                {'template': 'config_templates/k8s_metallb_manifest.yaml',
+                {'template': 'blueprints/blue_K8s/config_scripts/k8s_metallb_manifest.yaml',
                  'path': '~/',
                  'transfer_name': "metallb_manifest_{}.yaml".format(blue_id),
                  'name': "metallb_manifest.yaml"
                  }, jinja_vars)
             self.addJinjaTemplateFile(
-                {'template': 'config_templates/metallb_config.yaml',
+                {'template': 'blueprints/blue_K8s/config_scripts/metallb_config.yaml',
                  'path': '~/',
                  'transfer_name': "metallb_config_{}.yaml".format(blue_id),
                  'name': "metallb_config.yaml"
                  }, jinja_vars)
             self.addJinjaTemplateFile(
-                {'template': 'config_templates/k8s_openebs_operator.yaml',
+                {'template': 'blueprints/blue_K8s/config_scripts/k8s_openebs_operator.yaml',
                  'path': '~/',
                  'transfer_name': "openebs_operator_{}.yaml".format(blue_id),
                  'name': "openebs_operator.yaml"
                  }, jinja_vars)
             self.addJinjaTemplateFile(
-                {'template': 'config_templates/k8s_default_storageclass.yaml',
+                {'template': 'blueprints/blue_K8s/config_scripts/k8s_default_storageclass.yaml',
                  'path': '~/',
                  'transfer_name': "default_storageclass_{}.yaml".format(blue_id),
                  'name': "default_storageclass.yaml"
                  }, jinja_vars)
             self.addJinjaTemplateFile({
-                'template': 'config_templates/k8s_regcred.yaml',
+                'template': 'blueprints/blue_K8s/config_scripts/k8s_regcred.yaml',
                 'path': '~/',
                 'transfer_name': "regcred_{}.yaml".format(blue_id),
                 'name': "regcred.yaml"
             }, jinja_vars)
-            self.appendPbTasks('config_templates/playbook_kubernetes_master.yaml')
-            # self.appendPbTasks('config_templates/playbook_kubernetes_master.yaml')
+            self.appendPbTasks('blueprints/blue_K8s/config_scripts/playbook_kubernetes_master.yaml')
 
         if self.role == 'worker':
-            self.appendPbTasks('config_templates/playbook_kubernetes_worker.yaml')
-
-    #    def get_k8s_master_keys(self, stdout):
-    #    logger.info(stdout)
-    #    pass
+            self.appendPbTasks('blueprints/blue_K8s/config_scripts/playbook_kubernetes_worker.yaml')
 
     def add_worker_label(self, workers_to_label):
         self.resetPlaybook()

@@ -1,0 +1,8 @@
+---
+- hosts: all
+  tasks:
+  - name: starting upf
+    shell: |
+        systemctl status open5gs-upfd.service
+        sleep 1
+...

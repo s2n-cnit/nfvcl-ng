@@ -7,7 +7,7 @@ import time
 import subprocess
 import traceback
 from typing import List
-from models.db_blue import DbBlue
+from blueprints.db_blue_model import DbBlue
 # from bson.binary import Binary
 from utils import persistency
 from blueprints.blueprint import BlueprintBase
@@ -76,14 +76,14 @@ class LCMWorkers:
         thread.start()
 
     @staticmethod
-    def get_blue_detailed_summary(blue_filter: dict) -> List[DetailedBlueModel]:
+    def get_blue_detailed_summary(blue_filter: dict) -> List[dict]:
         blues = get_blue_by_filter(blue_filter)
         # logger.debug(blues)
         # return [item.print_detailed_summary() for item in blues]
         return [DetailedBlueModel.parse_obj(item) for item in blues]
 
     @staticmethod
-    def get_blue_short_summary(blue_filter: dict) -> List[ShortBlueModel]:
+    def get_blue_short_summary(blue_filter: dict) -> List[dict]:
         blues = get_blue_by_filter(blue_filter)
 
         return [ShortBlueModel.parse_obj(
@@ -460,8 +460,6 @@ class BlueLCMworker:
 
             nsi_id = osm_ns['nsi_id'] if 'nsi_id' not in p else p['nsi_id']
             
-            # r = nbiUtil.execute_primitive(nsi_id, p['member-vnfd-id'], p['primitive'], {p['param_key']: p[
-            # 'param_value']})
             r = nbiUtil.execute_primitive(nsi_id, p['primitive_data'])
 
             results.append({"result": r, "primitive": p, "time": datetime.datetime.now()})

@@ -1,0 +1,122 @@
+---
+
+- hosts: all
+  become: yes
+  ##gather_facts: no
+  #vars:
+    #- trex_version: latest
+    # just to check I added terraform file
+    #- trex_release_url: https://releases.hashicorp.com/terraform/1.0.9/terraform_1.0.9_linux_amd64.zip
+    #- trex_release_url: https://trex-tgn.cisco.com/trex/release/{{ trex_version }}
+    #- trex_version: v2.92
+    # the link of nfs upload folder
+#    - trex_release_url: http://192.168.17.60/ftp/upload/trex/{{ trex_version }}.tar.gz
+    #- trex_release_url: http://130.251.17.44:8000/trex/{{ trex_version }}.tar.gz
+    #- trex_release_url: https://trex-tgn.cisco.com/trex/release/{{ trex_version }}.tar.gz
+#    - trex_path_client: /opt/trex-{{ trex_version }}
+
+  tasks:
+
+    - name: update repisotory
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+    # pre-requirements for debian
+    #- name: install kernel headers on debian based systems
+     # apt:
+        # for specify kernel we use {{ }}
+      #  name: linux-header-{{ ansible_kernel }}
+       # state: present
+        #update_cache: yes
+
+    - name: install build-essential
+      apt:
+        name: build-essential
+        state: present
+
+    - name: install python3-distutils
+      apt:
+        name: python3-distutils
+        state: present
+        update_cache: yes
+
+    # I think doesnt need
+    # no it must be presented otherwise we will have error
+    - name: create trex folder
+      file:
+        path: /opt/trex-v2.92
+        state: directory
+
+    - name: install unzip
+      package:
+        name: unzip
+
+    - name: install trex on local machine
+      unarchive:
+        src: http://192.168.17.60/ftp/upload/trex/v2.92.tar.gz
+        dest: /opt/trex-v2.92
+        remote_src: yes
+        mode: 0755
+        owner: root
+        group: root
+
+    - name: Copy trex config files from httpserver
+      get_url:
+        url: http://192.168.17.60/ftp/upload/trex/trex_cfg.yaml
+        dest: /etc
+        force: yes
+        owner: root
+        group: root
+        mode: 0777
+
+    - name: Copy cap config files from httpserver
+      get_url:
+        url: http://192.168.17.60/ftp/upload/trex/http_simple_mirej.yaml
+#        dest: /opt/trex-{{ trex_version }}/{{ trex_version }}/cap2
+        dest: /opt/trex-v2.92/v2.92/cap2
+        force: yes
+        owner: root
+        group: root
+        mode: 0777
+
+    - name: Copy cap config files from httpserver
+      get_url:
+        url: http://192.168.17.60/ftp/upload/trex/sfr.yaml
+#        dest: /opt/trex-{{ trex_version }}/{{ trex_version }}/cap2
+        dest: /opt/trex-v2.92/v2.92/cap2
+        force: yes
+        owner: root
+        group: root
+        mode: 0777
+
+    # Set not permanent ip address
+    - name: Set temporary Net1 Ip address
+      shell: ifconfig ens4 10.0.10.195 netmask 255.255.255.0
+      args:
+#        chdir:  /opt/trex-{{ trex_version }}/{{ trex_version }}
+        chdir:  /opt/trex-v2.92/v2.92
+
+    - name: Set temporary Net2 Ip address
+      shell: ifconfig ens5 10.0.11.35 netmask 255.255.255.0
+
+    # added vars from ansible_vars (run_duration, cap2_name) list of dictionaries.
+    - name: run trex scritps
+      shell: nohup ./t-rex-64  --cfg /etc/trex_cfg.yaml -f cap2/{{ cap2_name }} -d {{ run_duration }} –m 1 –c 1 –k 5 --nc > first_run_logs.txt
+      args:
+        chdir: /opt/trex-v2.92/v2.92
+
+    # this works but now removed to check the vars
+#    - name: run trex scritps
+#      shell: nohup ./t-rex-64  --cfg /etc/trex_cfg.yaml -f cap2/http_simple_mirej.yaml -d 10 –m 1 –c 1 –k 5 --nc > first_run_logs.txt
+#      args:
+##        chdir:  /opt/trex-{{ trex_version }}/{{ trex_version }}
+#        chdir:  /opt/trex-v2.92/v2.92
+
+    - name: get trex results file
+      shell: cat /opt/trex-v2.92/v2.92/first_run_logs.txt
+      register: trex_results_file
+#
+    - name: return trex results
+      debug:
+        msg: "{{ trex_results_file }}"

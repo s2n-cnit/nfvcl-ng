@@ -6,17 +6,14 @@ from typing import Union, List
 import datetime
 import importlib
 import traceback
-# import pickle
 from threading import Thread
-from models.free5gck8_blue_create_model import Request4G5GBlueprintInstanceFree5Gc
-from models.blue_k8s_model import K8sBlueprintCreate
-from models.amari5g_blue_create_model import Request4G5GBlueprintInstance
-from models.mqttbroker_blue_create_model import MqttRequestBlueprintInstance
-from models.trex_blue_create_model import TrexRequestBlueprintInstance
-from models.blue_ueransim_model import UeranSimBlueprintRequestInstance
-from models.vo_blue_create_model import VoBlueprintRequestInstance
-from topology.topology import Topology
-from blueprints.blueprint import BlueprintBase
+from blueprints.blue_k8s.models import K8sBlueprintCreate, K8sBlueprintScale
+from blueprints.blue_5g_base.models import Create5gModel
+from blueprints.blue_mqtt.models import MqttRequestBlueprintInstance
+from blueprints.blue_trex.models import TrexRequestBlueprintInstance
+from blueprints.blue_ueransim.models import UeranSimBlueprintRequestInstance
+from blueprints.blue_vo.models import VoBlueprintRequestInstance
+from blueprints import BlueprintBase
 from main import *
 
 
@@ -100,44 +97,23 @@ async def get_blueprint(
 @blue_router.post('/', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
 def create_blueprint(
         msg: Union[
-            Request4G5GBlueprintInstanceFree5Gc,
+            Create5gModel,
             K8sBlueprintCreate,
-            Request4G5GBlueprintInstance,
             MqttRequestBlueprintInstance,
             TrexRequestBlueprintInstance,
             UeranSimBlueprintRequestInstance,
             VoBlueprintRequestInstance]
 ):
-    logger.debug('blueAPI post')
+    # logger.debug('blueAPI post')
     blue_id = id_generator()
-    logger.debug(msg)
-    logger.debug(type(msg))
-    # select the Blueprint type
-    if 'category' in msg:
-        blueprints = db.find_DB("blueprints", {'category': msg.category})
-        CandidateBlue = next((item for item in blueprints if (set(msg.flavors) <= set(item['flavors']['hard']))),
-                             None)
-    else:
-        CandidateBlue = db.findone_DB("blueprints", {'id': msg.type})
+
+    CandidateBlue = db.findone_DB("blueprints", {'id': msg.type})
 
     if CandidateBlue is None:
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': 'no Blueprints are satisfying the request'}
         raise HTTPException(status_code=406, detail=data)
     logger.info("Candidate Blueprint {} selected".format(CandidateBlue['id']))
-
-    """msg_areas = set()
-    
-    for area in msg.areas:
-        msg_areas.add(area)
-        
-    topo = Topology.from_db(db, nbiUtil, topology_lock)
-    topo_areas = dict(topo.get_areas())
-    
-    if not msg_areas.issubset(topo_areas):
-        data = {'status': 'error', 'resource': 'blueprint',
-                'description': 'Areas {} not defined in the topology'.format(msg_areas.difference(topo_areas))}
-        raise HTTPException(status_code=406, detail=data)"""
 
     # start async operations
     thread = Thread(target=instantiate_blueprint, args=(msg.dict(), blue_id, CandidateBlue,))
@@ -148,7 +124,7 @@ def create_blueprint(
 
 
 @blue_router.put('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def modify_blueprint(msg: dict, blue_id: str):
+def modify_blueprint(msg: Union[K8sBlueprintScale], blue_id: str):
     # assign a session id
     session_id = id_generator()
     try:

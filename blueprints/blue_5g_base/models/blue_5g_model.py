@@ -86,7 +86,7 @@ class FiveGAreaInfo(BaseModel):
     slices: List[Five5SliceRef]
 
 
-class Free5gck8sBlueCreateModel(BaseModel):
+class Create5gModel(BaseModel):
     type: Literal['5G']
     callbackURL: Optional[HttpUrl] = Field(
         '',

@@ -7,7 +7,7 @@ import requests
 import nfvo.osm_nbi_util
 from utils.prometheus_manager import PrometheusMan
 from nfvo.osm_nbi_util import nsd_build_package
-from models.db_blue import DbBlue
+from blueprints.db_blue_model import DbBlue
 from typing import List, Dict, Union
 import traceback
 import importlib

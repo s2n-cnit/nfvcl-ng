@@ -1,0 +1,2 @@
+screen -S amari_exporter -d -m bash -c "python3 amari_exporter.py"
+sleep 1

@@ -1,5 +1,5 @@
 from utils.util import *
-from blueprints.blue_lcm import LCMWorkers
+from blueprints import LCMWorkers
 from nfvo.pnf_manager import PNFmanager
 from nfvo.osm_nbi_util import NbiUtil
 from multiprocessing import Process

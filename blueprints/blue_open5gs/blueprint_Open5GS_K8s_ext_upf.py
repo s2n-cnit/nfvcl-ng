@@ -79,7 +79,7 @@ class Open5GS_K8s_ext_upf(Blue5GBase, ABC):
         if self.vim_core is None:
             raise ValueError('Vim CORE not found in the input')
 
-    def set_coreVnfd(self, area: str, vls=None) -> None:
+    def set_core_vnfd(self, area: str, vls=None) -> None:
         vnfd = sol006_VNFbuilder({
             'id': '{}_5gc'.format(self.get_id()),
             'name': '{}_5gc'.format(self.get_id()),
@@ -117,11 +117,11 @@ class Open5GS_K8s_ext_upf(Blue5GBase, ABC):
     # def setVnfd(self, area: str, tac: int = 0, vls: list = None, pdu: dict = None) -> None:
     # def getVnfd(self, area: str, tac=None) -> list:
 
-    def getVnfd(self, area: str, tac: typing.Optional[str] =None) -> list:
+    def get_vnfd(self, area: str, area_id: typing.Optional[str] =None) -> list:
         if area == "upf":
             logger.debug(self.vnfd['upf'])
             return self.vnfd['upf']
-        return super().getVnfd(area, tac)
+        return super().get_vnfd(area, area_id)
 
     def core_nsd(self) -> str:
         logger.info("Creating Core NSD(s)")
@@ -130,7 +130,7 @@ class Open5GS_K8s_ext_upf(Blue5GBase, ABC):
             {'vld': 'data', 'vim_net': core_v['wan']['id'], 'name': 'ens4', "mgt": True, 'k8s-cluster-net': 'data_net'}
         ]
 
-        self.setVnfd('core', vls=vim_net_mapping)
+        self.set_vnfd('core', vls=vim_net_mapping)
         param = {
             'name': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
             'id': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
@@ -184,7 +184,7 @@ class Open5GS_K8s_ext_upf(Blue5GBase, ABC):
                            "additionalParams": self.running_open5gs_conf }]
         }]
         logger.info('core kdu_configs: {}'.format(kdu_configs))
-        n_obj = sol006_NSD_builder(self.getVnfd('core'), core_v, param, vim_net_mapping, knf_configs=kdu_configs)
+        n_obj = sol006_NSD_builder(self.get_vnfd('core'), core_v, param, vim_net_mapping, knf_configs=kdu_configs)
         nsd_item = n_obj.get_nsd()
         nsd_item['vld'] = vim_net_mapping
         self.nsd_.append(nsd_item)
@@ -205,7 +205,7 @@ class Open5GS_K8s_ext_upf(Blue5GBase, ABC):
             {'vld': 'mgt', 'vim_net': vim['mgt'], "mgt": True},
             {'vld': 'datanet', 'vim_net': vim['wan']['id'], "mgt": False}
         ]
-        n_obj = sol006_NSD_builder(self.getVnfd('upf', tac['id']), vim, param, vim_net_mapping)
+        n_obj = sol006_NSD_builder(self.get_vnfd('upf', tac['id']), vim, param, vim_net_mapping)
         nsd_item = n_obj.get_nsd()
         nsd_item['tac'] = tac['id']
         nsd_item['vld'] = vim_net_mapping
@@ -373,7 +373,7 @@ class Open5GS_K8s_ext_upf(Blue5GBase, ABC):
                     logger.info('(UPF)Setting IP addresses for RAN nsi for TAC {} on VIM {}'.format(tac['id'], vim['name']))
 
                     # retrieving vlds from the vnf
-                    vnfd = self.getVnfd('tac', tac['id'])[0]
+                    vnfd = self.get_vnfd('tac', tac['id'])[0]
                     vld_names = [i['vld'] for i in vnfd['vl']]
                     vlds = get_ns_vld_ip(n['nsi_id'], vld_names)
 

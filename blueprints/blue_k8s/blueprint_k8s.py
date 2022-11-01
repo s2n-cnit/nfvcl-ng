@@ -1,11 +1,8 @@
-from blueprints.blueprint import BlueprintBase
-from blueprints.blueprint_utils import parse_ansible_output
-from configurators.k8s_configurator import ConfiguratorK8s
-from nfvo.vnf_manager import sol006_VNFbuilder
-from nfvo.nsd_manager import sol006_NSD_builder, get_ns_vld_ip
+from blueprints import BlueprintBase, parse_ansible_output
+from . import ConfiguratorK8s
+from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from typing import Union, List, Dict, Optional
 import traceback
-
 from main import *
 
 db = persistency.db()
@@ -54,7 +51,7 @@ class K8s(BlueprintBase):
         if core_area:
             self.conf['config']['core_area'] = core_area
         else:
-            raise ValueError('Vim CORE not found in the input')
+            raise ValueError('Core area not found in the input')
 
     def bootstrap_day0(self, msg: dict) -> list:
         self.topology_terraform(msg)

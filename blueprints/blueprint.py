@@ -97,29 +97,14 @@ class BlueprintBase(abc.ABC):
         self.db.delete_DB("blueprint-instances", {'id': self.id})
 
     def to_db(self):
-        data = {
-            'id': self.conf["blueprint_instance_id"],
-            'conf': self.conf,
-            'input_conf': self.input_conf,
-            'nsd_': self.nsd_,
-            'vnf_configurator': self.vnf_configurator,
-            'primitives': self.primitives,
-            'action_to_check': self.action_to_check,
-            'timestamp': self.timestamp,
-            'config_len': self.config_len,
-            'created': self.created,
-            'status': self.status,
-            'detailed_status': self.detailed_status,
-            'current_operation': self.current_operation,
-            'modified': datetime.datetime.now(),
-            'supported_operations': self.supported_operations,
-            'type': self.blue_type,
-            'pdu': self.pdu,
-            'vnfd': self.vnfd
-        }
-        data['id'] = self.conf["blueprint_instance_id"]
+        data = {'id': self.conf["blueprint_instance_id"], 'conf': self.conf, 'input_conf': self.input_conf,
+                'nsd_': self.nsd_, 'vnf_configurator': self.vnf_configurator, 'primitives': self.primitives,
+                'action_to_check': self.action_to_check, 'timestamp': self.timestamp, 'config_len': self.config_len,
+                'created': self.created, 'status': self.status, 'detailed_status': self.detailed_status,
+                'current_operation': self.current_operation, 'modified': datetime.datetime.now(),
+                'supported_operations': self.supported_operations, 'type': self.blue_type, 'pdu': self.pdu,
+                'vnfd': self.vnfd}
         data_serialized = json.loads(DbBlue.parse_obj(data).json())
-        #.dict(by_alias=True)
         if self.db.exists_DB("blueprint-instances", {'id': self.conf["blueprint_instance_id"]}):
 
             self.db.update_DB("blueprint-instances", data_serialized,
@@ -131,11 +116,11 @@ class BlueprintBase(abc.ABC):
     def get_id(self) -> str:
         return self.conf["blueprint_instance_id"]
 
-    def set_topology_lock(self, topo_lock):
+    def set_topology_lock(self, topo_lock) -> None:
         self.topology_lock = topo_lock
 
-    def get_operation_methods(self, operation: str) -> Dict[str, List]:
-        return self.supported_operations.get(operation) if hasattr(self, "supported_operations") else {}
+    def get_operation_methods(self, operation: str) -> List[Dict[str, List]]:
+        return self.supported_operations.get(operation) if hasattr(self, "supported_operations") else []
 
     def get_supported_operations(self) -> List[str]:
         if hasattr(self, "supported_operations"):
@@ -144,7 +129,7 @@ class BlueprintBase(abc.ABC):
             return []
 
     def build_packages(self, nsd_names) -> list:
-        logger.info("Building " + str(len(self.nsd_)) + " nsd package elk_files")
+        logger.info("Blue {} - Building " + str(len(self.nsd_)) + " nsd package".format(self.get_id()))
         res = []
         for n in self.nsd_:
             logger.debug(n['status'])
@@ -157,7 +142,8 @@ class BlueprintBase(abc.ABC):
                 continue
 
             if n['status'] != 'day0':
-                logger.error("the state of nsd {} is {}: aborting !".format(name, n['status']))
+                logger.error("Blue {} -  the state of nsd {} is {}: aborting !"
+                             .format(self.get_id(), name, n['status']))
                 raise ValueError('NSD {} not in Day0 state'.format(name))
 
             nsd_build_package(name, n['descr'])
@@ -323,10 +309,12 @@ class BlueprintBase(abc.ABC):
         for a in areas:
             if type(a) == int:
                 vims.add(topology.get_vim_name_from_area_id(a))
-                logger.debug("for area {} the following vims have been selected: {}".format(a, vims))
+                logger.debug("Blue {} - for area {} the following vims have been selected: {}"
+                             .format(self.get_id(), a, vims))
             else:
                 vims.add(topology.get_vim_name_from_area_id(a['id']))
-                logger.debug("for area {} the following vims have been selected: {}".format(a['id'], vims))
+                logger.debug("Blue {} - for area {} the following vims have been selected: {}"
+                             .format(self.get_id(), a['id'], vims))
         topology.del_network(net, list(vims), terraform=True)
         topology.save_topology()
 

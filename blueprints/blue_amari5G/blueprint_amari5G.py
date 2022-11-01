@@ -2,7 +2,6 @@ import typing
 from blueprints.blueprint import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
 from configurators.amari5GC_configurator import Configurator_Amari5GC
-from abc import ABC
 from nfvo.vnf_manager import sol006_VNFbuilder
 from nfvo.nsd_manager import sol006_NSD_builder, get_ns_vld_ip
 from main import *
@@ -13,7 +12,7 @@ nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_
 logger = create_logger('Amari5GBlue')
 
 
-class Amari5G(Blue5GBase, ABC):
+class Amari5G(Blue5GBase):
     def __init__(self, conf: dict, id_: str, data: typing.Union[typing.Dict, None] = None) -> None:
         BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         logger.info("Creating Amari5G Blueprint")
@@ -60,7 +59,7 @@ class Amari5G(Blue5GBase, ABC):
         if self.vim_core is None:
             raise ValueError('Vim CORE not found in the input')
 
-    def set_coreVnfd(self, area: str, vls=None) -> None:
+    def set_core_vnfd(self, area: str, vls=None) -> None:
         vnfd = sol006_VNFbuilder({
             'username': 'root',
             'password': 'root',
@@ -77,41 +76,8 @@ class Amari5G(Blue5GBase, ABC):
         self.vnfd['core'].append({'id': 'vnfd', 'name': vnfd.get_id(), 'vl': vls})
         logger.info(self.vnfd)
 
-    def set_edgeVnfd(self, area: str, tac: int = 0, vim: dict = None) -> None:
+    def set_edge_vnfd(self, area: str, tac: int = 0, vim: dict = None) -> None:
         pass
-
-    def setVnfd(self, area: str, tac: int = 0, vls: list = None, pdu: dict = None) -> None:
-        logger.info("setting VNFd for " + area)
-        if area == "core":
-            self.set_coreVnfd(area, vls=vls)
-        if area == 'tac':
-            if tac is None:
-                raise ValueError("tac is None in set Vnfd")
-            list_ = []
-
-            vnfd = sol006_VNFbuilder({
-                'id': str(self.get_id()) + '_' + pdu['implementation'] + "_tac" + str(tac) + '_enb',
-                'name': pdu['implementation'] + "_tac" + str(tac) + '_enb_pnfd',
-                'pdu': [{
-                    'count': 1,
-                    'id': pdu['name'],
-                    'interface': pdu['interface']
-                # }]})
-                }]}, charm_name='helmflexvnfm')
-            list_.append({'id': 'enb_vnfd', 'name': vnfd.get_id(), 'vl': pdu['interface']})
-            self.vnfd['tac'].append({'tac': tac, 'vnfd': list_})
-
-    def getVnfd(self, area: str, tac: typing.Optional[str] =None) -> list:
-        if area == "core":
-            logger.debug(self.vnfd['core'])
-            return self.vnfd['core']
-        if area == "tac":
-            if tac is None:
-                raise ValueError("tac is None in getVnfd")
-            tac_obj = next((item for item in self.vnfd['tac'] if item['tac'] == tac), None)
-            if tac_obj is None:
-                raise ValueError("tac not found in getting Vnfd")
-            return tac_obj['vnfd']
 
     def core_nsd(self) -> str:
         logger.info("Creating Core NSD(s)")
@@ -120,13 +86,13 @@ class Amari5G(Blue5GBase, ABC):
             {'vld': 'mgt', 'vim_net': core_v['mgt'], 'name': 'ens3', "mgt": True},
             {'vld': 'data', 'vim_net': core_v['wan']['id'], 'name': 'ens4', "mgt": False}
         ]
-        self.setVnfd('core', vls=vim_net_mapping)
+        self.set_vnfd('core', vls=vim_net_mapping)
         param = {
             'name': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
             'id': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
             'type': 'core'
         }
-        n_obj = sol006_NSD_builder(self.getVnfd('core'), core_v, param, vim_net_mapping)
+        n_obj = sol006_NSD_builder(self.get_vnfd('core'), core_v, param, vim_net_mapping)
         nsd_item = n_obj.get_nsd()
         nsd_item['vld'] = vim_net_mapping
         self.nsd_.append(nsd_item)
@@ -135,10 +101,6 @@ class Amari5G(Blue5GBase, ABC):
     def edge_nsd(self, tac:dict, vim: dict) -> typing.List[str]:
         """Override method"""
         return []
-
-    def check_tacs(self, msg: dict) -> bool:
-        # FIXME to be implemented
-        return False
 
     def update_recursive(self, dict1, dict2):
         '''
@@ -198,8 +160,6 @@ class Amari5G(Blue5GBase, ABC):
 
     def add_tac_nsd(self, msg: dict) -> typing.List[str]:
         # update current blue config with new data. The "pending" status is reflected in self.nsd_ status
-        if self.check_tacs(msg):
-            raise ValueError('TACs in msg already exist')
         self.update_confvims(msg['vims'])
         nsd_names = []
         for v in msg['vims']:
@@ -209,9 +169,6 @@ class Amari5G(Blue5GBase, ABC):
                     edge_n = self.edge_nsd(b, v)
                     nsd_names.extend(edge_n)
         return nsd_names
-
-    def edge_day2_conf(self, arg: dict, nsd_item: dict) -> typing.List[str]:
-        pass
 
     def add_tac_conf(self, msg: dict) -> list:
         res = []
@@ -235,23 +192,15 @@ class Amari5G(Blue5GBase, ABC):
     def del_tac_conf(self, msg: dict) -> list:
         pass
 
-    def init_day2_conf(self, msg: dict) -> list:
-        logger.info("Initializing Day2 configurations")
-        logger.debug("init_day2_conf msg: {}".format(msg))
-        res = []
-        self.to_db()
-        for n in self.nsd_:
-            if n['type'] == 'core':
-                # vnfd = self.getVnfd('core')[0]
-                conf_obj = Configurator_Amari5GC(n['descr']['nsd']['nsd'][0]['id'], 1, self.get_id(), self.conf, n['vld'])
-                self.vnf_configurator.append(conf_obj)
-                res += conf_obj.dump()
-            if n['type'] == 'ran':
-                # if self.pnf is False:
-                #    raise ValueError("PNF not supported in this blueprint instance")
-                res += self.ran_day2_conf(msg, n)
-        self.to_db()
-        return res
+    def core_day2_conf(self, arg: dict, nsd_item: dict) -> list:
+        conf_obj = Configurator_Amari5GC(n['descr']['nsd']['nsd'][0]['id'], 1, self.get_id(), self.conf, n['vld'])
+        return [conf_obj.dump()]
+
+    def edge_day2_conf(self, arg: dict, nsd_item: dict) -> list:
+        pass
+
+    def add_ues(self, msg: dict):
+        pass
 
     def add_slice_conf(self, msg: dict) -> list:
         # msg = {conf: {'plmn'=, 'sst'=, 'sd'=, 'qos_flows'=, 'tacs'=[]}}
@@ -278,49 +227,15 @@ class Amari5G(Blue5GBase, ABC):
         core_v = next((item for item in self.conf['vims'] if item['core']), None)
         self.conf['config']['core_wan_ip'] = vlds["data"][0]['ip']
         core_v['core_mgt_ip'] = vlds["mgt"][0]['ip']
-        vnfd = self.getVnfd('core')[0]
+        vnfd = self.get_vnfd('core')[0]
         for vl in vnfd['vl']:
             if vl['vld'] == 'mgt':
                 vl['ip'] = vlds["mgt"][0]['ip'] + '/24'
             if vl['vld'] == 'data':
                 vl['ip'] = vlds["data"][0]['ip'] + '/24'
 
-    def get_ip(self) -> None:
-        logger.info('Getting IP addresses of VNFIs')
-        for n in self.nsd_:
-            if n['type'] == 'core':
-                self.get_ip_core(n)
-
-            if n['type'] == 'ran':
-                try:
-                    vim = next((item for item in self.conf['vims'] if item['name'] == n['vim']), None)
-                    if vim is None:
-                        raise ValueError("get_ip vim is None")
-                    tac = next((item for item in vim['tacs'] if item['id'] == n['tac']), None)
-                    if tac is None:
-                        raise ValueError("get_ip tac is None")
-
-                    logger.info('Setting IP addresses for RAN nsi for TAC {} on VIM {}'.format(tac['id'], vim['name']))
-
-                    # retrieving vlds from the vnf
-                    vnfd = self.getVnfd('tac', tac['id'])[0]
-                    vld_names = [i['vld'] for i in vnfd['vl']]
-                    vlds = get_ns_vld_ip(n['nsi_id'], vld_names)
-
-                    if len(vld_names) == 1:
-                        #this enb has only one interface, by definition it should be labelled as mgt
-                        tac['nb_wan_ip'] = vlds["mgt"][0]['ip']
-                        tac['nb_mgt_ip'] = vlds["mgt"][0]['ip']
-                    elif 'data' in vld_names:
-                        # this enb has a separate data-plane interface
-                        tac['nb_wan_ip'] = vlds["data"][0]['ip']
-                        tac['nb_mgt_ip'] = vlds["mgt"][0]['ip']
-                    else:
-                        raise ValueError('mismatch in the enb interfaces')
-                except Exception as e:
-                    logger.error("Exception in getting IP addresses from RAN nsi: " + str(e))
-                    raise ValueError(str(e))
-        self.to_db()
+    def get_ip_edge(self, ns: dict) -> None:
+        pass
 
     def _destroy(self):
         logger.info("Destroying")

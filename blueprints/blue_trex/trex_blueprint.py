@@ -1,11 +1,9 @@
-from blueprints.blueprint import BlueprintBase
-from utils import persistency
-from blueprints.blueprint_utils import parse_ansible_output
-from configurators.trex_configurator_A import Configurator_trex
-from nfvo.vnf_manager import sol006_VNFbuilder
-from nfvo.nsd_manager import sol006_NSD_builder, get_ns_vld_ip
+from blueprints import BlueprintBase, parse_ansible_output
+from . import Configurator_trex
+from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
+from main import *
 from utils.util import *
-from nfvo.osm_nbi_util import NbiUtil
+from typing import Union, Dict
 
 # Insert functions to work with db(mango db)
 db = persistency.db()
@@ -15,13 +13,14 @@ logger = create_logger('trexBlueprint')
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 
 
-class trex(BlueprintBase):
+class Trex(BlueprintBase):
     """
     The goal of this blueprint is to create TRex virtual machine regarding the input variables. It create and modify the
     configurations files inside the machine and run it.
     """
-    def __init__(self, conf: dict, id_: str, recover: bool) -> None:
-        BlueprintBase.__init__(self, conf, id_)
+
+    def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
+        BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         """
         conf["blueprint_instance_id"] = id_ 
         conf : input configurations
@@ -39,10 +38,11 @@ class trex(BlueprintBase):
         # self.vnfd = {'core': [], 'tac': []}
         self.vnfd = {'core': []}
 
-        # a tuple of input
-        self.vim_core = next((item for item in self.conf['vims'] if item['core']), None)
-        if self.vim_core is None:
-            raise ValueError('Vim CORE not found in the input')
+        core_area = next((item for item in self.conf['areas'] if item['core']), None)
+        if core_area:
+            self.conf['config']['core_area'] = core_area
+        else:
+            raise ValueError('Core area not found in the input')
 
     # day 0 operation to create vnf
     def bootstrap_day0(self, msg: dict) -> list:
@@ -65,7 +65,7 @@ class trex(BlueprintBase):
             "type": "trex"
         }
         vim_net_mapping = [
-            {'vld': 'mgt', 'vim_net': self.vim_core['mgt'], "mgt": True}]
+            {'vld': 'mgt', 'vim_net': self.conf['config']['network_endpoints']['mgt'], "mgt": True}]
 
         """
           I added vim as an input for adding networks numbers
@@ -73,10 +73,10 @@ class trex(BlueprintBase):
         # adding extra nets taking from inputs post message
         # and check if it is in the extra-nets input post message field
         try:
-            for nets in self.vim_core["extra-nets"]:
+            for nets in self.conf['config']['network_endpoints']["data_nets"]:
                 vim_net_mapping.append(
                     {'vld': 'data_{}'.format(nets['name']), 'vim_net': nets['name'], "mgt": False})
-        except:
+        except Exception:
             raise ValueError("Trex needs at least two (or multiplication of 2 ) extra networks defined in extra-nets")
         # First create vnfd for trex
         self.setVnfd('core', vld=vim_net_mapping)
@@ -84,7 +84,9 @@ class trex(BlueprintBase):
         # Second step create NSD using function without template
         # get-id() ==> conf["blueprint_instance_id"]
 
-        n_obj = sol006_NSD_builder(self.getVnfd('core'), self.vim_core, param, vim_net_mapping)
+        n_obj = sol006_NSD_builder(
+            self.getVnfd('core'), self.get_vim_name(self.conf['config']['core_area']), param, vim_net_mapping
+        )
         self.nsd_.append(n_obj.get_nsd())
         nsd_names.append(param["name"])
         # for v in self.conf['vims']:
@@ -112,10 +114,6 @@ class trex(BlueprintBase):
             if vld is None:
                 raise ValueError("vlds are None in setVnfd")
 
-            # interfaces = [{'vld': 'mgt', 'name': 'ens3', "mgt": True}]
-            # interfaces = [{'vld': 'mgt', 'name': 'ens3', "mgt": True},
-            #               {'vld': 'net1', 'name': 'ens4', "mgt": False},
-            #               {'vld': 'net2', 'name': 'ens5', "mgt": False}]
             # Adding interfaces
             interfaces = []
             intf_index = 3  # starting from ens3
@@ -131,11 +129,6 @@ class trex(BlueprintBase):
                 intf_index += 1
 
             logger.info(f"interfaces are: {interfaces}")
-            # imported from nfvo.vnf_manager,
-            # connect to osm(it has usr and pass)
-            # (This part of code never run)if no template is given, it uses predefined templates for vnfd
-            # set the HW required
-            # find length of interfaces and define number of cpu regarding the interface number
             if len(interfaces) < 8:
                 vir_cpu = '8'
             else:
@@ -163,14 +156,6 @@ class trex(BlueprintBase):
         if area == "core":
             logger.debug(self.vnfd['core'])
             return self.vnfd['core']
-        # I can remove this part
-        # if area == "tac":
-        #     if tac is None:
-        #         raise ValueError("tac is None in getVnfd")
-        #     tac_obj = next((item for item in self.vnfd['tac'] if item['tac'] == tac), None)
-        #     if tac_obj is None:
-        #         raise ValueError("tac not found in getting Vnfd")
-        #     return tac_obj['vnfd']
 
     def get_ip(self) -> None:
         logger.debug('getting IP addresses from vnf instances')
@@ -182,7 +167,7 @@ class trex(BlueprintBase):
             vlds = get_ns_vld_ip(n['nsi_id'], ['mgt'])
             self.conf['config']['trex_ip'] = vlds["mgt"][0]['ip']
 
-        self.save_conf()
+        self.to_db()
 
     # Day 2 operations
     def init_trex_day2_conf(self, msg):
@@ -190,15 +175,11 @@ class trex(BlueprintBase):
         res = []
         conf_ = Configurator_trex('trex_' + str(self.get_id()), 1, self.get_id(), self.conf).dump()
         # saving the id of the action because we need to post process its output
-        # self.action_to_check.append(conf_[0]['param_value']['action_id'])
         self.action_to_check.append(conf_[0]['primitive_data']['primitive_params']['config-content'])
         res += conf_
         logger.debug("trex configuration built")
 
-        # allocate IP addresses for the load-balancer service
-        # net_name = self.conf['config']['load_balancer']['id']
-
-        self.save_conf()
+        self.to_db()
         return res
 
     def get_trex_results(self, callback_msg):
@@ -220,7 +201,9 @@ class trex(BlueprintBase):
             # retrieve data from action output
             self.conf['results_file'] = \
                 parse_ansible_output(action_output, playbook_name, 'return trex results', 'msg')['stdout']
-            # self.conf['results_file'] = \
-            #     parse_ansible_output(action_output, playbook_name, 'return trex results', 'msg')
+
             logger.info(f"{self.conf['results_file']}")
-        self.save_conf()
+        self.to_db()
+
+    def _destroy(self):
+        pass

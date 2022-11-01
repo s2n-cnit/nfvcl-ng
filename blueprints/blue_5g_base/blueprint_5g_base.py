@@ -1,8 +1,8 @@
 import importlib
 from typing import List, Optional
 from abc import ABC, abstractmethod
-from blueprints.blueprint import BlueprintBase
-from nfvo.nsd_manager import sol006_NSD_builder
+from blueprints import BlueprintBase
+from nfvo import sol006_NSD_builder, sol006_VNFbuilder, get_ns_vld_ip
 from utils.util import create_logger
 
 # create logger
@@ -11,12 +11,45 @@ logger = create_logger('Abstract5GBlue')
 
 class Blue5GBase(BlueprintBase, ABC):
 
+    def set_vnfd(self, area: str, area_id: int = 0, vls: list = None, pdu: dict = None) -> None:
+        logger.debug("Blue {} - setting VNFd for {}".format(self.get_id(), area))
+        if area == "core":
+            self.set_core_vnfd(area, vls=vls)
+        if area == 'area':
+            if area_id is None:
+                raise ValueError("tac is None in set Vnfd")
+            list_ = []
+
+            vnfd = sol006_VNFbuilder({
+                'id': str(self.get_id()) + '_' + pdu['implementation'] + "_tac" + str(area_id) + '_enb',
+                'name': pdu['implementation'] + "_tac" + str(area_id) + '_enb_pnfd',
+                'pdu': [{
+                    'count': 1,
+                    'id': pdu['name'],
+                    'interface': pdu['interface']
+                    # }]})
+                }]}, charm_name='helmflexvnfm')
+            list_.append({'id': 'enb_vnfd', 'name': vnfd.get_id(), 'vl': pdu['interface']})
+            self.vnfd['area'].append({'tac': area_id, 'vnfd': list_})
+
+    def get_vnfd(self, area: str, area_id: Optional[str] = None) -> list:
+        if area == "core":
+            logger.debug(self.vnfd['core'])
+            return self.vnfd['core']
+        if area == "area":
+            if area_id is None:
+                raise ValueError("Blue {} - area is None in getVnfd".format(self.get_id()))
+            area_obj = next((item for item in self.vnfd['area'] if item['area'] == area_id), None)
+            if area_obj is None:
+                raise ValueError("Blue {} - area not found in getting Vnfd".format(self.get_id()))
+            return area_obj['vnfd']
+
     @abstractmethod
-    def setVnfd(self, area: str, tac: int = 0, vls: list = None, pdu: dict = None) -> None:
+    def set_core_vnfd(self, area: str, vls: list =None) -> None:
         pass
 
     @abstractmethod
-    def getVnfd(self, area: str, tac: Optional[str] = None) -> list:
+    def set_edge_vnfd(self, area: str, vls: list = None) -> None:
         pass
 
     @abstractmethod
@@ -36,7 +69,7 @@ class Blue5GBase(BlueprintBase, ABC):
             raise ValueError('pdu not found for tac ' + str(area['id']))
         logger.info("Blue {} - for area {} pdu {} ({}) selected"
                     .format(self.get_id(), area['id'], pdu['name'], pdu['implementation']))
-        self.setVnfd('tac', area['id'], pdu=pdu)
+        self.set_vnfd('tac', area['id'], pdu=pdu)
 
         param = {
             'name': '{}_NGRAN_{}'.format(self.get_id(), area['id']),
@@ -47,7 +80,7 @@ class Blue5GBase(BlueprintBase, ABC):
             {'vld': 'mgt', 'vim_net': self.conf['config']['network_endpoints']['mgt'], "mgt": True},
             {'vld': 'data', 'vim_net': self.conf['config']['network_endpoints']['wan'], "mgt": False}
         ]
-        n_obj = sol006_NSD_builder(self.getVnfd('tac', area['id']), vim_name, param, vim_net_mapping)
+        n_obj = sol006_NSD_builder(self.get_vnfd('tac', area['id']), vim_name, param, vim_net_mapping)
         nsd_item = n_obj.get_nsd()
         nsd_item['area'] = area['id']
         nsd_item['vld'] = pdu['interface']
@@ -159,62 +192,77 @@ class Blue5GBase(BlueprintBase, ABC):
         return res
 
     @abstractmethod
+    def core_day2_conf(self, arg: dict, nsd_item: dict) -> list:
+        pass
+
+    @abstractmethod
     def edge_day2_conf(self, arg: dict, nsd_item: dict) -> List[str]:
         pass
 
-    @abstractmethod
     def init_day2_conf(self, msg: dict) -> list:
+        logger.debug("Blue {} - Initializing Day2 configurations".format(self.get_id()))
+        res = []
+        tail_res = []
+
+        for n in self.nsd_:
+            if n['type'] == 'core':
+                logger.debug("Blue {} - running core Day2 configurations".format(self.get_id()))
+                res += self.core_day2_conf(msg, n)
+            elif n['type'] == 'edge':
+                logger.debug("Blue {} - running edge Day2 configurations".format(self.get_id()))
+                res += self.edge_day2_conf(msg, n)
+            elif n['type'] == 'ran':
+                logger.debug("Blue {} - running ran Day2 configurations".format(self.get_id()))
+                res += self.ran_day2_conf(msg, n)
+
+        self.add_ues(msg)
+
+        return res
+
+    @abstractmethod
+    def add_ues(self, msg: dict):
         pass
 
     @abstractmethod
-    def get_ip(self) -> None:
+    def get_ip_core(self, ns: dict) -> None:
         pass
+
+    @abstractmethod
+    def get_ip_edge(self, ns: dict) -> None:
+        pass
+
+    def get_ip(self) -> None:
+        logger.info('Blue {} - Getting IP addresses of VNF instances'.format(self.get_id()))
+        for n in self.nsd_:
+            if n['type'] == 'core':
+                self.get_ip_core(n)
+            if n['type'] == 'edge':
+                self.get_ip_edge(n)
+            if n['type'] == 'ran':
+                try:
+                    area = next(item for item in self.conf['areas'] if item['id'] == n['area'])
+                    logger.debug('Blue {} - Setting IP addresses for RAN nsi for area {}'
+                                 .format(self.get_id(), area['id']))
+                    # retrieving vlds from the vnf
+                    vnfd = self.get_vnfd('area', area['id'])[0]
+                    vld_names = [i['vld'] for i in vnfd['vl']]
+                    vlds = get_ns_vld_ip(n['nsi_id'], vld_names)
+
+                    if len(vld_names) == 1:
+                        # this enb has only one interface, by definition it should be labelled as mgt
+                        area['nb_wan_ip'] = vlds["mgt"][0]['ip']
+                        area['nb_mgt_ip'] = vlds["mgt"][0]['ip']
+                    elif 'data' in vld_names:
+                        # this enb has a separate data-plane interface
+                        area['nb_wan_ip'] = vlds["data"][0]['ip']
+                        area['nb_mgt_ip'] = vlds["mgt"][0]['ip']
+                    else:
+                        raise ValueError('Blue {} - mismatch in the enb interfaces'.format(self.get_id()))
+                except Exception as e:
+                    logger.error("Exception in getting IP addresses from RAN nsi: " + str(e))
+                    raise ValueError(str(e))
+        self.to_db()
 
     @abstractmethod
     def _destroy(self):
         pass
-
-    """def add_tac_conf(self, msg: dict) -> list:
-        res = []
-        for msg_vim in msg['vims']:
-            if 'tacs' in msg_vim:
-                for msg_tac in msg_vim['tacs']:
-                    nsd = None
-                    for nsd_item in self.nsd_:
-                        if nsd_item['type'] == 'ran':
-                            if nsd_item['tac'] == msg_tac['id']:
-                                nsd = nsd_item
-                                break
-                    if nsd is None:
-                        raise ValueError('nsd for tac {} not found'.format(msg_tac['id']))
-                    res += self.ran_day2_conf({'vim': msg_vim['name'], 'tac': msg_tac['id']}, nsd)
-                    edge_res = self.edge_day2_conf({'vim': msg_vim['name'], 'tac': msg_tac['id']}, nsd)
-                    if edge_res :
-                        res += edge_res
-        return res
-
-    def del_tac_conf(self, msg: dict) -> list:
-        pass"""
-
-
-
-    """def add_slice_conf(self, msg: dict) -> list:
-        # msg = {conf: {'plmn'=, 'sst'=, 'sd'=, 'qos_flows'=, 'tacs'=[]}}
-        logger.info("Adding 5G slice(s)")
-        res = []
-        for configurator in self.vnf_configurator:
-            # the operations are evaluated within the configurator
-            # (e.g., the nb does add anything if there is not its tac)
-            res += configurator.add_slice(msg['conf'])
-        return res
-
-    def del_slice_conf(self, msg: dict) -> list:
-        # msg = {conf: {'plmn'=, 'sst'=, 'sd'=, 'qos_flows'=, 'tacs'=[]}}
-        logger.info("Deleting 5G slice(s)")
-        res = []
-        for configurator in self.vnf_configurator:
-            # the operations are evaluated within the configurator
-            # (e.g., the nb does add anything if there is not its tac)
-            res += configurator.add_slice(msg['conf'])
-        return res"""
-

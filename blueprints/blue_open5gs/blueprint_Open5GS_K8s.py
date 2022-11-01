@@ -1,19 +1,18 @@
-from blueprints.blue_amari5G.blueprint_amari5G import Amari5G
-from blueprints.blueprint import BlueprintBase
-from utils import persistency
-from nfvo.vnf_manager import sol006_VNFbuilder
-from nfvo.nsd_manager import sol006_NSD_builder, get_kdu_services
-from utils.util import create_logger
+from blueprints.blue_5g_base import Blue5GBase
+from blueprints import BlueprintBase
+from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services
+import typing
+from main import *
 
 db = persistency.db()
-
+nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 # create logger
-logger = create_logger('Open5GS_K8s')
+logger = create_logger('Open5GsK8s')
 
 
-class Open5Gs_K8s(Amari5G):
-    def __init__(self, conf: dict, id_: str, recover: bool) -> None:
-        BlueprintBase.__init__(self, conf, id_)
+class Open5GsK8s(Blue5GBase):
+    def __init__(self, conf: dict, id_: str, data: typing.Union[typing.Dict, None] = None) -> None:
+        BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         logger.info("Creating Open5GS_K8s Blueprint")
         self.supported_operations = {
             'init': [{
@@ -54,7 +53,7 @@ class Open5Gs_K8s(Amari5G):
         if self.vim_core is None:
             raise ValueError('Vim CORE not found in the input')
 
-    def set_coreVnfd(self, area: str, vls=None) -> None:
+    def set_core_vnfd(self, area: str, vls=None) -> None:
         vnfd = sol006_VNFbuilder({
             'id': '{}_5gc'.format(self.get_id()),
             'name': '{}_5gc'.format(self.get_id()),
@@ -66,6 +65,8 @@ class Open5Gs_K8s(Amari5G):
         self.vnfd['core'].append({'id': 'core', 'name': vnfd.get_id(), 'vl': vls})
         logger.debug(self.vnfd)
 
+    def set_edge_vnfd(self, area: str, vls: list = None) -> None:
+        pass
     # inherited from Amari5GC
     # def setVnfd(self, area: str, tac: int = 0, vls: list = None, pdu: dict = None) -> None:
     # def getVnfd(self, area: str, tac=None) -> list:
@@ -77,7 +78,7 @@ class Open5Gs_K8s(Amari5G):
             {'vld': 'data', 'vim_net': core_v['wan']['id'], 'name': 'ens4', "mgt": True, 'k8s-cluster-net': 'data_net'}
         ]
 
-        self.setVnfd('core', vls=vim_net_mapping)
+        self.set_vnfd('core', vls=vim_net_mapping)
         param = {
             'name': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
             'id': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
@@ -146,44 +147,20 @@ class Open5Gs_K8s(Amari5G):
                            "additionalParams": conf}]
         }]
         logger.info('core kdu_configs: {}'.format(kdu_configs))
-        n_obj = sol006_NSD_builder(self.getVnfd('core'), core_v, param, vim_net_mapping, knf_configs=kdu_configs)
+        n_obj = sol006_NSD_builder(self.get_vnfd('core'), core_v, param, vim_net_mapping, knf_configs=kdu_configs)
         nsd_item = n_obj.get_nsd()
         nsd_item['vld'] = vim_net_mapping
         self.nsd_.append(nsd_item)
         return param['name']
 
-    # inherited from Amari5GC
-    # def ran_nsd(self, tac: dict, vim: dict) -> str:  # differentianting e/gNodeB?
-    # def nsd(self) -> list:
-    # def check_tacs(self, msg: dict) -> bool:
-    # def update_confvims(self, new_vims):
-    # def del_tac(self, msg: dict) -> list:
-    # def add_tac_nsd(self, msg: dict) -> list:
-    # def ran_day2_conf(self, arg: dict, nsd_item: dict) -> list:
-    # def add_tac_conf(self, msg: dict) -> list:
-    # def del_tac_conf(self, msg: dict) -> list:
-    # def destroy(self):
-    # def get_ip
+    def edge_nsd(self, area: dict, vim_name: str) -> typing.List[str]:
+        pass
 
-    def init_day2_conf(self, msg: dict) -> list:
-        logger.info("Initializing Day2 configurations")
-        res = []
-        self.save_conf()
-        for n in self.nsd_:
-            if n['type'] == 'ran':
-                # if self.pnf is False:
-                #    raise ValueError("PNF not supported in this blueprint instance")
-                res += self.ran_day2_conf(msg, n)
-        self.save_conf()
-        return res
+    def core_day2_conf(self, arg: dict, nsd_item: dict) -> typing.List[str]:
+        pass
 
-    ## FIXME!!!!!!! erase this function!
-    ## this was added to override the parent's function, in order to avoid
-    ## the search for pdus in mongodb
-    # def nsd(self) -> list:
-    #    nsd_names = [self.core_nsd()]
-    #    logger.info("NSDs created")
-    #    return nsd_names
+    def edge_day2_conf(self, arg: dict, nsd_item: dict) -> typing.List[str]:
+        pass
 
     def core_upXade(self, msg: dict) ->list:
         ns_core = next((item for item in self.nsd_ if item['type'] == 'core'), None)
@@ -223,12 +200,13 @@ class Open5Gs_K8s(Amari5G):
 
         return res
 
-
-
     def add_slice_conf(self, msg: dict) -> list:
         pass
 
     def del_slice_conf(self, msg: dict) -> list:
+        pass
+
+    def add_ues(self, msg: dict):
         pass
 
     def get_ip_core(self, n) -> None:
@@ -260,3 +238,9 @@ class Open5Gs_K8s(Amari5G):
             if vl['vld'] == 'data':
                 vl['ip'] = vlds["data"][0]['ip'] + '/24'
         """
+
+    def get_ip_edge(self, n) -> None:
+        pass
+
+    def _destroy(self):
+        pass

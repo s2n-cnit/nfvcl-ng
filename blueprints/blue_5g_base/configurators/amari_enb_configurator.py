@@ -1,7 +1,8 @@
 from configurators.flex_configurator import Configurator_Flex
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
-import json, re
+import json
+import re
 from utils import persistency
 import logging
 

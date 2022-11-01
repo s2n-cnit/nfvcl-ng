@@ -5,18 +5,19 @@ import threading
 import time
 import subprocess
 import traceback
+import redis
 from typing import List
 from utils import persistency
-from blueprints import BlueprintBase, DbBlue, ShortBlueModel, DetailedBlueModel
+from blueprints import BlueprintBase, ShortBlueModel, DetailedBlueModel
 from nfvo import NbiUtil, get_nsd_name
 from utils.util import *
 
 logger = create_logger('BlueLCMWorker')
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 db = persistency.db()
+redis_cli = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8")
 
-
-def get_blue_by_filter(blue_filter: dict) -> List[DbBlue]:
+def get_blue_by_filter(blue_filter: dict) -> List[dict]:
     return db.find_DB("blueprint-instances", blue_filter)
 
 
@@ -38,14 +39,14 @@ class LCMWorkers:
         thread.start()
 
     @staticmethod
-    def get_blue_detailed_summary(blue_filter: dict) -> List[dict]:
+    def get_blue_detailed_summary(blue_filter: dict) -> List[DetailedBlueModel]:
         blues = get_blue_by_filter(blue_filter)
         # logger.debug(blues)
         # return [item.print_detailed_summary() for item in blues]
         return [DetailedBlueModel.parse_obj(item) for item in blues]
 
     @staticmethod
-    def get_blue_short_summary(blue_filter: dict) -> List[dict]:
+    def get_blue_short_summary(blue_filter: dict) -> List[ShortBlueModel]:
         blues = get_blue_by_filter(blue_filter)
 
         return [ShortBlueModel.parse_obj(
@@ -99,7 +100,7 @@ class BlueLCMworker:
         self.state = state
         self.queue = session_queue
         self.update_db()
-
+        redis_cli.publish('blueprint', self.blue.print_short_summary())
         while True:
             logger.info('worker {} awaiting for new job'.format(self.blue.get_id()))
             s_input = self.queue.get()
@@ -125,12 +126,6 @@ class BlueLCMworker:
 
     def update_db(self) -> None:
         self.blue.to_db()
-        """db.update_DB("blueprint_slice_intent",
-                     {
-                         "blueprint_object": Binary(pickle.dumps(self.blue, -1)),
-                         'type': self.blue.conf['blueprint_type']
-                     },
-                     {'id': self.blue.get_id()})"""
 
     def destroy(self):
         self.blue.status = 'processing'
@@ -138,7 +133,6 @@ class BlueLCMworker:
         self.blue.detailed_status = 'removing Network Service instances'
         self.update_db()
         nsi_list = []
-        vnfd_list = []
         for nsd in self.blue.get_nsd():
             if 'nsd_id' not in nsd:
                 logger.warning("Blue {} - no nsd id for this nsd ... skipping!".format(self.blue.get_id()))
@@ -151,18 +145,16 @@ class BlueLCMworker:
                 logger.warning("Blue {} - no nsi id for nsd {}... skipping!".format(self.blue.get_id(), nsd['nsd_id']))
 
         self.init_dayN(nsi_list)
-        self.blue.detailed_status = 'removing Network Service descriptors'
+        self.blue.detailed_status = 'destroying blueprint and temporary files'
         self.update_db()
         logger.info("Blue {} - destroying blueprint".format(self.blue.get_id(), ))
 
-        logger.debug("Blue {} - removing temporary elk_files".format(self.blue.get_id(), ))
+        logger.debug("Blue {} - removing temporary day2 files".format(self.blue.get_id(), ))
         subprocess.run(['rm', '-rf', 'day2_files/_{}*'.format(self.blue.get_id())])
         subprocess.run(['rm', '-rf', 'vnf_packages/{}_*'.format(self.blue.get_id())])
         subprocess.run(['rm', '-rf', '/tmp/nsd_packages/*_{}*'.format(self.blue.get_id())])
 
-        #db.delete_DB("blueprint_slice_intent", {'id': self.blue.get_id()})
-
-        # db.delete_DB("action_output", {'blue_id': self.blue.get_id()})
+        db.delete_DB("action_output", {'blue_id': self.blue.get_id()})
         self.blue.delete_db()
         self.blue.destroy()
 
@@ -191,7 +183,7 @@ class BlueLCMworker:
 
         # for each session we might have multiple stages, each one composed by day0, day2, and dayN lists of handlers
         session_methods = self.blue.get_operation_methods(requested_operation)
-        logger.info(session_methods)
+        # logger.info(session_methods)
         try:
             for stage in session_methods:
                 logger.debug('current stage: {}'.format(json.dumps(stage)))
@@ -220,7 +212,7 @@ class BlueLCMworker:
             self.blue.status = 'idle'
             self.blue.current_operation = None
             self.blue.detailed_status = None
-            logger.info("session {} for blueprint {} finalized".format(session_id, self.blue.get_id()))
+            logger.info("Blue {} - session {} finalized".format(self.blue.get_id(), session_id))
             self.update_db()
             self.blue.rest_callback(requested_operation, session_id, "ready")
 
@@ -229,20 +221,16 @@ class BlueLCMworker:
             self.abort_session(str(error), requested_operation, session_id)
 
     def day0_operation(self, handler, checked_vims: list, msg: dict):
-        logger.info("starting Day 0 operations for blueprint {}".format(self.blue.get_id()))
-
+        logger.info("Blue {} - starting Day 0 operations".format(self.blue.get_id()))
         # run the method to create blue's NSDs
         nsd_names = getattr(self.blue, handler['method'])(msg)
-        logger.info(f"CHECK!!! nsd_names is: {nsd_names}")
         # instantiate nsd
         if self.instantiate_blueprint(checked_vims, nsd_names) is False:
             return False
-
         self.update_db()
         # wait for NSDs becoming ready
         if self.wait_for_blue_day1(nsd_names) is False:
             return False
-
         self.update_db()
         # get IP addresses of VNFs
         self.blue.get_ip()
@@ -250,7 +238,7 @@ class BlueLCMworker:
         return True
 
     def day2_operation(self, handler, msg: dict):
-        logger.info("starting Day 2 operations for blueprint {}".format(self.blue.get_id()))
+        logger.info("Blue {} - starting Day 2 operations".format(self.blue.get_id()))
         if handler.get('callback') is not None:
             self.init_day2(getattr(self.blue, handler['method'])(msg),
                            blue_callback=getattr(self.blue, handler['callback']))
@@ -259,7 +247,7 @@ class BlueLCMworker:
         self.update_db()
 
     def dayN_operation(self, handler, msg: dict):
-        logger.info("starting dayN operations for blueprint {}".format(self.blue.get_id()))
+        logger.info("Blue {} - starting dayN operations".format(self.blue.get_id()))
         self.init_dayN(getattr(self.blue, handler['method'])(msg))
 
     @staticmethod
@@ -277,7 +265,7 @@ class BlueLCMworker:
     def instantiate_blueprint(self, vims: list, nsd_names: list):
 
         self.blue.get_timestamp('day0_buildpackages_start')
-        logger.debug('Blue {}: Day0 - building NSD packages'.format(self.blue.get_id()))
+        logger.debug('Blue {} - Day0 - building NSD packages'.format(self.blue.get_id()))
 
         # Day0 handlers must return the names of nsd to be instantiated
         self.blue.build_packages(nsd_names=nsd_names)
@@ -291,7 +279,7 @@ class BlueLCMworker:
             r = nbiUtil.nsd_reonboard(nsd_name)
 
             if r['error']:
-                logger.error("Blue {}: Day0 onboarding nsd {} failed, reason: {}"
+                logger.error("Blue {} - Day0 onboarding nsd {} failed, reason: {}"
                              .format(self.blue.get_id(), nsd_name, json.dumps(r['data'])))
                 self.blue.set_osm_status(nsd_name, 'error')
                 raise AssertionError("Blue {}: Day0 onboarding nsd {} failed, reason: {}"
@@ -308,7 +296,7 @@ class BlueLCMworker:
 
         # Day1 starts from here
         for nsd_item in [item for item in self.blue.get_nsd() if item['descr']['nsd']['nsd'][0]['name'] in nsd_names]:
-            logger.info("Blue {}: Day1 - instantiating NSD={} on VIM {}"
+            logger.info("Blue {} - Day1 - instantiating NSD={} on VIM {}"
                         .format(self.blue.get_id(), nsd_item['descr']['nsd']['nsd'][0]['name'], nsd_item['vim']))
 
             nsd_name = nsd_item['descr']['nsd']['nsd'][0]['name']
@@ -363,8 +351,8 @@ class BlueLCMworker:
                         logger.error(value_exception)
                         if len(value_exception.args) > 0 and \
                                 "Deploying at VIM: b\'\'" in value_exception.args[0]:
-                            logger.warning("NSI {} failed during day1 operations. Trying to recover."
-                                           .format(ns_item['nsi_id']))
+                            logger.warning("Blue {} - NSI {} failed during day1 operations. Trying to recover."
+                                           .format(self.blue.get_id(), ns_item['nsi_id']))
                             nbiUtil.ns_delete(ns_item['nsi_id'], True)
                             nsd_name = ns_item['descr']['nsd']['nsd'][0]['name']
                             r = nbiUtil.instantiate_ns(
@@ -375,11 +363,11 @@ class BlueLCMworker:
                                 self.blue.deploy_config(ns_item['nsd_id'])
                             )
                             if r['error']:
-                                logger.error("Blue {}: Day1 nsd {} instantiation failed, reason: {}"
+                                logger.error("Blue {} - Day1 nsd {} instantiation failed, reason: {}"
                                              .format(self.blue.get_id(), nsd_name, json.dumps(r['data'])))
                                 raise ValueError('Healing operation on NS not successful')
                             self.blue.add_osm_nsi(nsd_name, r['data']['id'])
-                            logger.warn('the new nsi_id is {}'.format(r['data']['id']))
+                            logger.warn('Blue {} - the new nsi_id is {}'.format(self.blue.get_id(), r['data']['id']))
                             self.blue.set_osm_status(nsd_name, 'day1')
                             # restart day 1 waiting loop
                             return self.wait_for_blue_day1(ns_to_check)
@@ -398,7 +386,7 @@ class BlueLCMworker:
                         ns_to_check.remove(nsd_name)
                         self.blue.set_osm_status(nsd_name, r["config-status"])
                         return False
-        logger.info("Blue {} -- instantiation completed".format(self.blue.get_id()))
+        logger.info("Blue {} - instantiation completed".format(self.blue.get_id()))
         self.blue.get_timestamp('day1_end')
         return True
 
@@ -409,7 +397,7 @@ class BlueLCMworker:
         results = []
 
         for p in day2_primitives:
-            self.blue.get_timestamp("Blue {}: Day 2 start - NSD {} primitive for VNFD {}".format(
+            self.blue.get_timestamp("Blue {} - Day 2 start - NSD {} primitive for VNFD {}".format(
                     self.blue.get_id(),
                     p['ns-name'],
                     str(p['primitive_data']['member_vnf_index'])
@@ -427,31 +415,31 @@ class BlueLCMworker:
             results.append({"result": r, "primitive": p, "time": datetime.datetime.now()})
             self.blue.store_primitives(results[-1])
 
-            self.blue.get_timestamp("Blue {}: Day 2 stop - NSD {} primitive for VNFD {}".format(
+            self.blue.get_timestamp("Blue {} - Day 2 stop - NSD {} primitive for VNFD {}".format(
                 self.blue.get_id(), p['ns-name'], str(p['primitive_data']['member_vnf_index'])))
-            self.blue.get_configlen("Blue {}: Day 2 start - NSD {} primitive for VNFD {}".format(
+            self.blue.get_configlen("Blue {} - Day 2 start - NSD {} primitive for VNFD {}".format(
                 self.blue.get_id(), p['ns-name'], str(p['primitive_data']['member_vnf_index'])),
                 p['primitive_data']['primitive_params'])
 
             if "completed" in r['charm_status']:
                 self.blue.set_osm_status(p['ns-name'], 'day2')
-                logger.info("Blue {}: {} correctly configured".format(self.blue.get_id(), p['ns-name']))
+                logger.info("Blue {} - {} correctly configured".format(self.blue.get_id(), p['ns-name']))
             else:
                 error_day2 = True
                 self.blue.set_osm_status(p['ns-name'], 'day2 error')
-                logger.error("Blue {}: Day 2 - nsd {} fails in Day2 operations: {}"
+                logger.error("Blue {} - Day 2 - nsd {} failed in Day2 operations: {}"
                              .format(self.blue.get_id(), p['ns-name'], json.dumps(r)))
 
         if error_day2:
-            logger.error("Blue {}: Day 2 - Error applying Day2 operations".format(self.blue.get_id()))
+            logger.error("Blue {} - Day 2 - Error applying Day2 operations".format(self.blue.get_id()))
             return False
 
         # Day2 callback for the Blueprint object
         if blue_callback is not None:
-            logger.info("Blue {}: Performing Day 2 callback".format(self.blue.get_id()))
+            logger.info("Blue {} - Performing Day 2 callback".format(self.blue.get_id()))
             blue_callback(results)
 
-        self.blue.get_timestamp('Blue {}: Day 2 end'.format(self.blue.get_id()))
+        self.blue.get_timestamp('Blue {} - Day 2 end'.format(self.blue.get_id()))
         db.insert_DB("nfv_performance", self.blue.get_performance())
         return True
 
@@ -475,27 +463,27 @@ class BlueLCMworker:
                 vnfd_to_delete.append(v)
 
         for nsi in nsi_list:
-            logger.debug("Blue {}: DayN - terminating nsi {}".format(self.blue.get_id(), nsi))
+            logger.debug("Blue {} - DayN - terminating nsi {}".format(self.blue.get_id(), nsi))
             r = nbiUtil.ns_delete(nsi)
-            logger.debug("Blue {}: DayN - nsi {} termination result: {}".format(self.blue.get_id(), nsi, json.dumps(r)))
+            logger.debug("Blue {} - DayN - nsi {} termination result: {}".format(self.blue.get_id(), nsi, json.dumps(r)))
 
         nsi_to_check = nsi_list[:]  # copy not by reference
         while len(nsi_to_check) > 0:
             vnfo_nsi_list = nbiUtil.get_nsi_list()
             if vnfo_nsi_list is None:
-                logger.warn("nsi list not found in the NFVO. Skipping...")
+                logger.warn("Blue {} - nsi list not found in the NFVO. Skipping...".format(self.blue.get_id()))
                 break
 
             for n_index, n_value in enumerate(nsi_to_check):
                 nsi = next((item for item in vnfo_nsi_list if item['id'] == n_value), None)
                 if nsi is None:
-                    logger.debug('NS instance {} deleted'.format(n_value))
+                    logger.debug('Blue {} - NS instance {} deleted'.format(self.blue.get_id(), n_value))
                     nsi_to_check.pop(n_index)
 
         for nsd in nsd_to_delete:
-            logger.debug("Blue {}: DayN - deleting nsd {}".format(self.blue.get_id(), nsd))
+            logger.debug("Blue {} - DayN - deleting nsd {}".format(self.blue.get_id(), nsd))
             r = nbiUtil.nsd_delete(nsd)
-            logger.debug("Blue {}: DayN - nsd {} deletion result: {}".format(self.blue.get_id(), nsd, json.dumps(r)))
+            logger.debug("Blue {} - DayN - nsd {} deletion result: {}".format(self.blue.get_id(), nsd, json.dumps(r)))
 
         nfvo_vnfd_list = nbiUtil.get_vnfd_list()
         logger.info("Blue {}: VNFD to be deleted: {}".format(self.blue.get_id(), vnfd_to_delete))
@@ -503,10 +491,10 @@ class BlueLCMworker:
             nfvo_vnfd = next((item for item in nfvo_vnfd_list if item['id'] == vnfd), None)
             if nfvo_vnfd is None:
                 continue
-            logger.debug("Blue {}: DayN - deleting vnfd {} {}".format(self.blue.get_id(), nfvo_vnfd['id'],
+            logger.debug("Blue {} - DayN - deleting vnfd {} {}".format(self.blue.get_id(), nfvo_vnfd['id'],
                                                                       nfvo_vnfd['_id']))
             r = nbiUtil.delete_vnfd(nfvo_vnfd['_id'])
-            logger.debug("Blue {}: DayN - vnfd {} {} deletion result:".format(self.blue.get_id(), nfvo_vnfd['id'],
+            logger.debug("Blue {} - DayN - vnfd {} {} deletion result:".format(self.blue.get_id(), nfvo_vnfd['id'],
                                                                               nfvo_vnfd['_id'], json.dumps(r)))
 
         for nsi in nsi_list:

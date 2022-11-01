@@ -22,5 +22,9 @@
     'port': 22,
     'user': 'root',
     'passwd': 'pap3rin0'
-  }]
+  }],
+  'redis': {
+    'host': '127.0.0.1',
+    'port': 16379
+  }
 }

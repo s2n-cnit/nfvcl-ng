@@ -1,16 +1,16 @@
-from blueprints.blue_amari5G.blueprint_amari5G import Amari5G
-from utils import persistency
-from nfvo.vnf_manager import sol006_VNFbuilder
-from utils.util import create_logger
+from blueprints.blue_amari5G import Amari5G
+from nfvo import sol006_VNFbuilder
+from main import *
 
 db = persistency.db()
+nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 # create logger
 logger = create_logger('open5GS')
 
 
 class open5GS(Amari5G):
-    def set_coreVnfd(self, area: str, vls=None) -> None:
-        #FIXME: pass it to KNF
+    def set_core_vnfd(self, area: str, vls=None) -> None:
+
         vnfd = sol006_VNFbuilder({
             'username': 'root',
             'password': 'root',

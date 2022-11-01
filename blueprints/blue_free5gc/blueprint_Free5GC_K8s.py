@@ -169,23 +169,23 @@ class Free5GC_K8s(Amari5G):
             self.vnfd[area].append({'id': 'upf', 'name': vnfd.get_id(), 'vl': interfaces, 'type': 'upf'})
         logger.debug(self.vnfd)
 
-    def set_coreVnfd(self, area: str, vls=None) -> None:
+    def set_core_vnfd(self, area: str, vls=None) -> None:
         self.set_baseCoreVnfd(area, vls)
 
         logger.debug(self.vnfd)
 
-    def set_edgeVnfd(self, area: str, tac: int = 0, vim: dict = None) -> None:
+    def set_edge_vnfd(self, area: str, tac: int = 0, vim: dict = None) -> None:
         self.set_upfVnfd(area=area, tac=tac, vim=vim)
 
-    def getVnfd(self, area: str, tac: typing.Optional[str] = None, type: str = None) -> list:
+    def get_vnfd(self, area: str, area_id: typing.Optional[str] = None, type: str = None) -> list:
         id_list = []
         if area == "core":
             logger.debug(self.vnfd['core'])
             id_list = self.vnfd['core']
         if area == "tac":
-            if tac is None:
+            if area_id is None:
                 raise ValueError("tac is None in getVnfd")
-            tac_obj = next((item for item in self.vnfd['tac'] if item['tac'] == tac), None)
+            tac_obj = next((item for item in self.vnfd['tac'] if item['tac'] == area_id), None)
             if tac_obj is None:
                 raise ValueError("tac not found in getting Vnfd")
             if type:
@@ -1054,7 +1054,7 @@ class Free5GC_K8s(Amari5G):
         ]
         nsd_names = []
 
-        self.setVnfd('core', vls=vim_net_mapping)
+        self.set_vnfd('core', vls=vim_net_mapping)
 
         # set networking parameters for 5GC core running configuration files
         self.set_core_networking_parameters( interfaceName = "ens3", subnetIP = "192.168.0.0",
@@ -1159,7 +1159,7 @@ class Free5GC_K8s(Amari5G):
 
         self.save_conf()
 
-        vnfd_ = self.getVnfd('core')
+        vnfd_ = self.get_vnfd('core')
         # Kubernetes
         vnfd_k8s = []
         # OpenStack
@@ -1210,7 +1210,7 @@ class Free5GC_K8s(Amari5G):
         logger.info("Creating EDGE NSD(s) for tac {} on vim {}".format(tac['id'], vim['name']))
         param_name_list = []
 
-        self.set_edgeVnfd('tac', tac['id'], vim)
+        self.set_edge_vnfd('tac', tac['id'], vim)
 
         if vim['mgt'] != vim['wan']['id']:
             vim_net_mapping = [
@@ -1228,7 +1228,7 @@ class Free5GC_K8s(Amari5G):
                 'id': '{}_{}_{}_{}'.format(type.upper(), str(tac['id']), str(self.conf['plmn']), str(self.get_id())),
                 'type': '{}'.format(type)
             }
-            edge_vnfd = self.getVnfd('tac', tac['id'], type)
+            edge_vnfd = self.get_vnfd('tac', tac['id'], type)
             if not edge_vnfd:
                 continue
             n_obj = sol006_NSD_builder(edge_vnfd, vim, param, vim_net_mapping)
@@ -1813,7 +1813,7 @@ class Free5GC_K8s(Amari5G):
                                 .format(n['type'].upper(), tac['id'], vim['name']))
 
                     # retrieving vlds from the vnf
-                    vnfd = self.getVnfd('tac', tac['id'], n['type'])[0]
+                    vnfd = self.get_vnfd('tac', tac['id'], n['type'])[0]
                     vld_names = [i['vld'] for i in vnfd['vl']]
                     vlds = get_ns_vld_ip(n['nsi_id'], vld_names)
 

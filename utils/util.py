@@ -26,6 +26,8 @@ with open("config.yaml", 'r') as stream:
         mongodb_host = nfvcl_conf['mongodb']['host']
         mongodb_port = str(nfvcl_conf['mongodb']['port'])
         mongodb_db = nfvcl_conf['mongodb']['db']
+        redis_host = nfvcl_conf['redis']['host']
+        redis_port = str(nfvcl_conf['redis']['port'])
     except Exception as exception:
         print('exception in the configuration file parsing: {}'.format(str(exception)))
 

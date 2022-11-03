@@ -25,7 +25,9 @@ class NoAliasDumper(yaml.SafeDumper):
         return True
 
 class Free5GC_K8s(BlueprintBase):
-    # Free5GC modules exported as external VMs
+    """
+    Free5GC modules exported as external VMs
+    """
     edge_vnfd_type = ['upf']
 
     def __init__(self, conf: dict, id_: str, recover: bool) -> None:
@@ -117,37 +119,38 @@ class Free5GC_K8s(BlueprintBase):
             }]})
         self.vnfd['core'].append({'id': 'core', 'name': vnfd.get_id(), 'vl': vls})
 
-    def set_upfVnfd(self, area: str, vls=None, tac: int = 0, vim: dict = None) -> None:
+    def set_upfVnfd(self, area: str, vls=None, area_id: int = 0) -> None:
         interfaces = None
         list_ = None
         if area == "core":
             interfaces = vls
-        elif area == "tac":
-            # Copy network from PDU
+        elif area == "area":
+            vim = self.get_vim(area_id)
+            if vim == None:
+                raise ValueError("area = {} has not a valid vim".format(area_id))
             interfaces = [
-                #{"vim_net": vim['wan']['id'], "vld": "datanet", "name": "ens4", "mgt": False},
                 {"vim_net": vim['mgt'], "vld": "mgt", "name": "ens3", "mgt": True}
             ]
-            tacObj = next((item for item in self.vnfd['tac'] if item['tac'] == tac), None)
-            if tacObj == None:
-                tacObj = {'tac': tac, 'vnfd': []}
-                self.vnfd['tac'].append(tacObj)
+            areaObj = next((item for item in self.vnfd['area'] if item['area'] == area_id), None)
+            if areaObj == None:
+                areaObj = {'area': area_id, 'vnfd': []}
+                self.vnfd['area'].append(areaObj)
 
-            list_ = tacObj['vnfd']
+            list_ = areaObj['vnfd']
         else:
             raise ValueError("area = {} is UNKNOWN".format(area))
 
         if list_ :
-            # tac
+            # area
             vnfd = sol006_VNFbuilder({
                 'username': 'root',
                 'password': 'root',
-                'id': self.get_id() + '_free5gc_upf_' + str(tac),
-                'name': self.get_id() + '_free5gc_upf_' + str(tac),
+                'id': self.get_id() + '_free5gc_upf_' + str(area_id),
+                'name': self.get_id() + '_free5gc_upf_' + str(area_id),
                 'vdu': [{
                     'count': 1,
                     'id': 'VM',
-                    'image': 'free5gc_v3.0.7',
+                    'image': self.image,
                     'vm-flavor': {'memory-mb': '4096', 'storage-gb': '8', 'vcpu-count': '2'},
                     'interface': interfaces,
                     'vim-monitoring': True
@@ -159,12 +162,12 @@ class Free5GC_K8s(BlueprintBase):
             vnfd = sol006_VNFbuilder({
                 'username': 'root',
                 'password': 'root',
-                'id': self.get_id() + '_free5gc_upf',
-                'name': self.get_id() + '_free5gc_upf',
+                'id': self.get_id() + '_free5gc_upf_core',
+                'name': self.get_id() + '_free5gc_upf_core',
                 'vdu': [{
                     'count': 1,
                     'id': 'VM',
-                    'image': 'free5gc_v3.0.7',
+                    'image': self.image,
                     'vm-flavor': {'memory-mb': '4096', 'storage-gb': '8', 'vcpu-count': '2'},
                     'interface': interfaces,
                     'vim-monitoring': True
@@ -173,34 +176,35 @@ class Free5GC_K8s(BlueprintBase):
             self.vnfd[area].append({'id': 'upf', 'name': vnfd.get_id(), 'vl': interfaces, 'type': 'upf'})
         logger.debug(self.vnfd)
 
-    def set_coreVnfd(self, area: str, vls=None) -> None:
+    def set_coreVnfd(self, vls=None) -> None:
         self.set_baseCoreVnfd(vls)
 
         logger.debug(self.vnfd)
 
-    def set_edgeVnfd(self, area: str, tac: int = 0, vim: dict = None) -> None:
-        self.set_upfVnfd(area=area, tac=tac, vim=vim)
+    def set_edgeVnfd(self, area: str, area_id: int = 0) -> None:
+        self.set_upfVnfd(area=area, area_id=area_id)
 
-    def getVnfd(self, area: str, tac: typing.Optional[str] = None, type: str = None) -> list:
+    def getVnfd(self, area: str, area_id: int = 0, type: str = None) -> list:
         id_list = []
         if area == "core":
-            logger.debug(self.vnfd['core'])
             id_list = self.vnfd['core']
-        if area == "tac":
-            if tac is None:
-                raise ValueError("tac is None in getVnfd")
-            tac_obj = next((item for item in self.vnfd['tac'] if item['tac'] == tac), None)
-            if tac_obj is None:
-                raise ValueError("tac not found in getting Vnfd")
+        elif area == "area":
+            area_obj = next((item for item in self.vnfd['area'] if item['area'] == area_id), None)
+            if area_obj is None:
+                raise ValueError("area {} not found in getting Vnfd".format(area_id))
             if type:
                 # create list with vnfd elements where "id" field is equal to "id" param
-                id_list = [item for item in tac_obj['vnfd'] if 'type' in item and item['type'] == type]
+                id_list = [item for item in area_obj['vnfd'] if 'type' in item and item['type'] == type]
             else :
-                id_list = [item for item in tac_obj['vnfd'] if 'type' not in item]
+                id_list = [item for item in area_obj['vnfd'] if 'type' not in item]
+        else:
+            raise ValueError("area = {} is UNKNOWN".format(area))
         return id_list
 
     def amf_reset_configuration(self) -> None:
-        # AMF reset configuration
+        """
+        AMF reset configuration
+        """
         self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]["servedGuamiList"] = []
         self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]["supportTaiList"] = []
         self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]["plmnSupportList"] = []
@@ -221,10 +225,8 @@ class Free5GC_K8s(BlueprintBase):
         :param dnnList: ex. [{"dnn": "internet", "dns": "8.8.8.8"}]
         :return: amfId
         """
-        # AMF configuration
         if mcc == None : mcc = self.conf['plmn'][:3]
         if mnc == None : mnc = self.conf['plmn'][3:]
-        #if amfId == None: amfId = str(random.choice(string.ascii_lowercase) for i in range(6))
         if amfId == None: amfId = "{0:06x}".format(random.randrange(0x000000, 0xFFFFFF))
         guamiItem = {"plmnId": {"mcc": mcc, "mnc": mnc}, "amfId": amfId}
         servedGuamiList = self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"] \
@@ -280,6 +282,9 @@ class Free5GC_K8s(BlueprintBase):
 
     def amf_unset_configuration(self, snssaiList: list = None, dnnList: list = None,
                                 mcc: str = None, mnc: str = None) -> None:
+        """
+        AMF unset configuration
+        """
         if mcc == None : mcc = self.conf['plmn'][:3]
         if mnc == None : mnc = self.conf['plmn'][3:]
         plmnId = {"mcc": mcc, "mnc": mnc}
@@ -313,7 +318,9 @@ class Free5GC_K8s(BlueprintBase):
             yaml.dump(ausfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def ausf_set_configuration(self, mcc: str = None, mnc: str = None) -> None :
-        # AUSF configuration
+        """
+        AUSF configuration
+        """
         if mcc == None: mcc = self.conf['plmn'][:3]
         if mnc == None: mnc = self.conf['plmn'][3:]
         plmnSupportItem = {"mcc": mcc, "mnc": mnc}
@@ -326,7 +333,9 @@ class Free5GC_K8s(BlueprintBase):
             yaml.dump(ausfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def n3iwf_reset_configuration(self) -> None:
-        # N3IWF configuration
+        """
+        N3IWF configuration
+        """
         self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"]["N3IWFInformation"] = \
             {"GlobalN3IWFID": {"PLMNID": {"MCC": "", "MNC": ""}, "N3IWFID": ""}, "Name": "",
              "SupportedTAList": []}
@@ -337,7 +346,9 @@ class Free5GC_K8s(BlueprintBase):
 
     def n3iwf_set_configuration(self, mcc: str = None, mnc: str = None, name: str = None, tac: int = -1,
             sliceSupportList: list = None, n3iwfId: int = -1) -> str:
-        # N3IWF configuration
+        """
+        N3IWF configuration
+        """
         if mcc == None: mcc = self.conf['plmn'][:3]
         if mnc == None: mnc = self.conf['plmn'][3:]
         #if name == None: name = str(random.choice(string.ascii_lowercase) for i in range(6))
@@ -391,6 +402,9 @@ class Free5GC_K8s(BlueprintBase):
         return name
 
     def n3iwf_unset_configuration(self, sliceSupportList: list = None) -> None:
+        """
+        N3IWF unset configuration
+        """
         if sliceSupportList != None:
             n3iwfInformation = self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"] \
                 ["N3IWFInformation"]
@@ -411,14 +425,18 @@ class Free5GC_K8s(BlueprintBase):
             yaml.dump(n3iwfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def nrf_reset_configuration(self) -> None:
-        # NRF configuration
+        """
+        NRF reset configuration
+        """
         self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]["DefaultPlmnId"] = {}
         nrfConfigurationBase = self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configuration"] = \
             yaml.dump(nrfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def nrf_set_configuration(self, mcc: str = None, mnc: str = None):
-        # NRF configuration
+        """
+        NRF configuration
+        """
         if mcc == None: mcc = self.conf['plmn'][:3]
         if mnc == None: mnc = self.conf['plmn'][3:]
         self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]["DefaultPlmnId"] = \
@@ -428,7 +446,9 @@ class Free5GC_K8s(BlueprintBase):
             yaml.dump(nrfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def nssf_reset_configuration(self) -> None:
-        # NSSF configuration
+        """
+        NSSF configuration
+        """
         mcc = self.conf['plmn'][:3]
         mnc = self.conf['plmn'][3:]
         self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configurationBase"]["supportedPlmnList"] = []
@@ -448,17 +468,20 @@ class Free5GC_K8s(BlueprintBase):
             yaml.dump(nssfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def getANewNsiId(self) -> int:
+        """
+        get a new value for NSI ID (used by NSSF)
+        """
         self.nsiIdCounter += 1
         return self.nsiIdCounter
 
     def nssf_set_configuration(self, mcc: str = None, mnc: str = None, operatorName: str = "CNIT", nssfName: str = None,
             sliceList: list = None, nfId: str = None, tac: int = -1) -> str:
-        # NSSF configuration
+        """
+        NSSF configuration
+        """
         if mcc == None: mcc = self.conf['plmn'][:3]
         if mnc == None: mnc = self.conf['plmn'][3:]
-        #if nssfName == None: nssfName = str(random.choice(string.ascii_lowercase) for i in range(6))
         if nssfName == None: nssfName = "{0:06x}".format(random.randrange(0x000000, 0xFFFFFF))
-        #if nfId == None: nfId = str(random.choice(string.digits) for i in range(35))
         if nfId == None: nfId = "{:035d}".format(random.randrange(0x0, 0x13426172C74D822B878FE7FFFFFFFF))
         sstSdList = []
         if sliceList != None:
@@ -567,7 +590,9 @@ class Free5GC_K8s(BlueprintBase):
         return nfId
 
     def nssf_unset_configuration(self, sliceList: list = None) -> None:
-
+        """
+        NSSF unset configuration
+        """
         if sliceList != None:
             supportedNssaiInPlmnList = self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"] \
                 ["configurationBase"]["supportedNssaiInPlmnList"]
@@ -615,15 +640,18 @@ class Free5GC_K8s(BlueprintBase):
             yaml.dump(nssfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def pcf_reset_configuration(self) -> None:
-        # PCF configuration
+        """
+        PCF configuration
+        """
         self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["pcfName"] = None
         pcfConfigurationBase = self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configuration"] = \
             yaml.dump(pcfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def pcf_set_configuration(self, pcfName: str = None) -> str:
-        # PCF configuration
-        #if pcfName == None: pcfName = str(random.choice(string.digits) for i in range(6))
+        """
+        PCF configuration
+        """
         if pcfName == None: pcfName = "{:06d}".format(random.randrange(0x000000, 0xFFFFFF))
         self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["pcfName"] = pcfName
         pcfConfigurationBase = self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configurationBase"]
@@ -632,7 +660,9 @@ class Free5GC_K8s(BlueprintBase):
         return pcfName
 
     def smf_reset_configuration(self) -> None:
-        # SMF configuration
+        """
+        SMF configuration
+        """
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]["smfName"] = ""
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]["snssaiInfos"] = []
 
@@ -654,7 +684,7 @@ class Free5GC_K8s(BlueprintBase):
     def smf_set_configuration(self, mcc: str = None, mnc: str = None, smfName: str = None, dnnList: list = None,
             sliceList: list = None, links: list = None, upNodes: dict = None) -> str:
         """
-
+        SMF set configuration
         :param mcc:
         :param mnc:
         :param smfName:
@@ -664,7 +694,6 @@ class Free5GC_K8s(BlueprintBase):
         :param upNodes:
         :return:
         """
-        # SMF configuration
         if mcc == None: mcc = self.conf['plmn'][:3]
         if mnc == None: mnc = self.conf['plmn'][3:]
         plmnId = {"mcc": mcc, "mnc": mnc}
@@ -748,6 +777,9 @@ class Free5GC_K8s(BlueprintBase):
         return smfName
 
     def smf_unset_configuration(self, dnnList: list = None, sliceList: list = None, tacList: list = None) -> None:
+        """
+        SMF unset configuration
+        """
         snssaiInfos = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"] \
             ["configurationBase"]["snssaiInfos"]
         userplaneInformationLinks = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"] \
@@ -797,25 +829,33 @@ class Free5GC_K8s(BlueprintBase):
                             userplaneInformationUpNodes.pop(nodeIndex)
 
     def udm_reset_configuration(self) -> None:
-        # UDM configuration
+        """
+        UDM configuration
+        """
         udmConfigurationBase = self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configuration"] = \
             yaml.dump(udmConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def udm_set_configuration(self) -> None:
-        # UDM configuration
+        """
+        UDM configuration
+        """
         udmConfigurationBase = self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configuration"] = \
             yaml.dump(udmConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def udr_reset_configuration(self) -> None:
-        # UDR configuration
+        """
+        UDR configuration
+        """
         udrConfigurationBase = self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configuration"] = \
             yaml.dump(udrConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def udr_set_configuration(self) -> None:
-        # UDR configuration
+        """
+        UDR configuration
+        """
         udrConfigurationBase = self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configuration"] = \
             yaml.dump(udrConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
@@ -827,9 +867,7 @@ class Free5GC_K8s(BlueprintBase):
         self.running_free5gc_conf["global"]["n6network"]["masterIf"] = interfaceName
         self.running_free5gc_conf["global"]["n6network"]["subnetIP"] = subnetIP
         self.running_free5gc_conf["global"]["n6network"]["gatewayIP"] = gatewayIP
-        # self.running_free5gc_conf["global"]["n6network"]["excludeIP"] = "192.168.0.254"
         self.running_free5gc_conf["global"]["n9network"]["masterIf"] = interfaceName
-        # self.running_free5gc_conf["upf"]["n6if"]["ipAddress"] = "192.168.0.58"
         # "POD_IP" is a value changed in runtime inside the container in k8s
         self.running_free5gc_conf["global"]["smf"]["n4if"]["interfaceIpAddress"] = "POD_IP"
         self.running_free5gc_conf["global"]["amf"]["n2if"]["interfaceIpAddress"] = "0.0.0.0"
@@ -1132,17 +1170,16 @@ class Free5GC_K8s(BlueprintBase):
         logger.info("db response: {}".format(response))
 
     def add_ues_from_configfile(self) -> None:
-        # Add UEs subscribers
-        if 'config' in self.conf and 'subscribers' in self.conf['config'] and "plmn" in self.conf:
+        """
+        Add UEs subscribers
+        """
+        if 'config' in self.conf and 'subscribers' in self.conf['config']:
             if 'subscribers' not in self.running_free5gc_conf:
                 self.running_free5gc_conf['subscribers'] = []
             for s in self.conf['config']['subscribers']:
                 if s not in self.running_free5gc_conf['subscribers']:
                     self.running_free5gc_conf['subscribers'].append(s)
     def bootstrap_day0(self, msg) -> list:
-        if "config" in msg:
-            if "defaultSlices" in msg["config"]:
-                self.defaultSliceList = msg["config"]["defaultSlices"]
         return super().bootstrap_day0(msg)
     def core_nsd(self) -> str:
         logger.info("Creating Core NSD(s)")

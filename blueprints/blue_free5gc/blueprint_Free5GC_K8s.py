@@ -1494,37 +1494,35 @@ class Free5GC_K8s(Blue5GBase):
 
         smfName = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]["smfName"]
 
-        if "vims" in msg:
-            for vim in msg["vims"]:
-                if "tacs" in vim:
-                    for tac in vim["tacs"]:
-                        dnnList = []
-                        if len(self.defaultSliceList) != 0:
-                            for s in self.defaultSliceList:
-                                tail_res += self.smf_add_upf(smfName=smfName, tac=tac["id"], slice=s,
-                                                        dnnInfoList=s["dnnList"])
-                                for dnn in s["dnnList"]:
-                                    if dnn not in dnnList:
-                                        dnnList.append(dnn)
-                        if "slices" in tac:
-                            for slice in tac["slices"]:
-                                s = {"sd": slice["sd"], "sst": slice["sst"] }
-                                if "dnnList" in slice:
-                                    tail_res += self.smf_add_upf(smfName=smfName, tac=tac["id"], slice=s,
-                                                            dnnInfoList=slice["dnnList"])
-                                    for dnn in slice["dnnList"]:
-                                        if dnn not in dnnList:
-                                            dnnList.append(dnn)
+        if "areas" in msg:
+            for area in msg["areas"]:
+                dnnList = []
+                if len(self.defaultSliceList) != 0:
+                    for s in self.defaultSliceList:
+                        tail_res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=s,
+                                                dnnInfoList=s["dnnList"])
+                        for dnn in s["dnnList"]:
+                            if dnn not in dnnList:
+                                dnnList.append(dnn)
+                if "slices" in area:
+                    for slice in area["slices"]:
+                        s = {"sd": slice["sd"], "sst": slice["sst"] }
+                        if "dnnList" in slice:
+                            tail_res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=s,
+                                                    dnnInfoList=slice["dnnList"])
+                            for dnn in slice["dnnList"]:
+                                if dnn not in dnnList:
+                                    dnnList.append(dnn)
 
-                        if len(dnnList) != 0:
-                            #  add default and slices Dnn list to UPF conf
-                            for upf in self.conf["config"]["upf_nodes"]:
-                                if upf["tac"] == tac["id"]:
-                                    if "dnnList" in upf:
-                                        upf["dnnList"].extend(dnnList)
-                                    else:
-                                        upf["dnnList"] = copy.deepcopy(dnnList)
-                                    break
+                if len(dnnList) != 0:
+                    #  add default and slices Dnn list to UPF conf
+                    for upf in self.conf["config"]["upf_nodes"]:
+                        if upf["tac"] == area["id"]:
+                            if "dnnList" in upf:
+                                upf["dnnList"].extend(dnnList)
+                            else:
+                                upf["dnnList"] = copy.deepcopy(dnnList)
+                            break
 
         for n in self.nsd_:
             if n['type'] == 'core':
@@ -1533,13 +1531,9 @@ class Free5GC_K8s(Blue5GBase):
                 if nsd_type and nsd_type[0] in self.edge_vnfd_type:
                     res += self.core_day2_conf(msg, n)
             elif n['type'] == 'ran':
-                # if self.pnf is False:
-                #    raise ValueError("PNF not supported in this blueprint instance")
                 tail_res += self.ran_day2_conf(msg, n)
             elif n['type'] in self.edge_vnfd_type:
                 res += self.edge_day2_conf(msg, n)
-
-        logger.info("UPDATED!!!")
 
         self.save_conf()
         res = res + tail_res
@@ -1553,31 +1547,32 @@ class Free5GC_K8s(Blue5GBase):
         :return:
         """
         res = []
-        if 'vims' in msg:
-            for msg_vim in msg['vims']:
-                if 'tacs' in msg_vim:
-                    for msg_tac in msg_vim['tacs']:
-                        nsd_list = []
-                        for nsd_item in self.nsd_:
-                            if nsd_item['tac'] == msg_tac['id'] and nsd_item['type'] in self.edge_vnfd_type:
-                                nsd_list.append(nsd_item)
-                        if not nsd_list: # list is empty
-                            raise ValueError('nsd for tac {} not found'.format(msg_tac['id']))
-                        for nsd in nsd_list:
-                            res += self.edge_day2_conf({'vim': msg_vim['name'], 'tac': msg_tac['id']}, nsd)
+        if 'areas' in msg:
+            for area in msg['areas']:
+                nsd_list = []
+                for nsd_item in self.nsd_:
+                    if nsd_item['area'] == area['id'] and nsd_item['type'] in self.edge_vnfd_type:
+                        nsd_list.append(nsd_item)
+                if not nsd_list: # list is empty
+                    raise ValueError('nsd for tac {} not found'.format(area['id']))
+                for nsd in nsd_list:
+                    vim = self.get_vim(area["id"])
+                    if vim == None:
+                        logger.error("area {} has not a valid VIM".format(area["id"]))
+                        continue
+                    res += self.edge_day2_conf({'vim': vim['name'], 'tac': area['id']}, nsd)
         return res
 
     def del_tac_nsd(self, msg: dict) -> list:
         nsi_to_delete = super().del_tac(msg)
-        for v in msg['vims']:
-            if 'tacs' in v:
-                for b in v['tacs']:
-                    for type in self.edge_vnfd_type:
-                        nsd_i = next((index for index, item in enumerate(self.nsd_) if item['tac'] == b['id'] and item['type'] == type), None)
-                        if nsd_i is None:
-                            raise ValueError('nsd not found')
-                        nsi_to_delete.append(self.nsd_[nsd_i]['nsi_id'])
-                        self.nsd_.pop(nsd_i)
+        if "areas" in msg:
+            for area in msg['areas']:
+                for type in self.edge_vnfd_type:
+                    nsd_i = next((index for index, item in enumerate(self.nsd_) if item['area'] == area['id'] and item['type'] == type), None)
+                    if nsd_i is None:
+                        raise ValueError('nsd not found')
+                    nsi_to_delete.append(self.nsd_[nsd_i]['nsi_id'])
+                    self.nsd_.pop(nsd_i)
         return nsi_to_delete
 
     def add_tac_conf(self, msg: dict) -> list:

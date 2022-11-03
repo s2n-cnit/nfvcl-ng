@@ -1591,8 +1591,8 @@ class Free5GC_K8s(Blue5GBase):
                 # add specific slices
                 if "slices" in area:
                     for slice in area["slices"]:
-                        res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice={slice["sst"], slice["sd"]},
-                                    dnnInfoList=slice["dnnList"])
+                        res += self.smf_add_upf(smfName=smfName, tac=area["id"],
+                                    slice={"sst": slice["sst"], "sd": slice["sd"]},dnnInfoList=slice["dnnList"])
                         sdSstDnnlist = [{s["sd"], s["sst"], s["dnnList"]} for s in sliceList]
                         if slice in sdSstDnnlist:
                             elem = sdSstDnnlist[sdSstDnnlist.index(slice)]

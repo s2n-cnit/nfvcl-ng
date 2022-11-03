@@ -94,36 +94,25 @@ class Free5GC_K8s(BlueprintBase):
             }],
         }
         self.primitives = []
-        self.vnfd = {'core': [], 'tac': []}
-        self.vim_core = next((item for item in self.conf['vims'] if item['core']), None)
+        self.vnfd = {'core': [], 'area': []}
+        self.vim_core = next((item for item in self.get_vims() if item['core']), None)
         self.chart = "nfvcl_helm_repo/free5gc:3.2.0"
+        self.image = "free5gc_v3.0.7"
         self.running_free5gc_conf = copy.deepcopy(free5GC_default_config.default_config)
+        # used for NSSF configuration
+        self.nsiIdCounter = 0
         # default slices
         self.defaultSliceList = []
-        # self.defaultSliceList = [
-        #     {
-        #         "sd": "000001",
-        #         "sst": 1,
-        #         "dnnList": [
-        #             {
-        #                 "dnn": "internet",
-        #                 "dns": {"ipv4": "8.8.8.8"},
-        #                 "pools": [{"cidr": "61.0.0.0/24"}]
-        #             }
-        #         ]
-        #     }
-        # ]
         if self.vim_core is None:
             raise ValueError('Vim CORE not found in the input')
-        self.nsiIdCounter = 0
 
-    def set_baseCoreVnfd(self, area: str, vls=None) -> None:
+    def set_baseCoreVnfd(self, vls=None) -> None:
         vnfd = sol006_VNFbuilder({
             'id': '{}_5gc'.format(self.get_id()),
             'name': '{}_5gc'.format(self.get_id()),
             'kdu': [{
                 'name': '5gc',
-                'helm-chart': 'nfvcl_helm_repo/free5gc:3.2.0',
+                'helm-chart': self.chart,
                 'interface': vls
             }]})
         self.vnfd['core'].append({'id': 'core', 'name': vnfd.get_id(), 'vl': vls})
@@ -185,7 +174,7 @@ class Free5GC_K8s(BlueprintBase):
         logger.debug(self.vnfd)
 
     def set_coreVnfd(self, area: str, vls=None) -> None:
-        self.set_baseCoreVnfd(area, vls)
+        self.set_baseCoreVnfd(vls)
 
         logger.debug(self.vnfd)
 

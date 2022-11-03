@@ -9,7 +9,7 @@ import ipaddress
 import logging
 
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
-db = persistency.db()
+db = persistency.DB()
 
 logger = logging.getLogger('keystoneauth')
 ch = logging.StreamHandler()

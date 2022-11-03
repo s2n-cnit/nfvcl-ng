@@ -1,5 +1,4 @@
 import typing
-
 from blueprints.blue_amari5G.blueprint_amari5G import Amari5G
 from blueprints.blueprint import BlueprintBase
 from utils import persistency
@@ -14,7 +13,7 @@ import copy
 import yaml
 import random
 
-db = persistency.db()
+db = persistency.DB()
 
 # create logger
 logger = create_logger('Free5GC_K8s')
@@ -103,7 +102,7 @@ class Free5GC_K8s(Amari5G):
             raise ValueError('Vim CORE not found in the input')
 
     def set_baseCoreVnfd(self, area: str, vls=None) -> None:
-        vnfd = sol006_VNFbuilder({
+        vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
             'id': '{}_5gc'.format(self.get_id()),
             'name': '{}_5gc'.format(self.get_id()),
             'kdu': [{
@@ -135,7 +134,7 @@ class Free5GC_K8s(Amari5G):
 
         if list_ :
             # tac
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'root',
                 'password': 'root',
                 'id': self.get_id() + '_free5gc_upf_' + str(tac),
@@ -152,7 +151,7 @@ class Free5GC_K8s(Amari5G):
             list_.append({'id': 'upf', 'name': vnfd.get_id(), 'vl': interfaces, 'type': 'upf'})
         else :
             # core
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'root',
                 'password': 'root',
                 'id': self.get_id() + '_free5gc_upf',

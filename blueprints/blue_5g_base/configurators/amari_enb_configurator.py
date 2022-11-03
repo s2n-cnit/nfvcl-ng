@@ -28,7 +28,7 @@ class Configurator_AmariENB(Configurator_Flex):
         self.type = "amarienb"
         super(Configurator_AmariENB, self).__init__(nsd_id, m_id, blue_id)
         logger.info("Configurator_AMARIENB allocated")
-        self.db = persistency.db()
+        self.db = persistency.DB()
 
         self.mgt_ip = args["mgt_ip"]
         # self.nsd_id = nsd_id

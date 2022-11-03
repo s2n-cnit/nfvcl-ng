@@ -13,7 +13,7 @@ class Configurator_Amari5GC(Configurator_Flex):
         logger.info("Configurator_Amari5GC allocated")
         self.day2_conf_file_name = 'amari_5GC_plmn_' + str(args['plmn']) + "_blue_" + blue_id + '.conf'
         self.ue_db_filename = 'ue_db_nfvcl.cfg'
-        self.db = persistency.db()
+        self.db = persistency.DB()
 
         self.conf = {'plmn': args['plmn'], 'gtp_ip': None}
 

@@ -1,9 +1,8 @@
 import json
 import datetime
 import requests
-import nfvo.osm_nbi_util
+from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
-from nfvo.osm_nbi_util import nsd_build_package
 from .db_blue_model import DbBlue
 from typing import List, Dict, Union
 import traceback
@@ -14,7 +13,7 @@ from main import create_logger
 from utils import persistency
 
 
-_db = persistency.db()
+_db = persistency.DB()
 
 # create logger
 logger = create_logger('blueprint')
@@ -26,8 +25,8 @@ class BlueprintBase(abc.ABC):
             conf: dict,
             id_: str,
             data: Union[Dict, None] = None,
-            db: persistency.db = None,
-            nbiutil: nfvo.osm_nbi_util.NbiUtil = None
+            db: persistency.DB = None,
+            nbiutil: NbiUtil = None
     ):
         if data:
             self.id = id_

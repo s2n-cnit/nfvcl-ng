@@ -20,7 +20,7 @@ class Blue5GBase(BlueprintBase, ABC):
                 raise ValueError("tac is None in set Vnfd")
             list_ = []
 
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'id': str(self.get_id()) + '_' + pdu['implementation'] + "_tac" + str(area_id) + '_enb',
                 'name': pdu['implementation'] + "_tac" + str(area_id) + '_enb_pnfd',
                 'pdu': [{

@@ -5,7 +5,7 @@ from typing import Union, List, Dict, Optional
 import traceback
 from main import *
 
-db = persistency.db()
+db = persistency.DB()
 logger = create_logger('K8sBlue')
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 
@@ -106,7 +106,7 @@ class K8s(BlueprintBase):
 
         if area == "core":
             interfaces = [{'vld': 'mgt', 'name': 'ens3', "mgt": True}]
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'root',
                 'password': 'root',
                 'id': self.get_id() + '_k8s_master',
@@ -140,7 +140,7 @@ class K8s(BlueprintBase):
                 )
                 intf_index += 1
 
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'root',
                 'password': 'root',
                 'id': '{}_k8s_worker_area_{}'.format(self.get_id(), area_id),

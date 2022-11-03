@@ -7,7 +7,7 @@ from nfvo.nsd_manager import sol006_NSD_builder, get_ns_vld_ip
 from configurators.vyos_configurator import Configurator_VyOs
 from utils.util import *
 
-db = persistency.db()
+db = persistency.DB()
 logger = create_logger('VyOSBlue')
 
 # one router per tac
@@ -53,7 +53,7 @@ class VyOSBlue(BlueprintBase):
 
     def setVnfd(self, vnf_tag, tac, interfaces):
         if vnf_tag is 'VyOS':
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'vyos',
                 'password': 'vyos',
                 'id': self.get_id() + '_vyos_' + str(tac['id']),

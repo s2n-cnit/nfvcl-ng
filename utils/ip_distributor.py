@@ -32,7 +32,7 @@ class IPdistributor:
             if self.pool['ip_start'] <= addr <= self.pool['ip_end']:
                 self.unassigned.append(ipaddress.IPv4Interface('{}/{}'.format(addr, self.net.netmask)))
 
-        self.db = persistency.db()
+        self.db = persistency.DB()
         self.save()
 
     def save(self):

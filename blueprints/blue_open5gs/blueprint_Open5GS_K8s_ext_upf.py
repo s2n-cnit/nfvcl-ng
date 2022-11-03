@@ -11,7 +11,7 @@ from configurators.open5gs_upf_configurator import Configurator_Open5GS_UPF
 import blueprints.blue_open5gs.open5GS_default_config as open5GS_default_config
 import copy
 
-db = persistency.db()
+db = persistency.DB()
 
 # create logger
 logger = create_logger('Open5GS_K8s')
@@ -80,7 +80,7 @@ class Open5GS_K8s_ext_upf(Blue5GBase, ABC):
             raise ValueError('Vim CORE not found in the input')
 
     def set_core_vnfd(self, area: str, vls=None) -> None:
-        vnfd = sol006_VNFbuilder({
+        vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
             'id': '{}_5gc'.format(self.get_id()),
             'name': '{}_5gc'.format(self.get_id()),
             'kdu': [{
@@ -97,7 +97,7 @@ class Open5GS_K8s_ext_upf(Blue5GBase, ABC):
             {"vim_net": vim['mgt'], "vld": "mgt", "name": "ens3", "mgt": True},
             {"vim_net": vim['wan'], "vld": "datanet", "name": "ens4", "mgt": False},
         ]
-        vnfd = sol006_VNFbuilder({
+        vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
             'username': 'root',
             'password': 'root',
             'id': self.get_id() + '_upf_' + str(tac),

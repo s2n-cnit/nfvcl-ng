@@ -10,7 +10,7 @@ class ConfiguratorK8s(Configurator_Flex):
         self.type = "k8s"
         super(ConfiguratorK8s, self).__init__(nsd_id, m_id, blue_id)
         logger.info("Blue {}: Configurator_K8s created for nsd {} and vnfd {}".format(blue_id, nsd_id, m_id))
-        self.db = persistency.db()
+        self.db = persistency.DB()
 
         if role not in ['worker', 'master']:
             raise ValueError('Configurator_K8s role {} not supported'.format(role))

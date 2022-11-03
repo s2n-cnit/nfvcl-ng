@@ -2,8 +2,12 @@ import os
 import shutil
 import tarfile
 import typing
+import yaml
 
-from main import *
+import utils.persistency
+from . import NbiUtil, PNFmanager
+from utils.persistency import DB
+from main import create_logger
 
 
 logger = create_logger('vnfd_manager')
@@ -21,10 +25,14 @@ def copytree(src, dst, symlinks=False, ignore=None):
 
 class sol006_VNFbuilder:
     def __init__(self,
+                 nbi_util: NbiUtil,
+                 db: utils.persistency.DB,
                  vnf_data: dict,
                  charm_name: typing.Optional[str] = None,
                  cloud_init: bool = False,
                  adapt_interfaces=False) -> None:
+        self.nbi_util = nbi_util
+        self.db = db
         self.vnfd = {}
         if 'vdu' in vnf_data:
             vnf_data['mgmt-interface'] = {
@@ -44,7 +52,7 @@ class sol006_VNFbuilder:
         self.create_sol006_descriptor(vnf_data)
         if charm_name:
             self.add_charm(vnf_data)
-        self.create_package(vnf_data)
+        self.create_package(nbi_util, vnf_data)
 
     def get_id(self) -> str:
         return self.vnfd['id']
@@ -104,7 +112,7 @@ class sol006_VNFbuilder:
         if 'pdu' in vnf:
             self.type = 'pnfd'
             for u in vnf['pdu']:
-                pdu = self.manage_pdu(u)
+                pdu = self.manage_pdu(self.nbi_util, self.db, u)
                 # update the username and password
                 vnf.update({'username': pdu['user'], 'password': pdu['passwd']})
                 # now prepare the descriptor
@@ -236,7 +244,7 @@ class sol006_VNFbuilder:
             raise ValueError('default-df missing in the vnfd')
         df['lcm-operations-configuration'] = lcm
 
-    def create_package(self, vnf_data: dict):
+    def create_package(self, nbi_util: NbiUtil, vnf_data: dict):
         self.base_path = '/tmp/vnf_packages/{}_vnfd'.format(self.vnfd['id'])
         # checking the folder tree e clean the vnf folder if it already exists
         if not os.path.exists('/tmp/vnf_packages'):
@@ -276,7 +284,7 @@ class sol006_VNFbuilder:
             tar.add(self.base_path, arcname=os.path.basename(self.base_path))
 
         logger.info("onboarding vnfd " + self.vnfd['id'])
-        res = nbiUtil.vnfd_onboard(self.vnfd['id'] + '_vnfd')
+        res = nbi_util.vnfd_onboard(self.vnfd['id'] + '_vnfd')
         logger.debug(res)
 
     def add_vdu_df(self, deployment_flavor_name: str, insta_level: str, vdu_id: str, count: int = 1,
@@ -286,12 +294,13 @@ class sol006_VNFbuilder:
         instalevel['vdu-level'].append({'vdu-id': vdu_id, 'number-of-instances': count})
         df['vdu-profile'].append({'id': vdu_id, 'min-number-of-instances': min_count})
 
-    def manage_pdu(self, u: dict) -> dict:
+    def manage_pdu(self, nbi_util: NbiUtil, db: DB, u: dict) -> dict:
         db_item = db.findone_DB("pdu", {'name': u['id']})
         logger.debug(db_item)
         if db_item is None:
             raise ValueError('pdu not present in the persistency layer')
         # check the pdu on osm
+        pnf_manager = PNFmanager()
         osm_pdu = pnf_manager.get(u['id'])
         # check if the pdu is already used
         logger.debug(osm_pdu)
@@ -312,7 +321,7 @@ class sol006_VNFbuilder:
         }
         vim_accounts = []
         # add all vim accounts
-        for v in nbiUtil.get_vims():
+        for v in nbi_util.get_vims():
             vim_accounts.append(v['_id'])
         obj['vim_accounts'] = vim_accounts
 

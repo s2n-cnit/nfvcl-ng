@@ -1,1 +1,1 @@
-from blue_ueransim_model import UeranSimBlueprintRequestInstance
+from .blue_ueransim_model import UeranSimBlueprintRequestInstance

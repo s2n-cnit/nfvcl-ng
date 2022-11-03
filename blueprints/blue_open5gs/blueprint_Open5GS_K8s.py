@@ -4,7 +4,7 @@ from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services
 import typing
 from main import *
 
-db = persistency.db()
+db = persistency.DB()
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 # create logger
 logger = create_logger('Open5GsK8s')
@@ -54,7 +54,7 @@ class Open5GsK8s(Blue5GBase):
             raise ValueError('Vim CORE not found in the input')
 
     def set_core_vnfd(self, area: str, vls=None) -> None:
-        vnfd = sol006_VNFbuilder({
+        vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
             'id': '{}_5gc'.format(self.get_id()),
             'name': '{}_5gc'.format(self.get_id()),
             'kdu': [{

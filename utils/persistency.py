@@ -56,7 +56,7 @@ class db_management:
         pass
 
 
-class db:
+class DB:
     @staticmethod
     def insert_DB(collection, data):
         db = OSSdb[collection]

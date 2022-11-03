@@ -6,7 +6,7 @@ from nfvo.vnf_manager import sol006_VNFbuilder
 from nfvo.nsd_manager import sol006_NSD_builder, get_ns_vld_ip
 from main import *
 
-db = persistency.db()
+db = persistency.DB()
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 # create logger
 logger = create_logger('Amari5GBlue')
@@ -60,7 +60,7 @@ class Amari5G(Blue5GBase):
             raise ValueError('Vim CORE not found in the input')
 
     def set_core_vnfd(self, area: str, vls=None) -> None:
-        vnfd = sol006_VNFbuilder({
+        vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
             'username': 'root',
             'password': 'root',
             'id': self.get_id() + '_amarisoft_5gc',

@@ -6,7 +6,7 @@ from utils.util import *
 from typing import Union, Dict
 
 # Insert functions to work with db(mango db)
-db = persistency.db()
+db = persistency.DB()
 logger = create_logger('trexBlueprint')
 
 # log into osm with user and pass
@@ -134,7 +134,7 @@ class Trex(BlueprintBase):
             else:
                 vir_cpu = f'{len(interfaces)}'
 
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'root',
                 'password': 'root',
                 'id': self.get_id() + 'trex',

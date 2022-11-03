@@ -4,7 +4,7 @@ from utils.util import *
 
 sol006 = True
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
-db = persistency.db()
+db = persistency.DB()
 
 # create logger
 logger = create_logger('nsd_manager')

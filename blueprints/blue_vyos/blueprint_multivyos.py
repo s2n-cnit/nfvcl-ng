@@ -5,7 +5,7 @@ from configurators.vyos_configurator import Configurator_MultiVyOs
 from utils import persistency
 import json
 
-db = persistency.db()
+db = persistency.DB()
 
 
 class VyOsMultipleTunnels(BlueprintBase):

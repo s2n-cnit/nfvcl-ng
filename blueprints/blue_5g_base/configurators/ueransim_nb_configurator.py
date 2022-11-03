@@ -2,7 +2,7 @@ from configurators.flex_configurator import Configurator_Flex
 from utils import persistency
 from utils.util import *
 
-db = persistency.db()
+db = persistency.DB()
 logger = create_logger('Configurator_UeRanSimNB')
 
 

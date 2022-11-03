@@ -7,7 +7,7 @@ from utils import persistency
 from typing import Union, Dict
 
 
-db = persistency.db()
+db = persistency.DB()
 logger = create_logger('UeRanSim')
 
 
@@ -55,7 +55,7 @@ class UeRanSim(BlueprintBase):
             if ue_id is None:
                 raise ValueError('UE id should be provided to build the VNFd')
 
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'root',
                 'password': 'root',
                 'id': self.get_id() + '_ue_' + str(ue_id),
@@ -75,7 +75,7 @@ class UeRanSim(BlueprintBase):
             if area is None:
                 raise ValueError('NB area should be provided to build the VNFd')
 
-            vnfd = sol006_VNFbuilder({
+            vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'root',
                 'password': 'root',
                 'id': self.get_id() + '_nb_' + str(area['id']),

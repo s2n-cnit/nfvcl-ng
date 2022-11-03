@@ -1,9 +1,9 @@
 from utils.util import create_logger
 from multiprocessing import Queue, RLock
-from topology.topology import Topology
+from topology import Topology
 import traceback
 from utils.persistency import OSSdb
-from nfvo.osm_nbi_util import NbiUtil
+from nfvo import NbiUtil
 
 
 logger = create_logger('Topology Worker')

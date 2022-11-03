@@ -3,7 +3,7 @@ from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services
 from main import *
 from typing import Union, Dict
 
-db = persistency.db()
+db = persistency.DB()
 logger = create_logger('VOBlue')
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 
@@ -44,7 +44,7 @@ class VO(BlueprintBase):
         return self.nsd()
 
     def setVnfd(self, interfaces: list):
-        vnfd = sol006_VNFbuilder({
+        vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
         'id': '{}_vo'.format(self.get_id()),
         'name': '{}_vo'.format(self.get_id()),
         'kdu': [{

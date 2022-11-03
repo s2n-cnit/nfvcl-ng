@@ -50,7 +50,7 @@ class Configurator_trex(Configurator_Flex):
         # this init add some vars also add playbook yaml file!
         logger.info("Configurator_trex_A created")
         logger.info(f"conf output is {args}")
-        self.db = persistency.db()
+        self.db = persistency.DB()
         # self.role = role
 
         """"# setting default values

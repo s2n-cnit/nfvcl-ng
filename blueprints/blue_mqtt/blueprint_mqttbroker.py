@@ -4,7 +4,7 @@ from nfvo.vnf_manager import sol006_VNFbuilder
 from nfvo.nsd_manager import sol006_NSD_builder
 from utils.util import *
 
-db = persistency.db()
+db = persistency.DB()
 logger = create_logger('MQTT Broker')
 
 
@@ -41,7 +41,7 @@ class MqttBroker(BlueprintBase):
         return self.nsd()
 
     def setVnfd(self, interfaces: list):
-        vnfd = sol006_VNFbuilder({
+        vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
             'id': '{}_mqtt_broker'.format(self.get_id()),
             'name': '{}_mqtt_broker'.format(self.get_id()),
             'kdu': [{

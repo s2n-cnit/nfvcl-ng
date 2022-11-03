@@ -2,7 +2,7 @@ from topology.os_nbi import OSclient
 from utils import persistency
 from utils.util import *
 
-db = persistency.db()
+db = persistency.DB()
 logger = create_logger('VimTerraformer')
 
 

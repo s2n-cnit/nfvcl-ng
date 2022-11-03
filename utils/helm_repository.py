@@ -5,7 +5,7 @@ import os.path
 import hashlib
 
 logger = create_logger('HelmRepository')
-db = persistency.db()
+db = persistency.DB()
 chart_path = 'helm_charts/'
 helm_url_prefix = '/helm_repo/'
 

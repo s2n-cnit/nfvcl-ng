@@ -1,1 +1,1 @@
-from mqttbroker_blue_create_model import MqttRequestBlueprintInstance
+from .mqttbroker_blue_create_model import MqttRequestBlueprintInstance

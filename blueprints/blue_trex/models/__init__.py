@@ -1,1 +1,1 @@
-from trex_blue_create_model import TrexRequestBlueprintInstance
+from .trex_blue_create_model import TrexRequestBlueprintInstance

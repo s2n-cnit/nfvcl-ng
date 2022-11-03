@@ -14,7 +14,7 @@ from utils.util import *
 
 logger = create_logger('BlueLCMWorker')
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
-db = persistency.db()
+db = persistency.DB()
 redis_cli = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8")
 
 def get_blue_by_filter(blue_filter: dict) -> List[dict]:

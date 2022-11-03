@@ -9,8 +9,7 @@ import traceback
 import importlib
 import abc
 from topology import Topology
-from main import create_logger
-from utils import persistency
+from utils import persistency, create_logger
 
 
 _db = persistency.DB()

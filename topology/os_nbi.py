@@ -1,4 +1,4 @@
-from utils.util import *
+from utils.util import osm_user, osm_passwd, osm_proj, osm_ip, osm_port
 from utils import persistency
 from nfvo.osm_nbi_util import NbiUtil
 from neutronclient.v2_0 import client as neutron_client

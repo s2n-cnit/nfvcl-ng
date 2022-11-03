@@ -1,4 +1,4 @@
-from nfvo.osm_nbi_util import NbiUtil
+from nfvo import NbiUtil
 from utils import persistency
 from utils.util import *
 

@@ -7,7 +7,7 @@ import tarfile
 from pathlib import Path
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-from utils.util import create_logger
+from utils import create_logger
 
 
 # Disable the InsecureRequestWarning for the requests to OSM

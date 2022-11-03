@@ -94,7 +94,7 @@ class Create5gModel(BaseModel):
     )
     config: Config5G
     # Fixme: Are you sure areas can be empty ? each one doesnt belong to a area?
-    areas: list[FiveGAreaInfo] = Field([], description="Set area")
+    areas: List[FiveGAreaInfo] = Field([], description="Set area")
 
     class Config:
         use_enum_values = True

@@ -1,5 +1,5 @@
 from utils import persistency
-from nfvo.osm_nbi_util import NbiUtil
+from nfvo import NbiUtil
 from utils.util import *
 import typing
 

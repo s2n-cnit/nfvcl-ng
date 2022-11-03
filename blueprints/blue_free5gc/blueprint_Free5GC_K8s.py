@@ -2,11 +2,11 @@ import typing
 
 from blueprints.blueprint import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
+from blueprints.blue_free5gc import free5GC_default_config
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services, get_ns_vld_ip
 from configurators.free5gc_configurator import Configurator_Free5GC
 from pymongo import MongoClient
 from bson import ObjectId
-import blueprints.blue_free5gc as free5GC_default_config
 import copy
 from main import *
 
@@ -24,7 +24,7 @@ class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
 
-class Free5GC_K8s(BlueprintBase):
+class Free5GC_K8s(Blue5GBase):
     """
     Free5GC modules exported as external VMs
     """
@@ -1179,11 +1179,9 @@ class Free5GC_K8s(BlueprintBase):
             for s in self.conf['config']['subscribers']:
                 if s not in self.running_free5gc_conf['subscribers']:
                     self.running_free5gc_conf['subscribers'].append(s)
-    def bootstrap_day0(self, msg) -> list:
-        return super().bootstrap_day0(msg)
     def core_nsd(self) -> str:
         logger.info("Creating Core NSD(s)")
-        core_v = next((item for item in self.conf['vims'] if item['core']), None)
+        core_v = next((item for item in self.get_vims() if item['core']), None)
         if core_v == None:
             raise ValueError("Core VIM in msg doesn't exist")
         vim_net_mapping = [
@@ -1219,50 +1217,48 @@ class Free5GC_K8s(BlueprintBase):
 
 
         # add tac, slice and dnn ids to all tacs of all vims
-        if "vims" in self.conf:
-            for vim in self.conf["vims"]:
-                if "tacs" in vim:
-                    # add tac id to tacList
-                    for tac in vim["tacs"]:
-                        tacList.append(tac["id"])
-                        if len(self.defaultSliceList) != 0:
-                            for s in self.defaultSliceList:
-                                self.smf_set_configuration(smfName=smfName, dnnList=s["dnnList"],
-                                                       sliceList=[s])
-                            self.n3iwf_set_configuration(n3iwfId=n3iwfId, tac=tac["id"],
-                                                         sliceSupportList=self.defaultSliceList)
-                            self.nssf_set_configuration(nssfName=nssfName, sliceList=self.defaultSliceList,
-                                                        tac=tac["id"])
+        if "areas" in self.conf:
+            # add tac id to tacList (area_id = tac)
+            for area in self.conf["areas"]:
+                tacList.append(area["id"])
+                if len(self.defaultSliceList) != 0:
+                    for s in self.defaultSliceList:
+                        self.smf_set_configuration(smfName=smfName, dnnList=s["dnnList"],
+                                               sliceList=[s])
+                    self.n3iwf_set_configuration(n3iwfId=n3iwfId, tac=area["id"],
+                                                 sliceSupportList=self.defaultSliceList)
+                    self.nssf_set_configuration(nssfName=nssfName, sliceList=self.defaultSliceList,
+                                                tac=area["id"])
 
-                        if "slices" in tac:
-                            # add slice to sliceList
-                            tacSliceList = []
-                            for slice in tac["slices"]:
-                                s = {"sd": slice["sd"], "sst": slice["sst"]}
-                                if s not in tacSliceList:
-                                    tacSliceList.append(s)
-                                if s not in sliceList:
-                                    sliceList.append(s)
-                                if "dnnList" in slice:
-                                    # add dnn to dnnList
-                                    dnnSliceList = []
-                                    for dnn in slice["dnnList"]:
-                                        if dnn not in dnnSliceList:
-                                            dnnSliceList.append(dnn)
-                                        if dnn not in dnnList:
-                                            dnnList.append(dnn)
+                if "slices" in area:
+                    # add slice to sliceList
+                    tacSliceList = []
+                    for slice in area["slices"]:
+                        s = {"sd": slice["sd"], "sst": slice["sst"]}
+                        if s not in tacSliceList:
+                            tacSliceList.append(s)
+                        if s not in sliceList:
+                            sliceList.append(s)
+                        if "dnnList" in slice:
+                            # add dnn to dnnList
+                            dnnSliceList = []
+                            for dnn in slice["dnnList"]:
+                                if dnn not in dnnSliceList:
+                                    dnnSliceList.append(dnn)
+                                if dnn not in dnnList:
+                                    dnnList.append(dnn)
 
-                                    self.smf_set_configuration(smfName=smfName, dnnList=dnnSliceList, sliceList=[s])
+                            self.smf_set_configuration(smfName=smfName, dnnList=dnnSliceList, sliceList=[s])
 
-                            self.n3iwf_set_configuration(n3iwfId=n3iwfId, tac=tac["id"], sliceSupportList=tacSliceList)
-                            self.nssf_set_configuration(nssfName=nssfName, sliceList=tacSliceList, tac=tac["id"])
+                    self.n3iwf_set_configuration(n3iwfId=n3iwfId, tac=area["id"], sliceSupportList=tacSliceList)
+                    self.nssf_set_configuration(nssfName=nssfName, sliceList=tacSliceList, tac=area["id"])
 
-                    # if there are not "tac" or "slices" associated with tac (excluding default values),
-                    # it executes a default configuration
-                    if len(tacList) == 0 or len(sliceList) == 0:
-                        self.smf_set_configuration(smfName=smfName, dnnList=dnnList, sliceList=sliceList)
-                        self.n3iwf_set_configuration(n3iwfId=n3iwfId)
-                        self.nssf_set_configuration(nssfName=nssfName)
+            # if there are not "tac" or "slices" associated with tac (excluding default values),
+            # it executes a default configuration
+            if len(tacList) == 0 or len(sliceList) == 0:
+                self.smf_set_configuration(smfName=smfName, dnnList=dnnList, sliceList=sliceList)
+                self.n3iwf_set_configuration(n3iwfId=n3iwfId)
+                self.nssf_set_configuration(nssfName=nssfName)
 
         if len(self.defaultSliceList) != 0:
             sliceList.extend(self.defaultSliceList)
@@ -1274,26 +1270,8 @@ class Free5GC_K8s(BlueprintBase):
         self.nrf_set_configuration()
         self.pcf_set_configuration()
         # SMF: "nodes" and "links" will be configured during "day2", because ip addresses are not known in this phase
-        #self.smf_set_configuration(dnnList = dnnList, sliceList = sliceList)
         self.udm_set_configuration()
         self.udr_set_configuration()
-        # for tac in tacList:
-        #     self.n3iwf_set_configuration(tac = tac, sliceSupportList = sliceList)
-        #     self.nssf_set_configuration(sliceList=sliceList, tac=tac)
-
-        # activation of 5G core modules
-        # self.running_free5gc_conf["deployAMF"] = True
-        # self.running_free5gc_conf["deployAUSF"] = True
-        # self.running_free5gc_conf["deployN3IWF"] = True
-        # self.running_free5gc_conf["deployNRF"] = True
-        # self.running_free5gc_conf["deployNSSF"] = True
-        # self.running_free5gc_conf["deployPCF"] = True
-        # self.running_free5gc_conf["deploySMF"] = True
-        # self.running_free5gc_conf["deployUDM"] = True
-        # self.running_free5gc_conf["deployUDR"] = True
-        # self.running_free5gc_conf["deployWEBUI"] = True
-
-        #self.add_ues_from_configfile()
 
         self.save_conf()
 
@@ -1343,12 +1321,14 @@ class Free5GC_K8s(BlueprintBase):
 
         return nsd_names
 
-    def edge_nsd(self, tac: dict, vim: dict) -> str:
-        # NOTE: no bypass here!
-        logger.info("Creating EDGE NSD(s) for tac {} on vim {}".format(tac['id'], vim['name']))
+    def edge_nsd(self, area_id: int = 0) -> str:
+        vim = self.get_vim(area_id)
+        if vim == None:
+            raise ValueError("Area {} has not a valid VIM".format(area_id))
+        logger.info("Creating EDGE NSD(s) for tac {} on vim {}".format(area_id, vim["id"]))
         param_name_list = []
 
-        self.set_edgeVnfd('tac', tac['id'], vim)
+        self.set_edgeVnfd('area', area_id)
 
         if vim['mgt'] != vim['wan']['id']:
             vim_net_mapping = [
@@ -1362,16 +1342,16 @@ class Free5GC_K8s(BlueprintBase):
 
         for type in self.edge_vnfd_type :
             param = {
-                'name': '{}_{}_{}_{}'.format(type.upper(), str(tac['id']), str(self.conf['plmn']), str(self.get_id())),
-                'id': '{}_{}_{}_{}'.format(type.upper(), str(tac['id']), str(self.conf['plmn']), str(self.get_id())),
+                'name': '{}_{}_{}_{}'.format(type.upper(), str(area_id), str(self.conf['plmn']), str(self.get_id())),
+                'id': '{}_{}_{}_{}'.format(type.upper(), str(area_id), str(self.conf['plmn']), str(self.get_id())),
                 'type': '{}'.format(type)
             }
-            edge_vnfd = self.getVnfd('tac', tac['id'], type)
+            edge_vnfd = self.getVnfd('area', area_id, type)
             if not edge_vnfd:
                 continue
             n_obj = sol006_NSD_builder(edge_vnfd, vim, param, vim_net_mapping)
             nsd_item = n_obj.get_nsd()
-            nsd_item['tac'] = tac['id']
+            nsd_item['area'] = area_id
             nsd_item['vld'] = vim_net_mapping
             self.nsd_.append(nsd_item)
             param_name_list.append(param['name'])
@@ -1384,20 +1364,14 @@ class Free5GC_K8s(BlueprintBase):
         :param msg: configuration message
         :return: list of nsd to create
         """
-        # update current blue config with new data. The "pending" status is reflected in self.nsd_ status
-        # if self.check_tacs(msg):
-        #    raise ValueError('TACs in msg already exist')
-        # self.update_confvims(msg['vims'])
         nsd_names = []
-        if 'vims' in msg:
-            for v in msg['vims']:
-                if 'tacs' in v:
-                    for b in v['tacs']:
-                        nsd_n = self.edge_nsd(b, v)
-                        try:
-                            nsd_names.extend(nsd_n)
-                        except TypeError:
-                            nsd_names.append(nsd_n)
+        if 'areas' in msg:
+            for area in msg['areas']:
+                nsd_n = self.edge_nsd(area["id"])
+                try:
+                    nsd_names.extend(nsd_n)
+                except TypeError:
+                    nsd_names.append(nsd_n)
         return nsd_names
 
     def core_day2_conf(self, arg: dict, nsd_item: dict) -> list:
@@ -1435,7 +1409,7 @@ class Free5GC_K8s(BlueprintBase):
         conf_data = {
             'plmn': str(self.conf['plmn']),
             'upf_nodes': self.conf['config']['upf_nodes'],
-            'tac': nsd_item['tac'] # tac of the node
+            'tac': nsd_item['area'] # tac of the node is the area ID
         }
 
         config = Configurator_Free5GC(
@@ -1489,14 +1463,15 @@ class Free5GC_K8s(BlueprintBase):
                                  "sNssaiUpfInfos": [{"dnnUpfInfoList": dnnUpfInfoList, "sNssai": slice}]}
                         upNodes["UPF-{}".format(tac)] = UPF
 
-        vim = next((item for item in self.conf['vims']), None)
-        if "vims" in self.conf:
-            for vim in self.conf["vims"]:
-                if "tacs" in vim:
-                    for tacNode in vim["tacs"]:
-                        if tacNode["id"] == tac:
-                            upNodes["gNB-{}".format(tac)] = {"type": "AN", "an_ip": "{}".format(tacNode["nb_wan_ip"])}
-                            break
+        if "areas" in self.conf:
+            for area in self.conf["areas"]:
+                vim = self.get_vim(area["id"])
+                if vim == None:
+                    logger.error("area {} has not a valid VIM".format(area["id"]))
+                    continue
+                if area["id"] == tac and "nb_wan_ip" in area:
+                    upNodes["gNB-{}".format(tac)] = {"type": "AN", "an_ip": "{}".format(area["nb_wan_ip"])}
+                    break
 
         upNodesList = list(upNodes)
         if links == None:

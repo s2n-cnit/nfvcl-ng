@@ -1,3 +1,4 @@
+from typing import List
 from blueprints.blueprint import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
 from blueprints.blue_free5gc import free5GC_default_config
@@ -22,7 +23,7 @@ class Free5GC_K8s(Blue5GBase):
     """
     edge_vnfd_type = ['upf']
 
-    def __init__(self, conf: dict, id_: str, recover: bool) -> None:
+    def __init__(self, conf: dict, id_: str) -> None:
         BlueprintBase.__init__(self, conf, id_, db=db, nbiutil=nbiUtil)
         logger.info("Creating \"Free5GC_K8s\" Blueprint")
         self.supported_operations = {
@@ -89,13 +90,13 @@ class Free5GC_K8s(Blue5GBase):
         }
         self.primitives = []
         self.vnfd = {'core': [], 'area': []}
-        self.vim_core = next((item for item in self.get_vims() if item['core']), None)
         self.chart = "nfvcl_helm_repo/free5gc:3.2.0"
         self.image = "free5gc_v3.0.7"
         # default slices
         self.defaultSliceList = []
         self.userManager = Configurator_Free5GC_User()
-        self.coreManager = Configurator_Free5GC_Core(copy.deepcopy(free5GC_default_config.default_config))
+        self.coreManager = Configurator_Free5GC_Core(conf, id_, copy.deepcopy(free5GC_default_config.default_config))
+        self.vim_core = next((item for item in self.get_vims() if item['core']), None)
         if self.vim_core is None:
             raise ValueError('Vim CORE not found in the input')
 
@@ -192,17 +193,7 @@ class Free5GC_K8s(Blue5GBase):
             raise ValueError("area = {} is UNKNOWN".format(area))
         return id_list
 
-    def add_ues_from_configfile(self) -> None:
-        """
-        Add UEs subscribers
-        """
-        if 'config' in self.conf and 'subscribers' in self.conf['config']:
-            if 'subscribers' not in self.running_free5gc_conf:
-                self.running_free5gc_conf['subscribers'] = []
-            for s in self.conf['config']['subscribers']:
-                if s not in self.running_free5gc_conf['subscribers']:
-                    self.running_free5gc_conf['subscribers'].append(s)
-    def core_nsd(self) -> str:
+    def core_nsd(self) -> List[str]:
         logger.info("Creating Core NSD(s)")
         core_v = next((item for item in self.get_vims() if item['core']), None)
         if core_v == None:
@@ -212,91 +203,17 @@ class Free5GC_K8s(Blue5GBase):
         ]
         nsd_names = []
 
-        self.setVnfd('core', vls=vim_net_mapping)
+        self.set_coreVnfd(vls=vim_net_mapping)
 
+        # TODO read subnetIP and gatewayIP from core_v
         # set networking parameters for 5GC core running configuration files
-        self.set_core_networking_parameters( interfaceName = "ens3", subnetIP = "192.168.0.0",
+        self.coreManager.set_core_networking_parameters( interfaceName = "ens3", subnetIP = "192.168.0.0",
                                              gatewayIP = "192.168.0.254" )
 
         # reset configuration
-        self.amf_reset_configuration()
-        self.ausf_reset_configuration()
-        self.n3iwf_reset_configuration()
-        self.nrf_reset_configuration()
-        self.nssf_reset_configuration()
-        self.pcf_reset_configuration()
-        self.smf_reset_configuration()
-        self.udm_reset_configuration()
-        self.udr_reset_configuration()
+        self.coreManager.reset_core_configuration()
 
-        # set configuration
-        tacList = []
-        sliceList = []
-        dnnList = []
-
-        smfName = "SMF-{0:06X}".format(random.randrange(0x000000, 0xFFFFFF))
-        n3iwfId = random.randint(1, 9999)
-        nssfName = "{0:06x}".format(random.randrange(0x000000, 0xFFFFFF))
-
-
-        # add tac, slice and dnn ids to all tacs of all vims
-        if "areas" in self.conf:
-            # add tac id to tacList (area_id = tac)
-            for area in self.conf["areas"]:
-                tacList.append(area["id"])
-                if len(self.defaultSliceList) != 0:
-                    for s in self.defaultSliceList:
-                        self.smf_set_configuration(smfName=smfName, dnnList=s["dnnList"],
-                                               sliceList=[s])
-                    self.n3iwf_set_configuration(n3iwfId=n3iwfId, tac=area["id"],
-                                                 sliceSupportList=self.defaultSliceList)
-                    self.nssf_set_configuration(nssfName=nssfName, sliceList=self.defaultSliceList,
-                                                tac=area["id"])
-
-                if "slices" in area:
-                    # add slice to sliceList
-                    tacSliceList = []
-                    for slice in area["slices"]:
-                        s = {"sd": slice["sd"], "sst": slice["sst"]}
-                        if s not in tacSliceList:
-                            tacSliceList.append(s)
-                        if s not in sliceList:
-                            sliceList.append(s)
-                        if "dnnList" in slice:
-                            # add dnn to dnnList
-                            dnnSliceList = []
-                            for dnn in slice["dnnList"]:
-                                if dnn not in dnnSliceList:
-                                    dnnSliceList.append(dnn)
-                                if dnn not in dnnList:
-                                    dnnList.append(dnn)
-
-                            self.smf_set_configuration(smfName=smfName, dnnList=dnnSliceList, sliceList=[s])
-
-                    self.n3iwf_set_configuration(n3iwfId=n3iwfId, tac=area["id"], sliceSupportList=tacSliceList)
-                    self.nssf_set_configuration(nssfName=nssfName, sliceList=tacSliceList, tac=area["id"])
-
-            # if there are not "tac" or "slices" associated with tac (excluding default values),
-            # it executes a default configuration
-            if len(tacList) == 0 or len(sliceList) == 0:
-                self.smf_set_configuration(smfName=smfName, dnnList=dnnList, sliceList=sliceList)
-                self.n3iwf_set_configuration(n3iwfId=n3iwfId)
-                self.nssf_set_configuration(nssfName=nssfName)
-
-        if len(self.defaultSliceList) != 0:
-            sliceList.extend(self.defaultSliceList)
-            for s in self.defaultSliceList:
-                dnnList.extend(s["dnnList"])
-        self.amf_set_configuration(supportedTacList = tacList, snssaiList = sliceList, dnnList = dnnList)
-
-        self.ausf_set_configuration()
-        self.nrf_set_configuration()
-        self.pcf_set_configuration()
-        # SMF: "nodes" and "links" will be configured during "day2", because ip addresses are not known in this phase
-        self.udm_set_configuration()
-        self.udr_set_configuration()
-
-        self.save_conf()
+        self.coreManager.add_tacs_and_slices(self.conf)
 
         vnfd_ = self.getVnfd('core')
         # Kubernetes
@@ -314,7 +231,7 @@ class Free5GC_K8s(Blue5GBase):
                 'vnf_id': '{}_5gc'.format(self.get_id()),
                 'kdu_confs': [{'kdu_name': '5gc',
                                "k8s-namespace": str(self.get_id()).lower(),
-                               "additionalParams": self.running_free5gc_conf}]
+                               "additionalParams": self.coreManager.getConfiguration()}]
             }]
             param = {
                 'name': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
@@ -344,14 +261,15 @@ class Free5GC_K8s(Blue5GBase):
 
         return nsd_names
 
-    def edge_nsd(self, area_id: int = 0) -> str:
-        vim = self.get_vim(area_id)
-        if vim == None:
-            raise ValueError("Area {} has not a valid VIM".format(area_id))
-        logger.info("Creating EDGE NSD(s) for tac {} on vim {}".format(area_id, vim["id"]))
+    # TODO: ask: why vim_name if there is area?
+    def edge_nsd(self, area: dict, vim_name: str) -> List[str]:
+        vim = self.get_vim(area["id"])
+        if vim is None:
+            raise ValueError("Area {} has not a valid VIM".format(area["id"]))
+        logger.info("Creating EDGE NSD(s) for tac {} on vim {}".format(area["id"], vim["id"]))
         param_name_list = []
 
-        self.set_edgeVnfd('area', area_id)
+        self.set_edgeVnfd('area', area["id"])
 
         if vim['mgt'] != vim['wan']['id']:
             vim_net_mapping = [
@@ -365,16 +283,16 @@ class Free5GC_K8s(Blue5GBase):
 
         for type in self.edge_vnfd_type :
             param = {
-                'name': '{}_{}_{}_{}'.format(type.upper(), str(area_id), str(self.conf['plmn']), str(self.get_id())),
-                'id': '{}_{}_{}_{}'.format(type.upper(), str(area_id), str(self.conf['plmn']), str(self.get_id())),
+                'name': '{}_{}_{}_{}'.format(type.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
+                'id': '{}_{}_{}_{}'.format(type.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
                 'type': '{}'.format(type)
             }
-            edge_vnfd = self.getVnfd('area', area_id, type)
+            edge_vnfd = self.getVnfd('area', area["id"], type)
             if not edge_vnfd:
                 continue
-            n_obj = sol006_NSD_builder(edge_vnfd, vim, param, vim_net_mapping)
+            n_obj = sol006_NSD_builder(edge_vnfd, vim["name"], param, vim_net_mapping)
             nsd_item = n_obj.get_nsd()
-            nsd_item['area'] = area_id
+            nsd_item['area'] = area["id"]
             nsd_item['vld'] = vim_net_mapping
             self.nsd_.append(nsd_item)
             param_name_list.append(param['name'])
@@ -390,7 +308,7 @@ class Free5GC_K8s(Blue5GBase):
         nsd_names = []
         if 'areas' in msg:
             for area in msg['areas']:
-                nsd_n = self.edge_nsd(area["id"])
+                nsd_n = self.edge_nsd(area["id"], self.get_vim_name(area["id"]))
                 try:
                     nsd_names.extend(nsd_n)
                 except TypeError:
@@ -447,105 +365,12 @@ class Free5GC_K8s(Blue5GBase):
 
         return res
 
-    def smf_del_upf(self, smfName: str, tac: int, slice: dict = None, dnnInfoList: list = None):
-        """
-        Del UPF(s) data to the configuration of SMF and restart SMF module in Free5GC deployment
-
-        :return: day2 object to add to "res" list for execution
-        """
-        logger.info("upf_nodes: {}".format(self.conf["config"]["upf_nodes"]))
-
-        self.smf_unset_configuration(dnnList=dnnInfoList, sliceList=[slice], tacList=[{"id": tac}])
-        self.config_5g_core_for_reboot()
-
-        msg2up = {'config': self.running_free5gc_conf}
-        return self.core_upXade(msg2up)
-
-    def smf_add_upf(self, smfName: str, tac: int, links: list = None, slice: dict = None, dnnInfoList: list = None):
-        """
-        Add UPF(s) data to the configuration of SMF and restart SMF module in Free5GC deployment
-
-        :return: day2 object to add to "res" list for execution
-        """
-        logger.info("upf_nodes: {}".format(self.conf["config"]["upf_nodes"]))
-        upNodes = {}
-        # fill "upNodes" with UPFs
-        # TODO complete with UPFs of core
-        if "config" in self.conf:
-            if "upf_nodes" in self.conf["config"]:
-                upfList = self.conf["config"]["upf_nodes"]
-                for upf in upfList:
-                    logger.info(" * upf[\"tac\"] = {} , tac = {}".format(upf["tac"], tac))
-                    if upf["tac"] == tac:
-                        dnnUpfInfoList = []
-                        for dnnInfo in dnnInfoList:
-                            dnnUpfInfoList.append({"dnn": dnnInfo["dnn"], "pools": dnnInfo["pools"]})
-                        UPF = {"nodeID": upf["ip"], "type": "UPF",
-                                 "interfaces": [{"endpoints": [upf["ip"]], "interfaceType": "N3",
-                                                 "networkInstance": dnnInfoList[0]["dnn"]}],
-                                 "sNssaiUpfInfos": [{"dnnUpfInfoList": dnnUpfInfoList, "sNssai": slice}]}
-                        upNodes["UPF-{}".format(tac)] = UPF
-
-        if "areas" in self.conf:
-            for area in self.conf["areas"]:
-                vim = self.get_vim(area["id"])
-                if vim == None:
-                    logger.error("area {} has not a valid VIM".format(area["id"]))
-                    continue
-                if area["id"] == tac and "nb_wan_ip" in area:
-                    upNodes["gNB-{}".format(tac)] = {"type": "AN", "an_ip": "{}".format(area["nb_wan_ip"])}
-                    break
-
-        upNodesList = list(upNodes)
-        if links == None:
-            if len(upNodesList) != 2:
-                logger.error("len of link is {}, links = {}".format(len(upNodesList), upNodesList))
-                raise ValueError("len of link is {}, links = {}".format(len(upNodesList), upNodesList))
-            links = [{"A": upNodesList[0], "B": upNodesList[1]}]
-
-        self.smf_set_configuration(smfName = smfName, links = links, upNodes = upNodes)
-        self.config_5g_core_for_reboot()
-
-        msg2up = {'config': self.running_free5gc_conf}
-        return self.core_upXade(msg2up)
-
     def init_day2_conf(self, msg: dict) -> list:
         logger.info("Initializing Day2 configurations")
         res = []
-        tail_res = []
-        self.save_conf()
 
-        smfName = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]["smfName"]
-
-        if "areas" in msg:
-            for area in msg["areas"]:
-                dnnList = []
-                if len(self.defaultSliceList) != 0:
-                    for s in self.defaultSliceList:
-                        tail_res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=s,
-                                                dnnInfoList=s["dnnList"])
-                        for dnn in s["dnnList"]:
-                            if dnn not in dnnList:
-                                dnnList.append(dnn)
-                if "slices" in area:
-                    for slice in area["slices"]:
-                        s = {"sd": slice["sd"], "sst": slice["sst"] }
-                        if "dnnList" in slice:
-                            tail_res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=s,
-                                                    dnnInfoList=slice["dnnList"])
-                            for dnn in slice["dnnList"]:
-                                if dnn not in dnnList:
-                                    dnnList.append(dnn)
-
-                if len(dnnList) != 0:
-                    #  add default and slices Dnn list to UPF conf
-                    for upf in self.conf["config"]["upf_nodes"]:
-                        if upf["tac"] == area["id"]:
-                            if "dnnList" in upf:
-                                upf["dnnList"].extend(dnnList)
-                            else:
-                                upf["dnnList"] = copy.deepcopy(dnnList)
-                            break
+        msg2up = {'config': self.coreManager.getConfiguration()}
+        res += self.core_upXade(msg2up)
 
         for n in self.nsd_:
             if n['type'] == 'core':
@@ -554,12 +379,9 @@ class Free5GC_K8s(Blue5GBase):
                 if nsd_type and nsd_type[0] in self.edge_vnfd_type:
                     res += self.core_day2_conf(msg, n)
             elif n['type'] == 'ran':
-                tail_res += self.ran_day2_conf(msg, n)
+                res += self.ran_day2_conf(msg, n)
             elif n['type'] in self.edge_vnfd_type:
                 res += self.edge_day2_conf(msg, n)
-
-        self.save_conf()
-        res = res + tail_res
 
         return res
 
@@ -587,11 +409,12 @@ class Free5GC_K8s(Blue5GBase):
         return res
 
     def del_tac_nsd(self, msg: dict) -> list:
-        nsi_to_delete = super().del_tac(msg)
+        nsi_to_delete = super().del_area(msg)
         if "areas" in msg:
             for area in msg['areas']:
                 for type in self.edge_vnfd_type:
-                    nsd_i = next((index for index, item in enumerate(self.nsd_) if item['area'] == area['id'] and item['type'] == type), None)
+                    nsd_i = next((index for index, item in enumerate(self.nsd_)
+                                  if item['area'] == area['id'] and item['type'] == type), None)
                     if nsd_i is None:
                         raise ValueError('nsd not found')
                     nsi_to_delete.append(self.nsd_[nsd_i]['nsi_id'])
@@ -848,67 +671,6 @@ class Free5GC_K8s(Blue5GBase):
                     res += self.core_upXade(msg2up) + tail_res
 
         return res
-
-    def config_5g_core_for_reboot(self) -> None:
-        """
-        This method modifies the running configuration of all 5G core modules.
-        So k8s, after loading it, restarts each module
-        :return:
-        """
-        self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        # Don't reboot NRF
-        #self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]\
-        #    ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-
-        amfConfigurationBase = self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configuration"] = \
-            yaml.dump(amfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        ausfConfigurationBase = self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"]["configuration"] = \
-            yaml.dump(ausfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        n3iwfConfigurationBase = self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configuration"] = \
-            yaml.dump(n3iwfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        # Don't reboot NRF
-        # nrfConfigurationBase = self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]
-        # self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configuration"] = \
-        #     yaml.dump(nrfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        nssfConfigurationBase = self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configuration"] = \
-            yaml.dump(nssfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        pcfConfigurationBase = self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configuration"] = \
-            yaml.dump(pcfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        smfConfigurationBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
-            yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        udmConfigurationBase = self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configuration"] = \
-            yaml.dump(udmConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        udrConfigurationBase = self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configuration"] = \
-            yaml.dump(udrConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        webuiConfigurationBase = self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"][
-            "configurationBase"]
-        self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]["configuration"] = \
-            yaml.dump(webuiConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def core_upXade(self, msg: dict) -> list:
         ns_core = next((item for item in self.nsd_ if item['type'] == 'core'), None)

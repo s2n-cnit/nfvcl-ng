@@ -1603,7 +1603,5 @@ default_config = {
         }
       }
     }
-  },
-
-  "subscribers": []
+  }
 }

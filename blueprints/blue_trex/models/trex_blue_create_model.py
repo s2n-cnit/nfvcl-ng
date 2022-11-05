@@ -28,7 +28,7 @@ class Vim(BaseModel):
 
 
 class TrexRequestBlueprintInstance(BaseModel):
-    type: Literal["Trex"] = Field(
+    type: Literal["trex"] = Field(
         None, description='type of the requested Blueprint'
     )
     callbackURL: Optional[str] = Field(

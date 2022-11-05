@@ -8,7 +8,7 @@ from pydantic import AnyHttpUrl
 from typing import Union, List
 
 topology_router = APIRouter(
-    prefix="/topology",
+    prefix="/v1/topology",
     tags=["Topology"],
     responses={404: {"description": "Not found"}},
 )

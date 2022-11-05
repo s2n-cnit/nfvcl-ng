@@ -111,6 +111,7 @@ class PduModel(BaseModel):
     type: str
     user: str
     passwd: str
+    nfvo_onboarded: bool =False
     implementation: str
     config: dict
     interface: conlist(PduInterface, min_items=1)  # = Field(..., min_items=1)

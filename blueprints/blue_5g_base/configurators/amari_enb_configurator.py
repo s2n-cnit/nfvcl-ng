@@ -121,7 +121,7 @@ class Configurator_AmariENB(Configurator_Flex):
                 print(res)
                 break
 
-        if license_ip is "":
+        if license_ip == "":
             raise ValueError("no Amarisoft License Servers available")
 
         return license_ip

@@ -43,7 +43,7 @@ class VyOsMultipleTunnels(BlueprintBase):
                 str(self.conf['slice']) + '_' + str(serv['id']) + '_nsd'
             n_['id'] = 'tunnel_' + \
                 str(self.conf['slice']) + '_' + str(serv['id'])
-            n_ = self.up dateVnfdNames(self.vnfd, n_)
+            n_ = self.updateVnfdNames(self.vnfd, n_)
 
             for link in n_['vld']:
                 if link['id'] == 'wan_vld':

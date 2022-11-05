@@ -1,9 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-import json
-from typing import List, Union, Any
+from typing import List, Union
 from main import *
-# from nfvcl import db
 
 
 class AnsiblePlaybookResult(BaseModel):

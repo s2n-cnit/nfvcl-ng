@@ -8,7 +8,8 @@ import traceback
 import redis
 from typing import List
 from utils import persistency
-from blueprints import BlueprintBase, ShortBlueModel, DetailedBlueModel
+from .blueprint import BlueprintBase
+from .rest_blue import ShortBlueModel, DetailedBlueModel
 from nfvo import NbiUtil, get_nsd_name
 from utils.util import *
 
@@ -100,7 +101,7 @@ class BlueLCMworker:
         self.state = state
         self.queue = session_queue
         self.update_db()
-        redis_cli.publish('blueprint', self.blue.print_short_summary())
+        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
         while True:
             logger.info('worker {} awaiting for new job'.format(self.blue.get_id()))
             s_input = self.queue.get()

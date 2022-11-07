@@ -461,14 +461,15 @@ class Topology:
             if pdu_check:
                 raise ValueError('PDU {} already existing'.format(pdu['name']))
 
-            status = "not onboarded"
+            # status = "not onboarded"
+            pdu.update({'nfvo-onboarded': False, "details": ""})
+            self._data['pdus'].append(pdu)
+            self.save_topology()
 
         except Exception:
             logger.error(traceback.format_exc())
-            status = "error"
             details = "{}".format(traceback.format_exc())
-        finally:
-            pdu.update({'nfvo-onboarding': status, "details": details})
+            pdu.update({'nfvo-onboarded': False, "details": details})
             self._data['pdus'].append(pdu)
             self.save_topology()
 
@@ -477,7 +478,7 @@ class Topology:
         try:
             pdu = next(item for item in self._data['pdus'] if item['name'] == pdu_name)
             res = False
-            if pdu['nfvo-onboarding'] == 'onboarded':
+            if pdu['nfvo-onboarded']:
                 res = self.nbiutil.delete_pdu(pdu_name)
                 logger.info("Deleting pdu from OSM, result: {}".format(res))
             if res:

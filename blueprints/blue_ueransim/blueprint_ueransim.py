@@ -1,12 +1,12 @@
-from blueprints.blueprint import BlueprintBase
-from nfvo.vnf_manager import sol006_VNFbuilder
-from nfvo.nsd_manager import sol006_NSD_builder, get_ns_vld_ip
-from configurators.ueransim_configurator import ConfiguratorUeUeRanSim
-from main import create_logger, nbiUtil
+from blueprints import BlueprintBase
+from nfvo import sol006_VNFbuilder,  sol006_NSD_builder, get_ns_vld_ip, NbiUtil
+from .configurators.ueransim_configurator import ConfiguratorUeUeRanSim
+# from main import create_logger, nbiUtil
 from utils import persistency
+from utils.util import *
 from typing import Union, Dict
 
-
+nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 db = persistency.DB()
 logger = create_logger('UeRanSim')
 
@@ -185,7 +185,7 @@ class UeRanSim(BlueprintBase):
             if nsd_item['type'] == 'nb':
                 for area in self.conf['areas']:
                     if 'area' in nsd_item and area['id'] == nsd_item['area']:
-                        pdu_check = self.topology_get_pdu_by_area({'area': area['id']})
+                        pdu_check = self.topology_get_pdu_by_area(area['id'])
                         if pdu_check:
                             self.status = 'error'
                             self.detailed_status = 'PDU at area {} already existing'.format(area['id'])
@@ -219,6 +219,7 @@ class UeRanSim(BlueprintBase):
                             'user': 'root',
                             'passwd': 'root',
                             'implementation': "ueransim_nb",
+                            'nfvo_onboarded': False,
                             'config': {'cell_id': '{}'.format(hex(1000 + area['id'])), 'radio_addr': gnb_radio_ips[-1]},
                             'interface': pdu_interfaces
                         }

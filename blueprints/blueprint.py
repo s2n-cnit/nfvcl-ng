@@ -4,6 +4,7 @@ import requests
 from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
 from .db_blue_model import DbBlue
+from blueprints.blue_types import blueprint_types
 from typing import List, Dict, Union
 import traceback
 import importlib
@@ -64,7 +65,7 @@ class BlueprintBase(abc.ABC):
             self.status = 'idle'
             self.detailed_status = None
             self.current_operation = None
-            self.modified = None
+            self.modified = datetime.datetime.now()
             self.supported_operations = {}
             self.blue_type = self.__class__.__name__
             self.conf["blueprint_type"] = self.blue_type
@@ -75,31 +76,32 @@ class BlueprintBase(abc.ABC):
     @classmethod
     def from_db(cls, blue_id):
         db_data = _db.findone_DB("blueprint-instances", {'id': blue_id})
-        if db_data and 'type' in db_data:
-            candidate_blue = _db.findone_DB("blueprints", {'id': db_data['type']})
-            if not candidate_blue:
-                raise ValueError('type {} for blueprint {} not found'.format(blue_id, db_data['type']))
-            try:
-                data = DbBlue.parse_obj(db_data).dict()
-                return getattr(importlib.import_module(
-                    "blueprints." + candidate_blue['module']), data['type'])(data['conf'], blue_id, data=data)
-            except Exception:
-                logger.error(traceback.format_exc())
-                raise ValueError('re-initialization for blueprint {} of type {} failed'
-                                 .format(blue_id, db_data['type']))
-        else:
+        if not db_data:
             raise ValueError('blueprint {} not found in DB or malformed'.format(blue_id))
+        data = DbBlue.parse_obj(db_data).dict()
+        if data['type'] not in blueprint_types:
+            raise ValueError('type {} for blueprint {} not found'.format(data['type'], blue_id))
+        blue_class = blueprint_types[data['type']]
+        try:
+
+            return getattr(importlib.import_module(
+                "blueprints." + blue_class['module_name']), blue_class['class_name'])(data['conf'], blue_id, data=data)
+        except Exception:
+            logger.error(traceback.format_exc())
+            raise ValueError('re-initialization for blueprint {} of type {} failed'
+                             .format(blue_id, db_data['type']))
 
     def delete_db(self):
         self.db.delete_DB("action_output", {'blue_id': self.id})
         self.db.delete_DB("blueprint-instances", {'id': self.id})
 
     def to_db(self):
+        self.modified = datetime.datetime.now()
         data = {'id': self.conf["blueprint_instance_id"], 'conf': self.conf, 'input_conf': self.input_conf,
                 'nsd_': self.nsd_, 'vnf_configurator': self.vnf_configurator, 'primitives': self.primitives,
                 'action_to_check': self.action_to_check, 'timestamp': self.timestamp, 'config_len': self.config_len,
                 'created': self.created, 'status': self.status, 'detailed_status': self.detailed_status,
-                'current_operation': self.current_operation, 'modified': datetime.datetime.now(),
+                'current_operation': self.current_operation, 'modified': self.modified,
                 'supported_operations': self.supported_operations, 'type': self.blue_type, 'pdu': self.pdu,
                 'vnfd': self.vnfd}
         data_serialized = json.loads(DbBlue.parse_obj(data).json())
@@ -217,11 +219,6 @@ class BlueprintBase(abc.ABC):
             'no_primitives': len(self.primitives)
         }
 
-    """@abc.abstractmethod
-    def set_mgt_ip_blueprint(self, nsd_name: str, vnfi_ips):
-        # to be overwritten by the specific blueprint
-        pass"""
-
     def get_nsd(self) -> List:
         return self.nsd_
 
@@ -262,7 +259,7 @@ class BlueprintBase(abc.ABC):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         topology.del_pdu(pdu_name)
         topology.save_topology()
-        self.pdu = [item for item in self.pdu if item['name'] != pdu_name]
+        self.pdu = [item for item in self.pdu if item != pdu_name]
 
     def topology_get_pdu(self, pdu_name: str):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
@@ -309,10 +306,12 @@ class BlueprintBase(abc.ABC):
                 vims.add(topology.get_vim_name_from_area_id(a))
                 logger.debug("Blue {} - for area {} the following vims have been selected: {}"
                              .format(self.get_id(), a, vims))
-            else:
+            elif type(a) == dict:
                 vims.add(topology.get_vim_name_from_area_id(a['id']))
                 logger.debug("Blue {} - for area {} the following vims have been selected: {}"
                              .format(self.get_id(), a['id'], vims))
+            else:
+                raise ValueError("Type error in areas")
         topology.del_network(net, list(vims), terraform=True)
         topology.save_topology()
 

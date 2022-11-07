@@ -54,11 +54,16 @@ class Configurator_Flex(Configurator_Base):
         # - 'template' name of the template file (with placeholder variables) to be used
         # - 'transfer_name' (name to be used for the transfer between the OSS and the VNFD)
         # - 'name' (final name of the file within the vnf)
-        # - 'path' (final path of the file within the VNF)
-        # vocabulary is a list of {'placeholder': key, 'value': value} for translating placeholder var in template elk_files
-        env = Environment(loader=FileSystemLoader("config_templates/"),
+        # - 'path' (final path of the file within the vnf manager, i.e., within the flexcham/flexchart)
+        # vocabulary is a list of {'placeholder': key, 'value': value} for translating placeholder var in template
+        # elk_files
+        env_path = ""
+        for folder in filed['template'].split('/')[:-1]:
+            env_path += "{}/".format(folder)
+        template_filename = filed['template'].split('/')[-1]
+        env = Environment(loader=FileSystemLoader(env_path),
                           extensions=['jinja2_ansible_filters.AnsibleCoreFiltersExtension'])
-        template = env.get_template(filed['template'].split('/')[-1])
+        template = env.get_template(template_filename)
         data = template.render(confvar=vars_)
 
         # with open('day2_files/' + filed['transfer_name'], 'w') as file:
@@ -132,9 +137,13 @@ class Configurator_Flex(Configurator_Base):
                 self.playbook['tasks'].append(task)
 
     def appendJinjaPbTasks(self, playbook_file: str, vars_):
-        env = Environment(loader=FileSystemLoader("config_templates/"),
+        env_path = ""
+        for folder in playbook_file.split('/')[:-1]:
+            env_path += "{}/".format(folder)
+        filename = playbook_file.split('/')[-1]
+        env = Environment(loader=FileSystemLoader(env_path),
                           extensions=['jinja2_ansible_filters.AnsibleCoreFiltersExtension'])
-        template = env.get_template(playbook_file.split('/')[-1])
+        template = env.get_template(filename)
         yaml_jinja = YAML(typ='jinja2')
         plays_ = yaml_jinja.load( template.render(confvar=vars_) )
         if not plays_:

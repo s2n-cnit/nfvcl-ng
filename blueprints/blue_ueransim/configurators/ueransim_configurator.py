@@ -15,7 +15,7 @@ class ConfiguratorUeUeRanSim(Configurator_Flex):
                 'gnbSearchList': args['vim_gnbs_ips'],
             }
             conf_file = "sim_{}.yaml".format(sim_index)
-            self.addJinjaTemplateFile({'template': 'blueprints/blue_ueransim/config_scripts&ue_ueransim.jinja2',
+            self.addJinjaTemplateFile({'template': 'blueprints/blue_ueransim/config_scripts/ue_ueransim.jinja2',
                      'path': '/root/',
                      'transfer_name': "{}_ue-{}_sim-{}.yaml".format(blue_id, args['id'], sim_index),
                      'name': conf_file

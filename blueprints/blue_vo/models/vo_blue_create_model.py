@@ -15,7 +15,7 @@ class Area(BaseModel):
 
 
 class VoBlueprintRequestInstance(BaseModel):
-    type: Literal["VO"] = Field(
+    type: Literal["vo"] = Field(
         None, description='type of the requested Blueprint'
     )
     callbackURL: Optional[str] = Field(

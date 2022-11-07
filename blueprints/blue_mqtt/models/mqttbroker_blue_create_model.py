@@ -28,7 +28,7 @@ class Vim(BaseModel):
 
 
 class MqttRequestBlueprintInstance(BaseModel):
-    type: Literal["MQTT"]
+    type: Literal["mqtt"]
     callbackURL: Optional[str] = Field(
         None,
         description='url that will be used to notify when the topology terraforming ends',

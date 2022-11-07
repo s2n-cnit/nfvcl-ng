@@ -7,18 +7,14 @@ import datetime
 import importlib
 import traceback
 from threading import Thread
-from blueprints.blue_k8s.models import K8sBlueprintCreate, K8sBlueprintScale
-from blueprints.blue_5g_base.models import Create5gModel
-from blueprints.blue_mqtt.models import MqttRequestBlueprintInstance
-from blueprints.blue_trex.models import TrexRequestBlueprintInstance
-from blueprints.blue_ueransim.models import UeranSimBlueprintRequestInstance
-from blueprints.blue_vo.models import VoBlueprintRequestInstance
 from blueprints import BlueprintBase
+from blueprints.blue_types import blueprint_types
+from .blue_models import blue_create_models, blue_day2_models
 from main import *
 
 
 blue_router = APIRouter(
-    prefix="/nfvcl/api/blue",
+    prefix="/nfvcl/v1/api/blue",
     tags=["Blueprints"],
     responses={404: {"description": "Not found"}},
 )
@@ -38,14 +34,12 @@ def delete_blueprint(blue_id):
     workers.destroy_worker(blue_id)
 
 
-def instantiate_blueprint(msg, blue_id, CandidateBlue):
+def instantiate_blueprint(msg, blue_id):
     day0_start = datetime.datetime.now()
-
-    logger.debug('instantiate_blueprint: ')
-    logger.debug(msg)
-
     try:
-        BlueClass = getattr(importlib.import_module("blueprints." + CandidateBlue['module']), CandidateBlue['id'])
+        selected_blue = blueprint_types[msg["type"]]
+        BlueClass = getattr(importlib.import_module(
+            "blueprints." + selected_blue['module_name']), selected_blue['class_name'])
         blue = BlueClass(msg, id_=str(blue_id))
         worker_queue = workers.set_worker(blue)
         worker_queue.put({'session_id': 0, 'msg': msg, 'requested_operation': 'init'})
@@ -96,27 +90,17 @@ async def get_blueprint(
 ################################################
 @blue_router.post('/', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
 def create_blueprint(
-        msg: Union[
-            Create5gModel,
-            K8sBlueprintCreate,
-            MqttRequestBlueprintInstance,
-            TrexRequestBlueprintInstance,
-            UeranSimBlueprintRequestInstance,
-            VoBlueprintRequestInstance]
+        msg: blue_create_models
 ):
     # logger.debug('blueAPI post')
     blue_id = id_generator()
-
-    CandidateBlue = db.findone_DB("blueprints", {'id': msg.type})
-
-    if CandidateBlue is None:
+    if msg.type not in blueprint_types:
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': 'no Blueprints are satisfying the request'}
         raise HTTPException(status_code=406, detail=data)
-    logger.info("Candidate Blueprint {} selected".format(CandidateBlue['id']))
-
+    logger.info("Candidate Blueprint {} selected".format(blueprint_types[msg.type]['class_name']))
     # start async operations
-    thread = Thread(target=instantiate_blueprint, args=(msg.dict(), blue_id, CandidateBlue,))
+    thread = Thread(target=instantiate_blueprint, args=(msg.dict(), blue_id,))
     # thread.daemon = True
     thread.start()
     # reply with submitted code
@@ -124,7 +108,7 @@ def create_blueprint(
 
 
 @blue_router.put('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def modify_blueprint(msg: Union[K8sBlueprintScale], blue_id: str):
+def modify_blueprint(msg: blue_day2_models, blue_id: str):
     # assign a session id
     session_id = id_generator()
     try:
@@ -135,17 +119,17 @@ def modify_blueprint(msg: Union[K8sBlueprintScale], blue_id: str):
                 'description': "Blueprint instance {} not found".format(blue_id)}
         raise HTTPException(status_code=404, detail=data)
 
-    if msg['operation'] not in blue.get_supported_operations():
+    if msg.operation not in blue.get_supported_operations():
         logger.error('operation {} not supported by blueprint {} --> get_supported_operations(): {}'
-                     .format(msg['operation'], blue.get_id(), blue.get_supported_operations()))
-        data = {'operation': msg['operation'], 'status': 'error', 'resource': 'blueprint',
+                     .format(msg.operation, blue.get_id(), blue.get_supported_operations()))
+        data = {'operation': msg.operation, 'status': 'error', 'resource': 'blueprint',
                 'id': blue.get_id(), 'session_id': session_id, 'description': 'operation not supported'}
         raise HTTPException(status_code=405, detail=data)
 
-    thread = Thread(target=update_blueprint, args=(blue, msg, blue_id, msg['operation'], session_id,))
+    thread = Thread(target=update_blueprint, args=(blue, msg, blue_id, msg.operation, session_id,))
     # thread.daemon = True
     thread.start()
-    return RestAnswer202(id=blue_id, resource="blueprint", operation=msg['operation'], status="submitted",
+    return RestAnswer202(id=blue_id, resource="blueprint", operation=msg.operation, status="submitted",
                          session_id=session_id, description="operation submitted")
 
 

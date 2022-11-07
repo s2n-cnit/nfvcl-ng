@@ -73,7 +73,7 @@ class K8sConfig(BaseModel):
 
 
 class K8sBlueprintCreate(BaseModel):
-    type: Literal['K8s']
+    type: Literal['k8s']
     callbackURL: Optional[str] = Field(
         None,
         description='url that will be used to notify when the blueprint processing finishes',

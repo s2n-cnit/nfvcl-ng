@@ -9,7 +9,9 @@ import traceback
 from threading import Thread
 from blueprints import BlueprintBase
 from blueprints.blue_types import blueprint_types
-from .blue_models import blue_create_models, blue_day2_models
+from blueprints.blue_ueransim import UeRanSim
+from blueprints.blue_k8s import K8s
+from .blue_models import *
 from main import *
 
 
@@ -107,6 +109,49 @@ def create_blueprint(
     return RestAnswer202(id=blue_id, resource="blueprint", operation="create", status="submitted")
 
 
+@blue_router.post('/5G', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+def create_blueprint_5g(
+        msg: Create5gModel
+):
+    return create_blueprint(msg)
+
+
+@blue_router.post('/K8S', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+def create_blueprint_k8s(
+        msg: K8sBlueprintCreate
+):
+    return create_blueprint(msg)
+
+
+"""@blue_router.post('/ueransim', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+def create_blueprint_ueransim(
+        msg: UeranSimBlueprintRequestInstance
+):
+    return create_blueprint(msg)
+"""
+
+
+@blue_router.post('/vo', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+def create_blueprint_vo(
+        msg: VoBlueprintRequestInstance
+):
+    return create_blueprint(msg)
+
+
+@blue_router.post('/mqtt', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+def create_blueprint_mqtt(
+        msg: MqttRequestBlueprintInstance
+):
+    return create_blueprint(msg)
+
+
+@blue_router.post('/trex', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+def create_blueprint_trex(
+        msg: TrexRequestBlueprintInstance
+):
+    return create_blueprint(msg)
+
+
 @blue_router.put('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
 def modify_blueprint(msg: blue_day2_models, blue_id: str):
     # assign a session id
@@ -131,6 +176,10 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
     thread.start()
     return RestAnswer202(id=blue_id, resource="blueprint", operation=msg.operation, status="submitted",
                          session_id=session_id, description="operation submitted")
+
+
+blue_router.include_router(UeRanSim.fastapi_router(create_blueprint, modify_blueprint))
+blue_router.include_router(K8s.fastapi_router(create_blueprint, modify_blueprint))
 
 
 @blue_router.delete('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)

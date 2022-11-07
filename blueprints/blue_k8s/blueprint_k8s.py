@@ -1,9 +1,12 @@
 from blueprints import BlueprintBase, parse_ansible_output
 from . import ConfiguratorK8s
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
-from typing import Union, List, Dict, Optional
+from typing import Union, List, Dict, Optional, Callable
+from fastapi import APIRouter
+from .models import K8sBlueprintCreate, K8sBlueprintScale
 import traceback
 from main import *
+
 
 db = persistency.DB()
 logger = create_logger('K8sBlue')
@@ -11,6 +14,23 @@ nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_
 
 
 class K8s(BlueprintBase):
+    api_router: APIRouter
+    api_day0_function: Callable
+    api_day2_function: Callable
+
+    @classmethod
+    def rest_create(cls, msg: K8sBlueprintCreate):
+        return cls.api_day0_function(msg)
+
+    # Fixme: create the pydantic model for adding/removing UEs
+    @classmethod
+    def rest_scale(cls, msg: K8sBlueprintScale, blue_id: str):
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def day2_methods(cls):
+        cls.api_router.add_api_route("/{blue_id}", cls.rest_scale, methods=["PUT"])
+
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         logger.info("Creating K8S Blueprint")

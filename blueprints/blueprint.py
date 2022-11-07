@@ -5,7 +5,8 @@ from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
 from .db_blue_model import DbBlue
 from blueprints.blue_types import blueprint_types
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Callable
+from fastapi import APIRouter
 import traceback
 import importlib
 import abc
@@ -20,6 +21,33 @@ logger = create_logger('blueprint')
 
 
 class BlueprintBase(abc.ABC):
+    api_router: APIRouter
+    api_day0_function: Callable
+    api_day2_function: Callable
+
+    @abc.abstractmethod
+    @classmethod
+    def rest_create(cls, msg):
+        pass
+
+    @abc.abstractmethod
+    @classmethod
+    def day2_methods(cls):
+        pass
+
+    @classmethod
+    def fastapi_router(cls, _day0_func: Callable, _day2_func: Callable):
+        cls.api_day0_function = _day0_func
+        cls.api_day2_function = _day2_func
+        cls.api_router = APIRouter(
+            prefix="/{}".format(cls.__name__),
+            tags=["Blueprint {}".format(cls.__name__)],
+            responses={404: {"description": "Not found"}}
+        )
+        cls.api_router.add_api_route("", cls.rest_create, methods=["POST"])
+        cls.day2_methods()
+        return cls.api_router
+
     def __init__(
             self,
             conf: dict,

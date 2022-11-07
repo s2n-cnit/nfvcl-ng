@@ -422,191 +422,59 @@ class Free5GC_K8s(Blue5GBase):
         return nsi_to_delete
 
     def add_tac_conf(self, msg: dict) -> list:
-        res = []
-        smfName = self.running_free5gc_conf["free5gc-smf"]["smf"] \
-            ["configuration"]["configurationBase"]["smfName"]
-        sliceList = []
-        if 'areas' in msg:
-            for area in msg['areas']:
-                if len(self.defaultSliceList) != 0:
-                    for slice in self.defaultSliceList:
-                        res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=slice,
-                                     dnnInfoList=slice["dnnList"])
-                        slice["tacList"] = [{"id": area["id"]}]
-                        sliceList.append(slice)
-                # add specific slices
-                if "slices" in area:
-                    for slice in area["slices"]:
-                        res += self.smf_add_upf(smfName=smfName, tac=area["id"],
-                                    slice={"sst": slice["sst"], "sd": slice["sd"]},dnnInfoList=slice["dnnList"])
-                        sdSstDnnlist = [{s["sd"], s["sst"], s["dnnList"]} for s in sliceList]
-                        if slice in sdSstDnnlist:
-                            elem = sdSstDnnlist[sdSstDnnlist.index(slice)]
-                            if {"id": area["id"]} not in elem["tacList"]:
-                                elem["tacList"].append({"id": area["id"]})
-                        else:
-                            slice["tacList"] = [{"id": area["id"]}]
-                            sliceList.append(slice)
-
-        if sliceList != []:
-            message = {"config": {"slices": sliceList}}
-            self.add_slice(message)
-
-        return res
+        return self.coreManager.add_tac_conf(msg)
 
     def del_tac_conf(self, msg: dict) -> list:
-        res = []
-        smfName = self.running_free5gc_conf["free5gc-smf"]["smf"] \
-            ["configuration"]["configurationBase"]["smfName"]
-        sliceList = []
-        if 'areas' in msg:
-            for area in msg['areas']:
-                res += self.smf_del_upf(smfName=smfName, tac=area["id"])
-                if "slices" in area:
-                    if "slices" in area:
-                        for slice in area["slices"]:
-                            slice["tacList"] = [{"id": area["id"]}]
-                            sliceList.append(slice)
-        if sliceList != []:
-            message = {"config": {"slices": sliceList}}
-            self.del_slice(message)
-
-        return res
+        return self.coreManager.del_tac_conf(msg)
 
     def add_slice(self, msg: dict) -> list:
         res = []
         tail_res = []
-
         tacList = []
-        sliceList = []
-        dnnList = []
 
         # add callback IP in self.conf
         if "callback" in msg:
             self.conf["callback"] = msg["callback"]
 
-        amfId = self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"] \
-            ["servedGuamiList"][0]["amfId"]
-        smfName= self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]["smfName"]
-        n3iwfId = self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"] \
-            ["N3IWFInformation"]["GlobalN3IWFID"]["N3IWFID"]
-        nssfName = self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configurationBase"]["nssfName"]
+        tail_res += self.coreManager.add_slice(msg)
 
         if "areas" in msg:
             for area in msg["areas"]:
-                if "slices" in area:
-                    for extSlice in area["slices"]:
-                        dnnSliceList = []
-                        slice = {"sd": extSlice["sd"], "sst": extSlice["sst"]}
-                        sliceList.append(slice)
-                        if "dnnList" in extSlice:
-                            for dnn in extSlice["dnnList"]:
-                                dnnSliceList.append(dnn)
-                                dnnList.append(dnn)
+                # Add DNN to UPF
+                for nsd_item in self.nsd_:
+                    if "area" in nsd_item and nsd_item['area'] == area["id"]:
+                        if nsd_item['type'] in self.edge_vnfd_type:
+                            conf_data = {
+                                'plmn': str(self.conf['plmn']),
+                                'upf_nodes': self.conf['config']['upf_nodes'],
+                                'tac': area["id"] # tac of the node
+                            }
 
-                        self.smf_set_configuration(smfName=smfName, dnnList=dnnSliceList, sliceList=[slice])
+                            config = Configurator_Free5GC(
+                                nsd_item['descr']['nsd']['nsd'][0]['id'],
+                                1,
+                                self.get_id(),
+                                conf_data
+                            )
 
-                        # add DNNs to upf configuration
-                        if len(dnnSliceList) != 0:
-                            for upf in self.conf["config"]["upf_nodes"]:
-                                if upf["tac"] == area["id"]:
-                                    if "dnnList" in upf:
-                                        upf["dnnList"].extend(dnnSliceList)
-                                    else:
-                                        upf["dnnList"] = copy.deepcopy(dnnSliceList)
-                                    break
+                            res += config.dump()
+                        elif nsd_item['type'] == 'ran':
+                            tail_res += self.ran_day2_conf(msg, nsd_item)
 
-                        tacList.append(area["id"])
-                        self.n3iwf_set_configuration(n3iwfId=n3iwfId, tac=area["id"], sliceSupportList=[slice])
-                        self.nssf_set_configuration(nssfName=nssfName, sliceList=[slice], tac=area["id"])
-                        tail_res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=slice, dnnInfoList=extSlice["dnnList"])
-                    self.amf_set_configuration(amfId=amfId, supportedTacList = tacList, snssaiList = sliceList, dnnList = dnnList)
-
-                    # Add DNN to UPF
-                    for tacItem in tacList:
-                        for nsd_item in self.nsd_:
-                            if "area" in nsd_item and nsd_item['area'] == tacItem:
-                                if nsd_item['type'] in self.edge_vnfd_type:
-                                    conf_data = {
-                                        'plmn': str(self.conf['plmn']),
-                                        'upf_nodes': self.conf['config']['upf_nodes'],
-                                        'tac': tacItem # tac of the node
-                                    }
-
-                                    config = Configurator_Free5GC(
-                                        nsd_item['descr']['nsd']['nsd'][0]['id'],
-                                        1,
-                                        self.get_id(),
-                                        conf_data
-                                    )
-
-                                    res += config.dump()
-                                elif nsd_item['type'] == 'ran':
-                                    tail_res += self.ran_day2_conf(msg, nsd_item)
-
-                    self.config_5g_core_for_reboot()
-                    msg2up = {'config': self.running_free5gc_conf}
-                    res += tail_res + self.core_upXade(msg2up)
+                # self.config_5g_core_for_reboot()
+                # msg2up = {'config': self.running_free5gc_conf}
+                # res += tail_res + self.core_upXade(msg2up)
 
         return res
 
     def add_ues(self, msg: dict) -> list:
         res = []
-
-        mongoDbPath = None
-        if "config" in self.conf:
-            if "mongodb" in self.conf["config"]:
-                mongoDbPath = "mongodb://{}:27017/".format(self.conf["config"]["mongodb"])
-
-        if "config" in msg and "plmn" in msg["config"]:
-            if "subscribers" in msg["config"]:
-                for subscriber in msg["config"]["subscribers"]:
-                    plmn = msg["config"]["plmn"]
-                    imsi = subscriber["imsi"]
-                    if "k" in subscriber and "opc" in subscriber:
-                        key = subscriber["k"]
-                        opc = subscriber["opc"]
-
-                        self.userManager.add_ue_to_db(plmn=plmn, imsi=imsi, key=key, ocv=opc, mongodbServiceHost=mongoDbPath)
-
-                    if "snssai" in subscriber:
-                        for snssaiElem in subscriber["snssai"]:
-                            sst = snssaiElem["sst"] # TODO "sliceId" in the json
-                            sd = snssaiElem["sd"] # TODO "sliceType" in the json
-                            default = snssaiElem["default"]
-
-                            self.userManager.add_snssai_to_db(plmn=plmn, imsi=imsi, sst=sst, sd=sd, default=default,
-                                                  mongodbServiceHost=mongoDbPath)
-
-                            if "dnnList" in snssaiElem:
-                                for dnnElem in snssaiElem["dnnList"]:
-                                    dnn = dnnElem["dnn"]
-                                    uplinkAmbr = dnnElem["uplinkAmbr"]
-                                    downlinkAmbr = dnnElem["downlinkAmbr"]
-                                    default5qi = dnnElem["default5qi"]
-
-                                    self.userManager.add_dnn_to_db(imsi=imsi, sst=sst, sd=sd, dnn=dnn, d5qi=default5qi,
-                                                       upambr=uplinkAmbr, downambr=downlinkAmbr,
-                                                       mongodbServiceHost=mongoDbPath)
-
-                                    # TODO complete with flowRules
-
+        self.userManager.add_ues(msg)
         return res
 
     def del_ues(self, msg: dict) -> list:
         res = []
-
-        mongoDbPath = None
-        if "config" in self.conf:
-            if "mongodb" in self.conf["config"]:
-                mongoDbPath = "mongodb://{}:27017/".format(self.conf["config"]["mongodb"])
-
-        if "config" in msg and "plmn" in msg["config"]:
-            if "subscribers" in msg["config"]:
-                for subscriber in msg["config"]["subscribers"]:
-                    plmn = msg["config"]["plmn"]
-                    imsi = subscriber["imsi"]
-                    self.userManager.del_ue_from_db(plmn=plmn, imsi=imsi, mongodbServiceHost=mongoDbPath)
+        self.userManager.del_ues(msg)
         return res
 
     def del_slice(self, msg: dict) -> list:
@@ -617,19 +485,16 @@ class Free5GC_K8s(Blue5GBase):
         if "callback" in msg:
             self.conf["callback"] = msg["callback"]
 
+        self.coreManager.del_slice(msg)
+
         if "areas" in msg:
             for area in msg["areas"]:
                 if "slices" in area:
                     for extSlice in area["slices"]:
                         dnnSliceList = []
-                        sliceList = [{"sd": extSlice["sd"], "sst": extSlice["sst"]}]
                         if "dnnList" in extSlice:
                             for dnn in extSlice["dnnList"]:
                                 dnnSliceList.append(dnn)
-                        self.amf_unset_configuration(sliceList,dnnSliceList)
-                        self.smf_unset_configuration(dnnSliceList, sliceList)
-                        self.n3iwf_unset_configuration(sliceList)
-                        self.nssf_unset_configuration(sliceList)
 
                         # remove DNNs to upf configuration
                         removingDnnList = []
@@ -665,10 +530,10 @@ class Free5GC_K8s(Blue5GBase):
                                     elif nsd_item['type'] == 'ran':
                                         tail_res += self.ran_day2_conf(msg,nsd_item)
 
-                    self.config_5g_core_for_reboot()
-
-                    msg2up = {'config': self.running_free5gc_conf}
-                    res += self.core_upXade(msg2up) + tail_res
+                    # self.config_5g_core_for_reboot()
+                    #
+                    # msg2up = {'config': self.running_free5gc_conf}
+                    # res += self.core_upXade(msg2up) + tail_res
 
         return res
 
@@ -689,18 +554,12 @@ class Free5GC_K8s(Blue5GBase):
                     'member_vnf_index': vnf_id,
                     'kdu_name': kdu_name,
                     'primitive': 'upgrade',
-                    'primitive_params': self.running_free5gc_conf
+                    'primitive_params': conf_params
                 }
             }
         ]
         if nsi_id is not None:
             res[0]['nsi_id'] = nsi_id
-
-        # TODO check if the the following commands are needed
-        if hasattr(self, "nsi_id"):
-            if self.nsi_id is not None:
-                for r in res:
-                    r['nsi_id'] = self.nsi_id
 
         return res
 

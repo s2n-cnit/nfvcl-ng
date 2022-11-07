@@ -305,3 +305,56 @@ class Configurator_Free5GC_User():
             upsert=True
         )
         logger.info("db response: {}".format(response))
+
+    def add_ues(self, msg: dict):
+        mongoDbPath = None
+        if "config" in msg:
+            if "mongodb" in msg["config"]:
+                mongoDbPath = "mongodb://{}:27017/".format(msg["config"]["mongodb"])
+
+        if "config" in msg and "plmn" in msg["config"]:
+            if "subscribers" in msg["config"]:
+                for subscriber in msg["config"]["subscribers"]:
+                    plmn = msg["config"]["plmn"]
+                    imsi = subscriber["imsi"]
+                    if "k" in subscriber and "opc" in subscriber:
+                        key = subscriber["k"]
+                        opc = subscriber["opc"]
+
+                        self.add_ue_to_db(plmn=plmn, imsi=imsi, key=key, ocv=opc,
+                                                      mongodbServiceHost=mongoDbPath)
+
+                    if "snssai" in subscriber:
+                        for snssaiElem in subscriber["snssai"]:
+                            sst = snssaiElem["sst"]  # TODO "sliceId" in the json
+                            sd = snssaiElem["sd"]  # TODO "sliceType" in the json
+                            default = snssaiElem["default"]
+
+                            self.add_snssai_to_db(plmn=plmn, imsi=imsi, sst=sst, sd=sd, default=default,
+                                                              mongodbServiceHost=mongoDbPath)
+
+                            if "dnnList" in snssaiElem:
+                                for dnnElem in snssaiElem["dnnList"]:
+                                    dnn = dnnElem["dnn"]
+                                    uplinkAmbr = dnnElem["uplinkAmbr"]
+                                    downlinkAmbr = dnnElem["downlinkAmbr"]
+                                    default5qi = dnnElem["default5qi"]
+
+                                    self.add_dnn_to_db(imsi=imsi, sst=sst, sd=sd, dnn=dnn, d5qi=default5qi,
+                                                                   upambr=uplinkAmbr, downambr=downlinkAmbr,
+                                                                   mongodbServiceHost=mongoDbPath)
+
+                                    # TODO complete with flowRules
+
+    def del_ues(self, msg: dict):
+        mongoDbPath = None
+        if "config" in msg:
+            if "mongodb" in msg["config"]:
+                mongoDbPath = "mongodb://{}:27017/".format(msg["config"]["mongodb"])
+
+        if "config" in msg and "plmn" in msg["config"]:
+            if "subscribers" in msg["config"]:
+                for subscriber in msg["config"]["subscribers"]:
+                    plmn = msg["config"]["plmn"]
+                    imsi = subscriber["imsi"]
+                    self.del_ue_from_db(plmn=plmn, imsi=imsi, mongodbServiceHost=mongoDbPath)

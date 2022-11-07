@@ -946,5 +946,154 @@ class Configurator_Free5GC_Core(Blue5GBase):
                                 upf["dnnList"] = copy.deepcopy(dnnList)
                             break
         return tail_res
+
+    def add_tac_conf(self, msg: dict) -> list:
+        res = []
+        smfName = self.running_free5gc_conf["free5gc-smf"]["smf"] \
+            ["configuration"]["configurationBase"]["smfName"]
+        sliceList = []
+        if 'areas' in msg:
+            for area in msg['areas']:
+                # add specific slices
+                if "slices" in area:
+                    for slice in area["slices"]:
+                        res += self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"],
+                                    slice={"sst": slice["sst"], "sd": slice["sd"]},dnnInfoList=slice["dnnList"])
+                        sdSstDnnlist = [{"sd": s["sd"], "sst": s["sst"], "dnnList": s["dnnList"]} for s in sliceList]
+                        if slice in sdSstDnnlist:
+                            elem = sdSstDnnlist[sdSstDnnlist.index(slice)]
+                            if "tacList" in elem:
+                                if {"id": area["id"]} not in elem["tacList"]:
+                                    elem["tacList"].append({"id": area["id"]})
+                            else:
+                                elem["tacList"] = [{"id": area["id"]}]
+                        else:
+                            slice["tacList"] = [{"id": area["id"]}]
+                            sliceList.append(slice)
+
+        if sliceList:
+            message = {"config": {"slices": sliceList}}
+            self.add_slice(message)
+
+        return res
+
+    def del_tac_conf(self, msg: dict) -> list:
+        res = []
+        sliceList = []
+        if 'areas' in msg:
+            for area in msg['areas']:
+                res += self.smf_del_upf(conf=msg, tac=area["id"])
+                if "slices" in area:
+                    if "slices" in area:
+                        for slice in area["slices"]:
+                            slice["tacList"] = [{"id": area["id"]}]
+                            sliceList.append(slice)
+        if sliceList != []:
+            message = {"config": {"slices": sliceList}}
+            self.del_slice(message)
+
+        return res
+
+    def add_slice(self, msg: dict) -> list:
+        if msg is None:
+            logger.warn("Conf is None")
+            return []
+
+        if "config" in msg and "plmn" in msg['config']:
+            mcc = msg['config']['plmn'][:3]
+            mnc = msg['config']['plmn'][3:]
+        else:
+            raise ValueError("config section is not in conf or plmn not specified in config section")
+
+        res = []
+        tacList = []
+        sliceList = []
+        dnnList = []
+
+        amfId = self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"] \
+            ["servedGuamiList"][0]["amfId"]
+        smfName= self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]["smfName"]
+        n3iwfId = self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"] \
+            ["N3IWFInformation"]["GlobalN3IWFID"]["N3IWFID"]
+        nssfName = self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configurationBase"]["nssfName"]
+
+        if "areas" in msg:
+            for area in msg["areas"]:
+                if "slices" in area:
+                    for extSlice in area["slices"]:
+                        dnnSliceList = []
+                        slice = {"sd": extSlice["sd"], "sst": extSlice["sst"]}
+                        sliceList.append(slice)
+                        if "dnnList" in extSlice:
+                            for dnn in extSlice["dnnList"]:
+                                dnnSliceList.append(dnn)
+                                dnnList.append(dnn)
+
+                        self.smf_set_configuration(smfName=smfName, dnnList=dnnSliceList, sliceList=[slice])
+
+                        # add DNNs to upf configuration
+                        if len(dnnSliceList) != 0:
+                            for upf in self.conf["config"]["upf_nodes"]:
+                                if upf["tac"] == area["id"]:
+                                    if "dnnList" in upf:
+                                        upf["dnnList"].extend(dnnSliceList)
+                                    else:
+                                        upf["dnnList"] = copy.deepcopy(dnnSliceList)
+                                    break
+
+                        tacList.append(area["id"])
+                        self.n3iwf_set_configuration(mcc=mcc, mnc= mnc, n3iwfId=n3iwfId, tac=area["id"],
+                                sliceSupportList=[slice])
+                        self.nssf_set_configuration(mcc=mcc, mnc=mnc, nssfName=nssfName, sliceList=[slice],
+                                tac=area["id"])
+                        res += self.smf_add_upf(mcc=mcc, mnc=mnc, smfName=smfName, tac=area["id"], slice=slice,
+                                dnnInfoList=extSlice["dnnList"])
+                    self.amf_set_configuration(mcc=mcc, mnc=mnc, amfId=amfId, supportedTacList = tacList,
+                                snssaiList = sliceList, dnnList = dnnList)
+
+        return res
+
+    def del_slice(self, msg: dict):
+        if msg is None:
+            logger.warn("Conf is None")
+            return []
+
+        if "config" in msg and "plmn" in msg['config']:
+            mcc = msg['config']['plmn'][:3]
+            mnc = msg['config']['plmn'][3:]
+        else:
+            raise ValueError("config section is not in conf or plmn not specified in config section")
+
+        if "areas" in msg:
+            for area in msg["areas"]:
+                if "slices" in area:
+                    for extSlice in area["slices"]:
+                        dnnSliceList = []
+                        sliceList = [{"sd": extSlice["sd"], "sst": extSlice["sst"]}]
+                        if "dnnList" in extSlice:
+                            for dnn in extSlice["dnnList"]:
+                                dnnSliceList.append(dnn)
+                        self.amf_unset_configuration(mcc=mcc, mnc=mnc, snssaiList=sliceList,dnnList=dnnSliceList)
+                        self.smf_unset_configuration(dnnList=dnnSliceList, sliceList=sliceList)
+                        self.n3iwf_unset_configuration(sliceSupportList=sliceList)
+                        self.nssf_unset_configuration(sliceList=sliceList)
+
+                        # remove DNNs to upf configuration
+                        removingDnnList = []
+                        if len(dnnSliceList) != 0:
+                            for upf in self.conf["config"]["upf_nodes"]:
+                                if upf["tac"] == area["id"]:
+                                    if "dnnList" in upf:
+                                        for dnnIndex, dnnElem in enumerate(upf["dnnList"]):
+                                            if dnnElem in dnnSliceList:
+                                                removingDnnList.append(dnnElem)
+                                                upf["dnnList"].pop(dnnIndex)
+
+                    # self.config_5g_core_for_reboot()
+                    #
+                    # msg2up = {'config': self.running_free5gc_conf}
+                    # res += self.core_upXade(msg2up) + tail_res
+
+
     def getConfiguration(self) -> dict:
         return self.running_free5gc_conf

@@ -595,7 +595,8 @@ class Free5GC_K8s(Blue5GBase):
                     else:
                         raise ValueError('({})mismatch in the enb interfaces'.format(n['type']))
 
-                    if '{}_nodes'.format(n['type']) not in self.conf['config']: self.conf['config']['{}_nodes'.format(n['type'])] = []
+                    if '{}_nodes'.format(n['type']) not in self.conf['config']:
+                        self.conf['config']['{}_nodes'.format(n['type'])] = []
                     self.conf['config']['{}_nodes'.format(n['type'])].append({
                         'ip': area['{}_ip'.format(n['type'])],
                         'nsi_id': n['nsi_id'],

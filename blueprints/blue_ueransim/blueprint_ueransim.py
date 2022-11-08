@@ -4,7 +4,9 @@ from .configurators.ueransim_configurator import ConfiguratorUeUeRanSim
 # from main import create_logger, nbiUtil
 from utils import persistency
 from utils.util import *
-from typing import Union, Dict
+from typing import Union, Dict, Callable
+from .models import UeranSimBlueprintRequestInstance
+from fastapi import APIRouter
 
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 db = persistency.DB()
@@ -12,6 +14,19 @@ logger = create_logger('UeRanSim')
 
 
 class UeRanSim(BlueprintBase):
+    @classmethod
+    def rest_create(cls, msg: UeranSimBlueprintRequestInstance):
+        return cls.api_day0_function(msg)
+
+    # Fixme: create the pydantic model for adding/removing UEs
+    @classmethod
+    def rest_add_del_ues(cls, msg: UeranSimBlueprintRequestInstance, blue_id: str):
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def day2_methods(cls):
+        cls.api_router.add_api_route("/{blue_id}", cls.rest_add_del_ues, methods=["PUT"])
+
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         logger.info("Creating UeRanSim Blueprint")

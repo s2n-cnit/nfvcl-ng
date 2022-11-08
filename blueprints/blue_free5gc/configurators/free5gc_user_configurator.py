@@ -306,7 +306,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-    def add_ues(self, msg: dict):
+    def add_ues(self, msg: dict) -> None:
         mongoDbPath = None
         if "config" in msg:
             if "mongodb" in msg["config"]:
@@ -346,7 +346,7 @@ class Configurator_Free5GC_User():
 
                                     # TODO complete with flowRules
 
-    def del_ues(self, msg: dict):
+    def del_ues(self, msg: dict) -> None:
         mongoDbPath = None
         if "config" in msg:
             if "mongodb" in msg["config"]:

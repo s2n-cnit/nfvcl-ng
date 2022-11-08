@@ -14,15 +14,11 @@ nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_
 # create logger
 logger = create_logger('Free5GC_K8s')
 
-# if mcc == None: mcc = self.conf['plmn'][:3]
-# if mnc == None: mnc = self.conf['plmn'][3:]
-
 class Free5GC_K8s(Blue5GBase):
-    """
-    Free5GC modules exported as external VMs
-    """
+    # Free5GC modules exported as external VMs
     edge_vnfd_type = ['upf']
-
+    chartName = "nfvcl_helm_repo/free5gc:3.2.0"
+    imageName = "free5gc_v3.0.7"
     def __init__(self, conf: dict, id_: str) -> None:
         BlueprintBase.__init__(self, conf, id_, db=db, nbiutil=nbiUtil)
         logger.info("Creating \"Free5GC_K8s\" Blueprint")
@@ -90,49 +86,51 @@ class Free5GC_K8s(Blue5GBase):
         }
         self.primitives = []
         self.vnfd = {'core': [], 'area': []}
-        self.chart = "nfvcl_helm_repo/free5gc:3.2.0"
-        self.image = "free5gc_v3.0.7"
-        # default slices
-        self.defaultSliceList = []
         self.userManager = Configurator_Free5GC_User()
         self.coreManager = Configurator_Free5GC_Core(conf, id_, copy.deepcopy(free5GC_default_config.default_config))
         self.vim_core = next((item for item in self.get_vims() if item['core']), None)
         if self.vim_core is None:
             raise ValueError('Vim CORE not found in the input')
 
-    def set_baseCoreVnfd(self, vls=None) -> None:
+    def set_baseCoreVnfd(self, vls) -> None:
+        if not vls:
+            raise ValueError("vls in None")
         vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
             'id': '{}_5gc'.format(self.get_id()),
             'name': '{}_5gc'.format(self.get_id()),
             'kdu': [{
                 'name': '5gc',
-                'helm-chart': self.chart,
+                'helm-chart': self.chartName,
                 'interface': vls
             }]})
         self.vnfd['core'].append({'id': 'core', 'name': vnfd.get_id(), 'vl': vls})
 
-    def set_upfVnfd(self, area: str, vls=None, area_id: int = 0) -> None:
+    def set_upfVnfd(self, area: str, vls=None, area_id: int = -1) -> None:
         interfaces = None
         list_ = None
-        if area == "core":
+        if not area:
+            raise ValueError("area cannot be none")
+        elif area == "core" and vls:
             interfaces = vls
-        elif area == "area":
+        elif area == "area" and area_id >= 0:
             vim = self.get_vim(area_id)
-            if vim == None:
+            if not vim:
                 raise ValueError("area = {} has not a valid vim".format(area_id))
             interfaces = [
                 {"vim_net": vim['mgt'], "vld": "mgt", "name": "ens3", "mgt": True}
             ]
             areaObj = next((item for item in self.vnfd['area'] if item['area'] == area_id), None)
-            if areaObj == None:
+            if not areaObj:
                 areaObj = {'area': area_id, 'vnfd': []}
                 self.vnfd['area'].append(areaObj)
-
             list_ = areaObj['vnfd']
         else:
             raise ValueError("area = {} is UNKNOWN".format(area))
 
-        if list_ :
+        if not interfaces:
+            raise ValueError("interfaces value cannot be none")
+
+        if list_:
             # area
             vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
                 'username': 'root',
@@ -142,7 +140,7 @@ class Free5GC_K8s(Blue5GBase):
                 'vdu': [{
                     'count': 1,
                     'id': 'VM',
-                    'image': self.image,
+                    'image': self.imageName,
                     'vm-flavor': {'memory-mb': '4096', 'storage-gb': '8', 'vcpu-count': '2'},
                     'interface': interfaces,
                     'vim-monitoring': True
@@ -159,7 +157,7 @@ class Free5GC_K8s(Blue5GBase):
                 'vdu': [{
                     'count': 1,
                     'id': 'VM',
-                    'image': self.image,
+                    'image': self.imageName,
                     'vm-flavor': {'memory-mb': '4096', 'storage-gb': '8', 'vcpu-count': '2'},
                     'interface': interfaces,
                     'vim-monitoring': True
@@ -170,7 +168,6 @@ class Free5GC_K8s(Blue5GBase):
 
     def set_coreVnfd(self, vls=None) -> None:
         self.set_baseCoreVnfd(vls)
-
         logger.debug(self.vnfd)
 
     def set_edgeVnfd(self, area: str, area_id: int = 0) -> None:
@@ -178,13 +175,15 @@ class Free5GC_K8s(Blue5GBase):
 
     def getVnfd(self, area: str, area_id: int = 0, type: str = None) -> list:
         id_list = []
-        if area == "core":
+        if not area:
+            raise ValueError("Area cannot be None")
+        elif area == "core":
             id_list = self.vnfd['core']
         elif area == "area":
             area_obj = next((item for item in self.vnfd['area'] if item['area'] == area_id), None)
-            if area_obj is None:
+            if not area_obj:
                 raise ValueError("area {} not found in getting Vnfd".format(area_id))
-            if type:
+            elif type:
                 # create list with vnfd elements where "id" field is equal to "id" param
                 id_list = [item for item in area_obj['vnfd'] if 'type' in item and item['type'] == type]
             else :
@@ -196,7 +195,7 @@ class Free5GC_K8s(Blue5GBase):
     def core_nsd(self) -> List[str]:
         logger.info("Creating Core NSD(s)")
         core_v = next((item for item in self.get_vims() if item['core']), None)
-        if core_v == None:
+        if not core_v:
             raise ValueError("Core VIM in msg doesn't exist")
         vim_net_mapping = [
             {'vld': 'data', 'vim_net': core_v['wan']['id'], 'name': 'ens4', "mgt": True, 'k8s-cluster-net': 'data_net'}
@@ -266,7 +265,7 @@ class Free5GC_K8s(Blue5GBase):
         vim = self.get_vim(area["id"])
         if vim is None:
             raise ValueError("Area {} has not a valid VIM".format(area["id"]))
-        logger.info("Creating EDGE NSD(s) for tac {} on vim {}".format(area["id"], vim["id"]))
+        logger.info("Creating EDGE NSD(s) for area {} on vim {}".format(area["id"], vim["id"]))
         param_name_list = []
 
         self.set_edgeVnfd('area', area["id"])
@@ -281,13 +280,13 @@ class Free5GC_K8s(Blue5GBase):
                 {'vld': 'mgt', 'vim_net': vim['wan']['id'], 'name': 'ens3', 'mgt': True}
             ]
 
-        for type in self.edge_vnfd_type :
+        for t in self.edge_vnfd_type :
             param = {
-                'name': '{}_{}_{}_{}'.format(type.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
-                'id': '{}_{}_{}_{}'.format(type.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
-                'type': '{}'.format(type)
+                'name': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
+                'id': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
+                'type': '{}'.format(t)
             }
-            edge_vnfd = self.getVnfd('area', area["id"], type)
+            edge_vnfd = self.getVnfd('area', area["id"], t)
             if not edge_vnfd:
                 continue
             n_obj = sol006_NSD_builder(edge_vnfd, vim["name"], param, vim_net_mapping)
@@ -301,7 +300,7 @@ class Free5GC_K8s(Blue5GBase):
     def add_ext_nsd(self, msg: dict) -> list:
         """
         Add external UPF(s) (not core) to the system
-        For every TAC in the configuration message (in VIMs -> tacs) add an UPF (execution of "edge_nsd" function)
+        For every TAC in the configuration message (in VIMs -> tacs) add a UPF (execution of "edge_nsd" function)
         :param msg: configuration message
         :return: list of nsd to create
         """
@@ -338,7 +337,6 @@ class Free5GC_K8s(Blue5GBase):
         )
 
         res += config.dump()
-        logger.info("CONF_DATA: {}".format(conf_data))
         logger.info("Module configuration built for core ")
 
         return res
@@ -361,7 +359,7 @@ class Free5GC_K8s(Blue5GBase):
         )
 
         res += config.dump()
-        logger.info("Configuration built for tac " + str(nsd_item['tac']))
+        logger.info("Configuration built for area {}".format(nsd_item['area']))
 
         return res
 
@@ -369,18 +367,21 @@ class Free5GC_K8s(Blue5GBase):
         logger.info("Initializing Day2 configurations")
         res = []
 
+        # configuration of the 5G core
         msg2up = {'config': self.coreManager.getConfiguration()}
         res += self.core_upXade(msg2up)
 
         for n in self.nsd_:
+            # configuration of external (ie. VM, not in k8s) 5G core modules, if exists (like "AMF", "UPF", etc)
             if n['type'] == 'core':
                 # split return a list. nsd_name is something like "amf_00101_DEGFE". We need the first characters
                 nsd_type = (n["descr"]["nsd"]["nsd"][0]["name"]).split("_")
-                if nsd_type and nsd_type[0] in self.edge_vnfd_type:
+                if nsd_type and isinstance(nsd_type[0], str) and nsd_type[0].lower() in self.edge_vnfd_type:
                     res += self.core_day2_conf(msg, n)
             elif n['type'] == 'ran':
                 res += self.ran_day2_conf(msg, n)
             elif n['type'] in self.edge_vnfd_type:
+                # configuration of edge 5G core modules (like "UPFs")
                 res += self.edge_day2_conf(msg, n)
 
         return res
@@ -402,7 +403,7 @@ class Free5GC_K8s(Blue5GBase):
                     raise ValueError('nsd for tac {} not found'.format(area['id']))
                 for nsd in nsd_list:
                     vim = self.get_vim(area["id"])
-                    if vim == None:
+                    if not vim:
                         logger.error("area {} has not a valid VIM".format(area["id"]))
                         continue
                     res += self.edge_day2_conf({'vim': vim['name'], 'tac': area['id']}, nsd)
@@ -422,21 +423,24 @@ class Free5GC_K8s(Blue5GBase):
         return nsi_to_delete
 
     def add_tac_conf(self, msg: dict) -> list:
-        return self.coreManager.add_tac_conf(msg)
+        res = self.coreManager.add_tac_conf(msg)
+        self.coreManager.config_5g_core_for_reboot()
+        res += self.core_upXade({'config': self.coreManager.getConfiguration()})
+        return res
 
     def del_tac_conf(self, msg: dict) -> list:
-        return self.coreManager.del_tac_conf(msg)
+        res = self.coreManager.del_tac_conf(msg)
+        self.coreManager.config_5g_core_for_reboot()
+        res += self.core_upXade({'config': self.coreManager.getConfiguration()})
+        return res
 
     def add_slice(self, msg: dict) -> list:
         res = []
         tail_res = []
-        tacList = []
 
         # add callback IP in self.conf
         if "callback" in msg:
             self.conf["callback"] = msg["callback"]
-
-        tail_res += self.coreManager.add_slice(msg)
 
         if "areas" in msg:
             for area in msg["areas"]:
@@ -465,17 +469,19 @@ class Free5GC_K8s(Blue5GBase):
                 # msg2up = {'config': self.running_free5gc_conf}
                 # res += tail_res + self.core_upXade(msg2up)
 
+        res += self.coreManager.add_slice(msg)
+        self.coreManager.config_5g_core_for_reboot()
+        res += tail_res + self.core_upXade({'config': self.coreManager.getConfiguration()})
+
         return res
 
     def add_ues(self, msg: dict) -> list:
-        res = []
         self.userManager.add_ues(msg)
-        return res
+        return []
 
     def del_ues(self, msg: dict) -> list:
-        res = []
         self.userManager.del_ues(msg)
-        return res
+        return []
 
     def del_slice(self, msg: dict) -> list:
         res = []
@@ -484,8 +490,6 @@ class Free5GC_K8s(Blue5GBase):
         # add callback IP in self.conf
         if "callback" in msg:
             self.conf["callback"] = msg["callback"]
-
-        self.coreManager.del_slice(msg)
 
         if "areas" in msg:
             for area in msg["areas"]:
@@ -530,10 +534,9 @@ class Free5GC_K8s(Blue5GBase):
                                     elif nsd_item['type'] == 'ran':
                                         tail_res += self.ran_day2_conf(msg,nsd_item)
 
-                    # self.config_5g_core_for_reboot()
-                    #
-                    # msg2up = {'config': self.running_free5gc_conf}
-                    # res += self.core_upXade(msg2up) + tail_res
+        self.coreManager.del_slice(msg)
+        self.coreManager.config_5g_core_for_reboot()
+        res += self.core_upXade({'config': self.coreManager.getConfiguration()}) + tail_res
 
         return res
 
@@ -545,7 +548,7 @@ class Free5GC_K8s(Blue5GBase):
 
     def kdu_upgrade(self, nsd_name: str, conf_params: dict, vnf_id="1", kdu_name="5gc", nsi_id=None):
         if 'kdu_model' not in conf_params:
-            conf_params['kdu_model'] = self.chart
+            conf_params['kdu_model'] = self.chartName
 
         res = [
             {

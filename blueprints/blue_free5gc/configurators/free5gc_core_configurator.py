@@ -1046,17 +1046,17 @@ class Configurator_Free5GC_Core(Blue5GBase):
                                 sliceSupportList=[slice])
                         self.nssf_set_configuration(mcc=mcc, mnc=mnc, nssfName=nssfName, sliceList=[slice],
                                 tac=area["id"])
-                        res += self.smf_add_upf(mcc=mcc, mnc=mnc, smfName=smfName, tac=area["id"], slice=slice,
+                        res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=slice,
                                 dnnInfoList=extSlice["dnnList"])
                     self.amf_set_configuration(mcc=mcc, mnc=mnc, amfId=amfId, supportedTacList = tacList,
                                 snssaiList = sliceList, dnnList = dnnList)
 
         return res
 
-    def del_slice(self, msg: dict):
+    def del_slice(self, msg: dict) -> None:
         if msg is None:
             logger.warn("Conf is None")
-            return []
+            return
 
         if "config" in msg and "plmn" in msg['config']:
             mcc = msg['config']['plmn'][:3]
@@ -1077,17 +1077,6 @@ class Configurator_Free5GC_Core(Blue5GBase):
                         self.smf_unset_configuration(dnnList=dnnSliceList, sliceList=sliceList)
                         self.n3iwf_unset_configuration(sliceSupportList=sliceList)
                         self.nssf_unset_configuration(sliceList=sliceList)
-
-                        # remove DNNs to upf configuration
-                        removingDnnList = []
-                        if len(dnnSliceList) != 0:
-                            for upf in self.conf["config"]["upf_nodes"]:
-                                if upf["tac"] == area["id"]:
-                                    if "dnnList" in upf:
-                                        for dnnIndex, dnnElem in enumerate(upf["dnnList"]):
-                                            if dnnElem in dnnSliceList:
-                                                removingDnnList.append(dnnElem)
-                                                upf["dnnList"].pop(dnnIndex)
 
                     # self.config_5g_core_for_reboot()
                     #

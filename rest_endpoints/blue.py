@@ -109,49 +109,6 @@ def create_blueprint(
     return RestAnswer202(id=blue_id, resource="blueprint", operation="create", status="submitted")
 
 
-@blue_router.post('/5G', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def create_blueprint_5g(
-        msg: Create5gModel
-):
-    return create_blueprint(msg)
-
-
-@blue_router.post('/K8S', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def create_blueprint_k8s(
-        msg: K8sBlueprintCreate
-):
-    return create_blueprint(msg)
-
-
-"""@blue_router.post('/ueransim', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def create_blueprint_ueransim(
-        msg: UeranSimBlueprintRequestInstance
-):
-    return create_blueprint(msg)
-"""
-
-
-@blue_router.post('/vo', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def create_blueprint_vo(
-        msg: VoBlueprintRequestInstance
-):
-    return create_blueprint(msg)
-
-
-@blue_router.post('/mqtt', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def create_blueprint_mqtt(
-        msg: MqttRequestBlueprintInstance
-):
-    return create_blueprint(msg)
-
-
-@blue_router.post('/trex', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def create_blueprint_trex(
-        msg: TrexRequestBlueprintInstance
-):
-    return create_blueprint(msg)
-
-
 @blue_router.put('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
 def modify_blueprint(msg: blue_day2_models, blue_id: str):
     # assign a session id

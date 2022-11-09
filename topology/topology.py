@@ -8,13 +8,14 @@ import typing
 import json
 import traceback
 from multiprocessing import RLock, Queue
-from utils.util import obj_multiprocess_lock
-
+from utils.util import obj_multiprocess_lock, redis_host, redis_port
+import redis
 
 topology_msg_queue = Queue()
 topology_lock = RLock()
 
 logger = create_logger('Topology')
+redis_cli = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8")
 
 
 class Topology:
@@ -67,6 +68,11 @@ class Topology:
             logger.info('starting terraforming VIM {}'.format(vim['name']))
             # self.os_terraformer[vim['name']] = VimTerraformer(vim)
             self.add_vim(vim, terraform=terraform)
+        msg = {
+            'operation': 'create',
+            'data': topo
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
@@ -87,6 +93,11 @@ class Topology:
         self._os_terraformer = {}
         self._data = {'vims': [], 'networks': [], 'routers': [], 'kubernetes': [], 'pdus': []}
         self.db.delete_DB('topology', {'id': 'topology'})
+        msg = {
+            'operation': 'delete',
+            'data': {}
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
     # **************************** VIMs ****************************
     def get_vim(self, vim_name: str) -> Union[dict, None]:
@@ -127,6 +138,11 @@ class Topology:
         data = self.nbiutil.add_vim(osm_vim)
         if not data:
             raise ValueError("failed to onboard VIM {} onto OSM".format(vim['name']))
+        msg = {
+            'operation': 'create_vim',
+            'data': vim
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
     @obj_multiprocess_lock
     def del_vim(self, vim, terraform=False):
@@ -151,6 +167,11 @@ class Topology:
                     self._os_terraformer[vim['name']].delNet(network['name'])
 
         self._data['vims'] = [item for item in self._data['vims'] if item['name'] != vim['name']]
+        msg = {
+            'operation': 'delete_vim',
+            'data': vim
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
     @obj_multiprocess_lock
     def update_vim(self, update_msg: dict, terraform: bool = True):
@@ -184,8 +205,13 @@ class Topology:
             if vim_area not in vim['areas']:
                 raise ValueError('area {} not in VIM {}'.format(vim_area, vim['name']))
             vim['areas'].pop(vim_area)
+        msg = {
+            'operation': 'update_vim',
+            'data': vim
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
-    def get_vim_name_from_area_id(self, area: str) -> str:
+    def get_vim_name_from_area_id(self, area: str) -> Union[str, None]:
         vim = next((item for item in self._data['vims'] if area in item['areas']), None)
         if vim:
             return vim['name']
@@ -224,6 +250,11 @@ class Topology:
                     raise ValueError('VIM {} not found'.format(vim_name))
                 # vim['networks'].append(network['name'])
                 self.add_vim_net(network['name'], vim, terraform=terraform)
+        msg = {
+            'operation': 'create_network',
+            'data': network
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
     @obj_multiprocess_lock
     def del_network(self, network: dict, vim_names_list: Union[list, None] = None, terraform: bool = False):
@@ -238,6 +269,11 @@ class Topology:
                 else:
                     self.del_vim_net(network['name'], vim, terraform=terraform)
         self._data['networks'] = [item for item in self._data['networks'] if item['name'] != network['name']]
+        msg = {
+            'operation': 'delete_network',
+            'data': network
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
     # **************************** Routers **************************
 
@@ -262,6 +298,11 @@ class Topology:
         if router_check:
             raise ValueError("router {} already existing in the topology". format(router['name']))
         self._data['routers'].append(router)
+        msg = {
+            'operation': 'create_router',
+            'data': router
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
     @obj_multiprocess_lock
     def del_router(self, router: dict, vim_names_list: list = None):
@@ -281,6 +322,11 @@ class Topology:
                     self.del_vim_router(router['name'], vim)
 
         self._data['routers'] = [item for item in self._data['routers'] if item['name'] != router['name']]
+        msg = {
+            'operation': 'delete_router',
+            'data': router
+        }
+        redis_cli.publish('topology', json.dumps(msg))
 
     # **************************** VIM updating **********************
 
@@ -416,7 +462,6 @@ class Topology:
         self.save_topology()
         return ip_range
 
-    @obj_multiprocess_lock
     def set_reserved_ip_range(self, ip_range: dict, net_name: str, owner: str) -> None:
         topology_net = next((n for n in self._data['networks'] if n['name'] == net_name), None)
         if not topology_net:
@@ -465,6 +510,11 @@ class Topology:
             pdu.update({'nfvo-onboarded': False, "details": ""})
             self._data['pdus'].append(pdu)
             self.save_topology()
+            msg = {
+                'operation': 'create_pdu',
+                'data': pdu
+            }
+            redis_cli.publish('topology', json.dumps(msg))
 
         except Exception:
             logger.error(traceback.format_exc())
@@ -483,6 +533,11 @@ class Topology:
                 logger.info("Deleting pdu from OSM, result: {}".format(res))
             if res:
                 self._data['pdus'] = [item for item in self._data['pdus'] if item['name'] != pdu_name]
+            msg = {
+                'operation': 'delete_pdu',
+                'data': pdu
+            }
+            redis_cli.publish('topology', json.dumps(msg))
         except ValueError as err:
             logger.error(err)
             raise ValueError('error in creating PDU')

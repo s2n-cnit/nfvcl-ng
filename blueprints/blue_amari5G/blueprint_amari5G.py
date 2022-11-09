@@ -1,9 +1,8 @@
 import typing
-from blueprints.blueprint import BlueprintBase
+from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
-from configurators.amari5GC_configurator import Configurator_Amari5GC
-from nfvo.vnf_manager import sol006_VNFbuilder
-from nfvo.nsd_manager import sol006_NSD_builder, get_ns_vld_ip
+from .configurators.amari5GC_configurator import Configurator_Amari5GC
+from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from main import *
 
 db = persistency.DB()

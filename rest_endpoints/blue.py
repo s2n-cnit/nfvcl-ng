@@ -178,8 +178,11 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
                          session_id=session_id, description="operation submitted")
 
 
-blue_router.include_router(UeRanSim.fastapi_router(create_blueprint, modify_blueprint))
-blue_router.include_router(K8s.fastapi_router(create_blueprint, modify_blueprint))
+# adding Blueprint specific POST and PUT methods
+for b in blueprint_types:
+    BlueClass = getattr(importlib.import_module("blueprints.{}".format(blueprint_types[b]['module_name'])),
+                        blueprint_types[b]['class_name'])
+    blue_router.include_router(BlueClass.fastapi_router(create_blueprint, modify_blueprint))
 
 
 @blue_router.delete('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)

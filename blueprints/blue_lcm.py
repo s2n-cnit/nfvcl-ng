@@ -101,7 +101,7 @@ class BlueLCMworker:
         self.state = state
         self.queue = session_queue
         self.update_db()
-        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+
         while True:
             logger.info('worker {} awaiting for new job'.format(self.blue.get_id()))
             s_input = self.queue.get()
@@ -181,7 +181,7 @@ class BlueLCMworker:
         self.blue.status = 'processing'
         self.blue.current_operation = requested_operation
         self.update_db()
-
+        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
         # for each session we might have multiple stages, each one composed by day0, day2, and dayN lists of handlers
         session_methods = self.blue.get_operation_methods(requested_operation)
         # logger.info(session_methods)
@@ -191,33 +191,41 @@ class BlueLCMworker:
                 if "day0" in stage:
                     self.blue.detailed_status = 'Day0/1'
                     self.update_db()
+                    redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
                     for handler in stage['day0']:
                         if not self.day0_operation(handler, checked_vims, msg):
                             raise (AssertionError('error in Day0 operations'))
                         self.update_db()
+                        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
 
                 if "day2" in stage:
                     self.blue.detailed_status = 'Day2'
                     self.update_db()
+                    redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
                     for handler in stage['day2']:
                         self.day2_operation(handler, msg)
                         self.update_db()
+                        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
 
                 if "dayN" in stage:
                     self.blue.detailed_status = 'DayN'
                     self.update_db()
+                    redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
                     for handler in stage['dayN']:
                         self.dayN_operation(handler, msg)
                         self.update_db()
+                        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
 
             self.blue.status = 'idle'
             self.blue.current_operation = None
             self.blue.detailed_status = None
             logger.info("Blue {} - session {} finalized".format(self.blue.get_id(), session_id))
             self.update_db()
+            redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
             self.blue.rest_callback(requested_operation, session_id, "ready")
 
         except AssertionError as error:
+            redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
             self.blue.rest_callback(requested_operation, session_id, "failed")
             self.abort_session(str(error), requested_operation, session_id)
 

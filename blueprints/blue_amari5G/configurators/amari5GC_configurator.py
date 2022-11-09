@@ -26,7 +26,7 @@ class Configurator_Amari5GC(Configurator_Flex):
             if args['tunnels']:
                 # in case of tunnels we should use IP addresses of the overlay net
                 self.conf['gtp_ip'] = args['config']['epc_s1_ip']
-        if self.conf['gtp_ip'] is None:
+        if not self.conf['gtp_ip']:
             for intf in interfaces:
                 if intf['vld'] == 'data':
                     self.conf['gtp_ip'] = intf['ip']
@@ -111,7 +111,7 @@ class Configurator_Amari5GC(Configurator_Flex):
 
     def add_slice(self, data: dict) -> list:
         pdn_item = next((item for item in self.conf['pdn'] if item['name'] == data['plmn']), None)
-        if pdn_item is None:
+        if not pdn_item:
             raise ValueError('pdn ' + data['plmn'] + ' not existing! Aborting action.')
         if 'nssai' not in self.conf_data:
             self.conf_data['nssai'] = []
@@ -132,7 +132,7 @@ class Configurator_Amari5GC(Configurator_Flex):
 
     def del_slice(self, data: dict) -> list:
         pdn_item = next((item for item in self.conf['pdn'] if item['name'] == data['plmn']), None)
-        if pdn_item is None:
+        if not pdn_item:
             raise ValueError('pdn ' + data['plmn'] + ' not existing! Aborting action.')
 
         nssai_index = next((index for index, item in enumerate(self.conf_data['nssai']) if item['sst'] == data['sst']), None)
@@ -163,7 +163,7 @@ class Configurator_Amari5GC(Configurator_Flex):
                 print(res)
                 break
 
-        if license_ip is "":
+        if license_ip == "":
             raise ValueError("no Amarisoft License Servers available")
 
         return license_ip

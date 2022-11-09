@@ -14,15 +14,10 @@ nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_
 
 
 class K8s(BlueprintBase):
-    api_router: APIRouter
-    api_day0_function: Callable
-    api_day2_function: Callable
-
     @classmethod
     def rest_create(cls, msg: K8sBlueprintCreate):
         return cls.api_day0_function(msg)
 
-    # Fixme: create the pydantic model for adding/removing UEs
     @classmethod
     def rest_scale(cls, msg: K8sBlueprintScale, blue_id: str):
         return cls.api_day2_function(msg, blue_id)

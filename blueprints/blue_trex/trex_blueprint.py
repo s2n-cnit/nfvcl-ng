@@ -1,5 +1,6 @@
 from blueprints import BlueprintBase, parse_ansible_output
 from . import Configurator_trex
+from .models import TrexRequestBlueprintInstance
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from main import *
 from utils.util import *
@@ -18,6 +19,15 @@ class Trex(BlueprintBase):
     The goal of this blueprint is to create TRex virtual machine regarding the input variables. It create and modify the
     configurations files inside the machine and run it.
     """
+
+    @classmethod
+    def rest_create(cls, msg: TrexRequestBlueprintInstance):
+        return cls.api_day0_function(msg)
+
+    @classmethod
+    def day2_methods(cls):
+        # cls.api_router.add_api_route("/{blue_id}", cls.rest_scale, methods=["PUT"])
+        pass
 
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)

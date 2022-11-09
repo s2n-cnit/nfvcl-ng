@@ -1,10 +1,10 @@
 from typing import List
-from blueprints.blueprint import BlueprintBase
+from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
-from blueprints.blue_free5gc import free5GC_default_config
+from blueprints.blue_5g_base.models import Create5gModel
+from . import free5GC_default_config
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services, get_ns_vld_ip
-from blueprints.blue_free5gc.configurators import Configurator_Free5GC, Configurator_Free5GC_User, \
-    Configurator_Free5GC_Core
+from .configurators import Configurator_Free5GC, Configurator_Free5GC_User, Configurator_Free5GC_Core
 import copy
 from main import *
 
@@ -14,11 +14,22 @@ nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_
 # create logger
 logger = create_logger('Free5GC_K8s')
 
+
 class Free5GC_K8s(Blue5GBase):
     # Free5GC modules exported as external VMs
     edge_vnfd_type = ['upf']
     chartName = "nfvcl_helm_repo/free5gc:3.2.0"
     imageName = "free5gc_v3.0.7"
+
+    @classmethod
+    def rest_create(cls, msg: Create5gModel):
+        return cls.api_day0_function(msg)
+
+    @classmethod
+    def day2_methods(cls):
+        # cls.api_router.add_api_route("/{blue_id}", cls.rest_scale, methods=["PUT"])
+        pass
+
     def __init__(self, conf: dict, id_: str) -> None:
         BlueprintBase.__init__(self, conf, id_, db=db, nbiutil=nbiUtil)
         logger.info("Creating \"Free5GC_K8s\" Blueprint")

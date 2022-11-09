@@ -2,6 +2,7 @@ import typing
 from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
 from .configurators.amari5GC_configurator import Configurator_Amari5GC
+from blueprints.blue_5g_base.models import Create5gModel
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from main import *
 
@@ -12,6 +13,15 @@ logger = create_logger('Amari5GBlue')
 
 
 class Amari5G(Blue5GBase):
+    @classmethod
+    def rest_create(cls, msg: Create5gModel):
+        return cls.api_day0_function(msg)
+
+    @classmethod
+    def day2_methods(cls):
+        # cls.api_router.add_api_route("/{blue_id}", cls.rest_scale, methods=["PUT"])
+        pass
+
     def __init__(self, conf: dict, id_: str, data: typing.Union[typing.Dict, None] = None) -> None:
         BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         logger.info("Creating Amari5G Blueprint")

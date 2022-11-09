@@ -1,14 +1,22 @@
-from blueprints.blueprint import BlueprintBase
+from blueprints import BlueprintBase
 from utils import persistency
-from nfvo.vnf_manager import sol006_VNFbuilder
-from nfvo.nsd_manager import sol006_NSD_builder
+from nfvo import sol006_VNFbuilder, sol006_NSD_builder
 from utils.util import *
+from .models import MqttRequestBlueprintInstance
 
 db = persistency.DB()
 logger = create_logger('MQTT Broker')
 
 
 class MqttBroker(BlueprintBase):
+    @classmethod
+    def rest_create(cls, msg: MqttRequestBlueprintInstance):
+        return cls.api_day0_function(msg)
+
+    @classmethod
+    def day2_methods(cls):
+        pass
+
     def __init__(self, conf: dict, id_: str, recover: bool = False):
         BlueprintBase.__init__(self, conf, id_)
         logger.info("Creating MQTT Broker")

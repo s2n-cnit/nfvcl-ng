@@ -1,4 +1,5 @@
 from blueprints import BlueprintBase
+from .models import VoBlueprintRequestInstance
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services
 from main import *
 from typing import Union, Dict
@@ -9,6 +10,18 @@ nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_
 
 
 class VO(BlueprintBase):
+    @classmethod
+    def rest_create(cls, msg: VoBlueprintRequestInstance):
+        return cls.api_day0_function(msg)
+
+    @classmethod
+    def rest_upgrade(cls, msg: VoBlueprintRequestInstance, blue_id: str):
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def day2_methods(cls):
+        cls.api_router.add_api_route("/{blue_id}", cls.rest_upgrade, methods=["PUT"])
+
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         logger.info("Creating Virtual Object Blueprint")

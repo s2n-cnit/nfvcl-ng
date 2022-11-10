@@ -1,3 +1,4 @@
+import ipaddress
 from typing import List
 from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
@@ -215,10 +216,22 @@ class Free5GC_K8s(Blue5GBase):
 
         self.set_coreVnfd(vls=vim_net_mapping)
 
-        # TODO read subnetIP and gatewayIP from core_v
         # set networking parameters for 5GC core running configuration files
-        self.coreManager.set_core_networking_parameters( interfaceName = "ens3", subnetIP = "192.168.0.0",
-                                             gatewayIP = "192.168.0.254" )
+        core_network = self.topology_get_network(core_v['wan'])
+        if not core_network:
+            raise ValueError("Core network {} not found".format(core_v['wan']))
+        else:
+            if "cidr" in core_network:
+                core_subnetIP = str(ipaddress.IPv4Network(core_network["cidr"])[0])
+            else:
+                raise ValueError("Core network {} has not a valid CIDR")
+            if "gateway" in core_network:
+                core_gatewayIP = core_network["gateway"]
+            else:
+                raise ValueError("Core network {} has not a valid gateway")
+
+        self.coreManager.set_core_networking_parameters( interfaceName="ens3", subnetIP=core_subnetIP,
+                                             gatewayIP=core_gatewayIP )
 
         # reset configuration
         self.coreManager.reset_core_configuration()
@@ -626,6 +639,9 @@ class Free5GC_K8s(Blue5GBase):
 
 
     def get_ip_core(self, n) -> None:
+        """
+        Set IP for 5G core k8s services (AMF, SMF, etc)
+        """
         logger.debug('get_ip_core')
         vlds = get_ns_vld_ip(n['nsi_id'], ["data"])
         key = None
@@ -653,6 +669,7 @@ class Free5GC_K8s(Blue5GBase):
                     'tac': n['area'] if 'area' in n else None
                 })
 
+        # TODO: expects more than one module for services
         try:
            kdu_services = get_kdu_services(n['nsi_id'], '5gc')
            for service in kdu_services:

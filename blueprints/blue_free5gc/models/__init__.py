@@ -1,0 +1,1 @@
+from .blue_FreefGC_k8s_model import Free5gck8sBlueCreateModel

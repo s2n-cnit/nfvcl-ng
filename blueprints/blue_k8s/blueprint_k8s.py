@@ -1,8 +1,7 @@
 from blueprints import BlueprintBase, parse_ansible_output
 from . import ConfiguratorK8s
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
-from typing import Union, List, Dict, Optional, Callable
-from fastapi import APIRouter
+from typing import Union, List, Dict, Optional
 from .models import K8sBlueprintCreate, K8sBlueprintScale
 import traceback
 from main import *

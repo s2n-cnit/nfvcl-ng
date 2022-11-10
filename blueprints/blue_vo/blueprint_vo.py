@@ -20,7 +20,7 @@ class VO(BlueprintBase):
 
     @classmethod
     def day2_methods(cls):
-        cls.api_router.add_api_route("/{blue_id}", cls.rest_upgrade, methods=["PUT"])
+        cls.api_router.add_api_route("/{blue_id}/upgrade", cls.rest_upgrade, methods=["PUT"])
 
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
@@ -139,7 +139,7 @@ class VO(BlueprintBase):
         self.conf['config']['external_ip'] = kdu_services[0]['external_ip'][0]
         # self.to_db()
 
-    def destroy(self):
+    def _destroy(self):
         logger.info("Destroying")
         self.to_db()
 

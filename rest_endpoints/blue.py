@@ -137,9 +137,13 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
 
 # adding Blueprint specific POST and PUT methods
 for b in blueprint_types:
-    BlueClass = getattr(importlib.import_module("blueprints.{}".format(blueprint_types[b]['module_name'])),
-                        blueprint_types[b]['class_name'])
-    blue_router.include_router(BlueClass.fastapi_router(create_blueprint, modify_blueprint))
+    try:
+        logger.info("exposing REST APIs for Blueprint {}".format(blueprint_types[b]['class_name']))
+        BlueClass = getattr(importlib.import_module("blueprints.{}".format(blueprint_types[b]['module_name'])),
+                            blueprint_types[b]['class_name'])
+        blue_router.include_router(BlueClass.fastapi_router(create_blueprint, modify_blueprint))
+    except Exception:
+        logger.error(traceback.format_exc())
 
 
 @blue_router.delete('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)

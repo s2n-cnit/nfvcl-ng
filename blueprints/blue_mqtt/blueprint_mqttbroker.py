@@ -1,11 +1,13 @@
 from blueprints import BlueprintBase
 from utils import persistency
-from nfvo import sol006_VNFbuilder, sol006_NSD_builder
+from nfvo import sol006_VNFbuilder, sol006_NSD_builder, NbiUtil
 from utils.util import *
 from .models import MqttRequestBlueprintInstance
+from typing import Union, Dict
 
 db = persistency.DB()
 logger = create_logger('MQTT Broker')
+nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 
 
 class MqttBroker(BlueprintBase):
@@ -14,11 +16,15 @@ class MqttBroker(BlueprintBase):
         return cls.api_day0_function(msg)
 
     @classmethod
-    def day2_methods(cls):
-        pass
+    def rest_upgrade(cls, msg: MqttRequestBlueprintInstance, blue_id: str):
+        return cls.api_day2_function(msg, blue_id)
 
-    def __init__(self, conf: dict, id_: str, recover: bool = False):
-        BlueprintBase.__init__(self, conf, id_)
+    @classmethod
+    def day2_methods(cls):
+        cls.api_router.add_api_route("/{blue_id}/upgrade", cls.rest_upgrade, methods=["PUT"])
+
+    def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
+        BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         logger.info("Creating MQTT Broker")
         self.supported_operations = {
             'init': [{
@@ -63,24 +69,19 @@ class MqttBroker(BlueprintBase):
     def getVnfd(self):
         return self.vnfd[0]
 
-    def broker_nsd(self, vim: dict) -> str:
+    def broker_nsd(self, area: dict) -> str:
         logger.info("Blue {} building NSD".format(self.get_id()))
 
         vnf_interfaces = [
-            {'vld': 'data', 'mgt': True, 'k8s-cluster-net': 'data_net', 'vim_net': vim['load_balancer_net']['id']},
+            {
+                'vld': 'data',
+                'mgt': True,
+                'k8s-cluster-net': 'data_net',
+                'vim_net': self.conf['config']['network_endpoints']['data']
+            },
         ]
 
         self.setVnfd(vnf_interfaces)
-
-        """
-        knf_configs = [{
-            'vnf_id': '{}_mqtt_broker'.format(self.get_id()),
-            'kdu_confs': [{'kdu_name': 'mqtt_broker', "additionalParams": {
-                "config": self.conf['config'],
-                # "extIPaddress": "172.16.200.151"
-            }}]
-        }]
-        """
 
         param = {
             'name': 'mqtt_broker_' + str(self.get_id()),
@@ -88,7 +89,7 @@ class MqttBroker(BlueprintBase):
             'type': 'mqtt_broker'
         }
         # tag, tac, list of vnf interfaces
-        n_obj = sol006_NSD_builder([self.getVnfd()], vim, param, vnf_interfaces)  #, knf_configs=knf_configs)
+        n_obj = sol006_NSD_builder([self.getVnfd()], self.get_vim_name(area['id']), param, vnf_interfaces)
         n_ = n_obj.get_nsd()
         self.nsd_.append(n_)
 
@@ -98,15 +99,14 @@ class MqttBroker(BlueprintBase):
         logger.info("Creating MQTT Broker Network Service Descriptors")
         nsd_names = []
         # one router per nsd per tac
-        for v in self.conf['vims']:
-            logger.info("Creating MQTT Broker NSD on VIM {}".format(v['name']))
-            nsd_names.append(self.broker_nsd(v))
+        for area in self.conf['areas']:
+            logger.info("Creating MQTT Broker NSD on area {}".format(area['id']))
+            nsd_names.append(self.broker_nsd(area))
         logger.info("NSDs created")
         return nsd_names
 
     def get_ip(self):
-        self.save_conf()
+        self.to_db()
 
-    def destroy(self):
-        logger.info("Destroying")
-        self.del_conf()
+    def _destroy(self):
+        pass

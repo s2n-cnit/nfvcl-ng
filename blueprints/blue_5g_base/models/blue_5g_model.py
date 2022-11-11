@@ -1,100 +1,113 @@
-
 from __future__ import annotations
-
-from enum import Enum
-from ipaddress import IPv4Address, IPv4Network
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field, conlist
+from pydantic import BaseModel, IPvAnyAddress, \
+    Field, constr, HttpUrl
 
 
-class Cni(Enum):
-    flannel = 'flannel'
-    calico = 'calico'
+# ===================================== SubClasses of subconfig section ================================================
+class SubDataNets(BaseModel):
+    net_name: str = Field(..., description="set net-name, exp: 'boh'")
+    dnn: str = Field(..., description="set dnn, exp: 'internet'")
 
 
-class LbType(Enum):
-    layer2 = 'layer2'
-    layer3 = 'layer3'
+class NetworkEndPoints(BaseModel):
+    mgt: Optional[str] = None
+    wan: Optional[str] = None
+    data_nets: List[SubDataNets]
 
 
-class LBPool(BaseModel):
-    mode: LbType = Field(
-        'layer2', description='Operating mode of Metal-LB. Default Layer-2.'
-    )
-    net_name: str = Field(
-        ..., description='name of the network in the topology'
-    )
-    ip_start: Optional[IPv4Address] = None
-    ip_end: Optional[IPv4Address] = None
-    range_length: Optional[str] = Field(
-        None,
-        description='Number of IPv4 addresses to reserved if no ip start and end are passed. Default 10 addresses.',
-    )
-
-    class Config:
-        use_enum_values = True
+class SubFlows(BaseModel):
+    flowId: str = Field(..., description="set flow Id, exp: f0")
+    ipAddrFilter: IPvAnyAddress = Field(None, description="set IP address filter")
+    fiveqi: constr(regex=r"[0-9]") = Field(..., alias="5qi")
+    gfbr: Optional[str] = Field(..., description="set gfbr, exp: 100Mbps")
 
 
-class K8sNetworkEndpoints(BaseModel):
-    mgt: str = Field(
-        ..., description='name of the topology network to be used for management'
-    )
-    data_nets: List[LBPool] = Field(..., description='topology networks to be used by the load balancer')
+class SubpduSessions(BaseModel):
+    pduSessionId: str = Field(..., description="set pduSession Id, exp: p0")
+    pduSessionAmbr: Optional[str] = Field(..., description="set pduSessionAmbr, exp: 10Mbps")
+    flows: List[SubFlows]
 
 
-class VMFlavors(BaseModel):
-    memory_mb: str = Field(16384, alias='memory-mb')
-    storage_gb: str = Field(32, alias='storage-gb')
-    vcpu_count: str = Field(16, alias='vcpu-count')
+class SubProfileParams(BaseModel):
+    isolationLevel: Literal["ISOLATION", "NO_ISOLATION"]
+    sliceAmbr: Optional[str] = Field('1000Mbps', description="Set sliceAmber, exp: 1000Mbps")
+    ueAmbr: Optional[str] = Field('50Mbps', description="Set ueAmbr, exp: 50Mbps")
+    maximumNumberUE: Optional[int]
+    pduSessions: List[SubpduSessions]
 
 
-class K8sAreaInfo(BaseModel):
-    id: int
-    core: Optional[bool] = False
-    workers_replica: int
-    worker_flavor_override: Optional[VMFlavors]
+class SubLocationConstraints(BaseModel):
+    geographicalAreaId: str
+    # fixme: Double check for the length
+    tai: constr(regex=r"^[0-9]+$") = Field(..., min_length=10, max_length=11)
 
 
-class K8sConfig(BaseModel):
-    version: Optional[str] = "1.24"
-    cni: Optional[Cni] = "flannel"
-    linkerd: Optional[dict]
-    pod_network_cidr: Optional[IPv4Network] \
-        = Field('10.254.0.0/16', description='K8s Pod network IPv4 cidr to init the cluster')
-    network_endpoints: K8sNetworkEndpoints
-    worker_flavors: VMFlavors = VMFlavors()
-    master_flavors: VMFlavors = VMFlavors()
-
-    class Config:
-        use_enum_values = True
+class SubEnabledUEList(BaseModel):
+    ICCID: str = Field("*", description="set the ICCID")
 
 
-class K8sBlueprintCreate(BaseModel):
-    type: Literal['K8s']
-    callbackURL: Optional[str] = Field(
-        None,
-        description='url that will be used to notify when the blueprint processing finishes',
-    )
-    config: K8sConfig
-    areas: conlist(K8sAreaInfo, min_items=1) = Field(
+class SubSliceProfiles(BaseModel):
+    sliceId: str
+    sliceType: Literal["EMBB", "URLLC", "MMTC"]
+    dnnlist: List[str] = Field([], description="set dnn-list as a listst on names")
+    profileParams: SubProfileParams
+    locationConstraints: List[SubLocationConstraints]
+    enabledUEList: List[SubEnabledUEList]
+
+
+class SubSnssai(BaseModel):
+    sliceId: str
+    sliceType: Literal["EMBB", "URLLC", "MMTC"]
+    pduSessionIds: List[str] = Field(..., description="Set Default slices parameters, exp: ['p0', 'p1']")
+    default_slice: Optional[bool]
+
+
+class SubSubscribers(BaseModel):
+    imsi: constr(regex=r'^[0-9]*$', min_length=15, max_length=15)
+    k: constr(regex=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
+    opc: constr(regex=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
+    snssai: List[SubSnssai]
+
+
+class SubConfig(BaseModel):
+    network_endpoints: NetworkEndPoints
+    plmn: constr(regex=r'^[0-9]*$', min_length=5, max_length=6) = Field(
         ...,
-        description='list of areas to instantiate the Blueprint',
+        description='PLMN identifier of the mobile network'
     )
+    sliceProfiles: Optional[List[SubSliceProfiles]] = Field(..., description="Set Default slices parameters")
+    subscribers: List[SubSubscribers]
 
-    class Config:
-        use_enum_values = True
+
+# =================================================== End of Config class =============================================
+# ====================================================sub area SubClasses =============================================
+class SubSlices(BaseModel):
+    sst: int
+    sd: str
+    dnnList: List[str] = Field(["internet", "internet1"])
 
 
-class Create5gModel(BaseModel):
-    callbackURL: Optional[str] = Field(
-        None,
-        description='url that will be used to notify when the blueprint processing finishes',
+class SubArea(BaseModel):
+    id: int
+    nci: str
+    idLength: int
+    core: bool
+    slices: Optional[List[SubSlices]] = Field([],description="set slices ")
+# ===============================================end of sub area ======================================================
+# =============================================== main section for blue free5gc k8s model class========================
+
+
+class Free5gck8sBlueCreateModel(BaseModel):
+    type: Literal["5G"]
+    callbackURL: Optional[HttpUrl] = Field(
+        '',
+        description='url that will be used to notify when the topology terraform ends'
     )
-    operation: Literal['scale']
-    add_areas: List[K8sAreaInfo]
-    modify_areas: List[K8sAreaInfo]
-    del_areas: List[K8sAreaInfo]
+    config: SubConfig
+    areas: List[SubArea] = Field(..., description="Set area")
 
+# =========================================== End of main section =====================================================
 
 
 '''

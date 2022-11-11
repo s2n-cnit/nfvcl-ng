@@ -2,8 +2,9 @@ import ipaddress
 from typing import List
 from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
-#from blueprints.blue_5g_base.models import Create5gModel
-from blueprints.blue_free5gc.models import Free5gck8sBlueCreateModel
+from blueprints.blue_5g_base.models import Create5gModel
+# TODO remove this unused model
+#from blueprints.blue_free5gc.models import Free5gck8sBlueCreateModel
 from . import free5GC_default_config
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services, get_ns_vld_ip
 from .configurators import Configurator_Free5GC, Configurator_Free5GC_User, Configurator_Free5GC_Core
@@ -24,7 +25,7 @@ class Free5GC_K8s(Blue5GBase):
     imageName = "free5gc_v3.0.7"
 
     @classmethod
-    def rest_create(cls, msg: Free5gck8sBlueCreateModel):
+    def rest_create(cls, msg: Create5gModel):
         return cls.api_day0_function(msg)
 
     @classmethod

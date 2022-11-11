@@ -98,7 +98,7 @@ class SubArea(BaseModel):
 # =============================================== main section for blue free5gc k8s model class========================
 
 
-class Free5gck8sBlueCreateModel(BaseModel):
+class Create5gModel(BaseModel):
     type: Literal["5G"]
     callbackURL: Optional[HttpUrl] = Field(
         '',

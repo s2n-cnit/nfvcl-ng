@@ -18,7 +18,7 @@ def get_blueprint_obj_byID(id_):
     return pickle.loads(db.findone_DB("blueprint_slice_intent", {"id": id_})['blueprint_object'])
 
 
-@k8s_router.post("/{blue_id}, status", status_code=202, callbacks=callback_router.routes)
+@k8s_router.post("/{blue_id}", status_code=202, callbacks=callback_router.routes)
 def post(blue_id: str, msg: dict):
     try:
         k8s_blue = get_blueprint_obj_byID(blue_id)

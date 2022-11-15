@@ -33,7 +33,7 @@ def helm_repo_get(chart_type, chart_file):
     raise HTTPException(status_code=400, detail="[NFVCL_DAY2] Operation not supported")
 
 
-@helm_router.get("/file")
+@helm_router.get("/{file}")
 def helm_index_get(file):
     logger.debug("GET REQUEST for helm index.yaml")
     if file == "index.yaml":

@@ -6,6 +6,7 @@ from rest_endpoints.topology import topology_router
 from rest_endpoints.blue import blue_router
 from rest_endpoints.day2action import day2_router
 from rest_endpoints.k8s import k8s_router
+from rest_endpoints.helm import helm_router
 from fastapi.staticfiles import StaticFiles
 
 
@@ -42,6 +43,7 @@ app.include_router(topology_router)
 app.include_router(blue_router)
 app.include_router(day2_router)
 app.include_router(k8s_router)
+app.include_router(helm_router)
 app.mount("/nfvcl_day2/day2", StaticFiles(directory="day2_files"), name="day2_files")
 app.mount("/helm_repo", StaticFiles(directory="helm_charts"), name="helm_repo")
 

@@ -13,7 +13,6 @@ helm_url_prefix = '/helm_repo/'
 def get_timestring() -> str:
     return datetime.utcnow().replace(microsecond=0).isoformat()+'Z'
 
-
 class HelmRepository:
     @staticmethod
     def get_entries() -> list:
@@ -42,6 +41,7 @@ class HelmRepository:
         self.create_index()
 
     def create_index(self):
+        global yaml_file
         db_charts = self.get_entries()
         registry_index = {'apiVersion': 'v1', 'entries': {}, 'generated': get_timestring()}
         for c in db_charts:
@@ -63,7 +63,7 @@ class HelmRepository:
             os.mkdir(chart_path)
             yaml_file = open(chart_path + 'index.yaml', 'w')
         except Exception as e:
-            logger.error(e.with_traceback())
+            logger.error(e.with_traceback(None))
         finally:
             logger.info("dumping registry file")
             yaml.dump(registry_index, yaml_file)
@@ -71,3 +71,4 @@ class HelmRepository:
 
 helm_repo = HelmRepository()
 helm_repo.create_index()
+

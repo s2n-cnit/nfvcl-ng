@@ -40,7 +40,7 @@ def helm_index_get(file):
         if not os.path.isfile(chart_path + "index.yaml"):
             logger.info("recreating the helm repo index")
             helm_repo.create_index()
-        return FileResponse(chart_path, media_type='application/yaml', filename="index.yaml")
+        return FileResponse(chart_path + "index.yaml", media_type='application/yaml', filename="index.yaml")
     raise HTTPException(status_code=400, detail="[NFVCL_HELM_REPO] Operation not supported")
 
 

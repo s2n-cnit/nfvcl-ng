@@ -179,7 +179,7 @@ class Free5GC_K8s(Blue5GBase):
         logger.debug(self.vnfd)
 
     def set_core_vnfd(self, area: str, vls=None) -> None:
-        if area is not "core":
+        if area != "core":
             raise ValueError("Area value is wrong")
         self.set_baseCoreVnfd(vls)
         logger.debug(self.vnfd)

@@ -58,9 +58,9 @@ def helm_onboard_post(helm_repo_item: HelmRepo):
 def create_helm_repo():
     # adding Helm repository to OSM
     r = next((item for item in nbiUtil.get_k8s_repos() if item['name'] == 'nfvcl_helm_repo'), None)
-    logger.warn('checking existing helm repo: {}'.format(r))
+    logger.info('checking existing helm repo: {}'.format(r))
     if r is not None:
-        logger.warn('deleting previous helm repository')
+        logger.info('deleting previous helm repository')
         nbiUtil.delete_k8s_repo('nfvcl_helm_repo')
 
     r = nbiUtil.add_k8s_repo('nfvcl_helm_repo', "http://{}:{}{}".format(nfvcl_ip, nfvcl_port, helm_url_prefix))

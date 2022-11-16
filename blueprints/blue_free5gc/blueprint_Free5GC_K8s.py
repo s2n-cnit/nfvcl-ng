@@ -99,10 +99,7 @@ class Free5GC_K8s(Blue5GBase):
         self.primitives = []
         self.vnfd = {'core': [], 'area': []}
         self.userManager = Configurator_Free5GC_User()
-        self.coreManager = Configurator_Free5GC_Core(conf, id_, copy.deepcopy(free5GC_default_config.default_config))
-        self.vim_core = next((item for item in self.get_vims() if item['core']), None)
-        if self.vim_core is None:
-            raise ValueError('Vim CORE not found in the input')
+        self.coreManager = Configurator_Free5GC_Core(copy.deepcopy(free5GC_default_config.default_config))
 
     def set_baseCoreVnfd(self, vls) -> None:
         if not vls:
@@ -339,6 +336,9 @@ class Free5GC_K8s(Blue5GBase):
                 except TypeError:
                     nsd_names.append(nsd_n)
         return nsd_names
+
+    def bootstrap_day0(self, msg) -> list:
+        return self.nsd()
 
     def core_day2_conf(self, arg: dict, nsd_item: dict) -> list:
         """

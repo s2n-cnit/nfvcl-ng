@@ -4,10 +4,6 @@ from typing import List
 import copy
 from main import *
 
-
-db = persistency.DB()
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
-
 # create logger
 logger = create_logger('Configurator_Free5GC_User')
 
@@ -18,9 +14,8 @@ class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
 
-class Configurator_Free5GC_Core(Blue5GBase):
-    def __init__(self, conf: dict, id_: str, running_free5gc_conf: string = None) -> None:
-        BlueprintBase.__init__(self, conf, id_, db=db, nbiutil=nbiUtil)
+class Configurator_Free5GC_Core():
+    def __init__(self, running_free5gc_conf: string = None) -> None:
         if running_free5gc_conf == None:
             raise ValueError("The Free5GC configuration file is empty")
         self.running_free5gc_conf = running_free5gc_conf

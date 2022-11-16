@@ -15,10 +15,10 @@ nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_
 # create logger
 logger = create_logger('Free5GC_K8s')
 
+# Free5GC modules exported as external VMs
+edge_vnfd_type = ['upf']
 
 class Free5GC_K8s(Blue5GBase):
-    # Free5GC modules exported as external VMs
-    edge_vnfd_type = ['upf']
     chartName = "nfvcl_helm_repo/free5gc:3.2.0"
     imageName = "free5gc_v3.0.7"
 
@@ -246,7 +246,7 @@ class Free5GC_K8s(Blue5GBase):
         # OpenStack
         vnfd_os = []
         for item in vnfd_ :
-            if "type" in item and item["type"] in self.edge_vnfd_type:
+            if "type" in item and item["type"] in edge_vnfd_type:
                 vnfd_os.append(item)
             else:
                 vnfd_k8s.append(item)
@@ -306,7 +306,7 @@ class Free5GC_K8s(Blue5GBase):
                 {'vld': 'mgt', 'vim_net': vim['wan']['id'], 'name': 'ens3', 'mgt': True}
             ]
 
-        for t in self.edge_vnfd_type :
+        for t in edge_vnfd_type :
             param = {
                 'name': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
                 'id': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
@@ -402,11 +402,11 @@ class Free5GC_K8s(Blue5GBase):
             if n['type'] == 'core':
                 # split return a list. nsd_name is something like "amf_00101_DEGFE". We need the first characters
                 nsd_type = (n["descr"]["nsd"]["nsd"][0]["name"]).split("_")
-                if nsd_type and isinstance(nsd_type[0], str) and nsd_type[0].lower() in self.edge_vnfd_type:
+                if nsd_type and isinstance(nsd_type[0], str) and nsd_type[0].lower() in edge_vnfd_type:
                     res += self.core_day2_conf(msg, n)
             elif n['type'] == 'ran':
                 res += self.ran_day2_conf(msg, n)
-            elif n['type'] in self.edge_vnfd_type:
+            elif n['type'] in edge_vnfd_type:
                 # configuration of edge 5G core modules (like "UPFs")
                 res += self.edge_day2_conf(msg, n)
 
@@ -423,7 +423,7 @@ class Free5GC_K8s(Blue5GBase):
             for area in msg['areas']:
                 nsd_list = []
                 for nsd_item in self.nsd_:
-                    if nsd_item['area'] == area['id'] and nsd_item['type'] in self.edge_vnfd_type:
+                    if nsd_item['area'] == area['id'] and nsd_item['type'] in edge_vnfd_type:
                         nsd_list.append(nsd_item)
                 if not nsd_list: # list is empty
                     raise ValueError('nsd for tac {} not found'.format(area['id']))
@@ -439,7 +439,7 @@ class Free5GC_K8s(Blue5GBase):
         nsi_to_delete = super().del_area(msg)
         if "areas" in msg:
             for area in msg['areas']:
-                for type in self.edge_vnfd_type:
+                for type in edge_vnfd_type:
                     nsd_i = next((index for index, item in enumerate(self.nsd_)
                                   if item['area'] == area['id'] and item['type'] == type), None)
                     if nsd_i is None:
@@ -473,7 +473,7 @@ class Free5GC_K8s(Blue5GBase):
                 # Add DNN to UPF
                 for nsd_item in self.nsd_:
                     if "area" in nsd_item and nsd_item['area'] == area["id"]:
-                        if nsd_item['type'] in self.edge_vnfd_type:
+                        if nsd_item['type'] in edge_vnfd_type:
                             conf_data = {
                                 'plmn': str(self.conf['plmn']),
                                 'upf_nodes': self.conf['config']['upf_nodes'],
@@ -540,7 +540,7 @@ class Free5GC_K8s(Blue5GBase):
                         if len(removingDnnList) != 0:
                             for nsd_item in self.nsd_:
                                 if "area" in nsd_item and nsd_item['area'] == area["id"]:
-                                    if nsd_item['type'] in self.edge_vnfd_type:
+                                    if nsd_item['type'] in edge_vnfd_type:
                                         conf_data = {
                                             'plmn': str(self.conf['plmn']),
                                             'upf_nodes': self.conf['config']['upf_nodes'],
@@ -595,7 +595,7 @@ class Free5GC_K8s(Blue5GBase):
     def get_ip(self) -> None:
         logger.info('Getting IP addresses of VNFIs (ext version)')
         for n in self.nsd_:
-            if n['type'] in self.edge_vnfd_type:
+            if n['type'] in edge_vnfd_type:
                 self.get_ip_edge(n)
         super().get_ip()
 

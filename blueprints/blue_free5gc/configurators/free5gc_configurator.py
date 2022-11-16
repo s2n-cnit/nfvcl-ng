@@ -1,4 +1,4 @@
-from blueprints.blue_free5gc import Free5GC_K8s
+from blueprints.blue_free5gc.blueprint_Free5GC_K8s import edge_vnfd_type
 
 from configurators.flex_configurator import Configurator_Flex
 from utils.util import *
@@ -10,7 +10,7 @@ class Configurator_Free5GC(Configurator_Flex):
         # Check the type of the module
         self.nsd_type = nsd_id.split("_")
         if self.nsd_type and self.nsd_type[0].lower() in \
-                Free5GC_K8s.edge_vnfd_type:
+                edge_vnfd_type:
             self.nsd_type = self.nsd_type[0].lower()
         else:
             logger.error("nsd type not recognized or not defined")

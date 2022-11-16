@@ -2,9 +2,7 @@ import ipaddress
 from typing import List
 from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
-from blueprints.blue_5g_base.models import Create5gModel
-# TODO remove this unused model
-#from blueprints.blue_free5gc.models import Free5gck8sBlueCreateModel
+from blueprints.blue_free5gc.models import Free5gck8sBlueCreateModel
 from . import free5GC_default_config
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services, get_ns_vld_ip
 from .configurators import Configurator_Free5GC, Configurator_Free5GC_User, Configurator_Free5GC_Core
@@ -25,7 +23,7 @@ class Free5GC_K8s(Blue5GBase):
     imageName = "free5gc_v3.0.7"
 
     @classmethod
-    def rest_create(cls, msg: Create5gModel):
+    def rest_create(cls, msg: Free5gck8sBlueCreateModel):
         return cls.api_day0_function(msg)
 
     @classmethod
@@ -180,11 +178,13 @@ class Free5GC_K8s(Blue5GBase):
             self.vnfd[area].append({'id': 'upf', 'name': vnfd.get_id(), 'vl': interfaces, 'type': 'upf'})
         logger.debug(self.vnfd)
 
-    def set_coreVnfd(self, vls=None) -> None:
+    def set_core_vnfd(self, area: str, vls=None) -> None:
+        if area is not "core":
+            raise ValueError("Area value is wrong")
         self.set_baseCoreVnfd(vls)
         logger.debug(self.vnfd)
 
-    def set_edgeVnfd(self, area: str, area_id: int = 0) -> None:
+    def set_edge_vnfd(self, area: str, area_id: int = 0) -> None:
         self.set_upfVnfd(area=area, area_id=area_id)
 
     def getVnfd(self, area: str, area_id: int = 0, type: str = None) -> list:
@@ -216,7 +216,7 @@ class Free5GC_K8s(Blue5GBase):
         ]
         nsd_names = []
 
-        self.set_coreVnfd(vls=vim_net_mapping)
+        self.set_core_vnfd("core", vls=vim_net_mapping)
 
         # set networking parameters for 5GC core running configuration files
         core_network = self.topology_get_network(core_v['wan'])
@@ -294,7 +294,7 @@ class Free5GC_K8s(Blue5GBase):
         logger.info("Creating EDGE NSD(s) for area {} on vim {}".format(area["id"], vim["id"]))
         param_name_list = []
 
-        self.set_edgeVnfd('area', area["id"])
+        self.set_edge_vnfd('area', area["id"])
 
         if vim['mgt'] != vim['wan']['id']:
             vim_net_mapping = [
@@ -596,49 +596,50 @@ class Free5GC_K8s(Blue5GBase):
         logger.info('Getting IP addresses of VNFIs (ext version)')
         for n in self.nsd_:
             if n['type'] in self.edge_vnfd_type:
-                try:
-                    vim = next((item for item in self.get_vims() if item['name'] == n['vim']), None)
-                    if vim is None:
-                        raise ValueError("get_ip vim is None")
-                    area = next((item for item in vim['areas'] if item['id'] == n['area']), None)
-                    if area is None:
-                        raise ValueError("get_ip tac is None")
-
-                    logger.info('(EXT)Setting IP addresses for {} nsi for Area {} on VIM {}'
-                                .format(n['type'].upper(), area["id"], vim['name']))
-
-                    # retrieving vlds from the vnf
-                    vnfd = self.getVnfd('area', area["id"], n['type'])[0]
-                    vld_names = [i['vld'] for i in vnfd['vl']]
-                    vlds = get_ns_vld_ip(n['nsi_id'], vld_names)
-
-                    if len(vld_names) == 1:
-                        area['{}_ip'.format(n['type'])] = vlds["mgt"][0]['ip']
-                        logger.info('{}(1) ip: {}'.format(n['type'].upper(), area['{}_ip'.format(n['type'])]))
-                    elif 'datanet' in vld_names:
-                        area['{}_ip'.format(n['type'])] = vlds["datanet"][0]['ip']
-                        logger.info('{}(2) ip: {}'.format(n['type'].upper(), area['{}_ip'.format(n['type'])]))
-                    else:
-                        raise ValueError('({})mismatch in the enb interfaces'.format(n['type']))
-
-                    if '{}_nodes'.format(n['type']) not in self.conf['config']:
-                        self.conf['config']['{}_nodes'.format(n['type'])] = []
-                    self.conf['config']['{}_nodes'.format(n['type'])].append({
-                        'ip': area['{}_ip'.format(n['type'])],
-                        'nsi_id': n['nsi_id'],
-                        'ns_id': n['descr']['nsd']['nsd'][0]['id'],
-                        'type': n['type'],
-                        'area': n['area'] if 'area' in n else None
-                    })
-                    logger.info("node ip: {}".format(area['{}_ip'.format(n['type'])]))
-                    logger.info("nodes: {}".format(self.conf['config']['{}_nodes'.format(n['type'])]))
-                except Exception as e:
-                    logger.error("({})Exception in getting IP addresses from EDGE nsi: {}"
-                                 .format(n['type'].upper(), str(e)))
-                    raise ValueError(str(e))
-
+                self.get_ip_edge(n)
         super().get_ip()
 
+    def get_ip_edge(self, ns: dict) -> None:
+        try:
+            vim = next((item for item in self.get_vims() if item['name'] == ns['vim']), None)
+            if vim is None:
+                raise ValueError("get_ip vim is None")
+            area = next((item for item in vim['areas'] if item['id'] == ns['area']), None)
+            if area is None:
+                raise ValueError("get_ip tac is None")
+
+            logger.info('(EXT)Setting IP addresses for {} nsi for Area {} on VIM {}'
+                        .format(ns['type'].upper(), area["id"], vim['name']))
+
+            # retrieving vlds from the vnf
+            vnfd = self.getVnfd('area', area["id"], ns['type'])[0]
+            vld_names = [i['vld'] for i in vnfd['vl']]
+            vlds = get_ns_vld_ip(ns['nsi_id'], vld_names)
+
+            if len(vld_names) == 1:
+                area['{}_ip'.format(ns['type'])] = vlds["mgt"][0]['ip']
+                logger.info('{}(1) ip: {}'.format(ns['type'].upper(), area['{}_ip'.format(ns['type'])]))
+            elif 'datanet' in vld_names:
+                area['{}_ip'.format(ns['type'])] = vlds["datanet"][0]['ip']
+                logger.info('{}(2) ip: {}'.format(ns['type'].upper(), area['{}_ip'.format(ns['type'])]))
+            else:
+                raise ValueError('({})mismatch in the enb interfaces'.format(ns['type']))
+
+            if '{}_nodes'.format(ns['type']) not in self.conf['config']:
+                self.conf['config']['{}_nodes'.format(ns['type'])] = []
+            self.conf['config']['{}_nodes'.format(ns['type'])].append({
+                'ip': area['{}_ip'.format(ns['type'])],
+                'nsi_id': ns['nsi_id'],
+                'ns_id': ns['descr']['nsd']['nsd'][0]['id'],
+                'type': ns['type'],
+                'area': ns['area'] if 'area' in ns else None
+            })
+            logger.info("node ip: {}".format(area['{}_ip'.format(ns['type'])]))
+            logger.info("nodes: {}".format(self.conf['config']['{}_nodes'.format(ns['type'])]))
+        except Exception as e:
+            logger.error("({})Exception in getting IP addresses from EDGE nsi: {}"
+                         .format(ns['type'].upper(), str(e)))
+            raise ValueError(str(e))
 
     def get_ip_core(self, n) -> None:
         """
@@ -699,3 +700,7 @@ class Free5GC_K8s(Blue5GBase):
 
         except Exception as e:
             logger.info("kdu not found, managed exception: {}".format(str(e)))
+
+    def _destroy(self):
+        # TODO to be implemented
+        pass

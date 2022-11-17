@@ -774,6 +774,7 @@ default_config = {
         "configurationBase": {
           "reboot": 0,
           "nssfName": "NSSF",
+          "nrfUri": "http://nrf-nnrf:8000",
           "serviceNameList": [
             "nnssf-nsselection",
             "nnssf-nssaiavailability"

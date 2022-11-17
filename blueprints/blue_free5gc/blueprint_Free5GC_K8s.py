@@ -205,7 +205,10 @@ class Free5GC_K8s(Blue5GBase):
 
     def core_nsd(self) -> List[str]:
         logger.info("Creating Core NSD(s)")
-        core_v = next((item for item in self.get_vims() if item['core']), None)
+        core_area = next((item for item in self.conf["areas"] if "core" in item and item["core"]), None)
+        if core_area is None:
+            raise ValueError("Core area not specified")
+        core_v = self.get_vim(core_area["id"])
         if not core_v:
             raise ValueError("Core VIM in msg doesn't exist")
         vim_net_mapping = [

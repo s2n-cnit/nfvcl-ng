@@ -381,7 +381,7 @@ class BlueprintBase(abc.ABC):
             area_vim = topology.get_vim_from_area_id(area)
             if area_vim['name'] not in vims_names:
                 vims_names.add(area_vim['name'])
-                vims.append(topology.get_vim_from_area_id(area))
+                vims.append(area_vim)
         print('*************************************\n{}*************************************\n'.format(vims))
         return vims
 

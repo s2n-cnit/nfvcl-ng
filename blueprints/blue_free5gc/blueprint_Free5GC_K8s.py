@@ -209,10 +209,12 @@ class Free5GC_K8s(Blue5GBase):
         if core_area is None:
             raise ValueError("Core area not specified")
         core_v = self.get_vim(core_area["id"])
+        if self.conf["config"]["network_endpoints"]["wan"] in core_v["networks"]:
+            core_v["wan"] = self.conf["config"]["network_endpoints"]["wan"]
         if not core_v:
             raise ValueError("Core VIM in msg doesn't exist")
         vim_net_mapping = [
-            {'vld': 'data', 'vim_net': core_v['wan']['id'], 'name': 'ens4', "mgt": True, 'k8s-cluster-net': 'data_net'}
+            {'vld': 'data', 'vim_net': core_v["wan"], 'name': 'ens4', "mgt": True, 'k8s-cluster-net': 'data_net'}
         ]
         nsd_names = []
 
@@ -264,7 +266,7 @@ class Free5GC_K8s(Blue5GBase):
                 'type': 'core'
             }
             n_obj = sol006_NSD_builder(
-                vnfd_k8s, core_v, param, vim_net_mapping, knf_configs=kdu_configs
+                vnfd_k8s, core_v["name"], param, vim_net_mapping, knf_configs=kdu_configs
             )
             nsd_item = n_obj.get_nsd()
             nsd_item['vld'] = vim_net_mapping
@@ -278,7 +280,7 @@ class Free5GC_K8s(Blue5GBase):
                     'id': str(item["id"]) + '_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
                     'type': 'core'
                 }
-                n_obj = sol006_NSD_builder([item], core_v, param, vim_net_mapping)
+                n_obj = sol006_NSD_builder([item], core_v["name"], param, vim_net_mapping)
                 nsd_item = n_obj.get_nsd()
                 nsd_item['vld'] = vim_net_mapping
                 self.nsd_.append(nsd_item)

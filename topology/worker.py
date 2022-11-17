@@ -47,6 +47,12 @@ def topology_worker(db: OSSdb, nbiutil: NbiUtil, queue: Queue, lock: RLock):
                 topology.add_pdu(msg)
             elif ops_type == "del_pdu":
                 topology.del_pdu(msg)
+            elif ops_type == "add_k8s":
+                topology.add_k8scluster(msg)
+            elif ops_type == "del_k8s":
+                topology.del_k8scluster(msg)
+            elif ops_type == "update_k8s":
+                topology.update_k8scluster(msg)
 
             else:
                 logger.error('message not supported: {}'.format(msg))

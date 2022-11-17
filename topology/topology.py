@@ -515,6 +515,7 @@ class Topology:
                 'data': pdu
             }
             redis_cli.publish('topology', json.dumps(msg))
+            self.save_topology()
 
         except Exception:
             logger.error(traceback.format_exc())
@@ -538,6 +539,8 @@ class Topology:
                 'data': pdu
             }
             redis_cli.publish('topology', json.dumps(msg))
+            self.save_topology()
+
         except ValueError as err:
             logger.error(err)
             raise ValueError('error in creating PDU')
@@ -549,3 +552,65 @@ class Topology:
 
     def get_pdus(self):
         return self._data['pdus']
+
+    def get_k8scluster(self):
+        return self._data['kubernetes']
+
+    @obj_multiprocess_lock
+    def add_k8scluster(self, data: dict):
+        # check if clusters with the same name exists
+
+        k8s_cluster = next((item for item in self._data['kubernetes'] if item['name'] == data['name']), None)
+        if not k8s_cluster:
+            raise ValueError('Kubernetes cluster with name {} already exists in the topology'.format(data['name']))
+
+        self._data['kubernetes'].append(data)
+        if 'nfvo_onboard' in data and data['nfvo_onboard']:
+            self._data['kubernetes'][-1]['nfvo_status'] = 'onboarding'
+            # Fixme use pydantic model?
+            if self.nbiutil.add_k8s_cluster(
+                    data['name'],
+                    data['credentials'],
+                    data['version'],
+                    data['vim_name'],
+                    data['networks']
+            ):
+                self._data['kubernetes'][-1]['nfvo_status'] = 'onboarded'
+            else:
+                self._data['kubernetes'][-1]['nfvo_status'] = 'error'
+        redis_cli.publish('topology', json.dumps(data))
+        self.save_topology()
+
+    @obj_multiprocess_lock
+    def del_k8scluster(self, name: str):
+        # check if it exists
+        k8s_cluster = next(item for item in self._data['kubernetes'] if item['name'] != name)
+
+        if k8s_cluster['nfvo_status'] == 'onboarded':
+            if not self.nbiutil.delete_k8s_cluster(name):
+                raise ValueError('Kubernetes {} cannot be de-onboarded... still in use? Aborting...'.format(name))
+
+        self._data['kubernetes'] = [item for item in self._data['kubernetes'] if item['name'] != name]
+
+        redis_cli.publish('topology', json.dumps(k8s_cluster))
+        self.save_topology()
+
+    @obj_multiprocess_lock
+    def update_k8scluster(self, name: str, data: dict):
+        cluster = next(item for item in self._data['kubernetes'] if item['name'] == name)
+        if cluster['nfvo_status'] != 'onboarded' and 'nfvo_onboard' in data and data['nfvo_onboard']:
+            cluster.update(data)
+            cluster['nfvo_status'] = 'onboarding'
+            # Fixme use pydantic model?
+            if self.nbiutil.add_k8s_cluster(
+                    cluster['name'],
+                    cluster['credentials'],
+                    cluster['version'],
+                    cluster['vim_name'],
+                    cluster['networks']
+            ):
+                cluster['nfvo_status'] = 'onboarded'
+            else:
+                cluster['nfvo_status'] = 'error'
+        redis_cli.publish('topology', json.dumps(data))
+        self.save_topology()

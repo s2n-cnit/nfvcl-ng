@@ -14,6 +14,11 @@ class NetworkTypeEnum(str, Enum):
     gre: str = 'gre'
     flat: str = 'flat'
 
+class NfvoOnboardStatus(str, Enum):
+    onboarded: str = 'onboarded'
+    not_onboarded: str = 'not_onboarded'
+    pending: str = 'pending'
+
 
 class VimModel(BaseModel):
     class VimConfigModel(BaseModel):
@@ -114,16 +119,42 @@ class PduModel(BaseModel):
     nfvo_onboarded: bool =False
     implementation: str
     config: dict
-    interface: conlist(PduInterface, min_items=1)  # = Field(..., min_items=1)
+    interface: conlist(PduInterface, min_items=1)
 
 
 class K8sModel(BaseModel):
     name: str
+    provided_by: str
+    blueprint_ref: Optional[str]
     credentials: dict
-    vim_account: str
+    vim_name: str
     k8s_version: str
-    networks: conlist(str, min_items=1)  # = Field(..., min_items=1)
-    areas: conlist(int, min_items=1)  # = Field(..., min_items=1)
+    networks: conlist(str, min_items=1)
+    areas: conlist(int, min_items=1)
+    cni: Optional[str]
+    nfvo_status: NfvoOnboardStatus = 'not_onboarded'
+
+
+class K8sModelCreateFromExternalCluster(BaseModel):
+    name: str
+    nfvo_onboard: bool = False
+    credentials: dict
+    vim_name: str
+    k8s_version: str
+    networks: conlist(str, min_items=1)
+    areas: conlist(int, min_items=1)
+    cni: Optional[str]
+
+class K8sModelUpdateRequest(BaseModel):
+    nfvo_onboard: bool = False
+    networks: conlist(str, min_items=1)
+    areas: conlist(int, min_items=1)
+
+
+class K8sModelCreateFromBlueprint(BaseModel):
+    name: str
+    nfvo_onboard: bool = False
+    blueprint_ref: str
 
 
 class TopologyModel(BaseModel):

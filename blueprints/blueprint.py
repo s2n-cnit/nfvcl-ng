@@ -56,6 +56,7 @@ class BlueprintBase(abc.ABC):
             db: persistency.DB = None,
             nbiutil: NbiUtil = None
     ):
+
         if data:
             self.id = id_
             self.conf = data['conf']
@@ -76,6 +77,8 @@ class BlueprintBase(abc.ABC):
             self.blue_type = data['type']
             self.vnfd = data['vnfd'] if 'vnfd' in data else {}
             self.pdu = data['pdu'] if 'pdu' in data else []
+            self.vnfi = data['vnfi'] if 'vnfi' in data else []
+            self.deployment_units = data['deployment_units'] if 'deployment_units' in data else []
         else:
             self.id = id_
             self.conf = conf
@@ -97,6 +100,8 @@ class BlueprintBase(abc.ABC):
             self.supported_operations = {}
             self.blue_type = self.__class__.__name__
             self.conf["blueprint_type"] = self.blue_type
+            self.vnfi = []
+            self.deployment_units = []
         self.topology_lock = None
         self.nbiutil = nbiutil
         self.db = db
@@ -131,7 +136,7 @@ class BlueprintBase(abc.ABC):
                 'created': self.created, 'status': self.status, 'detailed_status': self.detailed_status,
                 'current_operation': self.current_operation, 'modified': self.modified,
                 'supported_operations': self.supported_operations, 'type': self.blue_type, 'pdu': self.pdu,
-                'vnfd': self.vnfd}
+                'vnfd': self.vnfd, 'deployment_units': self.deployment_units}
         data_serialized = json.loads(DbBlue.parse_obj(data).json())
         if self.db.exists_DB("blueprint-instances", {'id': self.conf["blueprint_instance_id"]}):
 
@@ -273,6 +278,29 @@ class BlueprintBase(abc.ABC):
         else:
             return None
 
+    def get_vnf_data(self):
+        # resetting the vnfi to rewrite
+        self.vnfi = []
+        self.deployment_units = []
+
+        # getting all the vnf instances for the blueprint's network services
+        nsi_ids = [item['nsi_id'] for item in self.nsd_]
+        for nsi in nsi_ids:
+            self.vnfi += self.nbiutil.get_vnfi_list(nsi)
+
+        for vnf in self.vnfi:
+            for du in vnf['vdur']:
+                self.deployment_units.append({
+                    'name': du['name'],
+                    'vnfd-name': vnf['vnfd-ref'],
+                    'ns_id': vnf['nsr-id-ref'],
+                    'member-vnf-index-ref': vnf['member-vnf-index-ref'],
+                    'ip-address': du['ip-address'],
+                    'status': du['status'],
+                    'type': 'vdu'
+                })
+        # FIXME: add kdus and pdus
+
     @abc.abstractmethod
     def get_ip(self):
         pass
@@ -312,6 +340,21 @@ class BlueprintBase(abc.ABC):
             return topology.get_vim_from_area_id(area['id'])
         else:
             return topology.get_vim_from_area_id(area)
+
+    def topology_add_k8scluster(self, k8s_cluster_data: dict):
+        topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
+        topology.add_k8scluster(k8s_cluster_data)
+        topology.save_topology()
+
+    def topology_del_k8scluster(self):
+        topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
+        topology.del_k8scluster(self.get_id())
+        topology.save_topology()
+
+    def topology_update_k8scluster(self, k8s_cluster_data: dict):
+        topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
+        topology.update_k8scluster(self.get_id(), k8s_cluster_data)
+        topology.save_topology()
 
     def topology_add_network(self, net: dict, areas: list):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)

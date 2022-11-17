@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, HTTPException
-from topology.rest_topology_model import TopologyModel, VimModel, NetworkModel, RouterModel, UpdateVimModel, PduModel
+from topology.rest_topology_model import *
 from rest_endpoints.rest_callback import RestAnswer202, CallbackRequest
 from rest_endpoints.nfvcl_callback import callback_router
 from topology.topology import Topology, topology_msg_queue, topology_lock
@@ -203,3 +203,79 @@ async def create_pdu(router: PduModel):
 )
 async def delete_router(router_id: str):
     return produce_msg_worker('pdus', router_id, 'del_pdu')
+
+
+# ################################### K8s ###################################
+
+@topology_router.post("/kubernetes", response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+async def create_k8scluster(cluster: Union[K8sModelCreateFromExternalCluster, K8sModelCreateFromBlueprint]):
+    msg = cluster.dict()
+    msg.update({'ops_type': 'add_k8s'})
+    if 'blueprint_ref' not in msg or not msg['blueprint_ref']:
+        # msg is of model K8sModelCreateFromExternalCluster
+        msg.update({'provided_by': 'external'})
+        # looking for the blueprint
+
+    else:
+        msg.update({'provided_by': 'blueprint'})
+        blue_item = db.find_DB('blueprint-instances', {'id': msg['blueprint_ref']})
+        if not blue_item:
+            raise HTTPException(status_code=404, detail='Blueprint {} not found'.format(msg['blueprint_ref']))
+        if blue_item['type'] != 'K8s':
+            raise HTTPException(status_code=400, detail='Blueprint {} is not a Kubernetes cluster'
+                                .format(msg['blueprint_ref']))
+        if blue_item['type'] == 'error':
+            raise HTTPException(status_code=400, detail='Blueprint {} is in error state'.format(msg['blueprint_ref']))
+
+        core_area = next(item['id'] for item in blue_item['conf']['areas'] if item['core'])
+        topology = Topology.from_db(db, nbiUtil, topology_lock)
+        vim_name = topology.get_vim_from_area_id(core_area)['name']
+
+        msg.update({
+            'credentials': blue_item['conf']['config']['master-credentials'],
+            'cni': blue_item['conf']['config']['cni'],
+            'vim_name': vim_name,
+            'k8s_version': blue_item['conf']['config']['version'],
+            'networks': [item['netname'] for item in blue_item['conf']['config']['network_endpoints']['data_nets']],
+            'areas': [item['id'] for item in blue_item['conf']['areas']],
+            'nfvo_status': 'not_onboarded'
+        })
+    msg.update({'ops_type': 'add_k8s'})
+    topology_msg_queue.put(msg)
+    return {'id': 'topology'}
+
+
+@topology_router.put(
+    "/kubernetes/{cluster_id}",
+    response_model=RestAnswer202,
+    status_code=202,
+    callbacks=callback_router.routes)
+async def update_k8scluster(cluster_updates: K8sModelUpdateRequest, cluster_id):
+    msg = cluster_updates.dict()
+
+    # check if the cluster exists in the topology
+    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    candidate_cluster = next((item for item in topology.get_k8scluster() if item['name'] == cluster_id), None)
+    if not candidate_cluster:
+        raise HTTPException(status_code=404, detail='Kubernetes cluster {} cannot be found in the topology'
+                            .format(cluster_id))
+
+    msg.update({'ops_type': 'update_k8s'})
+    topology_msg_queue.put(msg)
+    return {'id': 'topology'}
+
+
+@topology_router.delete(
+    "/kubernetes/{cluster_id}",
+    response_model=RestAnswer202,
+    status_code=202,
+    callbacks=callback_router.routes
+)
+async def delete_k8scluster(cluster_id: str):
+    return produce_msg_worker('kubernetes', cluster_id, 'del_k8s')
+
+
+@topology_router.get("/kubernetes", response_model=List[K8sModel])
+async def get_k8scluster():
+    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    return topology.get_k8scluster()

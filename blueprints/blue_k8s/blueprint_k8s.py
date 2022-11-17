@@ -33,7 +33,7 @@ class K8s(BlueprintBase):
                 'day0': [{'method': 'bootstrap_day0'}],
                 'day2': [{'method': 'init_controller_day2_conf', 'callback': 'get_master_key'},
                          {'method': 'add_worker_day2'},
-                         {'method': 'add_worker_area_label'}],
+                         {'method': 'add_worker_area_label', 'callback': 'add_to_topology'}],
                 'dayN': []
             }],
             'scale': [{
@@ -41,11 +41,6 @@ class K8s(BlueprintBase):
                 'day2': [{'method': 'add_worker_day2'},
                          {'method': 'add_worker_area_label'}],
                 'dayN': [{'method': 'del_worker'}]
-            }],
-            'nfvo_k8s_onboard': [{
-                'day0': [],
-                'day2': [{'method': 'onboard_k8s_cluster'}],
-                'dayN': []
             }],
             'monitor': [{
                 'day0': [],
@@ -365,10 +360,11 @@ class K8s(BlueprintBase):
         for area in msg['areas']:
             # vdu_names = []
             for n in self.nsd_:
+
                 if n['type'] == 'worker' and n['area'] == area['id']:
                     # vnfi = self.nbiutil.get_vnfi_list(n['nsi_id'])[0]
                     # vdu_names.append(vnfi['vdur'][0]['name'])
-                    conf_ = ConfiguratorK8s(
+                    res += ConfiguratorK8s(
                         n['descr']['nsd']['nsd'][0]['id'],
                         1,
                         self.get_id(),
@@ -379,7 +375,7 @@ class K8s(BlueprintBase):
                     ).dump()
             # saving the id of the action because we need to post process its output
             # self.action_to_check.append(conf_[0]['param_value']['action_id'])
-            res += conf_
+
         logger.debug("K8s worker configuration built")
         self.to_db()
         return res
@@ -430,11 +426,25 @@ class K8s(BlueprintBase):
             self.conf['config']['master_credentials'] = parse_ansible_output(action_output, playbook_name,
                                                                              'k8s credentials', 'msg')['stdout']
         self.to_db()
-        if 'nfvo_onboard' in self.conf:
-            if self.conf['nfvo_onboard']:
-                self.onboard_k8s_cluster({})
 
-    def onboard_k8s_cluster(self, msg: dict):
+    def add_to_topology(self, callback_msg):
+        for primitive in callback_msg:
+            if primitive['result']['charm_status'] != 'completed':
+                raise ValueError('in k8s blue -> add_to_topology callback charm_status is not completed')
+        k8s_data = {
+            'name': self.get_id(),
+            'provided_by': 'blueprint',
+            'blueprint_ref': self.get_id(),
+            'k8s_version': self.conf['config']['version'],
+            'credentials': self.conf['config']['master_credentials'],
+            'vim_account': self.get_vim(self.conf['config']['core_area']),
+            'networks': [item['name'] for item in self.conf['config']['network_endpoints']['data_nets']],
+            'areas': [item['id'] for item in self.conf['areas']],
+            'nfvo_onboarded': False
+        }
+        self.topology_add_k8scluster(k8s_data)
+
+    """def onboard_k8s_cluster(self, msg: dict):
         core_vim = self.get_vim(self.conf['config']['core_area'])
         if core_vim is None:
             raise ValueError('onboard_k8s_cluster -> core vim is None')
@@ -453,7 +463,8 @@ class K8s(BlueprintBase):
         if res:
             self.conf['config']['nfvo_onboarded'] = True
 
-        return []
+        self.topology_update_k8scluster({'nfvo_onboarded': True})
+        return []"""
 
     def _destroy(self):
         logger.info("Destroying")

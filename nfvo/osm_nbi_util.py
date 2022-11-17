@@ -5,7 +5,7 @@ import ruamel
 import os
 import tarfile
 from pathlib import Path
-
+from typing import List
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from utils import create_logger
 
@@ -460,11 +460,22 @@ class NbiUtil:
             return False
 
     # Kubernetes Clusters ###################################################################################
-    def add_k8s_cluster(self, name: str, conf: dict, k8s_version: str, vim: str, k8s_nets: dict):
+    def add_k8s_cluster(self, name: str, conf: dict, k8s_version: str, vim: str, k8s_net_names: List['str']):
         if len(self.get_k8s_clusters()) > 0:
             logger.warn('trying to onboard multiple k8s clusters. OSM currently support one cluster. Aborting')
             return False
-        data = {"name": name, "credentials": conf, "vim_account": vim, "k8s_version": k8s_version, "nets": k8s_nets}
+        k8s_nets = {}
+        for net_name in k8s_net_names:
+            k8s_nets[net_name]= net_name
+
+        data = {
+            "name": name,
+            "credentials": conf,
+            "vim_account": vim,
+            "k8s_version": k8s_version,
+            "nets": k8s_nets,
+            "deployment_methods": "helm-chart-v3",
+        }
         result = self.post_x(data, '/admin/v1/k8sclusters')
         if self.check_REST_response(result):
             return result.json()

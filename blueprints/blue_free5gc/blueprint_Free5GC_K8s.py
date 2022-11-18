@@ -261,8 +261,8 @@ class Free5GC_K8s(Blue5GBase):
                                "additionalParams": self.coreManager.getConfiguration()}]
             }]
             param = {
-                'name': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
-                'id': '5GC_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
+                'name': '5GC_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
+                'id': '5GC_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
                 'type': 'core'
             }
             n_obj = sol006_NSD_builder(
@@ -276,8 +276,8 @@ class Free5GC_K8s(Blue5GBase):
         if vnfd_os:
             for item in vnfd_os:
                 param = {
-                    'name': str(item["id"]) + '_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
-                    'id': str(item["id"]) + '_' + str(self.conf['plmn']) + "_" + str(self.get_id()),
+                    'name': str(item["id"]) + '_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
+                    'id': str(item["id"]) + '_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
                     'type': 'core'
                 }
                 n_obj = sol006_NSD_builder([item], core_v["name"], param, vim_net_mapping)
@@ -310,8 +310,8 @@ class Free5GC_K8s(Blue5GBase):
 
         for t in edge_vnfd_type :
             param = {
-                'name': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
-                'id': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['plmn']), str(self.get_id())),
+                'name': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['config']['plmn']), str(self.get_id())),
+                'id': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['config']['plmn']), str(self.get_id())),
                 'type': '{}'.format(t)
             }
             edge_vnfd = self.getVnfd('area', area["id"], t)
@@ -356,7 +356,7 @@ class Free5GC_K8s(Blue5GBase):
         res = []
 
         conf_data = {
-            'plmn': str(self.conf['plmn']),
+            'plmn': str(self.conf['config']['plmn']),
             'upf_nodes': self.conf['config']['upf_nodes']
         }
 
@@ -377,7 +377,7 @@ class Free5GC_K8s(Blue5GBase):
         res = []
 
         conf_data = {
-            'plmn': str(self.conf['plmn']),
+            'plmn': str(self.conf['config']['plmn']),
             'upf_nodes': self.conf['config']['upf_nodes'],
             'tac': nsd_item['area'] # tac of the node is the area ID
         }
@@ -480,7 +480,7 @@ class Free5GC_K8s(Blue5GBase):
                     if "area" in nsd_item and nsd_item['area'] == area["id"]:
                         if nsd_item['type'] in edge_vnfd_type:
                             conf_data = {
-                                'plmn': str(self.conf['plmn']),
+                                'plmn': str(self.conf['config']['plmn']),
                                 'upf_nodes': self.conf['config']['upf_nodes'],
                                 'tac': area["id"] # tac of the node
                             }
@@ -547,7 +547,7 @@ class Free5GC_K8s(Blue5GBase):
                                 if "area" in nsd_item and nsd_item['area'] == area["id"]:
                                     if nsd_item['type'] in edge_vnfd_type:
                                         conf_data = {
-                                            'plmn': str(self.conf['plmn']),
+                                            'plmn': str(self.conf['config']['plmn']),
                                             'upf_nodes': self.conf['config']['upf_nodes'],
                                             'tac': area["id"],  # tac of the node
                                             'removingDnnList': removingDnnList

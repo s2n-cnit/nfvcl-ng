@@ -85,7 +85,7 @@ class NetworkModel(BaseModel):
     vid: Optional[int]
     dhcp: bool = True
     cidr: IPv4Network
-    gateway_ip: IPv4Network
+    gateway_ip: Optional[IPv4Network] = None
     allocation_pool: List[IPv4pool] = []
     reserved_ranges: List[IPv4reservedRange] = []
     dns_nameservers: List[IPv4Address] = []

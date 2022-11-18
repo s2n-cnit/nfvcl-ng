@@ -5,6 +5,6 @@ from typing import Literal
 # =============================================== main section for blue free5gc k8s model class========================
 
 class Free5gck8sBlueCreateModel(Create5gModel):
-    type: Literal["Free5GC"]
+    type: Literal["Free5GC_K8s"]
 
 # =========================================== End of main section =====================================================

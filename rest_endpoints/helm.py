@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from rest_endpoints.nfvcl_callback import callback_router
 from utils.helm_repository import helm_repo, chart_path, helm_url_prefix
-from pydantic import BaseModel
+from rest_endpoints.helm_model import HelmRepo
 import os
 import json
 from main import *
@@ -13,13 +13,6 @@ helm_router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 logger = create_logger('Helm repository REST endpoint')
-
-
-class HelmRepo(BaseModel):
-    name: str
-    description: str
-    version: str
-
 
 @helm_router.get("/{chart_type}/{chart_file}")
 def helm_repo_get(chart_type, chart_file):

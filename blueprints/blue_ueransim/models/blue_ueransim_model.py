@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, constr, conlist
 
 class ConfiguredNssaiItem(BaseModel):
     sst: int
+    sd: int
 
 
 class DefaultNssaiItem(BaseModel):

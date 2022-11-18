@@ -1,5 +1,5 @@
 import ipaddress
-from typing import List
+from typing import List, Union, Dict
 from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
 from blueprints.blue_free5gc.models import Free5gck8sBlueCreateModel
@@ -31,8 +31,8 @@ class Free5GC_K8s(Blue5GBase):
         # cls.api_router.add_api_route("/{blue_id}", cls.rest_scale, methods=["PUT"])
         pass
 
-    def __init__(self, conf: dict, id_: str) -> None:
-        BlueprintBase.__init__(self, conf, id_, db=db, nbiutil=nbiUtil)
+    def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None) -> None:
+        BlueprintBase.__init__(self, conf, id_, data=data, db=db, nbiutil=nbiUtil)
         logger.info("Creating \"Free5GC_K8s\" Blueprint")
         self.supported_operations = {
             'init': [{

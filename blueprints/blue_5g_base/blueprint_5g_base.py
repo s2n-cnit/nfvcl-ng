@@ -80,7 +80,7 @@ class Blue5GBase(BlueprintBase, ABC):
             {'vld': 'mgt', 'vim_net': self.conf['config']['network_endpoints']['mgt'], "mgt": True},
             {'vld': 'data', 'vim_net': self.conf['config']['network_endpoints']['wan'], "mgt": False}
         ]
-        n_obj = sol006_NSD_builder(self.get_vnfd('tac', area['id']), vim_name, param, vim_net_mapping)
+        n_obj = sol006_NSD_builder(self.get_vnfd('area', area['id']), vim_name, param, vim_net_mapping)
         nsd_item = n_obj.get_nsd()
         nsd_item['area'] = area['id']
         nsd_item['vld'] = pdu['interface']

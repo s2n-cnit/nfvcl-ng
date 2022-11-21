@@ -230,7 +230,7 @@ class UeRanSim(BlueprintBase):
                         pdu_obj = {
                             'name': 'nb_{}'.format(area['id']),
                             'area': str(area['id']),
-                            'type': 'nb_{}'.format(area['id']),
+                            'type': 'nb'.format(area['id']),
                             'user': 'root',
                             'passwd': 'root',
                             'implementation': "ueransim_nb",

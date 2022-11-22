@@ -122,11 +122,11 @@ class Free5GC_K8s(Blue5GBase):
         elif area == "core" and vls:
             interfaces = vls
         elif area == "area" and area_id >= 0:
-            vim = self.get_vim(area_id)
-            if not vim:
-                raise ValueError("area = {} has not a valid vim".format(area_id))
+            vim_mng = self.conf["config"]["network_endpoints"]["mgt"]
+            if not vim_mng:
+                raise ValueError("area = {} has not a valid vim mng network".format(area_id))
             interfaces = [
-                {"vim_net": vim['mgt'], "vld": "mgt", "name": "ens3", "mgt": True}
+                {"vim_net": vim_mng, "vld": "mgt", "name": "ens3", "mgt": True}
             ]
             areaObj = next((item for item in self.vnfd['area'] if item['area'] == area_id), None)
             if not areaObj:

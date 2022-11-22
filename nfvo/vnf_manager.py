@@ -299,10 +299,10 @@ class sol006_VNFbuilder:
         df['vdu-profile'].append({'id': vdu_id, 'min-number-of-instances': min_count})
 
     def manage_pdu(self, nbi_util: NbiUtil, db: DB, u: dict) -> dict:
-        topology = Topology.from_db(self.db, self.nbi_util, self.topology_lock)
-        db_item = topology.get_pdu(u['id'])
-        logger.debug(db_item)
-        if db_item is None:
+        pdus = db.findone_DB('topology', {'id': 'topology'})['pdus']
+        candidate_pdu = next((item for item in pdus if item['name'] == u['id']), None)
+
+        if not candidate_pdu:
             raise ValueError('pdu not present in the persistency layer')
         # check the pdu on osm
         pnf_manager = PNFmanager()
@@ -320,7 +320,7 @@ class sol006_VNFbuilder:
             res = pnf_manager.delete(u['id'])
             logger.debug('deleting pdu: ' + str(res))
         obj = {
-            'type': db_item['type'],
+            'type': candidate_pdu['type'],
             'name': u['id'],
             'shared': True,
         }
@@ -331,7 +331,7 @@ class sol006_VNFbuilder:
         obj['vim_accounts'] = vim_accounts
 
         interface = []
-        for i in db_item['interface']:
+        for i in candidate_pdu['interface']:
             interface.append(
                 {
                     # 'vld': i['vld'],
@@ -345,4 +345,4 @@ class sol006_VNFbuilder:
 
         # onboard the pdu on osm
         pnf_manager.create(obj)
-        return db_item
+        return candidate_pdu

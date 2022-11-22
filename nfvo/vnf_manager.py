@@ -8,7 +8,6 @@ import utils.persistency
 from . import NbiUtil, PNFmanager
 from utils.persistency import DB
 from utils import create_logger
-from topology import Topology
 
 
 logger = create_logger('vnfd_manager')

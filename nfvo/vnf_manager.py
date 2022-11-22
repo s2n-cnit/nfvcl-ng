@@ -336,8 +336,8 @@ class sol006_VNFbuilder:
                 {
                     # 'vld': i['vld'],
                     'name': i['name'],
-                    'ip-address': str(i['ip-address']),
-                    'vim-network-name': i['vim-network-name'],
+                    'ip-address': str(i['ip_address']),
+                    'vim-network-name': i['network_name'],
                     'mgmt': i['mgt']
                 }
             )

@@ -230,7 +230,7 @@ class Free5GC_K8s(Blue5GBase):
             else:
                 raise ValueError("Core network {} has not a valid CIDR")
             if "gateway_ip" in core_network:
-                core_gatewayIP = core_network["gateway_ip"]
+                core_gatewayIP =  str(ipaddress.IPv4Network(core_network["gateway_ip"])[0])
             else:
                 raise ValueError("Core network {} has not a valid gateway")
 

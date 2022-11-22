@@ -512,7 +512,7 @@ class Topology:
             self.save_topology()
             msg = {
                 'operation': 'create_pdu',
-                'data': pdu
+                'data': json.loads(PduModel.parse_obj(pdu).json())
             }
             redis_cli.publish('topology', json.dumps(msg))
             self.save_topology()
@@ -521,7 +521,9 @@ class Topology:
             logger.error(traceback.format_exc())
             details = "{}".format(traceback.format_exc())
             pdu.update({'nfvo-onboarded': False, "details": details})
-            self._data['pdus'].append(pdu)
+            pdu_candidate = next((item for item in self._data['pdus'] if item['name'] == pdu['name']), None)
+            if not pdu_candidate:
+                self._data['pdus'].append(pdu)
             self.save_topology()
 
     @obj_multiprocess_lock

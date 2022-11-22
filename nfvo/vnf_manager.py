@@ -8,6 +8,7 @@ import utils.persistency
 from . import NbiUtil, PNFmanager
 from utils.persistency import DB
 from utils import create_logger
+from topology import Topology
 
 
 logger = create_logger('vnfd_manager')
@@ -48,6 +49,7 @@ class sol006_VNFbuilder:
         self.cloud_init = cloud_init
         self.charm_name = charm_name
         self.adapt_interfaces = adapt_interfaces
+        self.topology_lock = None
 
         self.create_sol006_descriptor(vnf_data)
         if charm_name:
@@ -56,6 +58,9 @@ class sol006_VNFbuilder:
 
     def get_id(self) -> str:
         return self.vnfd['id']
+
+    def set_topology_lock(self, topo_lock) -> None:
+        self.topology_lock = topo_lock
 
     def create_sol006_descriptor(self, vnf: dict) -> None:
         self.vnfd.update({
@@ -295,7 +300,8 @@ class sol006_VNFbuilder:
         df['vdu-profile'].append({'id': vdu_id, 'min-number-of-instances': min_count})
 
     def manage_pdu(self, nbi_util: NbiUtil, db: DB, u: dict) -> dict:
-        db_item = db.findone_DB("pdu", {'name': u['id']})
+        topology = Topology.from_db(self.db, self.nbi_util, self.topology_lock)
+        db_item = topology.get_pdu(u['id'])
         logger.debug(db_item)
         if db_item is None:
             raise ValueError('pdu not present in the persistency layer')

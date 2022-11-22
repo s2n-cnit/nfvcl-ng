@@ -30,7 +30,7 @@ class Blue5GBase(BlueprintBase, ABC):
                     # }]})
                 }]}, charm_name='helmflexvnfm')
             list_.append({'id': 'enb_vnfd', 'name': vnfd.get_id(), 'vl': pdu['interface']})
-            self.vnfd['area'].append({'tac': area_id, 'vnfd': list_})
+            self.vnfd['area'].append({'area': area_id, 'vnfd': list_})
 
     def get_vnfd(self, area: str, area_id: Optional[str] = None) -> list:
         if area == "core":
@@ -69,7 +69,7 @@ class Blue5GBase(BlueprintBase, ABC):
             raise ValueError('pdu not found for tac ' + str(area['id']))
         logger.info("Blue {} - for area {} pdu {} ({}) selected"
                     .format(self.get_id(), area['id'], pdu['name'], pdu['implementation']))
-        self.set_vnfd('tac', area['id'], pdu=pdu)
+        self.set_vnfd('area', area['id'], pdu=pdu)
 
         param = {
             'name': '{}_NGRAN_{}'.format(self.get_id(), area['id']),
@@ -188,7 +188,7 @@ class Blue5GBase(BlueprintBase, ABC):
         )
         self.vnf_configurator.append(conf_obj)
         res += conf_obj.dump()
-        logger.info("e/gNB configuration built for tac " + str( nsd_item['tac'] ))
+        logger.info("e/gNB configuration built for tac " + str( nsd_item['area'] ))
         return res
 
     @abstractmethod

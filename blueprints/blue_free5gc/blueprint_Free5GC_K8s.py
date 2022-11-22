@@ -335,7 +335,7 @@ class Free5GC_K8s(Blue5GBase):
         nsd_names = []
         if 'areas' in msg:
             for area in msg['areas']:
-                nsd_n = self.edge_nsd(area["id"], self.get_vim_name(area["id"]))
+                nsd_n = self.edge_nsd(area, self.get_vim_name(area["id"]))
                 try:
                     nsd_names.extend(nsd_n)
                 except TypeError:

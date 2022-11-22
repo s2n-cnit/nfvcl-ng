@@ -293,19 +293,22 @@ class Free5GC_K8s(Blue5GBase):
         vim = self.get_vim(area["id"])
         if vim is None:
             raise ValueError("Area {} has not a valid VIM".format(area["id"]))
-        logger.info("Creating EDGE NSD(s) for area {} on vim {}".format(area["id"], vim["id"]))
+        logger.info("Creating EDGE NSD(s) for area {} on vim {}".format(area["id"], vim["name"]))
         param_name_list = []
 
         self.set_edge_vnfd('area', area["id"])
 
-        if vim['mgt'] != vim['wan']['id']:
+        vim_mgt = self.conf["config"]["network_endpoints"]["mgt"]
+        vim_wan = self.conf["config"]["network_endpoints"]["wan"]
+
+        if vim_mgt != vim_wan:
             vim_net_mapping = [
-                {'vld': 'mgt', 'vim_net': vim['mgt'], 'name': 'ens3', 'mgt': True},
-                {'vld': 'datanet', 'vim_net': vim['wan']['id'], 'name': 'ens4', 'mgt': False}
+                {'vld': 'mgt', 'vim_net': vim_mgt, 'name': 'ens3', 'mgt': True},
+                {'vld': 'datanet', 'vim_net': vim_wan, 'name': 'ens4', 'mgt': False}
             ]
         else:
             vim_net_mapping = [
-                {'vld': 'mgt', 'vim_net': vim['wan']['id'], 'name': 'ens3', 'mgt': True}
+                {'vld': 'mgt', 'vim_net': vim_wan, 'name': 'ens3', 'mgt': True}
             ]
 
         for t in edge_vnfd_type :

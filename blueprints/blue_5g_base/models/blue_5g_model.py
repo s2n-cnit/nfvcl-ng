@@ -82,10 +82,15 @@ class SubConfig(BaseModel):
 
 # =================================================== End of Config class =============================================
 # ====================================================sub area SubClasses =============================================
+class DnnElem(BaseModel):
+    dnn: str
+    dns: str
+
+
 class SubSlices(BaseModel):
     sst: int
     sd: str
-    dnnList: List[str] = Field(["internet", "internet1"])
+    dnnList: List[DnnElem]
 
 
 class SubArea(BaseModel):

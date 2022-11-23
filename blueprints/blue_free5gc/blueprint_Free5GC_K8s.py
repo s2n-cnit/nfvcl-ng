@@ -234,11 +234,11 @@ class Free5GC_K8s(Blue5GBase):
             else:
                 raise ValueError("Core network {} has not a valid gateway")
 
-        self.coreManager.set_core_networking_parameters( interfaceName="ens3", subnetIP=core_subnetIP,
-                                             gatewayIP=core_gatewayIP )
-
         # reset configuration
         self.coreManager.reset_core_configuration()
+
+        self.coreManager.set_core_networking_parameters( interfaceName="ens3", subnetIP=core_subnetIP,
+                                             gatewayIP=core_gatewayIP )
 
         self.coreManager.add_tacs_and_slices(self.conf)
 

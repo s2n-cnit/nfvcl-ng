@@ -335,7 +335,7 @@ default_config = {
       "replicaCount": 1,
       "image": {
         "name": "towards5gs/free5gc-ausf",
-        "tag": "v3.0.7",
+        "tag": "v3.2.0",
         "pullPolicy": "IfNotPresent"
       },
       "service": {
@@ -606,7 +606,7 @@ default_config = {
       "replicaCount": 1,
       "image": {
         "name": "towards5gs/free5gc-nrf",
-        "tag": "v3.0.7",
+        "tag": "v3.2.0",
         "pullPolicy": "IfNotPresent"
       },
       "configmap": {
@@ -705,7 +705,7 @@ default_config = {
       "replicaCount": 1,
       "image": {
         "name": "towards5gs/free5gc-nssf",
-        "tag": "v3.0.7",
+        "tag": "v3.2.0",
         "pullPolicy": "IfNotPresent"
       },
       "service": {
@@ -948,7 +948,7 @@ default_config = {
       "image": {
         "name": "towards5gs/free5gc-pcf",
         "pullPolicy": "IfNotPresent",
-        "tag": "v3.0.7"
+        "tag": "v3.2.0"
       },
       "service": {
         "name": "pcf-npcf",
@@ -1311,7 +1311,7 @@ default_config = {
       "replicaCount": 1,
       "image": {
         "name": "towards5gs/free5gc-udm",
-        "tag": "v3.0.7",
+        "tag": "v3.2.0",
         "pullPolicy": "IfNotPresent"
       },
       "service": {
@@ -1425,7 +1425,7 @@ default_config = {
       "image": {
         "name": "towards5gs/free5gc-udr",
         "pullPolicy": "IfNotPresent",
-        "tag": "v3.0.7",
+        "tag": "3.2.0",
       },
       "service": {
         "name": "udr-nudr",
@@ -1520,7 +1520,7 @@ default_config = {
       "replicaCount": 1,
       "image": {
         "name": "towards5gs/free5gc-webui",
-        "tag": "v3.0.7",
+        "tag": "v3.2.0",
         "pullPolicy": "IfNotPresent"
       },
       "service": {

@@ -438,6 +438,7 @@ class K8s(BlueprintBase):
             'k8s_version': self.conf['config']['version'],
             'credentials': self.conf['config']['master_credentials'],
             'vim_account': self.get_vim(self.conf['config']['core_area']),
+            'vim_name': self.get_vim(self.conf['config']['core_area'])['name'],
             'networks': [item['net_name'] for item in self.conf['config']['network_endpoints']['data_nets']],
             'areas': [item['id'] for item in self.conf['areas']],
             'nfvo_onboarded': False

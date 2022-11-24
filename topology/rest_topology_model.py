@@ -127,7 +127,7 @@ class K8sModel(BaseModel):
     name: str
     provided_by: str
     blueprint_ref: Optional[str]
-    credentials: dict
+    credentials: str
     vim_name: str
     k8s_version: str
     networks: conlist(str, min_items=1)

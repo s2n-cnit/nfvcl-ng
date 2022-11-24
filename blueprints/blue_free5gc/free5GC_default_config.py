@@ -81,7 +81,7 @@ default_config = {
   "deployMongoScripts": True,
   "deployAMF": True,
   "deployAUSF": True,
-  "deployN3IWF": True,
+  "deployN3IWF": False,
   "deployNRF": True,
   "deployNSSF": True,
   "deployPCF": True,

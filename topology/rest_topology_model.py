@@ -18,6 +18,7 @@ class NfvoOnboardStatus(str, Enum):
     onboarded: str = 'onboarded'
     not_onboarded: str = 'not_onboarded'
     pending: str = 'pending'
+    error: str = 'error'
 
 
 class VimModel(BaseModel):

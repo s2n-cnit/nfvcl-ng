@@ -573,7 +573,7 @@ class Topology:
             if self.nbiutil.add_k8s_cluster(
                     data['name'],
                     data['credentials'],
-                    data['version'],
+                    data['k8s_version'],
                     data['vim_name'],
                     data['networks']
             ):
@@ -607,7 +607,7 @@ class Topology:
             if self.nbiutil.add_k8s_cluster(
                     cluster['name'],
                     cluster['credentials'],
-                    cluster['version'],
+                    cluster['k8s_version'],
                     cluster['vim_name'],
                     cluster['networks']
             ):

@@ -218,7 +218,7 @@ async def create_k8scluster(cluster: Union[K8sModelCreateFromExternalCluster, K8
 
     else:
         msg.update({'provided_by': 'blueprint'})
-        blue_item = db.find_DB('blueprint-instances', {'id': msg['blueprint_ref']})
+        blue_item = next((item for item in db.find_DB('blueprint-instances', {'id': msg['blueprint_ref']})), None)
         if not blue_item:
             raise HTTPException(status_code=404, detail='Blueprint {} not found'.format(msg['blueprint_ref']))
         if blue_item['type'] != 'K8s':
@@ -232,11 +232,11 @@ async def create_k8scluster(cluster: Union[K8sModelCreateFromExternalCluster, K8
         vim_name = topology.get_vim_from_area_id(core_area)['name']
 
         msg.update({
-            'credentials': blue_item['conf']['config']['master-credentials'],
+            'credentials': blue_item['conf']['config']['master_credentials'],
             'cni': blue_item['conf']['config']['cni'],
             'vim_name': vim_name,
             'k8s_version': blue_item['conf']['config']['version'],
-            'networks': [item['netname'] for item in blue_item['conf']['config']['network_endpoints']['data_nets']],
+            'networks': [item['net_name'] for item in blue_item['conf']['config']['network_endpoints']['data_nets']],
             'areas': [item['id'] for item in blue_item['conf']['areas']],
             'nfvo_status': 'not_onboarded'
         })

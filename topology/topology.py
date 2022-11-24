@@ -563,7 +563,7 @@ class Topology:
         # check if clusters with the same name exists
 
         k8s_cluster = next((item for item in self._data['kubernetes'] if item['name'] == data['name']), None)
-        if not k8s_cluster:
+        if k8s_cluster:
             raise ValueError('Kubernetes cluster with name {} already exists in the topology'.format(data['name']))
 
         self._data['kubernetes'].append(data)

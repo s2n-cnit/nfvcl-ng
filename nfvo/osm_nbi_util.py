@@ -4,6 +4,7 @@ import requests
 import ruamel
 import os
 import tarfile
+import yaml
 from pathlib import Path
 from typing import List
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -470,7 +471,7 @@ class NbiUtil:
 
         data = {
             "name": name,
-            "credentials": conf,
+            "credentials": yaml.safe_load(conf),
             "vim_account": vim,
             "k8s_version": k8s_version,
             "nets": k8s_nets,

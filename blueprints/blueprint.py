@@ -344,7 +344,8 @@ class BlueprintBase(abc.ABC):
     def topology_add_k8scluster(self, k8s_cluster_data: dict):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         topology.add_k8scluster(k8s_cluster_data)
-        topology.save_topology()
+        # save topylogy yet inside add_k8scluster
+        #topology.save_topology()
 
     def topology_del_k8scluster(self):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)

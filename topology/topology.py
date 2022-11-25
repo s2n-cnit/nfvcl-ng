@@ -574,7 +574,7 @@ class Topology:
             # retrieve vim_id using vim_name
             vim_id = next((item['_id'] for item in vims if item['name'] == data['vim_name'] and '_id' in item), None)
             if vim_id is None:
-                raise ValueError('VIM (name={}) has not a vim_id'. format(data['vim_name']))
+                raise ValueError('VIM (name={}) has not a vim_id'.format(data['vim_name']))
             if self.nbiutil.add_k8s_cluster(
                     data['name'],
                     data['credentials'],

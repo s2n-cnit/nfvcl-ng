@@ -291,6 +291,12 @@ default_config = {
             "enable": True,  # true or false
             "expireTime": "6s",  # default is 6 seconds
             "maxRetryTimes": 4  # the max number of retransmission
+          },
+          # retransmission timer for NAS Identity Request message
+          "t3565": {
+            "enable": True,  # true or false
+            "expireTime": "6s",  # default is 6 seconds
+            "maxRetryTimes": 4  # the max number of retransmission
           }
         },
         # the kind of log output
@@ -1424,7 +1430,7 @@ default_config = {
       "image": {
         "name": "towards5gs/free5gc-udr",
         "pullPolicy": "IfNotPresent",
-        "tag": "3.2.0",
+        "tag": "v3.2.0",
       },
       "service": {
         "name": "udr-nudr",

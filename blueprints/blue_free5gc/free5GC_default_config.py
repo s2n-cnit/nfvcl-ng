@@ -293,7 +293,7 @@ default_config = {
             "maxRetryTimes": 4  # the max number of retransmission
           },
           # retransmission timer for NAS Identity Request message
-          "t3565": {
+          "t3570": {
             "enable": True,  # true or false
             "expireTime": "6s",  # default is 6 seconds
             "maxRetryTimes": 4  # the max number of retransmission

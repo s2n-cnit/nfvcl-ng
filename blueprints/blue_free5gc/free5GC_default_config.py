@@ -1388,9 +1388,7 @@ default_config = {
           ],
           "SuciProfile": [
             {
-              "ProtectionScheme": 1
-            },
-            {
+              "ProtectionScheme": 1,
               "PrivateKey": "c53c22208b61860b06c62e5406a7b330c2b577aa5558981510d128247d38bd1d",
               "PublicKey": "5a8d38864820197c3394b92613b20b91633cbd897119273bf8e4a6f4eec0a650"
             },

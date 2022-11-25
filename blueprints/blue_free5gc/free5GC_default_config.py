@@ -250,6 +250,7 @@ default_config = {
           # "locality": "area1" # Name of the location where a set of AMF, SMF and UPFs are located
           "networkFeatureSupport5GS": {  # 5gs Network Feature Support IE, refer to TS 24.501
             "enable": True,  # append this IE in Registration accept or not
+            "length": 1,
             "imsVoPS": 0,  # IMS voice over PS session indicator (uinteger, range: 0~1)
             "emc": 0,  # Emergency service support indicator for 3GPP access (uinteger, range: 0~3)
             "emf": 0,  # Emergency service fallback indicator for 3GPP access (uinteger, range: 0~3)

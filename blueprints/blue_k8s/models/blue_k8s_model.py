@@ -29,7 +29,7 @@ class LBPool(BaseModel):
     )
     ip_start: Optional[IPv4Address] = None
     ip_end: Optional[IPv4Address] = None
-    range_length: Optional[str] = Field(
+    range_length: Optional[int] = Field(
         None,
         description='Number of IPv4 addresses to reserved if no ip start and end are passed. Default 10 addresses.',
     )

@@ -92,7 +92,7 @@ class K8s(BlueprintBase):
                     logger.debug("{} retrieving lb IP range".format(self.get_id()))
                     range_length = lb_pool['range_length'] if 'range_length' in lb_pool else 20
 
-                    llb_range = self.topology_reserve_ip_range(lb_pool['net_name'], range_length)
+                    llb_range = self.topology_reserve_ip_range(lb_pool, range_length)
                     logger.info("Blue {} taking range {}-{} on network {} for lb"
                                 .format(self.get_id(), llb_range['start'], llb_range['end'], lb_pool['net_name']))
                     lb_pool['ip_start'] = llb_range['start']

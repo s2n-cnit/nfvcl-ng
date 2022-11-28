@@ -71,7 +71,7 @@ class K8s(BlueprintBase):
             logger.debug("Blue {} - terraforming".format(self.get_id()))
             pool_list = []
             for _p in msg['config']['network_endpoints']['data_nets']:
-                lb_pools = _p.copy()
+                lb_pool = _p.copy()
                 logger.debug("Blue {} - checking pool {}".format(self.get_id(), _p['net_name']))
                 for area in msg['areas']:
                     logger.debug("Blue {} - checking area {}".format(self.get_id(), area['id']))
@@ -80,24 +80,24 @@ class K8s(BlueprintBase):
                     if not vim:
                         raise ValueError('Blue {} - no VIMs at area {}'.format(self.get_id(), area['id']))
                     # check if the load-balancing network exists at the VIM
-                    if lb_pools['net_name'] not in vim['networks']:
+                    if lb_pool['net_name'] not in vim['networks']:
                         raise ValueError('Blue {} - network {} not available at VIM {}'
                                          .format(self.get_id(), vim['name'], area['id']))
 
-                net = self.topology_get_network(lb_pools['net_name'])
+                net = self.topology_get_network(lb_pool['net_name'])
 
-                lb_pools['cidr'] = net['cidr']
+                lb_pool['cidr'] = net['cidr']
 
-                if 'ip_start' not in lb_pools:
+                if 'ip_start' not in lb_pool or lb_pool['ip_start'] is None:
                     logger.debug("{} retrieving lb IP range".format(self.get_id()))
-                    range_length = lb_pools['range_length'] if 'range_length' in lb_pools else 20
+                    range_length = lb_pool['range_length'] if 'range_length' in lb_pool else 20
 
-                    llb_range = self.topology_reserve_ip_range(lb_pools['net_name'], range_length)
+                    llb_range = self.topology_reserve_ip_range(lb_pool['net_name'], range_length)
                     logger.info("Blue {} taking range {}-{} on network {} for lb"
-                                .format(self.get_id(), llb_range['start'], llb_range['end'], lb_pools['net_name']))
-                    lb_pools['ip_start'] = llb_range['start']
-                    lb_pools['ip_end'] = llb_range['end']
-                pool_list.append(lb_pools)
+                                .format(self.get_id(), llb_range['start'], llb_range['end'], lb_pool['net_name']))
+                    lb_pool['ip_start'] = llb_range['start']
+                    lb_pool['ip_end'] = llb_range['end']
+                pool_list.append(lb_pool)
 
             self.conf['config']['network_endpoints']['data_nets'] = pool_list
 

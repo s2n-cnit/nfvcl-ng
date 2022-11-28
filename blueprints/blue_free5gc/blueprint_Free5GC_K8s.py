@@ -612,37 +612,41 @@ class Free5GC_K8s(Blue5GBase):
             vim = next((item for item in self.get_vims() if item['name'] == ns['vim']), None)
             if vim is None:
                 raise ValueError("get_ip vim is None")
-            area = next((item for item in vim['areas'] if item['id'] == ns['area']), None)
-            if area is None:
+            area_id = next((item for item in vim['areas'] if item == ns['area']), None)
+            if area_id is None:
                 raise ValueError("get_ip tac is None")
 
             logger.info('(EXT)Setting IP addresses for {} nsi for Area {} on VIM {}'
-                        .format(ns['type'].upper(), area["id"], vim['name']))
+                        .format(ns['type'].upper(), area_id, vim['name']))
 
             # retrieving vlds from the vnf
-            vnfd = self.getVnfd('area', area["id"], ns['type'])[0]
+            vnfd = self.getVnfd('area', area_id, ns['type'])[0]
             vld_names = [i['vld'] for i in vnfd['vl']]
             vlds = get_ns_vld_ip(ns['nsi_id'], vld_names)
 
+            area_ip = None
             if len(vld_names) == 1:
-                area['{}_ip'.format(ns['type'])] = vlds["mgt"][0]['ip']
-                logger.info('{}(1) ip: {}'.format(ns['type'].upper(), area['{}_ip'.format(ns['type'])]))
+                area_ip = vlds["mgt"][0]['ip']
+                logger.info('{}(1) ip: {}'.format(ns['type'].upper(), area_ip))
             elif 'datanet' in vld_names:
-                area['{}_ip'.format(ns['type'])] = vlds["datanet"][0]['ip']
-                logger.info('{}(2) ip: {}'.format(ns['type'].upper(), area['{}_ip'.format(ns['type'])]))
+                area_ip = vlds["datanet"][0]['ip']
+                logger.info('{}(2) ip: {}'.format(ns['type'].upper(), area_ip))
             else:
                 raise ValueError('({})mismatch in the enb interfaces'.format(ns['type']))
+
+            if area_ip is None:
+                raise ValueError("area_ip not defined")
 
             if '{}_nodes'.format(ns['type']) not in self.conf['config']:
                 self.conf['config']['{}_nodes'.format(ns['type'])] = []
             self.conf['config']['{}_nodes'.format(ns['type'])].append({
-                'ip': area['{}_ip'.format(ns['type'])],
+                'ip': area_ip,
                 'nsi_id': ns['nsi_id'],
                 'ns_id': ns['descr']['nsd']['nsd'][0]['id'],
                 'type': ns['type'],
                 'area': ns['area'] if 'area' in ns else None
             })
-            logger.info("node ip: {}".format(area['{}_ip'.format(ns['type'])]))
+            logger.info("node ip: {}".format(area_ip))
             logger.info("nodes: {}".format(self.conf['config']['{}_nodes'.format(ns['type'])]))
         except Exception as e:
             logger.error("({})Exception in getting IP addresses from EDGE nsi: {}"

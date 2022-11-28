@@ -474,6 +474,11 @@ class NbiUtil:
             "credentials": yaml.safe_load(conf),
             "vim_account": vim,
             "k8s_version": k8s_version,
+            "deployment_methods": {
+                "helm-chart": False,
+                "helm-chart-v3": True,
+                "juju-bundle": False
+            },
             "nets": k8s_nets
         }
         result = self.post_x(data, '/admin/v1/k8sclusters')

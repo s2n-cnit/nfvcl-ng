@@ -158,7 +158,7 @@ class Blue5GBase(BlueprintBase, ABC):
             wan_vld = nsd_item['vld'][0]
 
         conf_data = {
-           'plmn': str(self.conf['plmn']),
+           'plmn': str(self.conf['config']['plmn']),
            'tac': nsd_item['area'],
            'gtp_ip': area['nb_wan_ip'],
            # 'mme_ip': self.conf['config']['core_wan_ip'],
@@ -184,7 +184,8 @@ class Blue5GBase(BlueprintBase, ABC):
             '{}_NGRAN_{}'.format(self.get_id(), nsd_item['area']),
             1,
             self.get_id(),
-            conf_data
+            conf_data,
+            self.topology_get_pdu_by_area(nsd_item['area'])
         )
         self.vnf_configurator.append(conf_obj)
         res += conf_obj.dump()

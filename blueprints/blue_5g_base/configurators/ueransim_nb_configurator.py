@@ -1,22 +1,24 @@
 from configurators.flex_configurator import Configurator_Flex
 from utils import persistency
 from utils.util import *
+from nfvo import NbiUtil
 
+nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 db = persistency.DB()
 logger = create_logger('Configurator_UeRanSimNB')
 
 
 class Configurator_UeRanSimNB(Configurator_Flex):
-    def __init__(self, nsd_id: str, m_id: int, blue_id: str, args: dict) -> None:
-
+    def __init__(self, nsd_id: str, m_id: int, blue_id: str, args: dict, pdu: dict) -> None:
+        if pdu is None or "config" not in pdu:
+            raise ValueError("not a valid pdu - pdu = {}".format(pdu))
         self.type = "euransim"
         super(Configurator_UeRanSimNB, self).__init__(nsd_id, m_id, blue_id)
         logger.info("Configurator_UeRanSimNB allocated")
         self.day2_conf_file_name = 'ueransim_nb_tac_{}_plmn_{}_blue_{}.conf'\
             .format(args['tac'], str(args['plmn']), blue_id)
 
-        persistent_data = db.findone_DB('pdu', {'tac': str( args['tac'] )})
-        self.conf = persistent_data['config']  # we start with the config data saved in the db
+        self.conf = pdu['config']  # we start with the config data saved in the db
         if 'nb_config' in args:
             #from here we should retrieve cell id and radio addr
             self.conf.update(args['nb_config'])

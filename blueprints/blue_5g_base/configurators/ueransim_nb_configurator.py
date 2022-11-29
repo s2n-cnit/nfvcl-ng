@@ -42,7 +42,7 @@ class Configurator_UeRanSimNB(Configurator_Flex):
 
         conf_file = 'nb.cfg'
         self.addJinjaTemplateFile(
-            {'template': 'config_templates/nb_ueransim.jinja2',
+            {'template': 'blueprints/blue_5g_base/config_scripts/nb_ueransim.jinja2',
              'path': '/root/',
              'transfer_name': self.day2_conf_file_name,
              'name': conf_file
@@ -50,7 +50,7 @@ class Configurator_UeRanSimNB(Configurator_Flex):
 
         # self.addShellCmds({'template': 'config_templates/ueransim_nb_init.shell'}, [])
         ansible_vars = {'conf_file': conf_file}
-        self.appendJinjaPbTasks('config_templates/playbook_nb_ueransim.yaml', vars_=ansible_vars)
+        self.appendJinjaPbTasks('blueprints/blue_5g_base/config_scripts/playbook_nb_ueransim.yaml', vars_=ansible_vars)
 
     def dump(self):
         logger.info("Dumping")

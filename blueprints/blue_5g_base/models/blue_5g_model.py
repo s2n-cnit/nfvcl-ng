@@ -82,9 +82,13 @@ class SubConfig(BaseModel):
 
 # =================================================== End of Config class =============================================
 # ====================================================sub area SubClasses =============================================
+class Pool(BaseModel):
+    cidr: IPvAnyAddress
+
 class DnnElem(BaseModel):
     dnn: str
     dns: str
+    pools: List[Pool]
 
 
 class SubSlices(BaseModel):

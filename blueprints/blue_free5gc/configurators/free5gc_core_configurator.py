@@ -1,5 +1,3 @@
-from blueprints.blueprint import BlueprintBase
-from blueprints.blue_5g_base import Blue5GBase
 from typing import List
 import copy
 from main import *
@@ -896,10 +894,6 @@ class Configurator_Free5GC_Core():
 
         if "areas" in conf:
             for area in conf["areas"]:
-                vim = self.get_vim(area["id"])
-                if vim == None:
-                    logger.error("area {} has not a valid VIM".format(area["id"]))
-                    continue
                 if area["id"] == tac and "nb_wan_ip" in area:
                     upNodes["gNB-{}".format(tac)] = {"type": "AN", "an_ip": "{}".format(area["nb_wan_ip"])}
                     break
@@ -925,15 +919,15 @@ class Configurator_Free5GC_Core():
                     for slice in area["slices"]:
                         s = {"sd": slice["sd"], "sst": slice["sst"] }
                         if "dnnList" in slice:
-                            tail_res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=s,
-                                                    dnnInfoList=slice["dnnList"])
+                            tail_res += self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=s,
+                                                         dnnInfoList=slice["dnnList"])
                             for dnn in slice["dnnList"]:
                                 if dnn not in dnnList:
                                     dnnList.append(dnn)
 
                 if len(dnnList) != 0:
                     #  add default and slices Dnn list to UPF conf
-                    for upf in self.conf["config"]["upf_nodes"]:
+                    for upf in msg["config"]["upf_nodes"]:
                         if upf["tac"] == area["id"]:
                             if "dnnList" in upf:
                                 upf["dnnList"].extend(dnnList)
@@ -1024,11 +1018,12 @@ class Configurator_Free5GC_Core():
                                 dnnSliceList.append(dnn)
                                 dnnList.append(dnn)
 
-                        self.smf_set_configuration(smfName=smfName, dnnList=dnnSliceList, sliceList=[slice])
+                        self.smf_set_configuration(mcc=mcc, mnc=mnc, smfName=smfName, dnnList=dnnSliceList,
+                                                   sliceList=[slice])
 
                         # add DNNs to upf configuration
                         if len(dnnSliceList) != 0:
-                            for upf in self.conf["config"]["upf_nodes"]:
+                            for upf in msg["config"]["upf_nodes"]:
                                 if upf["tac"] == area["id"]:
                                     if "dnnList" in upf:
                                         upf["dnnList"].extend(dnnSliceList)
@@ -1041,7 +1036,7 @@ class Configurator_Free5GC_Core():
                                 sliceSupportList=[slice])
                         self.nssf_set_configuration(mcc=mcc, mnc=mnc, nssfName=nssfName, sliceList=[slice],
                                 tac=area["id"])
-                        res += self.smf_add_upf(smfName=smfName, tac=area["id"], slice=slice,
+                        res += self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=slice,
                                 dnnInfoList=extSlice["dnnList"])
                     self.amf_set_configuration(mcc=mcc, mnc=mnc, amfId=amfId, supportedTacList = tacList,
                                 snssaiList = sliceList, dnnList = dnnList)

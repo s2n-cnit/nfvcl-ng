@@ -371,6 +371,9 @@ class Free5GC_K8s(Blue5GBase):
         )
 
         res += config.dump()
+
+        res += self.coreManager.day2_conf(self.conf)
+
         logger.info("Module configuration built for core ")
 
         return res

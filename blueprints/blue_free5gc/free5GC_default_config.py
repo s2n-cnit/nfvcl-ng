@@ -1589,6 +1589,7 @@ default_config = {
         "tls": []
       },
       "configuration": {
+        "reboot": 0,
         "logger": {
           "WEBUI": {
             "debugLevel": "info",

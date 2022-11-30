@@ -726,7 +726,7 @@ class Configurator_Free5GC_Core():
             ["reboot"] = random.randrange(0, 9999)
         self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]\
             ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]["configurationBase"]\
+        self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]\
             ["reboot"] = random.randrange(0, 9999)
 
         amfConfigurationBase = self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]
@@ -757,10 +757,10 @@ class Configurator_Free5GC_Core():
         udrConfigurationBase = self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configuration"] = \
             yaml.dump(udrConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        webuiConfigurationBase = self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"][
-            "configurationBase"]
-        self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]["configuration"] = \
-            yaml.dump(webuiConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        # webuiConfigurationBase = self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"][
+        #     "configurationBase"]
+        # self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]["configuration"] = \
+        #     yaml.dump(webuiConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def add_tacs_and_slices(self, conf: dict, smfName: string = None, n3iwfId: int = None,
             nssfName: string = None) -> None:

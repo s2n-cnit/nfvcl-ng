@@ -372,8 +372,6 @@ class Free5GC_K8s(Blue5GBase):
 
         res += config.dump()
 
-        res += self.coreManager.day2_conf(self.conf)
-
         logger.info("Module configuration built for core ")
 
         return res
@@ -403,6 +401,8 @@ class Free5GC_K8s(Blue5GBase):
     def init_day2_conf(self, msg: dict) -> list:
         logger.info("Initializing Day2 configurations")
         res = []
+
+        res += self.coreManager.day2_conf(self.conf)
 
         # configuration of the 5G core
         msg2up = {'config': self.coreManager.getConfiguration()}

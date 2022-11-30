@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Optional, Literal
-from pydantic import BaseModel, IPvAnyAddress, \
+from pydantic import BaseModel, IPvAnyAddress, IPvAnyNetwork,\
     Field, constr, HttpUrl
 
 
@@ -83,7 +83,7 @@ class SubConfig(BaseModel):
 # =================================================== End of Config class =============================================
 # ====================================================sub area SubClasses =============================================
 class Pool(BaseModel):
-    cidr: IPvAnyAddress
+    cidr: IPvAnyNetwork
 
 class DnnElem(BaseModel):
     dnn: str

@@ -3,7 +3,7 @@ import copy
 from main import *
 
 # create logger
-logger = create_logger('Configurator_Free5GC_User')
+logger = create_logger('Configurator_Free5GC_Core')
 
 class NoAliasDumper(yaml.SafeDumper):
     """
@@ -908,8 +908,8 @@ class Configurator_Free5GC_Core():
         self.smf_set_configuration(mcc=mcc, mnc=mnc, smfName=smfName, links=links, upNodes=upNodes)
         self.config_5g_core_for_reboot()
 
-    def day2_conf(self, msg: dict) -> List:
-        tail_res = []
+    def day2_conf(self, msg: dict):
+        #tail_res = []
         smfName = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]["smfName"]
 
         if "areas" in msg:
@@ -919,7 +919,7 @@ class Configurator_Free5GC_Core():
                     for slice in area["slices"]:
                         s = {"sd": slice["sd"], "sst": slice["sst"] }
                         if "dnnList" in slice:
-                            tail_res += self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=s,
+                            self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=s,
                                                          dnnInfoList=slice["dnnList"])
                             for dnn in slice["dnnList"]:
                                 if dnn not in dnnList:
@@ -934,7 +934,8 @@ class Configurator_Free5GC_Core():
                             else:
                                 upf["dnnList"] = copy.deepcopy(dnnList)
                             break
-        return tail_res
+
+        #return tail_res
 
     def add_tac_conf(self, msg: dict) -> list:
         res = []

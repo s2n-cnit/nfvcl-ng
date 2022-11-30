@@ -402,7 +402,7 @@ class Free5GC_K8s(Blue5GBase):
         logger.info("Initializing Day2 configurations")
         res = []
 
-        res += self.coreManager.day2_conf(self.conf)
+        self.coreManager.day2_conf(self.conf)
 
         # configuration of the 5G core
         msg2up = {'config': self.coreManager.getConfiguration()}

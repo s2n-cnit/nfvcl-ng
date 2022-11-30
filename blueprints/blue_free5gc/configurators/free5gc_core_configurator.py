@@ -881,8 +881,8 @@ class Configurator_Free5GC_Core():
             if "upf_nodes" in conf["config"]:
                 upfList = conf["config"]["upf_nodes"]
                 for upf in upfList:
-                    logger.info(" * upf[\"tac\"] = {} , tac = {}".format(upf["tac"], tac))
-                    if upf["tac"] == tac:
+                    logger.info(" * upf[\"tac\"] = {} , tac = {}".format(upf["area"], tac))
+                    if upf["area"] == tac:
                         dnnUpfInfoList = []
                         for dnnInfo in dnnInfoList:
                             dnnUpfInfoList.append({"dnn": dnnInfo["dnn"], "pools": dnnInfo["pools"]})
@@ -928,7 +928,7 @@ class Configurator_Free5GC_Core():
                 if len(dnnList) != 0:
                     #  add default and slices Dnn list to UPF conf
                     for upf in msg["config"]["upf_nodes"]:
-                        if upf["tac"] == area["id"]:
+                        if upf["area"] == area["id"]:
                             if "dnnList" in upf:
                                 upf["dnnList"].extend(dnnList)
                             else:
@@ -1024,7 +1024,7 @@ class Configurator_Free5GC_Core():
                         # add DNNs to upf configuration
                         if len(dnnSliceList) != 0:
                             for upf in msg["config"]["upf_nodes"]:
-                                if upf["tac"] == area["id"]:
+                                if upf["area"] == area["id"]:
                                     if "dnnList" in upf:
                                         upf["dnnList"].extend(dnnSliceList)
                                     else:

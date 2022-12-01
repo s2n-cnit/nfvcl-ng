@@ -49,9 +49,9 @@ class Configurator_Free5GC(Configurator_Flex):
         ansible_vars = {'conf_file': conf_file, 'type': self.nsd_type, 'dnn_list': self.conf["dnn_list"],
                         'removing_dnn_list': removingDnnList}
         if self.nsd_type == "upf":
-            self.appendJinjaPbTasks('config_templates/playbook_upf_free5gc.yaml', vars_=ansible_vars)
+            self.appendJinjaPbTasks('blueprints/blue_free5gc/config_scripts/playbook_upf_free5gc.yaml', vars_=ansible_vars)
         else:
-            self.appendJinjaPbTasks('config_templates/playbook_free5gc.yaml', vars_=ansible_vars)
+            self.appendJinjaPbTasks('blueprints/blue_free5gc/config_scripts/playbook_free5gc.yaml', vars_=ansible_vars)
 
     def dump(self):
         logger.info("Dumping")

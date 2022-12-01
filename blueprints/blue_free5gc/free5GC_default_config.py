@@ -1171,53 +1171,7 @@ default_config = {
               "mcc": "208", # Mobile Country Code (3 digits string, digit: 0~9)
               "mnc": "93" # Mobile Network Code (2 or 3 digits string, digit: 0~9)
             }
-          ],
-          "userplane_information": { # list of userplane information
-            "up_nodes": { # information of userplane node (AN or UPF)
-              "gNB1": { # the name of the node
-                "type": "AN", # the type of the node (AN or UPF)
-                "an_ip": ""
-              },
-              "UPF": {  # the name of the node
-                "type": "UPF", # the type of the node (AN or UPF)
-                "node_id": "10.100.50.241", # the IP/FQDN of N4 interface on this UPF (PFCP)
-                "sNssaiUpfInfos": [ # S-NSSAI information list for this UPF
-                  {
-                    "sNssai": { # S-NSSAI (Single Network Slice Selection Assistance Information)
-                      "sst": 1, # Slice/Service Type (uinteger, range: 0~255)
-                      "sd": "010203" # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
-                    },
-                    "dnnUpfInfoList": [ # DNN information list for this S-NSSAI
-                      {
-                        "dnn": "internet",
-                        "pools": [
-                          {
-                            "cidr": "10.1.0.0/17"
-                          }
-                        ],
-                      }
-                    ]
-                  }
-                ],
-                "interfaces": [ # Interface list for this UPF
-                  {
-                    "interfaceType": "N3", # the type of the interface (N3 or N9)
-                    "endpoints": [ # the IP address of this N3/N9 interface on this UPF
-                      "10.100.50.233"
-                    ],
-                    "networkInstance": "internet" # Data Network Name (DNN)
-                  }
-                ]
-              }
-            },
-            "links": [ # the topology graph of userplane, A and B represent the two nodes of each link
-              {
-                "A": "gNB1",
-                "B": "UPF"
-              }
-            ]
-          #locality: area1 # Name of the location where a set of AMF, SMF and UPFs are located
-          }
+          ]
         },
         "ueRoutingInfo": "",
         "ueRoutingInfoBase": {

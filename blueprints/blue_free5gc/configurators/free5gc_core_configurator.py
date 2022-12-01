@@ -51,7 +51,7 @@ class Configurator_Free5GC_Core():
         :param mcc: "001"
         :param mnc: "01"
         :param snssaiList: ex. [{"sst": 1, "sd": "000001"}]
-        :param dnnList: ex. [{"dnn": "internet", "dns": "8.8.8.8"}]
+        :param dnnList: ex. [{"dnn": "internet", "dns": { "ipv4": "8.8.8.8"}}]
         :return: amfId
         """
         if mcc == None or mnc == None:
@@ -506,7 +506,7 @@ class Configurator_Free5GC_Core():
         :param mcc:
         :param mnc:
         :param smfName:
-        :param dnnList: es. [{"dnn": "internet", "dns": "8.8.8.8"}]
+        :param dnnList: es. [{"dnn": "internet", "dns": { "ipv4": "8.8.8.8"}}]
         :param sliceList: es. [{"sst": 1, "sd": "000001"}]
         :param links:
         :param upNodes:
@@ -539,13 +539,13 @@ class Configurator_Free5GC_Core():
                                         dnnFound = True
                                         break
                                 if dnnFound == False:
-                                    item["dnnInfos"].append({"dnn": dnn["dnn"], "dns": dnn["dns"]})
+                                    item["dnnInfos"].append({"dnn": dnn["dnn"], "dns": { "ipv4": dnn["dns"]}})
                                 else:
                                     dnnFound = False
                 if sNssaiFound == False:
                     dnnInfos = []
                     for dnn in dnnList:
-                        dnnInfos.append({"dnn": dnn["dnn"], "dns": dnn["dns"]})
+                        dnnInfos.append({"dnn": dnn["dnn"], "dns": { "ipv4": dnn["dns"]}})
                     snssaiInfos.append({"dnnInfos": dnnInfos, "sNssai": slice})
                 else:
                     sNssaiFound = False

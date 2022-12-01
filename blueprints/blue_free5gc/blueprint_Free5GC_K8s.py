@@ -404,10 +404,6 @@ class Free5GC_K8s(Blue5GBase):
 
         self.coreManager.day2_conf(self.conf)
 
-        # configuration of the 5G core
-        msg2up = {'config': self.coreManager.getConfiguration()}
-        res += self.core_upXade(msg2up)
-
         for n in self.nsd_:
             # configuration of external (ie. VM, not in k8s) 5G core modules, if exists (like "AMF", "UPF", etc)
             if n['type'] == 'core':
@@ -420,6 +416,10 @@ class Free5GC_K8s(Blue5GBase):
             elif n['type'] in edge_vnfd_type:
                 # configuration of edge 5G core modules (like "UPFs")
                 res += self.edge_day2_conf(msg, n)
+
+        # configuration of the 5G core
+        msg2up = {'config': self.coreManager.getConfiguration()}
+        res += self.core_upXade(msg2up)
 
         return res
 

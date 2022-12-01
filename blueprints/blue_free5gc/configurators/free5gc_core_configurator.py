@@ -1,4 +1,3 @@
-from typing import List
 import copy
 from main import *
 
@@ -701,66 +700,84 @@ class Configurator_Free5GC_Core():
         self.udm_reset_configuration()
         self.udr_reset_configuration()
 
-    def config_5g_core_for_reboot(self) -> None:
+    def config_5g_core_for_reboot(self, moduleNameToReboot: str = None) -> None:
         """
         This method modifies the running configuration of all 5G core modules.
         So k8s, after loading it, restarts each module
+
+        moduleNameToReboot: module name to be rebooted, ex: "amf", "smf"...
+        if None, it reboots all modules
+
         :return:
         """
-        self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        # Don't reboot NRF
-        #self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]\
-        #    ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]\
-            ["reboot"] = random.randrange(0, 9999)
-        self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]\
-            ["reboot"] = random.randrange(0, 9999)
 
-        amfConfigurationBase = self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configuration"] = \
-            yaml.dump(amfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        ausfConfigurationBase = self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"]["configuration"] = \
-            yaml.dump(ausfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        n3iwfConfigurationBase = self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configuration"] = \
-            yaml.dump(n3iwfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        # Don't reboot NRF
-        # nrfConfigurationBase = self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]
-        # self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configuration"] = \
-        #     yaml.dump(nrfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        nssfConfigurationBase = self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configuration"] = \
-            yaml.dump(nssfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        pcfConfigurationBase = self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configuration"] = \
-            yaml.dump(pcfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        smfConfigurationBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
-            yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        udmConfigurationBase = self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configuration"] = \
-            yaml.dump(udmConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        udrConfigurationBase = self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]
-        self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configuration"] = \
-            yaml.dump(udrConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
-        # webuiConfigurationBase = self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"][
-        #     "configurationBase"]
-        # self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]["configuration"] = \
-        #     yaml.dump(webuiConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        if moduleNameToReboot is None or moduleNameToReboot == "amf":
+            self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]\
+                ["reboot"] = random.randrange(0, 9999)
+            amfConfigurationBase = self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configurationBase"]
+            self.running_free5gc_conf["free5gc-amf"]["amf"]["configuration"]["configuration"] = \
+                yaml.dump(amfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        elif moduleNameToReboot is None or moduleNameToReboot == "ausf":
+            self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"]["configurationBase"]\
+                ["reboot"] = random.randrange(0, 9999)
+            ausfConfigurationBase = self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"][
+                "configurationBase"]
+            self.running_free5gc_conf["free5gc-ausf"]["ausf"]["configuration"]["configuration"] = \
+                yaml.dump(ausfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        elif moduleNameToReboot is None or moduleNameToReboot == "n3iwf":
+            self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configurationBase"]\
+                ["reboot"] = random.randrange(0, 9999)
+            n3iwfConfigurationBase = self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"][
+                "configurationBase"]
+            self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]["configuration"] = \
+                yaml.dump(n3iwfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        ### Don't reboot NRF
+        #elif moduleNameToReboot is None or moduleNameToReboot == "nrf":
+        #   self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]\
+        #       ["reboot"] = random.randrange(0, 9999)
+        #   nrfConfigurationBase = self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configurationBase"]
+        #   self.running_free5gc_conf["free5gc-nrf"]["nrf"]["configuration"]["configuration"] = \
+        #       yaml.dump(nrfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        elif moduleNameToReboot is None or moduleNameToReboot == "nssf":
+            self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configurationBase"]\
+                ["reboot"] = random.randrange(0, 9999)
+            nssfConfigurationBase = self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"][
+                "configurationBase"]
+            self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]["configuration"] = \
+                yaml.dump(nssfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        elif moduleNameToReboot is None or moduleNameToReboot == "pcf":
+            self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configurationBase"]\
+                ["reboot"] = random.randrange(0, 9999)
+            pcfConfigurationBase = self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configurationBase"]
+            self.running_free5gc_conf["free5gc-pcf"]["pcf"]["configuration"]["configuration"] = \
+                yaml.dump(pcfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        elif moduleNameToReboot is None or moduleNameToReboot == "smf":
+            self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]\
+                ["reboot"] = random.randrange(0, 9999)
+            smfConfigurationBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]
+            self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
+                yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        elif moduleNameToReboot is None or moduleNameToReboot == "udm":
+            self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configurationBase"]\
+                ["reboot"] = random.randrange(0, 9999)
+            udmConfigurationBase = self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configurationBase"]
+            self.running_free5gc_conf["free5gc-udm"]["udm"]["configuration"]["configuration"] = \
+                yaml.dump(udmConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        elif moduleNameToReboot is None or moduleNameToReboot == "udr":
+            self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]\
+                ["reboot"] = random.randrange(0, 9999)
+            udrConfigurationBase = self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configurationBase"]
+            self.running_free5gc_conf["free5gc-udr"]["udr"]["configuration"]["configuration"] = \
+                yaml.dump(udrConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        elif moduleNameToReboot is None or moduleNameToReboot == "webui":
+            self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]\
+                ["reboot"] = random.randrange(0, 9999)
+            # webuiConfigurationBase = self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"][
+            #     "configurationBase"]
+            # self.running_free5gc_conf["free5gc-webui"]["webui"]["configuration"]["configuration"] = \
+            #     yaml.dump(webuiConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+        else:
+            raise ValueError("{} is not a module of deployed Free5GC".format(moduleNameToReboot))
 
     def add_tacs_and_slices(self, conf: dict, smfName: string = None, n3iwfId: int = None,
             nssfName: string = None) -> None:

@@ -36,7 +36,7 @@ class Configurator_Free5GC(Configurator_Flex):
 
         conf_file = '{}cfg.yaml'.format(self.nsd_type)
         self.addJinjaTemplateFile(
-            {'template': 'blueprints/blue_free5gc/configurators/{}_free5gc.jinja2'.format(self.nsd_type),
+            {'template': 'blueprints/blue_free5gc/config_scripts/{}_free5gc.jinja2'.format(self.nsd_type),
              'path': '/root/free5gc/config',
              'transfer_name': self.day2_conf_file_name,
              'name': conf_file

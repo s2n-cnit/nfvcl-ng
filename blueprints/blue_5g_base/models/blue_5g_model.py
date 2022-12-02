@@ -83,7 +83,7 @@ class SubConfig(BaseModel):
 # =================================================== End of Config class =============================================
 # ====================================================sub area SubClasses =============================================
 class Pool(BaseModel):
-    cidr: IPvAnyNetwork
+    cidr: str
 
 class DnnElem(BaseModel):
     dnn: str

@@ -401,6 +401,7 @@ class Free5GC_K8s(Blue5GBase):
     def init_day2_conf(self, msg: dict) -> list:
         logger.info("Initializing Day2 configurations")
         res = []
+        tail_res = []
 
         self.coreManager.day2_conf(self.conf)
 
@@ -412,14 +413,16 @@ class Free5GC_K8s(Blue5GBase):
                 if nsd_type and isinstance(nsd_type[0], str) and nsd_type[0].lower() in edge_vnfd_type:
                     res += self.core_day2_conf(msg, n)
             elif n['type'] == 'ran':
-                res += self.ran_day2_conf(msg, n)
+                tail_res += self.ran_day2_conf(msg, n)
             elif n['type'] in edge_vnfd_type:
                 # configuration of edge 5G core modules (like "UPFs")
                 res += self.edge_day2_conf(msg, n)
 
         # configuration of the 5G core
         msg2up = {'config': self.coreManager.getConfiguration()}
-        res += self.core_upXade(msg2up)
+        tail_res += self.core_upXade(msg2up)
+
+        res += tail_res
 
         return res
 

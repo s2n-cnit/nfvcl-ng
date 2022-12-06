@@ -5,9 +5,15 @@ from pydantic import BaseModel, IPvAnyAddress, IPvAnyNetwork,\
 
 
 # ===================================== SubClasses of subconfig section ================================================
+class Pool(BaseModel):
+    cidr: str
+
+
 class SubDataNets(BaseModel):
     net_name: str = Field(..., description="set net-name, exp: 'boh'")
     dnn: str = Field(..., description="set dnn, exp: 'internet'")
+    dns: str
+    pools: List[Pool]
 
 
 class NetworkEndPoints(BaseModel):
@@ -82,13 +88,8 @@ class SubConfig(BaseModel):
 
 # =================================================== End of Config class =============================================
 # ====================================================sub area SubClasses =============================================
-class Pool(BaseModel):
-    cidr: str
-
 class DnnElem(BaseModel):
-    dnn: str
-    dns: str
-    pools: List[Pool]
+    net_name: str
 
 
 class SubSlices(BaseModel):

@@ -538,8 +538,7 @@ class Free5GC_K8s(Blue5GBase):
                     for extSlice in area["slices"]:
                         dnnSliceList = []
                         if "dnnList" in extSlice:
-                            for dnn in extSlice["dnnList"]:
-                                dnnSliceList.append(dnn)
+                            dnnSliceList.extend(self.coreManager.get_dnn_list_from_net_names(self.conf, extSlice["dnnList"]))
 
                         # remove DNNs to upf configuration
                         removingDnnList = []

@@ -83,7 +83,7 @@ class SubConfig(BaseModel):
         description='PLMN identifier of the mobile network'
     )
     sliceProfiles: Optional[List[SubSliceProfiles]] = Field(..., description="Set Default slices parameters")
-    subscribers: List[SubSubscribers]
+    subscribers: Optional[List[SubSubscribers]]
 
 
 # =================================================== End of Config class =============================================
@@ -104,13 +104,14 @@ class SubArea(BaseModel):
 # =============================================== main section for blue free5gc k8s model class========================
 
 
-class Create5gModel(BaseModel):
+class Add5gModel(BaseModel):
+    operation: Literal["add"]
     type: Literal["5G"]
     callbackURL: Optional[HttpUrl] = Field(
         '',
         description='url that will be used to notify when the topology terraform ends'
     )
-    config: SubConfig
-    areas: List[SubArea] = Field(..., description="Set area")
+    config: Optional[SubConfig]
+    areas: Optional[List[SubArea]] = Field(..., description="Set area")
 
 # =========================================== End of main section =====================================================

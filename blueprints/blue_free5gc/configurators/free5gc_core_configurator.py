@@ -1,5 +1,5 @@
 import copy
-from typing import List
+from typing import List, Union
 from main import *
 
 # create logger
@@ -12,6 +12,22 @@ class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
 
+
+class SstConvertion():
+    sstType = {"EMBB": 1, "URLLC": 2, "MMTC": 3}
+
+    def __init__(self) -> None:
+        pass
+
+    @classmethod
+    def to_string(cls, value: int = None) -> str:
+        return next((k for k, v in cls.sstType.items() if v == value), None)
+
+    @classmethod
+    def to_int(cls, value: str = None) -> int:
+        return next((v for k,v in cls.sstType.items() if k == value), None)
+
+
 class Configurator_Free5GC_Core():
     def __init__(self, running_free5gc_conf: string = None) -> None:
         if running_free5gc_conf == None:
@@ -22,10 +38,11 @@ class Configurator_Free5GC_Core():
         self.smfName = "SMF-{0:06X}".format(random.randrange(0x000000, 0xFFFFFF))
         self.n3iwfId = random.randint(1, 9999)
         self.nssfName = "{0:06x}".format(random.randrange(0x000000, 0xFFFFFF))
+
     def get_dnn_list_from_net_names(self, msg: dict = None, netNames: list = None) -> List:
         """
         It works reading the msg ("slice-intent" message) and match netNames to "data_nets" section
-        ex: [{"net_name": "internet"}] -> [
+        ex: ["internet"] -> [
         {
           "dnn": "internet",
           "dns": "8.8.8.8",
@@ -39,6 +56,15 @@ class Configurator_Free5GC_Core():
                    if i["net_name"] in netNames]
 
         return dnnList
+
+    def get_dnn_names_from_slice(self, msg: dict = None, sliceType: str = None, sliceId: str = None) -> List:
+        """
+        """
+        if msg is None or sliceType is None or sliceId is None:
+            raise ValueError("configuration or slice values are not valid")
+        return  next((i["dnnList"] for i in msg["config"]["sliceProfiles"] if i["sliceId"] == sliceId and
+                         i["sliceType"] == sliceType ), None)
+
 
     def amf_reset_configuration(self) -> None:
         """
@@ -835,7 +861,7 @@ class Configurator_Free5GC_Core():
                     # add slice to sliceList
                     tacSliceList = []
                     for slice in area["slices"]:
-                        s = {"sd": slice["sd"], "sst": slice["sst"]}
+                        s = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"])}
                         if s not in tacSliceList:
                             tacSliceList.append(s)
                         if s not in sliceList:
@@ -843,7 +869,8 @@ class Configurator_Free5GC_Core():
                         if "dnnList" in slice:
                             # add dnn to dnnList
                             dnnSliceList = []
-                            for dnn in self.get_dnn_list_from_net_names(conf, slice["dnnList"]):
+                            for dnn in self.get_dnn_list_from_net_names(conf,
+                                        self.get_dnn_names_from_slice(conf, slice["sliceType"], slice["sliceId"])):
                                 dnnSliceList.append(dnn)
                                 if dnn not in dnnList:
                                     dnnList.append(dnn)
@@ -951,9 +978,10 @@ class Configurator_Free5GC_Core():
                 dnnList = []
                 if "slices" in area:
                     for slice in area["slices"]:
-                        s = {"sd": slice["sd"], "sst": slice["sst"] }
+                        s = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"]) }
                         if "dnnList" in slice:
-                            message_dnnList = self.get_dnn_list_from_net_names(msg,slice["dnnList"])
+                            message_dnnList = self.get_dnn_list_from_net_names(msg,
+                                    self.get_dnn_names_from_slice(msg, slice["sliceType"], slice["sliceId"]))
                             self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=s,
                                                     dnnInfoList=message_dnnList)
                             for dnn in message_dnnList:
@@ -981,13 +1009,15 @@ class Configurator_Free5GC_Core():
                 # add specific slices
                 if "slices" in area:
                     for slice in area["slices"]:
-                        dnnList = self.get_dnn_list_from_net_names(msg, slice["dnnList"])
+                        dnnList = self.get_dnn_list_from_net_names(msg,
+                                        self.get_dnn_names_from_slice(msg, slice["sliceType"], slice["sliceId"]))
                         res += self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"],
-                                    slice={"sst": slice["sst"], "sd": slice["sd"]}, dnnInfoList=dnnList)
+                                    slice={"sst": SstConvertion.to_int(slice["sliceType"]),
+                                           "sd": slice["sliceId"]}, dnnInfoList=dnnList)
 
                         # search slice to add area info. So every slice has all areas info
                         sdSstDnnlist = [{"sd": s["sd"], "sst": s["sst"]} for s in sliceList]
-                        sliceToSearch = {"sd": slice["sd"], "sst": slice["sst"]}
+                        sliceToSearch = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"])}
                         if sliceToSearch in sdSstDnnlist:
                             elem = sdSstDnnlist[sdSstDnnlist.index(sliceToSearch)]
                             if "tacList" in elem:
@@ -996,8 +1026,9 @@ class Configurator_Free5GC_Core():
                             else:
                                 elem["tacList"] = [{"id": area["id"]}]
                         else:
-                            slice["tacList"] = [{"id": area["id"]}]
-                            sliceList.append(slice)
+                            newSlice = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"])}
+                            newSlice["tacList"] = [{"id": area["id"]}]
+                            sliceList.append(newSlice)
 
         if sliceList:
             message = {"config": {"slices": sliceList}}
@@ -1050,10 +1081,11 @@ class Configurator_Free5GC_Core():
                 if "slices" in area:
                     for extSlice in area["slices"]:
                         dnnSliceList = []
-                        slice = {"sd": extSlice["sd"], "sst": extSlice["sst"]}
+                        slice = {"sd": extSlice["sliceId"], "sst": SstConvertion.to_int(extSlice["sliceType"])}
                         sliceList.append(slice)
                         if "dnnList" in extSlice:
-                            extDnnList=self.get_dnn_list_from_net_names(msg, extSlice["dnnList"])
+                            extDnnList=self.get_dnn_list_from_net_names(msg,
+                                    self.get_dnn_names_from_slice(msg, extSlice["sliceType"], extSlice["sliceId"]))
                             dnnSliceList.extend(extDnnList)
                             dnnList.extend(extDnnList)
 
@@ -1076,7 +1108,8 @@ class Configurator_Free5GC_Core():
                         self.nssf_set_configuration(mcc=mcc, mnc=mnc, nssfName=nssfName, sliceList=[slice],
                                 tac=area["id"])
                         res += self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=slice,
-                                dnnInfoList=self.get_dnn_list_from_net_names(msg, extSlice["dnnList"]))
+                                dnnInfoList=self.get_dnn_list_from_net_names(msg,
+                                        self.get_dnn_names_from_slice(msg, extSlice["sliceType"], extSlice["sliceId"])))
                     self.amf_set_configuration(mcc=mcc, mnc=mnc, amfId=amfId, supportedTacList = tacList,
                                 snssaiList = sliceList, dnnList = dnnList)
 
@@ -1098,9 +1131,10 @@ class Configurator_Free5GC_Core():
                 if "slices" in area:
                     for extSlice in area["slices"]:
                         dnnSliceList = []
-                        sliceList = [{"sd": extSlice["sd"], "sst": extSlice["sst"]}]
+                        sliceList = [{"sd": extSlice["sliceId"], "sst": SstConvertion.to_int(extSlice["sliceType"])}]
                         if "dnnList" in extSlice:
-                            dnnSliceList.extend(self.get_dnn_list_from_net_names(msg, extSlice["dnnList"]))
+                            dnnSliceList.extend(self.get_dnn_list_from_net_names(msg,
+                                    self.get_dnn_names_from_slice(msg, extSlice["sliceType"], extSlice["sliceId"])))
                         self.amf_unset_configuration(mcc=mcc, mnc=mnc, snssaiList=sliceList,dnnList=dnnSliceList)
                         self.smf_unset_configuration(dnnList=dnnSliceList, sliceList=sliceList)
                         self.n3iwf_unset_configuration(sliceSupportList=sliceList)

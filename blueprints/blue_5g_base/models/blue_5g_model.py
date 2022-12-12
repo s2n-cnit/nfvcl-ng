@@ -56,7 +56,7 @@ class SubEnabledUEList(BaseModel):
 class SubSliceProfiles(BaseModel):
     sliceId: str
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
-    dnnlist: List[str] = Field([], description="set dnn-list as a listst on names")
+    dnnList: List[str] = Field([], description="set dnn-list as a listst on names")
     profileParams: SubProfileParams
     locationConstraints: List[SubLocationConstraints]
     enabledUEList: List[SubEnabledUEList]

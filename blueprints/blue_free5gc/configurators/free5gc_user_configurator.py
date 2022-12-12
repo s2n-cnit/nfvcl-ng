@@ -1,5 +1,6 @@
 from pymongo import MongoClient
 from bson import ObjectId
+from blueprints.blue_free5gc.configurators.free5gc_core_configurator import SstConvertion
 from main import *
 
 # create logger
@@ -326,9 +327,9 @@ class Configurator_Free5GC_User():
 
                     if "snssai" in subscriber:
                         for snssaiElem in subscriber["snssai"]:
-                            sst = snssaiElem["sst"]  # TODO "sliceId" in the json
-                            sd = snssaiElem["sd"]  # TODO "sliceType" in the json
-                            default = snssaiElem["default"]
+                            sst = SstConvertion.to_int(snssaiElem["sliceType"])
+                            sd = snssaiElem["sliceId"]
+                            default = snssaiElem["default_slice"]
 
                             self.add_snssai_to_db(plmn=plmn, imsi=imsi, sst=sst, sd=sd, default=default,
                                                               mongodbServiceHost=mongoDbPath)

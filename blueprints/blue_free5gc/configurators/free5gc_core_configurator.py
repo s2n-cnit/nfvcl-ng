@@ -1026,8 +1026,8 @@ class Configurator_Free5GC_Core():
                             else:
                                 elem["tacList"] = [{"id": area["id"]}]
                         else:
-                            newSlice = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"])}
-                            newSlice["tacList"] = [{"id": area["id"]}]
+                            newSlice = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"]),
+                                        "tacList": [{"id": area["id"]}]}
                             sliceList.append(newSlice)
 
         if sliceList:
@@ -1042,14 +1042,14 @@ class Configurator_Free5GC_Core():
         if 'areas' in msg:
             for area in msg['areas']:
                 res += self.smf_del_upf(conf=msg, tac=area["id"])
-                if "slices" in area:
-                    if "slices" in area:
-                        for slice in area["slices"]:
-                            slice["tacList"] = [{"id": area["id"]}]
-                            sliceList.append(slice)
-        if sliceList != []:
-            message = {"config": {"slices": sliceList}}
-            self.del_slice(message)
+        #         if "slices" in area:
+        #             for slice in area["slices"]:
+        #                 slice["tacList"] = [{"id": area["id"]}]
+        #                 sliceList.append(slice)
+        # if sliceList != []:
+        #     message = {"config": {"slices": sliceList}}
+        #     self.del_slice(message)
+        self.del_slice(msg)
 
         return res
 

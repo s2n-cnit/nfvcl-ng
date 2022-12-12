@@ -92,6 +92,7 @@ class SubConfig(BaseModel):
 class SubSlices(BaseModel):
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
     sliceId: str
+    dnnList: Optional[List[str]]
 
 
 class SubArea(BaseModel):

@@ -52,8 +52,8 @@ class Configurator_Free5GC_Core():
         """
         if msg is None or netNames is None:
             raise ValueError("configuration or network names of datanets are not valid")
-        dnnList = [{i["dnn"], i["dns"], i["pools"]} for i in msg["config"]["network_endpoints"]["data_nets"]
-                   if i["net_name"] in netNames]
+        dnnList = [{"dnn": i["dnn"], "dns": i["dns"], "pools": i["pools"]} for i
+                   in msg["config"]["network_endpoints"]["data_nets"] if i["net_name"] in netNames]
 
         return dnnList
 

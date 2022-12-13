@@ -172,7 +172,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response.deleted_count))
 
-    def add_snssai_to_db(self, plmn: str, imsi: str, sst: str, sd: str, default: bool = True,
+    def add_snssai_to_db(self, plmn: str, imsi: str, sst: int, sd: str, default: bool = True,
                      mongodbServiceHost: str = "mongodb://mongodb:27017/") -> None:
         client = MongoClient(mongodbServiceHost)
         db = client["free5gc"]
@@ -190,7 +190,7 @@ class Configurator_Free5GC_User():
                     "smPolicySnssaiData.{:02x}{}".format(sst, sd):
                         {
                             "snssai": {
-                                "sst": int(sst), "sd": format(sd)
+                                "sst": sst, "sd": format(sd)
                                 }
                         }
                 }
@@ -236,7 +236,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-    def add_dnn_to_db(self, imsi: str, sst: str, sd: str, dnn: str, d5qi: int, upambr: str, downambr: str,
+    def add_dnn_to_db(self, imsi: str, sst: int, sd: str, dnn: str, d5qi: int, upambr: str, downambr: str,
                      mongodbServiceHost: str = "mongodb://mongodb:27017/") -> None:
         client = MongoClient(mongodbServiceHost)
         db = client["free5gc"]
@@ -258,7 +258,7 @@ class Configurator_Free5GC_User():
             {
                 "ueId": "imsi-{}".format(imsi),
                 "singleNssai": {
-                    "sst": int(sst),"sd": format(sd)
+                    "sst": sst,"sd": format(sd)
                 }
             },
             {
@@ -334,18 +334,31 @@ class Configurator_Free5GC_User():
                             self.add_snssai_to_db(plmn=plmn, imsi=imsi, sst=sst, sd=sd, default=default,
                                                               mongodbServiceHost=mongoDbPath)
 
-                            if "dnnList" in snssaiElem:
-                                for dnnElem in snssaiElem["dnnList"]:
-                                    dnn = dnnElem["dnn"]
-                                    uplinkAmbr = dnnElem["uplinkAmbr"]
-                                    downlinkAmbr = dnnElem["downlinkAmbr"]
-                                    default5qi = dnnElem["default5qi"]
+                            if "sliceProfiles" in msg["config"]:
+                                for sliceProfile in msg["config"]["sliceProfiles"]:
+                                    if sliceProfile["sliceId"] == snssaiElem["sliceId"] \
+                                            and sliceProfile["sliceType"] == snssaiElem["sliceType"]:
+                                        if "dnnList" in sliceProfile:
+                                            if "network_endpoints" in msg["config"] \
+                                                    and "data_nets" in msg["config"]["network_endpoints"]:
+                                                for net_name in sliceProfile["dnnList"]:
+                                                    for data_net in msg["config"]["network_endpoints"]["data_nets"]:
+                                                        if net_name == data_net["net_name"]:
+                                                            dnn = data_net["dnn"]
+                                                            uplinkAmbr = data_net["uplinkAmbr"]
+                                                            downlinkAmbr = data_net["downlinkAmbr"]
+                                                            default5qi = data_net["default5qi"]
 
-                                    self.add_dnn_to_db(imsi=imsi, sst=sst, sd=sd, dnn=dnn, d5qi=default5qi,
-                                                                   upambr=uplinkAmbr, downambr=downlinkAmbr,
-                                                                   mongodbServiceHost=mongoDbPath)
-
-                                    # TODO complete with flowRules
+                                                            self.add_dnn_to_db(imsi=imsi, sst=sst, sd=sd, dnn=dnn,
+                                                                    d5qi=default5qi,upambr=uplinkAmbr,
+                                                                    downambr=downlinkAmbr, mongodbServiceHost=mongoDbPath)
+                                    if "profileParams" in sliceProfile and "pduSessions" in sliceProfile["profileParams"]:
+                                        if "pduSessionIds" in snssaiElem:
+                                            for pduSessionId in snssaiElem["pduSessionIds"]:
+                                                for pduSession in sliceProfile["profileParams"]["pduSessions"]:
+                                                    if pduSessionId == pduSession["pduSessionId"]:
+                                                            pass
+                                                            # TODO complete with flowRules
 
     def del_ues(self, msg: dict) -> None:
         mongoDbPath = None
@@ -353,9 +366,9 @@ class Configurator_Free5GC_User():
             if "mongodb" in msg["config"]:
                 mongoDbPath = "mongodb://{}:27017/".format(msg["config"]["mongodb"])
 
-        if "config" in msg and "plmn" in msg["config"]:
-            if "subscribers" in msg["config"]:
-                for subscriber in msg["config"]["subscribers"]:
-                    plmn = msg["config"]["plmn"]
-                    imsi = subscriber["imsi"]
-                    self.del_ue_from_db(plmn=plmn, imsi=imsi, mongodbServiceHost=mongoDbPath)
+            if "plmn" in msg["config"]:
+                if "subscribers" in msg["config"]:
+                    for subscriber in msg["config"]["subscribers"]:
+                        plmn = msg["config"]["plmn"]
+                        imsi = subscriber["imsi"]
+                        self.del_ue_from_db(plmn=plmn, imsi=imsi, mongodbServiceHost=mongoDbPath)

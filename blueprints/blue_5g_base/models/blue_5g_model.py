@@ -14,6 +14,9 @@ class SubDataNets(BaseModel):
     dnn: str = Field(..., description="set dnn, exp: 'internet'")
     dns: str
     pools: List[Pool]
+    uplinkAmbr: Optional[str]
+    downlinkAmbr: Optional[str]
+    default5qi: Optional[str]
 
 
 class NetworkEndPoints(BaseModel):

@@ -18,5 +18,6 @@ blue_create_models = Union[
 ]
 
 blue_day2_models = Union[
-    K8sBlueprintScale
+    K8sBlueprintScale,
+    Free5gck8sBlueCreateModel
 ]

@@ -27,7 +27,7 @@ class NetworkEndPoints(BaseModel):
 
 class SubFlows(BaseModel):
     flowId: str = Field(..., description="set flow Id, exp: f0")
-    ipAddrFilter: IPvAnyAddress = Field(None, description="set IP address filter")
+    ipAddrFilter: Optional[IPvAnyAddress] = Field(None, description="set IP address filter")
     fiveqi: constr(regex=r"[0-9]") = Field(..., alias="5qi")
     gfbr: Optional[str] = Field(..., description="set gfbr, exp: 100Mbps")
 
@@ -95,7 +95,6 @@ class SubConfig(BaseModel):
 class SubSlices(BaseModel):
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
     sliceId: str
-    dnnList: Optional[List[str]]
 
 
 class SubArea(BaseModel):

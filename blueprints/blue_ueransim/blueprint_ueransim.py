@@ -185,7 +185,7 @@ class UeRanSim(BlueprintBase):
 
     def check_pdu_area(self, msg: dict):
         for area in msg['areas']:
-            if db.findone_DB('pdu', {'area': str(area['id'])}):
+            if self.topology_get_pdu_by_area(area):
                 self.status = 'error'
                 self.detailed_status = 'PDU at area {} already existing'.format(area['id'])
                 raise ValueError(self.detailed_status)

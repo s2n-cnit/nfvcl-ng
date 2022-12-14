@@ -549,7 +549,7 @@ class Configurator_Free5GC_Core():
         :param mcc:
         :param mnc:
         :param smfName:
-        :param dnnList: es. [{"dnn": "internet", "dns": { "ipv4": "8.8.8.8"}}]
+        :param dnnList: es. [{"dnn": "internet", "dns": "8.8.8.8"}]
         :param sliceList: es. [{"sst": 1, "sd": "000001"}]
         :param links:
         :param upNodes:
@@ -856,27 +856,27 @@ class Configurator_Free5GC_Core():
             # add tac id to tacList (area_id = tac)
             for area in conf["areas"]:
                 tacList.append(area["id"])
-
                 if "slices" in area:
                     # add slice to sliceList
                     tacSliceList = []
+                    
                     for slice in area["slices"]:
                         s = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"])}
                         if s not in tacSliceList:
                             tacSliceList.append(s)
                         if s not in sliceList:
                             sliceList.append(s)
-                        if "dnnList" in slice:
-                            # add dnn to dnnList
-                            dnnSliceList = []
-                            for dnn in self.get_dnn_list_from_net_names(conf,
-                                        self.get_dnn_names_from_slice(conf, slice["sliceType"], slice["sliceId"])):
-                                dnnSliceList.append(dnn)
-                                if dnn not in dnnList:
-                                    dnnList.append(dnn)
 
-                            self.smf_set_configuration(mcc=mcc, mnc=mnc, smfName=self.smfName, dnnList=dnnSliceList,
-                                    sliceList=[s])
+                        # add dnn to dnnList
+                        dnnSliceList = []
+                        for dnn in self.get_dnn_list_from_net_names(conf, self.get_dnn_names_from_slice(conf, slice[
+                                "sliceType"], slice["sliceId"])):
+                            dnnSliceList.append(dnn)
+                            if dnn not in dnnList:
+                                dnnList.append(dnn)
+
+                        self.smf_set_configuration(mcc=mcc, mnc=mnc, smfName=self.smfName, dnnList=dnnSliceList,
+                                                   sliceList=[s])
 
                     self.n3iwf_set_configuration(mcc=mcc, mnc=mnc, n3iwfId=self.n3iwfId, tac=area["id"],
                             sliceSupportList=tacSliceList)

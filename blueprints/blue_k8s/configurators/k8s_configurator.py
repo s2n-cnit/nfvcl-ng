@@ -93,6 +93,12 @@ class ConfiguratorK8s(Configurator_Flex):
                 'transfer_name': "regcred_{}.yaml".format(blue_id),
                 'name': "regcred.yaml"
             }, jinja_vars)
+            self.addJinjaTemplateFile({
+                'template': 'blueprints/blue_k8s/config_scripts/k8s_metricserver.yaml',
+                'path': '~/',
+                'transfer_name': "metricserver_{}.yaml".format(blue_id),
+                'name': "metricserver.yaml"
+            }, jinja_vars)
             self.appendPbTasks('blueprints/blue_k8s/config_scripts/playbook_kubernetes_master.yaml')
 
         if self.role == 'worker':

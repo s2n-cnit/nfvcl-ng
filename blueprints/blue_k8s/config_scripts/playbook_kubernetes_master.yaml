@@ -43,6 +43,7 @@
         - kubectl apply -f metallb_manifest.yaml
         - kubectl apply -f "{{ metallb_configmap_file }}"
         - kubectl apply -f regcred.yaml
+        - kubectl apply -f metricserver.yaml
         - kubectl create clusterrolebinding tiller-cluster-admin --clusterrole=cluster-admin  --serviceaccount=kube-system:default
    - name: Install linkerd sidecars
      command: "{{ item }}"

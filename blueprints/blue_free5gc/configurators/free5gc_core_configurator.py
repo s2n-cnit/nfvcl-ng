@@ -979,14 +979,13 @@ class Configurator_Free5GC_Core():
                 if "slices" in area:
                     for slice in area["slices"]:
                         s = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"]) }
-                        if "dnnList" in slice:
-                            message_dnnList = self.get_dnn_list_from_net_names(msg,
-                                    self.get_dnn_names_from_slice(msg, slice["sliceType"], slice["sliceId"]))
-                            self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=s,
-                                                    dnnInfoList=message_dnnList)
-                            for dnn in message_dnnList:
-                                if dnn not in dnnList:
-                                    dnnList.append(dnn)
+                        message_dnnList = self.get_dnn_list_from_net_names(msg,
+                                self.get_dnn_names_from_slice(msg, slice["sliceType"], slice["sliceId"]))
+                        self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=s,
+                                                dnnInfoList=message_dnnList)
+                        for dnn in message_dnnList:
+                            if dnn not in dnnList:
+                                dnnList.append(dnn)
 
                 if len(dnnList) != 0:
                     #  add default and slices Dnn list to UPF conf
@@ -1083,11 +1082,10 @@ class Configurator_Free5GC_Core():
                         dnnSliceList = []
                         slice = {"sd": extSlice["sliceId"], "sst": SstConvertion.to_int(extSlice["sliceType"])}
                         sliceList.append(slice)
-                        if "dnnList" in extSlice:
-                            extDnnList=self.get_dnn_list_from_net_names(msg,
-                                    self.get_dnn_names_from_slice(msg, extSlice["sliceType"], extSlice["sliceId"]))
-                            dnnSliceList.extend(extDnnList)
-                            dnnList.extend(extDnnList)
+                        extDnnList=self.get_dnn_list_from_net_names(msg,
+                                self.get_dnn_names_from_slice(msg, extSlice["sliceType"], extSlice["sliceId"]))
+                        dnnSliceList.extend(extDnnList)
+                        dnnList.extend(extDnnList)
 
                         self.smf_set_configuration(mcc=mcc, mnc=mnc, smfName=smfName, dnnList=dnnSliceList,
                                                    sliceList=[slice])

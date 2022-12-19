@@ -1,10 +1,16 @@
 from pymongo import MongoClient
 from bson import ObjectId
+from enum import Enum
 from blueprints.blue_free5gc.configurators.free5gc_core_configurator import SstConvertion
 from main import *
 
 # create logger
 logger = create_logger('Configurator_Free5GC_User')
+
+class UpSecurityType(Enum):
+    PREFERRED = 0
+    NOT_NEEDED = 1
+    REQUIRED = 2
 
 class Configurator_Free5GC_User():
     def __init__(self) -> None:
@@ -131,6 +137,13 @@ class Configurator_Free5GC_User():
         db = client["free5gc"]
 
         response = db.policyData.ues.amData.delete_many(
+            {
+                "ueId" : "imsi-{}".format(imsi)
+            }
+        )
+        logger.info("db response: {}".format(response.deleted_count))
+
+        response = db.policyData.ues.flowRule.delete_many(
             {
                 "ueId" : "imsi-{}".format(imsi)
             }
@@ -307,6 +320,74 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
+    def add_flow_to_db(self, gbrUL: str, gbrDL: str, imsi: str, servingPlmnId: str, dnn: str, fiveqi: str,
+                     mbrUL: str, filter: str, snssai: str, mbrDL: str,
+                     mongodbServiceHost: str = "mongodb://mongodb:27017/") -> None:
+        client = MongoClient(mongodbServiceHost)
+        db = client["free5gc"]
+
+        response = db.policyData.ues.flowRule.update_many(
+            {
+                "ueId" : "imsi-{}".format(imsi)
+            },
+            {
+                "$setOnInsert": {
+                        "_id": ObjectId(),
+                        "ueId": "imsi-{}".format(imsi)
+                },
+                "$set": {
+                        "gbrUL": gbrUL,
+                        "gbrDL": gbrDL,
+                        "servingPlmnId": servingPlmnId,
+                        "dnn": dnn,
+                        "5qi": int(fiveqi),
+                        "mbrUL": mbrUL,
+                        "filter": filter,
+                        "snssai": snssai,
+                        "mbrDL": mbrDL,
+                        "subscCats": ["free5gc"]
+                }
+            },
+            upsert = True
+        )
+        logger.info("db response: {}".format(response))
+
+    # def add_up_security_to_db(self, imsi: str, sst: int, sd: int, dnn: str,
+    #                           integrity: UpSecurityType = UpSecurityType.NOT_NEEDED,
+    #                           confidentiality: UpSecurityType = UpSecurityType.NOT_NEEDED,
+    #                           mongodbServiceHost: str = "mongodb://mongodb:27017/") -> None:
+    #     client = MongoClient(mongodbServiceHost)
+    #     db = client["free5gc"]
+    #
+    #     response = db.policyData.ues.flowRule.update_many(
+    #         {
+    #             "ueId": "imsi-{}".format(imsi),
+    #             "singleNssai": {
+    #                 "sst": sst,"sd": format(sd)
+    #             },
+    #             "dnnConfigurations"
+    #         },
+    #         {
+    #             "$setOnInsert": {
+    #                     "_id": ObjectId(),
+    #                     "gbrUL": gbrUL,
+    #                     "gbrDL": gbrDL,
+    #                     "ueId": "imsi-{}".format(imsi),
+    #                     "servingPlmnId": servingPlmnId,
+    #                     "dnn": dnn,
+    #                     "5qi": int(fiveqi),
+    #                     "mbrUL": mbrUL,
+    #                     "filter": filter,
+    #                     "snssai": snssai,
+    #                     "mbrDL": mbrDL,
+    #                     "subscCats": ["free5gc"]
+    #             }
+    #         },
+    #         upsert = True
+    #     )
+    #     logger.info("db response: {}".format(response))
+
+
     def add_ues(self, msg: dict) -> None:
         mongoDbPath = None
         if "config" in msg:
@@ -350,15 +431,27 @@ class Configurator_Free5GC_User():
                                                             default5qi = data_net["default5qi"]
 
                                                             self.add_dnn_to_db(imsi=imsi, sst=sst, sd=sd, dnn=dnn,
-                                                                    d5qi=default5qi,upambr=uplinkAmbr,
+                                                                    d5qi=int(default5qi),upambr=uplinkAmbr,
                                                                     downambr=downlinkAmbr, mongodbServiceHost=mongoDbPath)
                                     if "profileParams" in sliceProfile and "pduSessions" in sliceProfile["profileParams"]:
                                         if "pduSessionIds" in snssaiElem:
                                             for pduSessionId in snssaiElem["pduSessionIds"]:
                                                 for pduSession in sliceProfile["profileParams"]["pduSessions"]:
                                                     if pduSessionId == pduSession["pduSessionId"]:
-                                                            pass
-                                                            # TODO complete with flowRules
+                                                        for flow in pduSession["flows"]:
+                                                            gbrUL = flow["gfbr"]
+                                                            gbrDL = flow["gfbr"]
+                                                            #imsi = imsi
+                                                            servingPlmnId = plmn
+                                                            fiveqi = flow["5qi"]
+                                                            mbrUL = flow["gfbr"]
+                                                            filter = flow["ipAddrFilter"]
+                                                            snssai = "{:02x}{}".format(sst, sd)
+                                                            mbrDL = flow["gfbr"]
+                                                            for dnn in sliceProfile["dnnList"]:
+                                                                self.add_flow_to_db(gbrUL, gbrDL, imsi, servingPlmnId,
+                                                                                    dnn, fiveqi, mbrUL, filter, snssai,
+                                                                                    mbrDL)
 
     def del_ues(self, msg: dict) -> None:
         mongoDbPath = None

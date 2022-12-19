@@ -443,7 +443,7 @@ class Configurator_Free5GC_User():
                                                             gbrDL = flow["gfbr"]
                                                             #imsi = imsi
                                                             servingPlmnId = plmn
-                                                            fiveqi = flow["5qi"]
+                                                            fiveqi = flow["qi"]
                                                             mbrUL = flow["gfbr"]
                                                             filter = flow["ipAddrFilter"]
                                                             snssai = "{:02x}{}".format(sst, sd)

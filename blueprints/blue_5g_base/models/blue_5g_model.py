@@ -28,7 +28,7 @@ class NetworkEndPoints(BaseModel):
 class SubFlows(BaseModel):
     flowId: str = Field(..., description="set flow Id, exp: f0")
     ipAddrFilter: Optional[IPvAnyAddress] = Field(None, description="set IP address filter")
-    fiveqi: constr(regex=r"[0-9]") = Field(..., alias="5qi")
+    qi: constr(regex=r"[0-9]")
     gfbr: Optional[str] = Field(..., description="set gfbr, exp: 100Mbps")
 
 

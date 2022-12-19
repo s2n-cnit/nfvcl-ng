@@ -37,7 +37,7 @@ class Free5GC_K8s(Blue5GBase):
         self.supported_operations = {
             'init': [{
                 'day0': [{'method': 'bootstrap_day0'}],
-                'day2': [{'method': 'init_day2_conf'}],
+                'day2': [{'method': 'init_day2_conf'}, {'method': 'add_ues'}],
                 'dayN': []
             }],
             'add_tac': [{

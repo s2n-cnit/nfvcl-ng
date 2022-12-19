@@ -16,7 +16,7 @@ class Configurator_Free5GC_User():
         client = MongoClient(mongodbServiceHost)
         db = client["free5gc"]
 
-        response = db.policyData.ues.amData.update(
+        response = db.policyData.ues.amData.update_many(
             {
                 "ueId" : "imsi-{}".format(imsi)
             },
@@ -31,7 +31,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-        response = db.policyData.ues.smData.update(
+        response = db.policyData.ues.smData.update_many(
             {
                 "ueId" : "imsi-{}".format(imsi)
             },
@@ -45,7 +45,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-        response = db.subscriptionData.authenticationData.authenticationSubscription.update(
+        response = db.subscriptionData.authenticationData.authenticationSubscription.update_many(
             {
                 "ueId" : "imsi-{}".format(imsi)
             },
@@ -81,7 +81,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-        db.subscriptionData.provisionedData.amData.update(
+        db.subscriptionData.provisionedData.amData.update_many(
             {
                 "ueId" : "imsi-{}".format(imsi)
             },
@@ -108,7 +108,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-        response = db.subscriptionData.provisionedData.smfSelectionSubscriptionData.update(
+        response = db.subscriptionData.provisionedData.smfSelectionSubscriptionData.update_many(
             {
                 "ueId" : "imsi-{}".format(imsi)
             },
@@ -181,7 +181,7 @@ class Configurator_Free5GC_User():
         if default:
             nssaiType = "defaultSingleNssais"
 
-        response = db.policyData.ues.smData.update(
+        response = db.policyData.ues.smData.update_many(
             {
                 "ueId": "imsi-{}".format(imsi)
             },
@@ -199,7 +199,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-        response = db.subscriptionData.provisionedData.amData.update(
+        response = db.subscriptionData.provisionedData.amData.update_many(
             {
                 "ueId": "imsi-{}".format(imsi)
             },
@@ -215,7 +215,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-        response = db.subscriptionData.provisionedData.smData.update(
+        response = db.subscriptionData.provisionedData.smData.update_many(
             {
                 "ueId": "imsi-{}".format(imsi),
                 "singleNssai": {
@@ -241,7 +241,7 @@ class Configurator_Free5GC_User():
         client = MongoClient(mongodbServiceHost)
         db = client["free5gc"]
 
-        response = db.policyData.ues.smData.update(
+        response = db.policyData.ues.smData.update_many(
             {
                 "ueId": "imsi-{}".format(imsi)
             },
@@ -254,7 +254,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-        response = db.subscriptionData.provisionedData.smData.update(
+        response = db.subscriptionData.provisionedData.smData.update_many(
             {
                 "ueId": "imsi-{}".format(imsi),
                 "singleNssai": {
@@ -294,7 +294,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response))
 
-        response = db.subscriptionData.provisionedData.smfSelectionSubscriptionData.update(
+        response = db.subscriptionData.provisionedData.smfSelectionSubscriptionData.update_many(
             {
                 "ueId": "imsi-{}".format(imsi)
             },

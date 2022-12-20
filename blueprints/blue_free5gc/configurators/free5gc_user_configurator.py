@@ -451,7 +451,7 @@ class Configurator_Free5GC_User():
                                                             for dnn in sliceProfile["dnnList"]:
                                                                 self.add_flow_to_db(gbrUL, gbrDL, imsi, servingPlmnId,
                                                                                     dnn, fiveqi, mbrUL, filter, snssai,
-                                                                                    mbrDL)
+                                                                                    mbrDL,mongodbServiceHost=mongoDbPath)
 
     def del_ues(self, msg: dict) -> None:
         mongoDbPath = None

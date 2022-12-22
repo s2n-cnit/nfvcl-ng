@@ -35,7 +35,7 @@ class Configurator_Free5GC_User():
             },
             upsert = True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
         response = db.policyData.ues.smData.update_many(
             {
@@ -49,7 +49,7 @@ class Configurator_Free5GC_User():
             },
             upsert = True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
         response = db.subscriptionData.authenticationData.authenticationSubscription.update_many(
             {
@@ -85,7 +85,7 @@ class Configurator_Free5GC_User():
             },
             upsert = True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
         db.subscriptionData.provisionedData.amData.update_many(
             {
@@ -112,7 +112,7 @@ class Configurator_Free5GC_User():
             },
             upsert = True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
         response = db.subscriptionData.provisionedData.smfSelectionSubscriptionData.update_many(
             {
@@ -129,7 +129,7 @@ class Configurator_Free5GC_User():
             },
             upsert = True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
     def del_ue_from_db(self, plmn: str, imsi: str,
                      mongodbServiceHost: str = "mongodb://mongodb:27017/") -> None:
@@ -210,7 +210,7 @@ class Configurator_Free5GC_User():
             },
             upsert=True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
         response = db.subscriptionData.provisionedData.amData.update_many(
             {
@@ -226,7 +226,7 @@ class Configurator_Free5GC_User():
             },
             upsert=True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
         response = db.subscriptionData.provisionedData.smData.update_many(
             {
@@ -247,7 +247,7 @@ class Configurator_Free5GC_User():
             },
             upsert=True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
     def add_dnn_to_db(self, imsi: str, sst: int, sd: str, dnn: str, d5qi: int, upambr: str, downambr: str,
                      mongodbServiceHost: str = "mongodb://mongodb:27017/") -> None:
@@ -265,7 +265,7 @@ class Configurator_Free5GC_User():
             },
             upsert=True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
         response = db.subscriptionData.provisionedData.smData.update_many(
             {
@@ -305,7 +305,7 @@ class Configurator_Free5GC_User():
             },
             upsert=True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
         response = db.subscriptionData.provisionedData.smfSelectionSubscriptionData.update_many(
             {
@@ -318,7 +318,7 @@ class Configurator_Free5GC_User():
             },
             upsert=True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
     def add_flow_to_db(self, gbrUL: str, gbrDL: str, imsi: str, servingPlmnId: str, dnn: str, fiveqi: str,
                      mbrUL: str, filter: str, snssai: str, mbrDL: str,
@@ -350,7 +350,7 @@ class Configurator_Free5GC_User():
             },
             upsert = True
         )
-        logger.info("db response: {}".format(response.raw_result()))
+        logger.info("db response: {}".format(response.raw_result))
 
     # def add_up_security_to_db(self, imsi: str, sst: int, sd: int, dnn: str,
     #                           integrity: UpSecurityType = UpSecurityType.NOT_NEEDED,

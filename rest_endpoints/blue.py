@@ -51,7 +51,7 @@ def instantiate_blueprint(msg, blue_id):
         logger.error(traceback.format_exc())
 
 
-def update_blueprint(self, blue, msg, blue_id, requested_operation, session_id):
+def update_blueprint(blue, msg, blue_id, requested_operation, session_id):
     global PrometheusMan
     worker_queue = workers.get_worker(blue_id)
     worker_queue.put({'session_id': session_id, 'msg': msg, 'requested_operation': requested_operation})

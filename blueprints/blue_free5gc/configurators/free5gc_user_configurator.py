@@ -87,7 +87,7 @@ class Configurator_Free5GC_User():
         )
         logger.info("db response: {}".format(response.raw_result))
 
-        db.subscriptionData.provisionedData.amData.update_many(
+        response = db.subscriptionData.provisionedData.amData.update_many(
             {
                 "ueId" : "imsi-{}".format(imsi)
             },

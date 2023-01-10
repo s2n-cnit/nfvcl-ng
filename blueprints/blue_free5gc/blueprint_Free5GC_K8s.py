@@ -179,7 +179,7 @@ class Free5GC_K8s(Blue5GBase):
         if area != "core":
             raise ValueError("Area value is wrong")
         self.set_baseCoreVnfd(vls)
-        self.set_upfVnfd(area=area)
+        self.set_upfVnfd(area=area, vls=vls)
         logger.debug(self.vnfd)
 
     def set_edge_vnfd(self, area: str, area_id: int = 0) -> None:

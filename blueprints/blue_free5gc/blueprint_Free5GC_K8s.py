@@ -329,14 +329,13 @@ class Free5GC_K8s(Blue5GBase):
             param_name_list.append(param['name'])
         return param_name_list
 
-    def add_ext_nsd(self, model_msg) -> list:
+    def add_ext_nsd(self, msg) -> list:
         """
         Add external UPF(s) (not core) to the system
         For every TAC in the configuration message (in VIMs -> tacs) add a UPF (execution of "edge_nsd" function)
         :param msg: configuration message
         :return: list of nsd to create
         """
-        msg = model_msg.dict()
         nsd_names = []
         if 'areas' in msg:
             for area in msg['areas']:
@@ -400,12 +399,11 @@ class Free5GC_K8s(Blue5GBase):
 
         return res
 
-    def init_day2_conf(self, model_msg) -> list:
+    def init_day2_conf(self, msg) -> list:
         logger.info("Initializing Day2 configurations")
         res = []
         middle_res = []
         tail_res = []
-        msg = model_msg.dict()
 
         self.coreManager.day2_conf(self.conf)
 
@@ -430,14 +428,13 @@ class Free5GC_K8s(Blue5GBase):
 
         return res
 
-    def add_ext_conf(self, model_msg) -> list:
+    def add_ext_conf(self, msg) -> list:
         """
         Day-2 for added external UPF
         :param msg:
         :return:
         """
         res = []
-        msg = model_msg.dict()
         if 'areas' in msg:
             for area in msg['areas']:
                 nsd_list = []
@@ -454,8 +451,7 @@ class Free5GC_K8s(Blue5GBase):
                     res += self.edge_day2_conf({'vim': vim['name'], 'tac': area['id']}, nsd)
         return res
 
-    def del_tac_nsd(self, model_msg: dict) -> list:
-        msg = model_msg.dict()
+    def del_tac_nsd(self, msg: dict) -> list:
         nsi_to_delete = super().del_area(msg)
         if "areas" in msg:
             for area in msg['areas']:
@@ -468,22 +464,19 @@ class Free5GC_K8s(Blue5GBase):
                     self.nsd_.pop(nsd_i)
         return nsi_to_delete
 
-    def add_tac_conf(self, model_msg) -> list:
-        msg = model_msg.dict()
+    def add_tac_conf(self, msg) -> list:
         res = self.coreManager.add_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
         res += self.core_upXade({'config': self.coreManager.getConfiguration()})
         return res
 
-    def del_tac_conf(self, model_msg) -> list:
-        msg = model_msg.dict()
+    def del_tac_conf(self, msg) -> list:
         res = self.coreManager.del_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
         res += self.core_upXade({'config': self.coreManager.getConfiguration()})
         return res
 
-    def add_slice(self, model_msg) -> list:
-        msg = model_msg.dict()
+    def add_slice(self, msg) -> list:
         res = []
         tail_res = []
 
@@ -524,18 +517,15 @@ class Free5GC_K8s(Blue5GBase):
 
         return res
 
-    def add_ues(self, model_msg) -> list:
-        msg = model_msg.dict()
+    def add_ues(self, msg) -> list:
         self.userManager.add_ues(msg)
         return []
 
-    def del_ues(self, model_msg) -> list:
-        msg = model_msg.dict()
+    def del_ues(self, msg) -> list:
         self.userManager.del_ues(msg)
         return []
 
-    def del_slice(self, model_msg) -> list:
-        msg = model_msg.dict()
+    def del_slice(self, msg) -> list:
         res = []
         tail_res = []
 
@@ -592,8 +582,6 @@ class Free5GC_K8s(Blue5GBase):
         return res
 
     def core_upXade(self, msg) -> list:
-        if type(msg) != "dict":
-            msg = msg.dict()
         ns_core = next((item for item in self.nsd_ if item['type'] == 'core'), None)
         if ns_core is None:
             raise ValueError('core NSD not found')

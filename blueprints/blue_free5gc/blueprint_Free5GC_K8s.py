@@ -179,6 +179,7 @@ class Free5GC_K8s(Blue5GBase):
         if area != "core":
             raise ValueError("Area value is wrong")
         self.set_baseCoreVnfd(vls)
+        self.set_upfVnfd(area=area)
         logger.debug(self.vnfd)
 
     def set_edge_vnfd(self, area: str, area_id: int = 0) -> None:
@@ -276,8 +277,8 @@ class Free5GC_K8s(Blue5GBase):
         if vnfd_os:
             for item in vnfd_os:
                 param = {
-                    'name': str(item["id"]) + '_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
-                    'id': str(item["id"]) + '_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
+                    'name': str(item["type"]) + '_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
+                    'id': str(item["type"]) + '_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
                     'type': 'core'
                 }
                 n_obj = sol006_NSD_builder([item], core_v["name"], param, vim_net_mapping)

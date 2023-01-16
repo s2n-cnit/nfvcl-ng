@@ -90,9 +90,13 @@ class Blue5GBase(BlueprintBase, ABC):
     def nsd(self) -> List[str]:
         nsd_names = self.core_nsd()
         for area in self.conf['areas']:
-            vim = self.get_vim_name(area['id'])
-            nsd_names.append(self.ran_nsd(area, vim))
-            nsd_names.extend(self.edge_nsd(area, vim))
+            if "core" in area and area["core"]:
+                # if area is core, do nothing
+                pass
+            else:
+                vim = self.get_vim_name(area['id'])
+                nsd_names.append(self.ran_nsd(area, vim))
+                nsd_names.extend(self.edge_nsd(area, vim))
         logger.info("Blue {} - created NSDs: {}".format(self.get_id(), nsd_names))
         return nsd_names
 

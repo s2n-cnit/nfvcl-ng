@@ -45,7 +45,10 @@ class Topology:
     @classmethod
     def from_db(cls, db: OSSdb, nbiutil: NbiUtil, lock: RLock):
         topo = db.findone_DB("topology", {})
-        data = TopologyModel.parse_obj(topo).dict()
+        if topo:
+            data = TopologyModel.parse_obj(topo).dict()
+        else:
+            data = None
         return cls(data, db, nbiutil, lock)
 
     def save_topology(self) -> None:

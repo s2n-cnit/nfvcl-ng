@@ -4,5 +4,4 @@ requests
 ruamel.yaml
 python-neutronclient
 paramiko
-traceback
-jinja2_ansible_filters
+jinja2-ansible-filters

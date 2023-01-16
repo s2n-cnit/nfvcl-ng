@@ -5,3 +5,4 @@ ruamel.yaml
 python-neutronclient
 paramiko
 jinja2-ansible-filters
+redis

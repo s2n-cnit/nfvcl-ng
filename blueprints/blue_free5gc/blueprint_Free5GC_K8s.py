@@ -270,6 +270,7 @@ class Free5GC_K8s(Blue5GBase):
                 vnfd_k8s, core_v["name"], param, vim_net_mapping, knf_configs=kdu_configs
             )
             nsd_item = n_obj.get_nsd()
+            nsd_item['area'] = core_area["id"]
             nsd_item['vld'] = vim_net_mapping
             self.nsd_.append(nsd_item)
             nsd_names.append(param["name"])
@@ -283,6 +284,7 @@ class Free5GC_K8s(Blue5GBase):
                 }
                 n_obj = sol006_NSD_builder([item], core_v["name"], param, vim_net_mapping)
                 nsd_item = n_obj.get_nsd()
+                nsd_item['area'] = core_area["id"]
                 nsd_item['vld'] = vim_net_mapping
                 self.nsd_.append(nsd_item)
                 nsd_names.append(param["name"])
@@ -674,7 +676,8 @@ class Free5GC_K8s(Blue5GBase):
                 if "config" not in self.conf:
                     self.conf['config'] = {}
                 self.conf['config']['amf_ip'] = vlds["data"][0]["ip"]
-            if vlds["data"][0]["vnfd_name"][-3:].lower() == "upf":
+            if vlds["data"][0]["vnfd_name"][-3:].lower() == "upf" or \
+                    vlds["data"][0]["vnfd_name"][-8:].lower() == "upf_core":
                 key = "upf_nodes"
             if vlds["data"][0]["vnfd_name"][-5:].lower() == "n3iwf":
                 key = "n3iwf_nodes"
@@ -688,7 +691,7 @@ class Free5GC_K8s(Blue5GBase):
                     'nsi_id': n['nsi_id'],
                     'ns_id': n['descr']['nsd']['nsd'][0]['id'],
                     'type': n['type'],
-                    'tac': n['area'] if 'area' in n else None
+                    'area': n['area'] if 'area' in n else None
                 })
 
         # TODO: expects more than one module for services

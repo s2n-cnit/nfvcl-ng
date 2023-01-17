@@ -934,15 +934,14 @@ class Configurator_Free5GC_Core():
         else:
             raise ValueError("config section is not in conf or plmn not specified in config section")
 
-        logger.info("upf_nodes: {}".format(conf["config"]["upf_nodes"]))
         upNodes = {}
         # fill "upNodes" with UPFs
-        # TODO complete with UPFs of core
         if "config" in conf:
             if "upf_nodes" in conf["config"]:
+                logger.info("upf_nodes: {}".format(conf["config"]["upf_nodes"]))
                 upfList = conf["config"]["upf_nodes"]
                 for upf in upfList:
-                    logger.info(" * upf[\"tac\"] = {} , tac = {}".format(upf["area"], tac))
+                    logger.info(" * upf[\"area\"] = {} , tac = {}".format(upf["area"], tac))
                     if upf["area"] == tac:
                         dnnUpfInfoList = []
                         for dnnInfo in dnnInfoList:
@@ -961,8 +960,12 @@ class Configurator_Free5GC_Core():
 
         upNodesList = list(upNodes)
         if links == None:
+            if len(upNodesList) == 1:
+                # UPF of the core
+                # TODO: management of core's UPF
+                logger.info("UPF of the core")
+                return
             if len(upNodesList) != 2:
-                logger.error("len of link is {}, links = {}".format(len(upNodesList), upNodesList))
                 raise ValueError("len of link is {}, links = {}".format(len(upNodesList), upNodesList))
             links = [{"A": upNodesList[0], "B": upNodesList[1]}]
 

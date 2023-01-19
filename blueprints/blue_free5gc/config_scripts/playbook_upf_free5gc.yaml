@@ -21,6 +21,9 @@
        iptables -I INPUT -i uptun -j ACCEPT
   - name: starting ue process in a screen shell
     shell: |
-       screen -S upf -d -m bash -c '/root/free5gc/NFs/upf/build/bin/free5gc-upfd -c /root/free5gc/config/upfcfg.yaml -l /root/free5gc/log/nf/upf.log -g /root/free5gc/log/free5gc.log'
+       test -f /root/free5gc/config/upfcfg.yaml && UPF=./free5gc/config/upfcfg.yaml
+       test -f /root/free5gc/NFs/upf/build/bin/free5gc-upfd && UPF=/root/free5gc/NFs/upf/build/bin/free5gc-upfd
+       mkdir -p /root/free5gc/log/nf/
+       screen -S upf -d -m bash -c '$UPF -c /root/free5gc/config/upfcfg.yaml -l /root/free5gc/log/nf/upf.log -g /root/free5gc/log/free5gc.log'
        sleep 1
 ...

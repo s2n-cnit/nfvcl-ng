@@ -23,14 +23,18 @@ class Configurator_Free5GC(Configurator_Flex):
         self.conf = {}
         if self.nsd_type == "upf":
             upf = next((item for item in args['upf_nodes'] if item['ns_id'] == nsd_id), None)
+            # set upf version for configuration file
+            self.conf["upfversion"] = "1.0.3"
             if upf == None:
                 self.conf["pfcp"] = []
                 self.conf["gtpu"] = []
                 self.conf["dnn_list"] = []
+                self.conf["upftype"] = None
             else:
                 self.conf["pfcp"] = [upf["ip"]]
                 self.conf["gtpu"] = [upf["ip"]]
                 self.conf["dnn_list"] = upf["dnnList"]
+                self.conf["upftype"] = upf["type"] # "core" o other values
         else:
             raise("ERROR: nsd type is not UPF")
 

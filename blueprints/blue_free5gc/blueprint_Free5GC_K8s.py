@@ -20,7 +20,7 @@ edge_vnfd_type = ['upf']
 
 class Free5GC_K8s(Blue5GBase):
     chartName = "nfvcl_helm_repo/free5gc:3.2.0"
-    imageName = "free5gc_v3.0.7"
+    imageName = "free5gc_v3.2.0"
 
     @classmethod
     def rest_create(cls, msg: Free5gck8sBlueCreateModel):

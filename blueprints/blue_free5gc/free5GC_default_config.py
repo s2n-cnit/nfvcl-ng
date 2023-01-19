@@ -1145,6 +1145,7 @@ default_config = {
         "configurationBase": {
           "reboot": 0,
           "smfName": "SMF",
+          "ulcl": True,
           "serviceNameList": [
             "nsmf-pdusession",
             "nsmf-event-exposure",

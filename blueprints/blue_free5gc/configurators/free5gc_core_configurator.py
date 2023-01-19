@@ -539,6 +539,7 @@ class Configurator_Free5GC_Core():
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
             yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False)
         smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
+        smfUeRoutingInfoBase = dict()
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
             yaml.dump(smfUeRoutingInfoBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
@@ -935,20 +936,32 @@ class Configurator_Free5GC_Core():
             raise ValueError("config section is not in conf or plmn not specified in config section")
 
         upNodes = {}
+        coreUpfName = None
         # fill "upNodes" with UPFs
         if "config" in conf:
             if "upf_nodes" in conf["config"]:
                 logger.info("upf_nodes: {}".format(conf["config"]["upf_nodes"]))
                 upfList = conf["config"]["upf_nodes"]
+                coreUpf = next((item for item in upfList if item["type"] == "core"), None)
+                if coreUpf is None:
+                    raise ValueError("upf of type core not exist")
+                coreUpfName = "UPF-{}".format(coreUpf["area"])
                 for upf in upfList:
                     logger.info(" * upf[\"area\"] = {} , tac = {}".format(upf["area"], tac))
                     if upf["area"] == tac:
                         dnnUpfInfoList = []
                         for dnnInfo in dnnInfoList:
                             dnnUpfInfoList.append({"dnn": dnnInfo["dnn"], "pools": dnnInfo["pools"]})
-                        UPF = {"nodeID": upf["ip"], "type": "UPF",
-                               "interfaces": [{"endpoints": [upf["ip"]], "interfaceType": "N3",
-                                               "networkInstance": dnnInfoList[0]["dnn"]}],
+                        interfaces = None
+                        if upf["type"] == "core":
+                            interfaces = [{"endpoints": [upf["ip"]], "interfaceType": "N9",
+                                "networkInstance": dnnInfoList[0]["dnn"]}]
+                        else:
+                            interfaces = [{"endpoints": [upf["ip"]], "interfaceType": "N3",
+                                "networkInstance": dnnInfoList[0]["dnn"]},
+                                {"endpoints": [upf["ip"]], "interfaceType": "N9",
+                                "networkInstance": dnnInfoList[0]["dnn"]}]
+                        UPF = {"nodeID": upf["ip"], "type": "UPF", "interfaces": interfaces,
                                "sNssaiUpfInfos": [{"dnnUpfInfoList": dnnUpfInfoList, "sNssai": slice}]}
                         upNodes["UPF-{}".format(tac)] = UPF
 
@@ -962,12 +975,12 @@ class Configurator_Free5GC_Core():
         if links == None:
             if len(upNodesList) == 1:
                 # UPF of the core
-                # TODO: management of core's UPF
-                logger.info("UPF of the core")
-                return
-            if len(upNodesList) != 2:
-                raise ValueError("len of link is {}, links = {}".format(len(upNodesList), upNodesList))
-            links = [{"A": upNodesList[0], "B": upNodesList[1]}]
+                logger.info("Only the core UPF, no gNB")
+            #if len(upNodesList) != 2:
+            #    raise ValueError("len of link is {}, links = {}".format(len(upNodesList), upNodesList))
+            else:
+                links = [{"A": upNodesList[0], "B": coreUpfName}]
+                links.append({"A": coreUpfName, "B": upNodesList[1]})
 
         self.smf_set_configuration(mcc=mcc, mnc=mnc, smfName=smfName, links=links, upNodes=upNodes)
         self.config_5g_core_for_reboot()

@@ -63,7 +63,7 @@ async def get_blueprints(
     detailed: bool = Query(default=False, description="Detailed or summarized view list")
 ) -> dict:
     blue_filter = {}
-    if type is not None:
+    if type:
         blue_filter['type'] = type
     if detailed:
         res = workers.get_blue_detailed_summary(blue_filter)

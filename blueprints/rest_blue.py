@@ -8,14 +8,20 @@ import datetime
 class NetworkServiceSummaryModel(BaseModel):
     status: str
     type: str
-    vim: dict
+    vim: str
     nsi_id: str
     nsd_id: str
+    area: int
+    descr: dict
+    deploy_config: dict
 
 
 class VnfDescriptorReference(BaseModel):
     id: str
     name: str
+    v1: dict
+    area_id: Optional[int] = None
+    type: Optional[str] = None
 
 
 class ShortBlueModel(BaseModel):
@@ -39,8 +45,8 @@ class DetailedBlueModel(BaseModel):
     current_operation: Union[str, None] = None
     created: datetime.datetime
     modified: Optional[datetime.datetime] = None
-    supported_ops: List[str] = []
+    supported_ops: dict[List] = []
     areas: List[dict] = []
     ns: List[NetworkServiceSummaryModel] = []
-    vnfd: List[VnfDescriptorReference] = []
+    vnfd: dict[List[VnfDescriptorReference]] = []
     primitives: Optional[List[dict]]

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 import datetime
 # from enum import Enum
 # from ipaddress import IPv4Network, IPv4Address
@@ -11,17 +11,17 @@ class NetworkServiceSummaryModel(BaseModel):
     vim: str
     nsi_id: str
     nsd_id: str
-    area: int
+    area: Optional[int]
     descr: dict
     deploy_config: dict
 
 
 class VnfDescriptorReference(BaseModel):
-    id: str
-    name: str
-    v1: dict
-    area_id: Optional[int] = None
-    type: Optional[str] = None
+    id: Optional[str]
+    name: Optional[str]
+    v1: Optional[dict]
+    area_id: Optional[int]
+    type: Optional[str]
 
 
 class ShortBlueModel(BaseModel):
@@ -45,8 +45,8 @@ class DetailedBlueModel(BaseModel):
     current_operation: Union[str, None] = None
     created: datetime.datetime
     modified: Optional[datetime.datetime] = None
-    supported_ops: dict[List] = None
+    supported_ops: Dict[str, List] = None
     areas: List[dict] = []
     ns: List[NetworkServiceSummaryModel] = []
-    vnfd: dict[List[VnfDescriptorReference]] = None
+    vnfd: Dict[str, List[VnfDescriptorReference]] = None
     primitives: Optional[List[dict]]

@@ -18,7 +18,7 @@ gtpu:
   # If there are multiple connection, set addr to 0.0.0.0 or list all the addresses
   ifList:
     {% for node in confvar.gtpu %}
-    {% if conf.upftype != "core" %}
+    {% if confvar.upftype != "core" %}
     - addr: {{ node }}
       type: N3
     {% endif %}

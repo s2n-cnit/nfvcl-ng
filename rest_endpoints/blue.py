@@ -59,11 +59,11 @@ def update_blueprint(blue, msg, blue_id, requested_operation, session_id):
 
 @blue_router.get("/", response_model=Union[List[ShortBlueModel], List[DetailedBlueModel]])
 async def get_blueprints(
-    type: bool = Query(default=False, description="Filter blueprints by type"),
+    type: Union[str, None] = Query(default=None, description="Filter blueprints by type"),
     detailed: bool = Query(default=False, description="Detailed or summarized view list")
 ) -> dict:
     blue_filter = {}
-    if type:
+    if type is not None:
         blue_filter['type'] = type
     if detailed:
         res = workers.get_blue_detailed_summary(blue_filter)

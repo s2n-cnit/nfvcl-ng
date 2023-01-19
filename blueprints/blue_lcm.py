@@ -44,7 +44,22 @@ class LCMWorkers:
         blues = get_blue_by_filter(blue_filter)
         # logger.debug(blues)
         # return [item.print_detailed_summary() for item in blues]
-        return [DetailedBlueModel.parse_obj(item) for item in blues]
+        return [DetailedBlueModel.parse_obj(
+            {
+                'id': item['id'],
+                'type': item['type'],
+                'status': item['status'],
+                'detailed_status': item['detailed_status'],
+                'current_operation': item['current_operation'],
+                'created': item['created'],
+                'modified': item['modified'],
+                'supported_ops': item['supported_operations'],
+                'areas': item['conf']['areas'],
+                'ns': item['nsd_'],
+                'vnfd': item['vnfd'],
+                'primitives': item['primitives']
+            }
+        ) for item in blues]
 
     @staticmethod
     def get_blue_short_summary(blue_filter: dict) -> List[ShortBlueModel]:

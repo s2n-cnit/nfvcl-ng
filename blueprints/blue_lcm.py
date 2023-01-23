@@ -166,9 +166,12 @@ class BlueLCMworker:
         logger.info("Blue {} - destroying blueprint".format(self.blue.get_id(), ))
 
         logger.debug("Blue {} - removing temporary day2 files".format(self.blue.get_id(), ))
-        subprocess.run(['rm', '-rf', 'day2_files/_{}*'.format(self.blue.get_id())])
-        subprocess.run(['rm', '-rf', 'vnf_packages/{}_*'.format(self.blue.get_id())])
-        subprocess.run(['rm', '-rf', '/tmp/nsd_packages/*_{}*'.format(self.blue.get_id())])
+        try:
+            subprocess.run(['rm', '-rf', 'day2_files/_{}*'.format(self.blue.get_id())])
+            subprocess.run(['rm', '-rf', 'vnf_packages/{}_*'.format(self.blue.get_id())])
+            subprocess.run(['rm', '-rf', '/tmp/nsd_packages/*_{}*'.format(self.blue.get_id())])
+        except FileNotFoundError as error:
+            logger.info("{}".format(error))
 
         db.delete_DB("action_output", {'blue_id': self.blue.get_id()})
         self.blue.delete_db()

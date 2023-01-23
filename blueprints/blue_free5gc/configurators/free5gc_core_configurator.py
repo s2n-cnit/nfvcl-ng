@@ -937,6 +937,18 @@ class Configurator_Free5GC_Core():
 
         upNodes = {}
         coreUpfName = None
+        coreSlices = []
+
+        if "areas" in conf:
+             # convert: sliceId -> sd , sliceType -> sst
+            coreSlicesTmp = next((item["slices"] for item in conf["areas"] if "core" in item and item["core"]), [])
+            coreSlices = list({"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"])}
+                               for slice in coreSlicesTmp)
+            for area in conf["areas"]:
+                if area["id"] == tac and "nb_wan_ip" in area:
+                    upNodes["gNB-{}".format(tac)] = {"type": "AN", "an_ip": "{}".format(area["nb_wan_ip"])}
+                    break
+
         # fill "upNodes" with UPFs
         if "config" in conf:
             if "upf_nodes" in conf["config"]:
@@ -951,7 +963,10 @@ class Configurator_Free5GC_Core():
                     if upf["area"] == tac:
                         dnnUpfInfoList = []
                         for dnnInfo in dnnInfoList:
-                            dnnUpfInfoList.append({"dnn": dnnInfo["dnn"], "pools": dnnInfo["pools"]})
+                            if slice in coreSlices and upf["type"] != "core":
+                                dnnUpfInfoList.append({"dnn": dnnInfo["dnn"]})
+                            else:
+                                dnnUpfInfoList.append({"dnn": dnnInfo["dnn"], "pools": dnnInfo["pools"]})
                         interfaces = None
                         if upf["type"] == "core":
                             interfaces = [{"endpoints": [upf["ip"]], "interfaceType": "N9",
@@ -964,12 +979,6 @@ class Configurator_Free5GC_Core():
                         UPF = {"nodeID": upf["ip"], "type": "UPF", "interfaces": interfaces,
                                "sNssaiUpfInfos": [{"dnnUpfInfoList": dnnUpfInfoList, "sNssai": slice}]}
                         upNodes["UPF-{}".format(tac)] = UPF
-
-        if "areas" in conf:
-            for area in conf["areas"]:
-                if area["id"] == tac and "nb_wan_ip" in area:
-                    upNodes["gNB-{}".format(tac)] = {"type": "AN", "an_ip": "{}".format(area["nb_wan_ip"])}
-                    break
 
         upNodesList = list(upNodes)
         if links == None:

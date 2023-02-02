@@ -11,14 +11,11 @@
     ignore_errors: yes
   - name: install gtp5g kernel module
     shell: |
+       rm -r /root/gtp5g
+       git clone -b v0.7.1 https://github.com/free5gc/gtp5g.git
        cd /root/gtp5g
        make
        make install
-  - name: enable IP forward and set iptables
-    shell: |
-       sysctl -w net.ipv4.ip_forward=1
-       iptables -t nat -A POSTROUTING -o ens3 -j MASQUERADE
-       iptables -I INPUT -i uptun -j ACCEPT
   - name: starting ue process in a screen shell
     shell: |
        test -f /root/free5gc/bin/upf && UPF=/root/free5gc/bin/upf && UPFOPTION=--lc
@@ -26,4 +23,12 @@
        mkdir -p /root/free5gc/log/nf/
        screen -S upf -d -m bash -c "$UPF -c /root/free5gc/config/upfcfg.yaml -l /root/free5gc/log/nf/upf.log $UPFOPTION /root/free5gc/log/free5gc.log"
        sleep 1
+  - name: enable IP forward and set iptables
+    shell: |
+       sysctl -w net.ipv4.ip_forward=1
+       iptables -A FORWARD -i upfgtp -o ens3 -j ACCEPT
+       iptables -A FORWARD -i ens3 -o upfgtp -m state --state ESTABLISHED,RELATED -j ACCEPT
+       iptables -t nat -A POSTROUTING -o ens3 -j MASQUERADE
+       #iptables -t nat -A POSTROUTING -o ens3 -j MASQUERADE
+       #iptables -I INPUT -i uptun -j ACCEPT
 ...

@@ -35,7 +35,7 @@ class SubFlows(BaseModel):
 class SubpduSessions(BaseModel):
     pduSessionId: str = Field(..., description="set pduSession Id, exp: p0")
     pduSessionAmbr: Optional[str] = Field(..., description="set pduSessionAmbr, exp: 10Mbps")
-    flows: List[SubFlows]
+    flows: List[SubFlows] = Field(default=[])
 
 
 class SubProfileParams(BaseModel):
@@ -101,8 +101,8 @@ class SubArea(BaseModel):
     id: int
     nci: str
     idLength: int
-    core: bool
-    slices: Optional[List[SubSlices]] = Field([],description="set slices ")
+    core: bool = Field(default=True)
+    slices: Optional[List[SubSlices]] = Field(default=[],description="set slices ")
 # ===============================================end of sub area ======================================================
 # =============================================== main section for blue free5gc k8s model class========================
 
@@ -110,7 +110,7 @@ class SubArea(BaseModel):
 class Create5gModel(BaseModel):
     type: Literal["5G"]
     callbackURL: Optional[HttpUrl] = Field(
-        '',
+        default='',
         description='url that will be used to notify when the topology terraform ends'
     )
     config: SubConfig

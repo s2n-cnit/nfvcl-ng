@@ -11,6 +11,7 @@ sudo apt install -y mongodb
 
 echo "configure mongodb..."
 sudo sed -i '/bind_ip/ s/127\.0\.0\.1/0\.0\.0\.0/' /etc/mongodb.conf
+sudo systemctl restart mongodb
 
 echo "restart mongodb..."
 sudo service restart mongodb

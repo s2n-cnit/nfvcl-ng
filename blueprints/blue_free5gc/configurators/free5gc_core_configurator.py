@@ -538,10 +538,100 @@ class Configurator_Free5GC_Core():
         smfConfigurationBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
             yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False)
+        self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"] = dict()
         smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
-        smfUeRoutingInfoBase = dict()
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
             yaml.dump(smfUeRoutingInfoBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+
+    def smf_routing_set_configuration(self, members: list = None, links: list = None, specificPaths: list = None,
+                                      groupName: str = "UE1"):
+        """
+        smf routing set configuration.
+        Configuration for "uerounting.yaml" in case ULCL (Uplink Classifier) is enabled
+        :param members:
+            list of UEs imsi. ex. ["imsi-208930000000003", "imsi-208930000000004"]
+        :param links:
+            list of links as set in SMF configuration. ex. [{"A": "gNB1", "B": "UPF-core"}, {"A": "UPF-core", "B": "UPF-1"}]
+        :param specificPaths:
+            list of specific path. ex. [{"dest": "8.8.8.8/32", "path": ["UPF-1", "UPF-2"]}]
+        :param groupName:
+            name (string) of the sub-configuration group. ex. "UE1"
+        """
+        smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
+
+        if smfUeRoutingInfoBase is None or type(smfUeRoutingInfoBase) is not dict:
+            smfUeRoutingInfoBase = dict()
+        if groupName not in smfUeRoutingInfoBase:
+            smfUeRoutingInfoBase[groupName] = dict()
+        group = smfUeRoutingInfoBase[groupName]
+        if members is not None:
+            if "members" not in group:
+                group["members"] = []
+            for elem in members:
+                if "imsi-{}".format(elem) not in group["members"]:
+                    group["members"].append("imsi-{}".format(elem))
+        if links is not None:
+            if "topology" not in group:
+                group["topology"] = []
+            group["topology"].extend(links)
+        if specificPaths is not None:
+            if "specificPath" not in group:
+                group["specificPath"] = []
+            group["specificPath"].extend(specificPaths)
+
+
+        self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
+            yaml.dump(smfUeRoutingInfoBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+
+    def smf_routing_unset_configuration(self, members: list = None, links: list = None, specificPaths: list = None,
+                                      groupName: str = "UE1", tac: int = None ):
+        """
+        smf routing unset configuration.
+        Configuration for "uerounting.yaml" in case ULCL (Uplink Classifier) is enabled
+        :param members:
+            list of UEs imsi. ex. ["imsi-208930000000003", "imsi-208930000000004"]
+        :param links:
+            list of links as set in SMF configuration. ex. [{"A": "gNB1", "B": "UPF-core"}, {"A": "UPF-core", "B": "UPF-1"}]
+        :param specificPaths:
+            list of specific path. ex. [{"dest": "8.8.8.8/32", "path": ["UPF-1", "UPF-2"]}]
+        :param groupName:
+            name (string) of the sub-configuration group. ex. "UE1"
+        : param tac :
+            tac ID (area ID). If specified, it is used to remove all links referred to this tac (area)
+        """
+        smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
+
+        if smfUeRoutingInfoBase is dict:
+            if groupName in smfUeRoutingInfoBase:
+                group = smfUeRoutingInfoBase[groupName]
+                if members is not None:
+                    if "members" in group:
+                        for elem in members:
+                            group["members"].delete("imsi-{}".format(elem))
+                    else:
+                        raise ValueError("\"members\" list is NOT in smf routing configuration")
+                if links is not None:
+                    if "topology" in group:
+                        for elem in links:
+                            group["topology"].delete(elem)
+                    else:
+                        raise ValueError("\"topology\" list is NOT in smf routing configuration")
+                if specificPaths is not None:
+                    if "specificPath" in group:
+                        for elem in specificPaths:
+                            group["specificPath"].delete(elem)
+                if tac is not None:
+                    if "topology" in group:
+                        for elem in group["topology"]:
+                            if "A" in group["topology"] and group["topology"]["A"] == "UPF-{}".format(tac):
+                                group["topology"].delete(elem)
+                                continue
+                            if "B" in group["topology"] and group["topology"]["B"] == "UPF-{}".format(tac):
+                                group["topology"].delete(elem)
+                                continue
+
+                self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
+                    yaml.dump(smfUeRoutingInfoBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def smf_set_configuration(self, mcc: str, mnc: str, smfName: str = None, dnnList: list = None,
                               sliceList: list = None, links: list = None, upNodes: dict = None) -> str:
@@ -632,9 +722,6 @@ class Configurator_Free5GC_Core():
         smfConfigurationBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
             yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False)
-        smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
-        self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
-            yaml.dump(smfUeRoutingInfoBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
         return smfName
 
@@ -913,6 +1000,11 @@ class Configurator_Free5GC_Core():
         logger.info("upf_nodes: {}".format(conf["config"]["upf_nodes"]))
 
         self.smf_unset_configuration(dnnList=dnnInfoList, sliceList=[slice], tacList=[{"id": tac}])
+        members = None
+        if "config" in conf and "subscribers" in conf["config"]:
+            subscribers = conf["config"]["subscribers"]
+            members = [elem["imsi"] for elem in subscribers if "imsi" in elem]
+        self.smf_routing_unset_configuration(members=members,tac=tac)
         self.config_5g_core_for_reboot()
         #
         # msg2up = {'config': self.running_free5gc_conf}
@@ -988,10 +1080,15 @@ class Configurator_Free5GC_Core():
             #if len(upNodesList) != 2:
             #    raise ValueError("len of link is {}, links = {}".format(len(upNodesList), upNodesList))
             else:
-                links = [{"A": upNodesList[0], "B": coreUpfName}]
-                links.append({"A": coreUpfName, "B": upNodesList[1]})
+                links = [{"A": upNodesList[0], "B": upNodesList[1]}]
+                links.append({"A": upNodesList[1], "B": coreUpfName})
 
         self.smf_set_configuration(mcc=mcc, mnc=mnc, smfName=smfName, links=links, upNodes=upNodes)
+        members = None
+        if "config" in conf and "subscribers" in conf["config"]:
+            subscribers = conf["config"]["subscribers"]
+            members = [elem["imsi"] for elem in subscribers if "imsi" in elem]
+        self.smf_routing_set_configuration(members=members, links=links)
         self.config_5g_core_for_reboot()
 
     def day2_conf(self, msg: dict):

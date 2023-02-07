@@ -16,8 +16,8 @@ class Configurator_Free5GC_User():
     def __init__(self) -> None:
         pass
 
-    def add_ue_to_db(self, plmn: str, imsi: str, key: str, ocv: str, defaultUeUplink: str = "10 Mbps",
-                     defaultUeDownlink: str = "20 Mbps", gpsis: str = "msisdn-0900000000",
+    def add_ue_to_db(self, plmn: str, imsi: str, key: str, ocv: str, defaultUeUplink: str = "1 Gbps",
+                     defaultUeDownlink: str = "2 Gbps", gpsis: str = "msisdn-0900000000",
                      mongodbServiceHost: str = "mongodb://mongodb:27017/") -> None:
         client = MongoClient(mongodbServiceHost)
         db = client["free5gc"]
@@ -340,12 +340,11 @@ class Configurator_Free5GC_User():
                         "gbrDL": gbrDL,
                         "servingPlmnId": servingPlmnId,
                         "dnn": dnn,
-                        "5qi": int(fiveqi),
+                        "5qi": float(fiveqi),
                         "mbrUL": mbrUL,
                         "filter": filter,
                         "snssai": snssai,
-                        "mbrDL": mbrDL,
-                        "subscCats": ["free5gc"]
+                        "mbrDL": mbrDL
                 }
             },
             upsert = True
@@ -379,8 +378,7 @@ class Configurator_Free5GC_User():
     #                     "mbrUL": mbrUL,
     #                     "filter": filter,
     #                     "snssai": snssai,
-    #                     "mbrDL": mbrDL,
-    #                     "subscCats": ["free5gc"]
+    #                     "mbrDL": mbrDL
     #             }
     #         },
     #         upsert = True

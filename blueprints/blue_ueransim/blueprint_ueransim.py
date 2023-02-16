@@ -135,8 +135,8 @@ class UeRanSim(BlueprintBase):
         self.setVnfd('NB', area['vnf_interfaces'], area=area)
 
         param = {
-            'name': 'nb_tac_{}_{}'.format(area['id'], self.get_id()),
-            'id': 'nb_tac_{}_{}'.format(area['id'], self.get_id()),
+            'name': '{}_nb_tac_{}'.format(self.get_id(), area['id']),
+            'id': '{}_nb_tac_{}'.format(self.get_id(), area['id']),
             'type': 'nb'
         }
         # tag, tac, list of vnf interfaces
@@ -157,8 +157,8 @@ class UeRanSim(BlueprintBase):
         self.setVnfd('UE', ue['vnf_interfaces'], ue_id=ue['id'])
 
         param = {
-            'name': 'ue_' + str(ue['id']) + '_' + str(self.get_id()),
-            'id': 'ue_' + str(ue['id']) + '_' + str(self.get_id()),
+            'name': '{}_ue_{}'.format(self.get_id(), ue['id']),
+            'id': '{}_ue_{}'.format(self.get_id(), ue['id']),
             'type': 'ue'
         }
         # tag, tac, list of vnf interfaces

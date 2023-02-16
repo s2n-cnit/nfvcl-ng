@@ -262,8 +262,8 @@ class Free5GC_K8s(Blue5GBase):
                                "additionalParams": self.coreManager.getConfiguration()}]
             }]
             param = {
-                'name': '5GC_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
-                'id': '5GC_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
+                'name': "{}_5GC_{}".format(self.get_id(), self.conf['config']['plmn']),
+                'id': "{}_5GC_{}".format(self.get_id(), self.conf['config']['plmn']),
                 'type': 'core'
             }
             n_obj = sol006_NSD_builder(
@@ -278,8 +278,8 @@ class Free5GC_K8s(Blue5GBase):
         if vnfd_os:
             for item in vnfd_os:
                 param = {
-                    'name': str(item["type"]) + '_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
-                    'id': str(item["type"]) + '_' + str(self.conf['config']['plmn']) + "_" + str(self.get_id()),
+                    'name': '{}_{}_{}'.format(self.get_id(), item["type"], self.conf['config']['plmn']),
+                    'id': '{}_{}_{}'.format(self.get_id(), item["type"], self.conf['config']['plmn']),
                     'type': 'core'
                 }
                 n_obj = sol006_NSD_builder([item], core_v["name"], param, vim_net_mapping)
@@ -316,8 +316,8 @@ class Free5GC_K8s(Blue5GBase):
 
         for t in edge_vnfd_type :
             param = {
-                'name': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['config']['plmn']), str(self.get_id())),
-                'id': '{}_{}_{}_{}'.format(t.upper(), str(area["id"]), str(self.conf['config']['plmn']), str(self.get_id())),
+                'name': '{}_{}_{}_{}'.format(str(self.get_id()), t.upper(), str(area["id"]), str(self.conf['config']['plmn'])),
+                'id': '{}_{}_{}_{}'.format(str(self.get_id()), t.upper(), str(area["id"]), str(self.conf['config']['plmn'])),
                 'type': '{}'.format(t)
             }
             edge_vnfd = self.getVnfd('area', area["id"], t)
@@ -412,9 +412,9 @@ class Free5GC_K8s(Blue5GBase):
         for n in self.nsd_:
             # configuration of external (ie. VM, not in k8s) 5G core modules, if exists (like "AMF", "UPF", etc)
             if n['type'] == 'core':
-                # split return a list. nsd_name is something like "amf_00101_DEGFE". We need the first characters
+                # split return a list. nsd_name is something like "DEGFE_amf_00101". We need the first characters
                 nsd_type = (n["descr"]["nsd"]["nsd"][0]["name"]).split("_")
-                if nsd_type and isinstance(nsd_type[0], str) and nsd_type[0].lower() in edge_vnfd_type:
+                if nsd_type and isinstance(nsd_type[1], str) and nsd_type[1].lower() in edge_vnfd_type:
                     res += self.core_day2_conf(msg, n)
             elif n['type'] == 'ran':
                 tail_res += self.ran_day2_conf(msg, n)

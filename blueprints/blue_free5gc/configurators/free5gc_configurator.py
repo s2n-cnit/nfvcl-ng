@@ -6,7 +6,7 @@ logger = create_logger('Configurator_Free5GC')
 class Configurator_Free5GC(Configurator_Flex):
     def __init__(self, nsd_id: str, m_id: int, blue_id: str, args: dict) -> None:
         # Check the type of the module
-        self.nsd_type = nsd_id.split("_")[0].lower()
+        self.nsd_type = nsd_id.split("_")[1].lower()
 
         self.type = "free5gc_{}".format(self.nsd_type)
         super(Configurator_Free5GC, self).__init__(nsd_id, m_id, blue_id)

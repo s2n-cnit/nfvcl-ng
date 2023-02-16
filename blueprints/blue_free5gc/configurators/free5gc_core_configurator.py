@@ -544,7 +544,7 @@ class Configurator_Free5GC_Core():
             yaml.dump(smfUeRoutingInfoBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def smf_routing_set_configuration(self, members: list = None, links: list = None, specificPaths: list = None,
-                                      groupName: str = "UE1"):
+                                      groupName: str = None):
         """
         smf routing set configuration.
         Configuration for "uerounting.yaml" in case ULCL (Uplink Classifier) is enabled
@@ -558,6 +558,9 @@ class Configurator_Free5GC_Core():
             name (string) of the sub-configuration group. ex. "UE1"
         """
         smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
+
+        if groupName == None:
+            return
 
         if smfUeRoutingInfoBase is None or type(smfUeRoutingInfoBase) is not dict:
             smfUeRoutingInfoBase = dict()
@@ -1077,18 +1080,21 @@ class Configurator_Free5GC_Core():
             if len(upNodesList) == 1:
                 # UPF of the core
                 logger.info("Only the core UPF, no gNB")
+                groupName = None
             #if len(upNodesList) != 2:
             #    raise ValueError("len of link is {}, links = {}".format(len(upNodesList), upNodesList))
             else:
                 links = [{"A": upNodesList[0], "B": upNodesList[1]}]
                 links.append({"A": upNodesList[1], "B": coreUpfName})
+                groupName = "UE-{}-{}".format(upNodesList[0], upNodesList[1])
 
         self.smf_set_configuration(mcc=mcc, mnc=mnc, smfName=smfName, links=links, upNodes=upNodes)
         members = None
         if "config" in conf and "subscribers" in conf["config"]:
             subscribers = conf["config"]["subscribers"]
             members = [elem["imsi"] for elem in subscribers if "imsi" in elem]
-        self.smf_routing_set_configuration(members=members, links=links)
+        self.smf_routing_set_configuration(members=members, links=links,
+                                           groupName=groupName)
         self.config_5g_core_for_reboot()
 
     def day2_conf(self, msg: dict):

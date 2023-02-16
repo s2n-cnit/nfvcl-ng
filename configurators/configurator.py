@@ -38,7 +38,7 @@ class Configurator_Base(object):
             if isinstance(self.action_list, list):
                 self.action_list.append({"action": res, "time": now.strftime("%H:%M:%S")})
         """
-        # TODO check if the the following commands are needed
+        # TODO check if the following commands are needed
         if hasattr(self, "nsi_id"):
             if self.nsi_id is not None:
                 for r in res:

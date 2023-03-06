@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    {% for item in confvar.lb_pools %}
+    - name: {{ item.net_name }}
+      protocol: {{ item.mode }}
+      addresses:
+      - {{ item.ip_start }}-{{ item.ip_end }}
+    {% endfor %}

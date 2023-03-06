@@ -1,0 +1,12 @@
+name: flexcharm
+summary: the nfvcl charm for flexible ansible-based operations
+description: The OSM charm for flexible ansible-based operations in the CNIT NFVCL project
+tags:
+  - nfv
+subordinate: false
+series:
+  - bionic
+  - xenial
+peers: # This will give HA capabilities to your Proxy Charm
+  proxypeer:
+    interface: proxypeer

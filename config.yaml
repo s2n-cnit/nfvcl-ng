@@ -1,0 +1,30 @@
+{
+  'nfvcl': {
+    'port': 5002,
+    'ip': '127.0.0.1'
+  },
+  'osm': {
+    'host': '127.0.0.1',
+    'port': '9999',
+    'username':'admin',
+    'password':'password',
+    'project': 'admin',
+    'version': 12
+  },
+  'mongodb': {
+    'host': '127.0.0.1',
+    'port': 27017,
+    'db': 'nfvcl'
+  },
+  'prometheus': [{
+    'scrap_file': '/etc/prometheus/nfvcl.yaml',
+    'host': '127.0.0.1',
+    'port': 22,
+    'user': 'root',
+    'passwd': 'password'
+  }],
+  'redis': {
+    'host': '127.0.0.1',
+    'port': 6379
+  }
+}

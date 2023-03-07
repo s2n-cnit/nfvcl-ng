@@ -6,6 +6,7 @@ blueprint_types = {
     "UeRanSim": {"class_name": "UeRanSim", "module_name": "blue_ueransim"},
     "mqtt": {"class_name": "MqttBroker", "module_name": "blue_mqtt"},
     "Trex": {"class_name": "Trex", "module_name": "blue_trex"},
+    "VyOSBlue": {"class_name": "VyOSBlue", "module_name": "blue_vyos"}
 }
 
 

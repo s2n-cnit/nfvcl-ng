@@ -115,6 +115,8 @@ class Configurator_Flex(Configurator_Base):
                       .format(playbook_file))
             if vars_ is not None:
                 self.playbook['vars'] = vars_
+            else:
+                self.playbook['vars'] = plays_[0]['vars']
 
             if 'gather_facts' not in self.playbook:
                 self.playbook['gather_facts'] = 'no'

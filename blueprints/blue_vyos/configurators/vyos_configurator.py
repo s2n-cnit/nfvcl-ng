@@ -1,9 +1,12 @@
-from configurators.configurator import Configurator_Base
+from typing import List
+from ipaddress import IPv4Network
 from configurators.flex_configurator import Configurator_Flex
+from ..models import VyOSRouterNetworkEndpoints, VyOSSourceNATRule, VyOSDestNATRule
+import secrets
 import logging
 
 # create logger
-logger = logging.getLogger('Configurator_K8s')
+logger = logging.getLogger('Configurator_VyOS')
 logger.setLevel(logging.INFO)
 # create console handler and set level to debug
 ch = logging.StreamHandler()
@@ -15,52 +18,172 @@ ch.setFormatter(formatter)
 # add ch to logger
 logger.addHandler(ch)
 
+class Configurator_VyOS(Configurator_Flex):
+    router_area_id: int
+    network_endpoints: VyOSRouterNetworkEndpoints
 
-class Configurator_VyOs(Configurator_Flex):
-    def __init__(self, nsd_id, m_id, blue_id, args):
+    def __init__(self, area_id: int, nsd_name: str, m_id: int, blue_id: str,
+                 network_endpoints: VyOSRouterNetworkEndpoints = None, username: str = 'vyos', password: str = 'vyos'):
         # NOTE: args is the tac obj within blue.conf
-
+        self.network_endpoints = network_endpoints
+        self.router_area_id = area_id
         self.type = "VyOS"
-        super(Configurator_VyOs, self).__init__(nsd_id, m_id, blue_id)
+        super(Configurator_VyOS, self).__init__(nsd_name, m_id, blue_id)
+
         logger.info("Configurator_VyOs created")
-        # self.db = persistency.db()
 
-        ansible_vars = []
+    def initial_configuration(self):
+        """
+        Perform initial configuration for VyOS router, this includes:
+        -Playbook loading
+        -setup account and password for ansible (in order to configure vyos)
+        -add configuration task to playbook for data interfaces
+        -add configuration task to playbook for loopback in
+        """
+        # Do not set as second arg an empty list, or it will override the playbook vars
+        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_vyos.yaml')
+        self.add_vyos_config_vars(username='vyos', password='vyos')
 
-        loopback_ipaddr = "10.200." + str(args['id']) + ".1/32"
-        self.addPlaybook('config_templates/playbook_vyos.yaml', vars_=ansible_vars)
+        self.setup_data_interfaces()
+        self.setup_loopback_ip()
+        self.add_vyos_info_task()
 
+    def setup_loopback_ip(self):
         lines = []
-        for intf in args['interfaces']:
-            if 'mgt' in intf:
-                if intf['mgt']:
-                    # skipping the mgt interface since it is already configured
-                    continue
-            # NOTE: the ip address is got by get IP address, but OSM is not reporting netmask! setting /24 as default
-            lines.append("set interfaces ethernet " + intf['name'] + " address " + intf['ip_address'] + '/24')
-            lines.append("set interfaces ethernet " + intf['name'] + " description " + intf['vld'])
-            lines.append("set interfaces ethernet " + intf['name'] + " duplex auto")
-            lines.append("set interfaces ethernet " + intf['name'] + " speed auto")
-        lines.append("set interfaces loopback lo address " + loopback_ipaddr)
-        self.addVyOS_config_task('step 1 configure interfaces', lines)
+        loopback_ipaddr = "10.200." + str(self.router_area_id) + ".1/32"
+        lines.append("set interfaces loopback lo address {}".format(loopback_ipaddr))
+        self.add_vyos_config_task('Configuring loopback', 'vyos.vyos.vyos_config', lines)
 
-    def addVyOS_config_task(self, name, lines):
+    def setup_data_interfaces(self):
+        """
+        Once the configurator is build. It is possible to create instructions to set up data interfaces for ansible.
+        Instructions are written in self.playbook.
+        """
+        lines = []
+
+        interface_index = 1  # STARTING From 1 because management interface is always present and called eth0
+        # This code works because vyos create sequentials interfaces starting from eth0, eth1, eth2, ..., ethN
+        for network in self.network_endpoints.data_nets:
+            # Getting prefix lenght
+            prefix_length = IPv4Network(network.network).prefixlen
+
+            interface_address = network.ip_addr
+            # NOTE: the ip address is got by get IP address, but OSM is not reporting netmask! setting /24 as default
+            if interface_address is None:
+                lines.append("set interfaces ethernet eth{} address dhcp".format(interface_index))
+            else:
+                lines.append("set interfaces ethernet eth{} address {}/{}".format(interface_index, interface_address,
+                                                                                  prefix_length))
+            lines.append("set interfaces ethernet eth{} description \'{}\'".format(interface_index, self.blue_id))
+            lines.append("set interfaces ethernet eth{} duplex auto".format(interface_index))
+            lines.append("set interfaces ethernet eth{} speed auto".format(interface_index))
+            #MAX supported MTU is 1450
+            lines.append("set interfaces ethernet eth{} mtu 1450".format(interface_index))
+            interface_index = interface_index + 1
+        self.add_vyos_config_task('Configure DATA Interfaces', 'vyos.vyos.vyos_config', lines)
+
+    def setup_snat_rules(self, rule_list: List[VyOSSourceNATRule]):
+        """
+        Create instructions for ansible to set up SNAT rules. Instructions are written in self.playbook
+        @param rule_list: SNAT rules to set up in the VYOS instance
+        """
+        lines = []
+
+        for rule in rule_list:
+            lines.append(
+                "set nat source rule {} outbound-interface {}".format(rule.rule_number, rule.outbound_interface))
+            lines.append(
+                "set nat source rule {} source address {}".format(rule.rule_number, rule.source_address))
+            lines.append(
+                "set nat source rule {} translation address {}".format(rule.rule_number,rule.virtual_ip))
+
+        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_empty_vyos.yaml')
+
+        self.add_vyos_config_task('Configure SNAT rules', 'vyos.vyos.vyos_config', lines)
+
+    def setup_dnat_rules(self, rule_list: List[VyOSDestNATRule]):
+        """
+        Create instructions for ansible to set up DNAT rules. Instructions are written in self.playbook
+        @param rule_list: DNAT rules to set up in the VYOS instance
+        """
+        lines = []
+
+        for rule in rule_list:
+            lines.append(
+                "set nat destination rule {} inbound-interface {}".format(rule.rule_number, rule.inbound_interface))
+            lines.append(
+                "set nat destination rule {} destination address {}".format(rule.rule_number, rule.virtual_ip))
+            lines.append(
+                "set nat destination rule {} translation address {}".format(rule.rule_number, rule.real_destination_ip))
+            lines.append(
+                "set nat destination rule {} description '{}'".format(rule.rule_number, rule.description))
+
+        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_empty_vyos.yaml')
+
+        self.add_vyos_config_task('Configure SNAT rules', 'vyos.vyos.vyos_config', lines)
+
+    def delete_nat_rule(self, snat_rule_list: List[VyOSSourceNATRule], dnat_rule_list: List[VyOSDestNATRule]):
+        """
+        Create instructions for ansible to delete NAT rules. Instructions are written in self.playbook
+        @param snat_rule_list: SNAT rules to delete
+        @param dnat_rule_list: DNAT rules to delete
+        """
+        lines = []
+
+        for snat_rule in snat_rule_list:
+            lines.append(
+                "delete nat source rule {} ".format(snat_rule.rule_number, snat_rule.outbound_interface))
+        for dnat_rule in dnat_rule_list:
+            lines.append(
+                "delete nat destination rule {} ".format(dnat_rule.rule_number, dnat_rule.inbound_interface))
+
+        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_empty_vyos.yaml')
+
+        self.add_vyos_config_task('Deleting NAT rules', 'vyos.vyos.vyos_config', lines)
+
+    def add_vyos_config_task(self, name:str, module:str, lines:List[str]):
+        """
+        Add the instruction task lines to the playbook, using the desired module (for example vyos.vyos.vyos_config).
+        If the playbook is not present it is reset.
+        If others tasks are present, the task is appended.
+
+        @param name the name of the task to be appended
+        @param module the ansible module to be used
+        @param lines the instruction lines of the task
+        """
         if not hasattr(self, 'playbook'):
             self.resetPlaybook()
-        self.playbook['tasks'].append({'name': name, 'vyos.vyos.vyos_config': {'lines': lines}})
+        if not self.playbook['tasks']:
+            self.playbook['tasks']=[]
+        self.playbook['tasks'].append({'name': name, module: {'lines': lines, 'save': 'yes'}})
+
+    def add_vyos_info_task(self):
+        if not self.playbook['tasks']:
+            self.playbook['tasks'] = []
+        self.playbook['tasks'].append(
+            {'name': 'Getting vyos info L3', 'vyos.vyos.vyos_l3_interfaces': {'state': 'gathered'}})
+
+    # Setup ssh user and password
+    def add_vyos_config_vars(self, username: str, password: str):
+        if not self.playbook['vars']:
+            self.playbook['vars'] = []
+        self.playbook['vars'].append({'ansible_user': username})
+        self.playbook['vars'].append({'ansible_ssh_pass': password})
 
     def dump(self):
         logger.info("Dumping")
+        # The last random part of file name is needed in case 2 or more configuration need to be applied at the same
+        # time, otherwise the name of the file will be the same and overwritten.
         self.dumpAnsibleFile(10, 'ansible_vyos_' + str(self.nsd_id) +
-                             '_' + str(self.nsd['member-vnfd-id']))
-        return super(Configurator_VyOs, self).dump()
+                             '_' + str(self.nsd['member-vnfd-id']) + secrets.token_hex(nbytes=3))
+        return super(Configurator_VyOS, self).dump()
 
     def enable_elk(self, args):
         self.addPlaybook('config_templates/playbook_vyos.yaml', vars_=[])
         lines = []
         for u in args["logstash.url"]:
-            lines.append("set system syslog host " + str( u ) + " facility all level all")
-        self.addVyOS_config_task('configure elk', lines)
+            lines.append("set system syslog host " + str(u) + " facility all level all")
+        self.add_vyos_config_task('configure elk', 'vyos.vyos.vyos_config', lines)
         return self.dump()
 
     def custom_prometheus_exporter(self):
@@ -70,68 +193,3 @@ class Configurator_VyOs(Configurator_Flex):
     def destroy(self):
         logger.info("Destroying")
         # TODO remove prometheus jobs
-
-
-
-class Configurator_MultiVyOs(Configurator_Base):
-    def __init__(self, nsd_id, m_id, router_id, local_ip, peers):
-        self.nsd_id = nsd_id
-        self.nsd = {'member-vnfd-id': m_id}
-        self.type = "vyos"
-        self.monitoring_tools = []
-        self.local_ip = local_ip  # ip address on the wan interface
-        self.peers = peers  # [{id:, remote_ip:, net_id: }]
-        self.id = router_id
-
-    def dump(self):
-        cmds = {}
-        cmds['conf'] = [
-            "set interfaces ethernet eth1 address dhcp",
-            "set interfaces ethernet eth1 description INSIDE",
-            "set interfaces ethernet eth1 duplex auto",
-            "set interfaces ethernet eth1 speed auto",
-            "set interfaces ethernet eth2 address " + str(self.local_ip),
-            "set interfaces ethernet eth2 description OUTSIDE",
-            "set interfaces ethernet eth2 duplex auto",
-            "set interfaces ethernet eth2 speed auto",
-            "set interfaces loopback lo address 1.10.1." + str(self.id) + "/32",
-            "set policy route-map CONNECT rule 10 action permit",
-            "set policy route-map CONNECT rule 10 match interface eth1",
-            "set protocols ospf area 0 network 1.10.1.0/24",
-            "set protocols ospf parameters router-id 1.10.1." + str(self.id),
-            "set protocols ospf redistribute connected route-map CONNECT"
-        ]
-        if str(self.local_ip).split('.')[0] == "10":
-            cmds['conf'].append("set protocols static route 172.16.0.0/24 next-hop 10.254.99.1 distance 1")
-        if str(self.local_ip).split('.')[0] == "172":
-            cmds['conf'].append("set protocols static route 10.254.99.0/24 next-hop 172.16.0.80 distance 1")
-        for p_ in self.peers:
-            print("-----------> RouterID: " + str(self.id) + " Peer: " + str(p_['id'])+"\n")
-            if int(self.id) < int(p_['id']):
-                cmds['conf'].append(
-                    "set interfaces tunnel tun" + str(p_['net_id']) + " address 10.1." + str(p_['net_id']) + ".1/30")
-            else:
-                cmds['conf'].append(
-                    "set interfaces tunnel tun" + str(p_['net_id']) + " address 10.1." + str(p_['net_id']) + ".2/30")
-            cmds['conf'].append(
-                "set protocols ospf area 0 network 10.1." + str(p_['net_id']) + ".0/30")
-
-            cmds['conf'].append("set interfaces tunnel tun" + str(p_['net_id']) + " encapsulation 'ipip'")
-            cmds['conf'].append("set interfaces tunnel tun" + str(p_['net_id']) + " local-ip '" + str(self.local_ip).split('/')[0] + "'")
-            cmds['conf'].append("set interfaces tunnel tun" + str(p_['net_id']) + " multicast 'disable'")
-            cmds['conf'].append("set interfaces tunnel tun" + str(p_['net_id']) + " remote-ip '" + str(p_['remote_ip']).split('/')[0] + "'")
-
-        self.config_content = cmds
-        return self.dump_()
-
-    def enable_elk(self, args):
-        cmds = {}
-
-        self.monitoring_tools.append("elk")
-        cmds['conf'] = []
-        for u in args["logstash.url"]:
-            cmds['conf'].append("set system syslog host " + str( u ) + " facility all level all")
-
-        self.config_content = cmds
-
-        return self.dump_()

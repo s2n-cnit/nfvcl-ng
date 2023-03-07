@@ -592,18 +592,28 @@ class Topology:
         self.save_topology()
 
     @obj_multiprocess_lock
-    def del_k8scluster(self, name: str):
+    def del_k8scluster(self, message: dict):
+        #Obtaining the name of the cluster to delete
+        k8s_name_to_delete = message['name']
+        if not k8s_name_to_delete:
+            raise ValueError('Error while trying to delete k8s cluster: parsed name is null')
         # check if it exists
-        k8s_cluster = next(item for item in self._data['kubernetes'] if item['name'] != name)
+        k8s_matching_cluster_list = [item for item in self._data['kubernetes'] if item['name'] == k8s_name_to_delete]
 
-        if k8s_cluster['nfvo_status'] == 'onboarded':
-            if not self.nbiutil.delete_k8s_cluster(name):
-                raise ValueError('Kubernetes {} cannot be de-onboarded... still in use? Aborting...'.format(name))
+        #Checking if there is at least one element, that is the cluster we want to delete
+        if len(k8s_matching_cluster_list)>0:
+            k8s_cluster = k8s_matching_cluster_list[0]
+            if k8s_cluster['nfvo_status'] == 'onboarded':
+                if not self.nbiutil.delete_k8s_cluster(k8s_name_to_delete):
+                    raise ValueError('Kubernetes {} cannot be de-onboarded... still in use? Aborting...'.format(k8s_name_to_delete))
 
-        self._data['kubernetes'] = [item for item in self._data['kubernetes'] if item['name'] != name]
+            #Setting new k8s cluster list as
+            self._data['kubernetes'] = [item for item in self._data['kubernetes'] if item['name'] != k8s_name_to_delete]
 
-        redis_cli.publish('topology', json.dumps(k8s_cluster))
-        self.save_topology()
+            redis_cli.publish('topology', json.dumps(k8s_cluster))
+            self.save_topology()
+        else:
+            logger.error("Deleting k8s cluster: no cluster called {} was found".format(k8s_name_to_delete))
 
     @obj_multiprocess_lock
     def update_k8scluster(self, name: str, data: dict):

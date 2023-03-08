@@ -491,9 +491,17 @@ class NbiUtil:
             return False
 
     def get_k8s_clusters(self, cluster_name: str = ""):
+        """
+        Retrieve the k8s cluster from OSM, given the cluster name (NOT the id!)
+
+        @param cluster_name: the name of the cluster to retrieve
+
+        @return the k8s cluster (in osm) in JSON format, False if not found
+        #todo use pydantic model for K8s info from osm
+        """
         url = "/admin/v1/k8sclusters"
         if cluster_name != "":
-            url += "/{}".format(cluster_name)
+            url += "/?name={}".format(cluster_name)
         r = self.get_x(url)
         # logger.debug("{} --- {}".format(r.status_code, r.text))
         if self.check_REST_response(r):
@@ -502,10 +510,24 @@ class NbiUtil:
             return False
 
     def get_k8s_cluster_id(self, name=None):
+        """
+        Filter the k8s cluster id from the JSON info about a k8s retrieved from OSM
+
+        @param name the name of the cluster to search. If null, the method looks for the id of all k8s clusters present.
+
+        @return the id of the first match
+        """
         res_json = self.get_k8s_clusters(cluster_name=name)
-        return next((item['id'] for item in res_json if item['name'] == name), None)
+        return next((item['_id'] for item in res_json if item['name'] == name), None)
 
     def delete_k8s_cluster(self, name: str):
+        """
+        Delete a k8s from OSM
+
+        @param name: the name of the cluster to delete (different from id)
+
+        @return response in json format if it is deleted, False otherwise
+        """
         repo_id = self.get_k8s_cluster_id(name)
         result = self.delete_x('/admin/v1/k8sclusters/{}'.format(repo_id))
         # logger.debug(result)

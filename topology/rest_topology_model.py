@@ -125,14 +125,14 @@ class PduModel(BaseModel):
 
 
 class K8sModel(BaseModel):
-    name: str
+    name: str = Field(title="Name of k8s cluster")
     provided_by: str
-    blueprint_ref: Optional[str]
-    credentials: str
-    vim_name: str
+    blueprint_ref: str = Field(default="", title="Reference blueprint, empty if k8s cluster is external")
+    credentials: str = Field(title="Content of k8s crediential file (example admin.conf)")
+    vim_name: str = Field(title="Reference VIM, where k8s cluster is deployed (example OpenStack)")
     k8s_version: str
-    networks: conlist(str, min_items=1)
-    areas: conlist(int, min_items=1)
+    networks: List[str] = Field(title="List of attached networks",min_items=1)
+    areas: List[str] = Field(title="Competence areas",min_items=1)
     cni: Optional[str]
     nfvo_status: NfvoOnboardStatus = 'not_onboarded'
 

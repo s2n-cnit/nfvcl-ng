@@ -2,18 +2,19 @@ from fastapi import APIRouter, Query, HTTPException
 from blueprints.rest_blue import ShortBlueModel, DetailedBlueModel
 from rest_endpoints.rest_callback import RestAnswer202
 from rest_endpoints.nfvcl_callback import callback_router
-from typing import Union, List
+from typing import List
 import datetime
 import importlib
 import traceback
 from threading import Thread
 from blueprints import BlueprintBase
 from blueprints.blue_types import blueprint_types
-from blueprints.blue_ueransim import UeRanSim
-from blueprints.blue_k8s import K8s
+from topology import Topology
+from topology.rest_topology_model import K8sModel
 from .blue_models import *
 from main import *
-
+from utils import get_pods_for_k8s_namespace, get_client_for_k8s_from_file_content
+from .rest_description import *
 
 blue_router = APIRouter(
     prefix="/nfvcl/v1/api/blue",
@@ -164,3 +165,39 @@ def delete(blue_id: str):
     thread.start()
     return RestAnswer202(id=blue_id, resource="blueprint", operation="delete", status="submitted",
                          session_id=session_id, description="operation submitted")
+
+
+@blue_router.get('/{blue_id}/pods', response_model=dict, status_code=202, description=BLUE_GET_PODS_DESCRIPTION,
+                 summary=BLUE_GET_PODS_SUMMARY)
+def get_pods(blue_id: str):
+    #TODO replace all common code with a static method
+    session_id = id_generator()
+    try:
+        blue = get_blueprint_by_id(blue_id)
+        if not blue:
+            raise ValueError('blueprint {} not found in the persistency layer'.format(blue_id))
+    except Exception:
+        logger.error(traceback.format_exc())
+        data = {'status': 'error', 'resource': 'blueprint',
+                'description': "Blueprint instance {} not found".format(blue_id)}
+        raise HTTPException(status_code=404, detail=data)
+
+    topology = Topology.from_db(db, nbiUtil, topology_lock)
+
+    k8s_list = topology.get_k8scluster()
+
+    k8s_obj_list: List[K8sModel] = []
+    for k8s in k8s_list:
+        k8s_object = K8sModel.parse_obj(k8s)
+        k8s_obj_list.append(k8s_object)
+
+    #TODO what if there are multiple k8s clusters?
+    if len(k8s_obj_list)>0:
+        k8s_config = get_client_for_k8s_from_file_content(k8s_obj_list[0].credentials)
+        pod_list = get_pods_for_k8s_namespace(k8s_config, namespace=blue_id)
+    else:
+        raise ValueError("The are NO k8s cluster in the topology!")
+
+    to_return = pod_list.to_dict()
+
+    return to_return

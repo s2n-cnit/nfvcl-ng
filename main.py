@@ -13,12 +13,6 @@ workers = LCMWorkers(topology_lock)
 pnf_manager = PNFmanager()
 
 Process(target=topology_worker, args=(db, nbiUtil, topology_msg_queue, topology_lock)).start()
-# topology = Topology.from_db(db=db, nbiutil=nbiUtil)
 
-blueprint_type_catalog = [
-    {'id': 'K8s', 'module': 'blue_K8s'},
-    {'id': 'ueransim', 'module': 'blue_ueransim'}
-]
-
-
-pdu_type_catalog = []
+# !!!
+# For FastAPI and routers instantiation look in the nfvcl.py file!

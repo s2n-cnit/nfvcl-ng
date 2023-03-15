@@ -5,6 +5,7 @@ from blueprints.blue_mqtt.models import MqttRequestBlueprintInstance
 from blueprints.blue_trex.models import TrexRequestBlueprintInstance
 from blueprints.blue_ueransim.models import UeranSimBlueprintRequestInstance
 from blueprints.blue_vo.models import VoBlueprintRequestInstance
+from blueprints.blue_vyos.models import VyOSBlueprintCreate
 from typing import Union
 
 blue_create_models = Union[
@@ -14,7 +15,8 @@ blue_create_models = Union[
     MqttRequestBlueprintInstance,
     TrexRequestBlueprintInstance,
     UeranSimBlueprintRequestInstance,
-    VoBlueprintRequestInstance
+    VoBlueprintRequestInstance,
+    VyOSBlueprintCreate
 ]
 
 blue_day2_models = Union[

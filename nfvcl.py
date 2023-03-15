@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+import rest_endpoints.blue
 from main import *
 from fastapi import FastAPI
 from rest_endpoints.topology import topology_router
@@ -8,26 +8,7 @@ from rest_endpoints.day2action import day2_router
 from rest_endpoints.k8s import k8s_router
 from rest_endpoints.helm import helm_router
 from fastapi.staticfiles import StaticFiles
-
-
-logger = create_logger('NFVCL')
-
-"""
-previous Flask rest classes:
-
-api.add_resource(nsiAPI, '/nfvcl/api/nsi')
-api.add_resource(vnfiAPI, '/nfvcl/api/vnfi')
-api.add_resource(pduAPI, '/nfvcl/api/pdu')
-api.add_resource(pnfAPI, '/nfvcl/api/pnf')
-api.add_resource(vimAPI, '/nfvcl/api/vim')
-# api.add_resource(k8sAPI, '/nfvcl/api/k8s')
-api.add_resource(UeDbAPI, '/nfvcl/api/uedb')
-api.add_resource(BluetypeAPI, '/nfvcl/api/bluetype')
-api.add_resource(BlueMetrics, '/nfvcl/bluemetrics')
-
-api.add_resource(VoApi, '/nfvcl/vo')  # /<string:arg>
-"""
-
+import os
 
 app = FastAPI(
     title="NFVCL",
@@ -39,13 +20,23 @@ app = FastAPI(
     },
 )
 
+#Populate blue_router with all blueprints APIs before include it.
+rest_endpoints.blue.initialize_blueprints_routers()
+
+#Including routers for each case. In this part all APIs definitions are loaded.
 app.include_router(topology_router)
 app.include_router(blue_router)
 app.include_router(day2_router)
 app.include_router(k8s_router)
 app.include_router(helm_router)
+
+day2_files = "day2_files"
+
+#Check if the day2 folder exists and, in case not, it creates the folder.
+if not os.path.exists(day2_files):
+    os.makedirs(day2_files)
+
+#Making repositories available for external access. Configuration files will be served from here.
 app.mount("/nfvcl_day2/day2", StaticFiles(directory="day2_files"), name="day2_files")
 app.mount("/helm_repo", StaticFiles(directory="helm_charts"), name="helm_repo")
-
-# if __name__ == '__main__':
 

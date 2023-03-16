@@ -140,7 +140,7 @@ class K8sModel(BaseModel):
 class K8sModelCreateFromExternalCluster(BaseModel):
     name: str
     nfvo_onboard: bool = False
-    credentials: dict
+    credentials: str
     vim_name: str
     k8s_version: str
     networks: conlist(str, min_items=1)

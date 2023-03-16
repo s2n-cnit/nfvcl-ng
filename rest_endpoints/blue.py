@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, status
 from blueprints.rest_blue import ShortBlueModel, DetailedBlueModel
 from rest_endpoints.rest_callback import RestAnswer202
 from rest_endpoints.nfvcl_callback import callback_router
@@ -19,9 +19,25 @@ from .rest_description import *
 blue_router = APIRouter(
     prefix="/nfvcl/v1/api/blue",
     tags=["Blueprints"],
-    responses={404: {"description": "Not found"}},
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
 
+def initialize_blueprints_routers():
+    """
+    Load Blueprint specific routers into the general blue router. This method must be called in order to enable
+    blueprint specific APIs
+    """
+    # !! VERY IMPORTANT
+    # This piece of code is adding Blueprint specific POST and PUT methods to the router
+    for b in blueprint_types:
+        try:
+            logger.info("exposing REST APIs for Blueprint {}".format(blueprint_types[b]['class_name']))
+            BlueClass = getattr(importlib.import_module("blueprints.{}".format(blueprint_types[b]['module_name'])),
+                                blueprint_types[b]['class_name'])
+            # Define as methods to handle creation and modification of blueprint the 2 method in this file.
+            blue_router.include_router(BlueClass.fastapi_router(create_blueprint, modify_blueprint))
+        except Exception:
+            logger.error(traceback.format_exc())
 
 def get_blueprint_by_id(id_: str):
     try:
@@ -87,20 +103,20 @@ async def get_blueprint(
     else:
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': "Blueprint instance {} not found".format(blue_id)}
-        raise HTTPException(status_code=404, detail=data)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=data)
 
 
 ################################################
-@blue_router.post('/', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
-def create_blueprint(
-        msg: blue_create_models
-):
-    # logger.debug('blueAPI post')
+@blue_router.post('/', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
+def create_blueprint(msg: blue_create_models):
+    # Generate random ID for the blueprint
     blue_id = id_generator()
+
     if msg.type not in blueprint_types:
         data = {'status': 'error', 'resource': 'blueprint',
-                'description': 'no Blueprints are satisfying the request'}
-        raise HTTPException(status_code=406, detail=data)
+                'description': 'No Blueprints are satisfying the request. The type is not in enabled blueprint types.'}
+        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail=data)
+
     logger.info("Candidate Blueprint {} selected".format(blueprint_types[msg.type]['class_name']))
     # start async operations
     thread = Thread(target=instantiate_blueprint, args=(msg.dict(), blue_id,))
@@ -110,8 +126,12 @@ def create_blueprint(
     return RestAnswer202(id=blue_id, resource="blueprint", operation="create", status="submitted")
 
 
-@blue_router.put('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+@blue_router.put('/{blue_id}', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
 def modify_blueprint(msg: blue_day2_models, blue_id: str):
+    """
+    This method is actually handling all requested operations on blueprints though NFVCL APIs.
+    It receives the message and create a thread for the relative plueprint (if it does exist) to handle the request.
+    """
     # assign a session id
     session_id = id_generator()
     try:
@@ -120,14 +140,14 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
         logger.error(traceback.format_exc())
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': "Blueprint instance {} not found".format(blue_id)}
-        raise HTTPException(status_code=404, detail=data)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=data)
 
     if msg.operation not in blue.get_supported_operations():
         logger.error('operation {} not supported by blueprint {} --> get_supported_operations(): {}'
                      .format(msg.operation, blue.get_id(), blue.get_supported_operations()))
         data = {'operation': msg.operation, 'status': 'error', 'resource': 'blueprint',
                 'id': blue.get_id(), 'session_id': session_id, 'description': 'operation not supported'}
-        raise HTTPException(status_code=405, detail=data)
+        raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail=data)
 
     thread = Thread(target=update_blueprint, args=(blue, msg, blue_id, msg.operation, session_id,))
     # thread.daemon = True
@@ -136,18 +156,7 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
                          session_id=session_id, description="operation submitted")
 
 
-# adding Blueprint specific POST and PUT methods
-for b in blueprint_types:
-    try:
-        logger.info("exposing REST APIs for Blueprint {}".format(blueprint_types[b]['class_name']))
-        BlueClass = getattr(importlib.import_module("blueprints.{}".format(blueprint_types[b]['module_name'])),
-                            blueprint_types[b]['class_name'])
-        blue_router.include_router(BlueClass.fastapi_router(create_blueprint, modify_blueprint))
-    except Exception:
-        logger.error(traceback.format_exc())
-
-
-@blue_router.delete('/{blue_id}', response_model=RestAnswer202, status_code=202, callbacks=callback_router.routes)
+@blue_router.delete('/{blue_id}', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
 def delete(blue_id: str):
     session_id = id_generator()
     try:
@@ -158,7 +167,7 @@ def delete(blue_id: str):
         logger.error(traceback.format_exc())
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': "Blueprint instance {} not found".format(blue_id)}
-        raise HTTPException(status_code=404, detail=data)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=data)
 
     thread = Thread(target=delete_blueprint, args=(blue_id,))
     # thread.daemon = True
@@ -167,7 +176,7 @@ def delete(blue_id: str):
                          session_id=session_id, description="operation submitted")
 
 
-@blue_router.get('/{blue_id}/pods', response_model=dict, status_code=202, description=BLUE_GET_PODS_DESCRIPTION,
+@blue_router.get('/{blue_id}/pods', response_model=dict, status_code=status.HTTP_202_ACCEPTED, description=BLUE_GET_PODS_DESCRIPTION,
                  summary=BLUE_GET_PODS_SUMMARY)
 def get_pods(blue_id: str):
     #TODO replace all common code with a static method
@@ -180,7 +189,7 @@ def get_pods(blue_id: str):
         logger.error(traceback.format_exc())
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': "Blueprint instance {} not found".format(blue_id)}
-        raise HTTPException(status_code=404, detail=data)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=data)
 
     topology = Topology.from_db(db, nbiUtil, topology_lock)
 

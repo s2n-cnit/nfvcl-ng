@@ -1,7 +1,8 @@
 from utils.util import create_logger
 from utils.ipam import *
 from topology.vim_terraform import VimTerraformer
-from topology.rest_topology_model import TopologyModel, PduModel
+from models.topology import TopologyModel
+from models.network import PduModel
 from utils.persistency import OSSdb
 from nfvo.osm_nbi_util import NbiUtil
 import typing
@@ -205,9 +206,14 @@ class Topology:
             vim['areas'].append(vim_area)
         for vim_area in update_msg['areas_to_del']:
             logger.debug("deleting area {} from vim {}".format(vim_area, vim['name']))
-            if vim_area not in vim['areas']:
+            try:
+                vim_area_int = int(vim_area)
+            except ValueError:
+                raise ValueError('Area {} to delete from VIM {} is not a valid int number'.format(vim_area, vim['name']))
+            if vim_area_int not in vim['areas']:
                 raise ValueError('area {} not in VIM {}'.format(vim_area, vim['name']))
-            vim['areas'].pop(vim_area)
+            vim['areas'].pop(vim_area_int)
+
         msg = {
             'operation': 'update_vim',
             'data': vim

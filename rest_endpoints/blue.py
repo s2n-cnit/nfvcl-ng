@@ -10,10 +10,10 @@ from threading import Thread
 from blueprints import BlueprintBase
 from blueprints.blue_types import blueprint_types
 from topology import Topology
-from topology.rest_topology_model import K8sModel
+from models.k8s import K8sModel
 from .blue_models import *
 from main import *
-from utils import get_pods_for_k8s_namespace, get_client_for_k8s_from_file_content
+from utils import get_pods_for_k8s_namespace, get_k8s_config_from_file_content, parse_k8s_clusters_from_dict
 from .rest_description import *
 
 blue_router = APIRouter(
@@ -21,6 +21,7 @@ blue_router = APIRouter(
     tags=["Blueprints"],
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
+
 
 def initialize_blueprints_routers():
     """
@@ -38,6 +39,7 @@ def initialize_blueprints_routers():
             blue_router.include_router(BlueClass.fastapi_router(create_blueprint, modify_blueprint))
         except Exception:
             logger.error(traceback.format_exc())
+
 
 def get_blueprint_by_id(id_: str):
     try:
@@ -76,8 +78,8 @@ def update_blueprint(blue, msg, blue_id, requested_operation, session_id):
 
 @blue_router.get("/", response_model=Union[List[ShortBlueModel], List[DetailedBlueModel]])
 async def get_blueprints(
-    type: Union[str, None] = Query(default=None, description="Filter blueprints by type"),
-    detailed: bool = Query(default=False, description="Detailed or summarized view list")
+        type: Union[str, None] = Query(default=None, description="Filter blueprints by type"),
+        detailed: bool = Query(default=False, description="Detailed or summarized view list")
 ) -> dict:
     blue_filter = {}
     if type:
@@ -91,8 +93,8 @@ async def get_blueprints(
 
 @blue_router.get("/{blue_id}", response_model=Union[ShortBlueModel, DetailedBlueModel])
 async def get_blueprint(
-    blue_id: str,
-    detailed: bool = Query(default=False, description="Detailed or summarized view list")
+        blue_id: str,
+        detailed: bool = Query(default=False, description="Detailed or summarized view list")
 ) -> dict:
     if detailed:
         res = workers.get_blue_detailed_summary({'id': blue_id})
@@ -107,7 +109,8 @@ async def get_blueprint(
 
 
 ################################################
-@blue_router.post('/', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
+@blue_router.post('/', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                  callbacks=callback_router.routes)
 def create_blueprint(msg: blue_create_models):
     # Generate random ID for the blueprint
     blue_id = id_generator()
@@ -126,7 +129,8 @@ def create_blueprint(msg: blue_create_models):
     return RestAnswer202(id=blue_id, resource="blueprint", operation="create", status="submitted")
 
 
-@blue_router.put('/{blue_id}', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
+@blue_router.put('/{blue_id}', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                 callbacks=callback_router.routes)
 def modify_blueprint(msg: blue_day2_models, blue_id: str):
     """
     This method is actually handling all requested operations on blueprints though NFVCL APIs.
@@ -156,7 +160,8 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
                          session_id=session_id, description="operation submitted")
 
 
-@blue_router.delete('/{blue_id}', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
+@blue_router.delete('/{blue_id}', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                    callbacks=callback_router.routes)
 def delete(blue_id: str):
     session_id = id_generator()
     try:
@@ -176,10 +181,11 @@ def delete(blue_id: str):
                          session_id=session_id, description="operation submitted")
 
 
-@blue_router.get('/{blue_id}/pods', response_model=dict, status_code=status.HTTP_202_ACCEPTED, description=BLUE_GET_PODS_DESCRIPTION,
+@blue_router.get('/{blue_id}/pods', response_model=dict, status_code=status.HTTP_202_ACCEPTED,
+                 description=BLUE_GET_PODS_DESCRIPTION,
                  summary=BLUE_GET_PODS_SUMMARY)
 def get_pods(blue_id: str):
-    #TODO replace all common code with a static method
+    # TODO replace all common code with a static method
     session_id = id_generator()
     try:
         blue = get_blueprint_by_id(blue_id)
@@ -189,20 +195,17 @@ def get_pods(blue_id: str):
         logger.error(traceback.format_exc())
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': "Blueprint instance {} not found".format(blue_id)}
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=data)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=data, session_id=session_id)
 
     topology = Topology.from_db(db, nbiUtil, topology_lock)
 
     k8s_list = topology.get_k8scluster()
 
-    k8s_obj_list: List[K8sModel] = []
-    for k8s in k8s_list:
-        k8s_object = K8sModel.parse_obj(k8s)
-        k8s_obj_list.append(k8s_object)
+    k8s_clusters: List[K8sModel] = parse_k8s_clusters_from_dict(k8s_list)
 
-    #TODO what if there are multiple k8s clusters?
-    if len(k8s_obj_list)>0:
-        k8s_config = get_client_for_k8s_from_file_content(k8s_obj_list[0].credentials)
+    # TODO what if there are multiple k8s clusters?
+    if len(k8s_clusters) > 0:
+        k8s_config = get_k8s_config_from_file_content(k8s_clusters[0].credentials)
         pod_list = get_pods_for_k8s_namespace(k8s_config, namespace=blue_id)
     else:
         raise ValueError("The are NO k8s cluster in the topology!")

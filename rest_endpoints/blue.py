@@ -13,7 +13,7 @@ from topology import Topology
 from models.k8s import K8sModel
 from .blue_models import *
 from main import *
-from utils import get_pods_for_k8s_namespace, get_k8s_config_from_file_content, parse_k8s_clusters_from_dict
+from utils.k8s import get_pods_for_k8s_namespace, get_k8s_config_from_file_content, parse_k8s_clusters_from_dict
 from .rest_description import *
 
 blue_router = APIRouter(
@@ -186,22 +186,25 @@ def delete(blue_id: str):
                  summary=BLUE_GET_PODS_SUMMARY)
 def get_pods(blue_id: str):
     # TODO replace all common code with a static method
-    session_id = id_generator()
+    local_session_id = id_generator()
     try:
         blue = get_blueprint_by_id(blue_id)
         if not blue:
             raise ValueError('blueprint {} not found in the persistency layer'.format(blue_id))
     except Exception:
+        # Print on the console
         logger.error(traceback.format_exc())
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': "Blueprint instance {} not found".format(blue_id)}
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=data, session_id=session_id)
+        # Inform the API caller
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=data)
 
     topology = Topology.from_db(db, nbiUtil, topology_lock)
 
     k8s_list = topology.get_k8scluster()
 
     k8s_clusters: List[K8sModel] = parse_k8s_clusters_from_dict(k8s_list)
+
 
     # TODO what if there are multiple k8s clusters?
     if len(k8s_clusters) > 0:

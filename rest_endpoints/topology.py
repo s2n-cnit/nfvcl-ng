@@ -11,7 +11,6 @@ from topology.topology import Topology, topology_msg_queue, topology_lock
 from main import db, nbiUtil
 from pydantic import AnyHttpUrl
 from typing import Union, List
-from utils import get_daemon_sets, parse_k8s_clusters_from_dict, get_k8s_config_from_file_content, check_installed_daemons
 from .rest_description import *
 
 topology_router = APIRouter(

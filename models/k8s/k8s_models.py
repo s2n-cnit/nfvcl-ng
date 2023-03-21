@@ -38,7 +38,19 @@ class K8sModelCreateFromExternalCluster(BaseModel):
     areas: conlist(int, min_items=1)
     cni: Optional[str]
 
-class K8sDaemons(Enum):
+
+class K8sDaemon(str, Enum):
     FLANNEL = 'flannel'
     OPEN_EBS = 'openebs-ndm'
     METALLB = 'metallb'
+
+
+class K8sVersion(str, Enum):
+    V1_24 = 'v1.24'
+    V1_25 = 'v1.25'
+    V1_26 = 'v1.26'
+    V1_27 = 'v1.27'
+
+    @classmethod
+    def has_value(cls, value):
+        return value in cls._value2member_map_

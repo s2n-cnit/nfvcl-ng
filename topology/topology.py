@@ -1,3 +1,5 @@
+from models.k8s import K8sModel
+from utils.k8s import parse_k8s_clusters_from_dict
 from utils.util import create_logger
 from utils.ipam import *
 from topology.vim_terraform import VimTerraformer
@@ -45,6 +47,15 @@ class Topology:
 
     @classmethod
     def from_db(cls, db: OSSdb, nbiutil: NbiUtil, lock: RLock):
+        """
+        Return the topology from the DB as TopologyModel instance.
+        Args:
+            db: the database
+            nbiutil: the NbiUtil
+            lock: the resource lock
+        Returns:
+            TopologyModel: The instance of the topology from the database
+        """
         topo = db.findone_DB("topology", {})
         if topo:
             data = TopologyModel.parse_obj(topo).dict()
@@ -566,6 +577,17 @@ class Topology:
 
     def get_k8scluster(self):
         return self._data['kubernetes']
+
+    def get_k8scluster_model(self) -> List[K8sModel]:
+        """
+        Get the k8s cluster list from the topology as List[K8sModel]
+
+        Returns:
+            List[K8sModel]: the k8s cluster list
+        """
+        k8s_clusters: List[K8sModel] = parse_k8s_clusters_from_dict(self._data['kubernetes'])
+        return k8s_clusters
+
 
     @obj_multiprocess_lock
     def add_k8scluster(self, data: dict):

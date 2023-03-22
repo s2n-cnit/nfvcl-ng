@@ -6,7 +6,7 @@ import kubernetes.utils
 from kubernetes import config
 from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, V1APIGroupList, VersionInfo
 from kubernetes.client.rest import ApiException
-from config_templates.k8s.k8s_config_manager import get_plugin_config_for_k8s_version
+from config_templates.k8s.k8s_plugin_config_manager import get_plugin_config_for_k8s_version
 
 from models.k8s import K8sModel, K8sDaemon, K8sVersion
 

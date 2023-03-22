@@ -1,4 +1,3 @@
-import json
 from typing import List
 from fastapi import APIRouter, HTTPException, Body, status
 from kubernetes.utils import FailToCreateError
@@ -23,9 +22,12 @@ def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
     that give API user an idea of what is going wrong.
 
     Args:
+
         cluster_id: the cluster ID that identify a k8s cluster in the topology.
 
-    Returns: The matching k8s cluster or Throw HTTPException if NOT found.
+    Returns:
+
+        The matching k8s cluster or Throw HTTPException if NOT found.
     """
     try:
         topology = Topology.from_db(db, nbiUtil, topology_lock)
@@ -42,17 +44,19 @@ def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
         raise HTTPException(status_code=400, detail="Failed getting k8s cluster {}".format(cluster_id))
 
 
-@k8s_router.put("/{cluster_id}", response_model=List[dict], summary="Apply yaml to k8s", description="The yaml" \
-                                                                                                     " content of the body will be applied to the cluster like 'kubectl apply -f content'")
+@k8s_router.put("/{cluster_id}", response_model=List[dict])
 async def apply_to_k8s(cluster_id: str, body=Body(...)):
     """
     Apply a yaml content to the target k8s cluster. The specified resources in the yaml file MUST NOT exist.
 
     Args:
+
         cluster_id: The cluster ID of the k8s belonging to the topology in which the yaml will be applied.
+
         body: The yaml content to apply at the cluster
 
     Returns:
+
         List[dict]: the list of created resources returned from the k8s cluster.
     """
     cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
@@ -81,6 +85,18 @@ async def apply_to_k8s(cluster_id: str, body=Body(...)):
 
 @k8s_router.get("/{cluster_id}/plugins", response_model=List[K8sDaemon], summary="", description="")
 async def get_installed_plugins(cluster_id: str):
+    """
+    Return installed plugins on a cluster
+
+    Args:
+
+        cluster_id: [str] the cluster id
+
+    Returns:
+
+        A list of installed plugins
+    """
+
     cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
@@ -89,18 +105,21 @@ async def get_installed_plugins(cluster_id: str):
     return installed_plugins
 
 
-@k8s_router.put("/{cluster_id}/plugins", response_model=dict, summary="", description="")
+@k8s_router.put("/{cluster_id}/plugins", response_model=dict)
 async def install_plugins(cluster_id: str, message: List[K8sDaemon], detailed: bool = False):
     """
     Install required plugins to the target k8s clusters.
 
     Args:
+
         cluster_id: String. The cluster ID of the k8s belonging to the topology in which the yaml will be applied.
         message: the list of K8sDaemon to install (plugins)
+
         detailed: if the response is detailed, its content correspond to k8s response. Othewise it is just a list of
         installed plugins.
 
     Returns:
+
         The k8s response if detailed, a list of installed plugins otherwise.
     """
 
@@ -113,8 +132,7 @@ async def install_plugins(cluster_id: str, message: List[K8sDaemon], detailed: b
         installation_result: dict = install_plugin_to_cluster(kube_client_config=k8s_config, plugins_to_install=message)
     except ValueError as val_err:
         logging.error(val_err)
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Some plugins are already installed, see " \
-                                                                         " NFVCL log for further details. You can also GET /k8s/{cluster_id}/plugins to retrieve installed plugins.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
 
     # If detailed parse all the content from k8s otherwise just a list of installed plugins
     if detailed:

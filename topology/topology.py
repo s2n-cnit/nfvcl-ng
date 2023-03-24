@@ -1,6 +1,6 @@
 from models.k8s import K8sModel
 from utils.k8s import parse_k8s_clusters_from_dict
-from utils.util import create_logger
+from utils.log import create_logger
 from utils.ipam import *
 from topology.vim_terraform import VimTerraformer
 from models.topology import TopologyModel
@@ -11,14 +11,14 @@ import typing
 import json
 import traceback
 from multiprocessing import RLock, Queue
-from utils.util import obj_multiprocess_lock, redis_host, redis_port
-import redis
+from utils.util import obj_multiprocess_lock
+from utils.redis.redis_manager import get_redis_instance
 
 topology_msg_queue = Queue()
 topology_lock = RLock()
 
 logger = create_logger('Topology')
-redis_cli = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8")
+redis_cli = get_redis_instance()
 
 
 class Topology:
@@ -223,7 +223,7 @@ class Topology:
                 raise ValueError('Area {} to delete from VIM {} is not a valid int number'.format(vim_area, vim['name']))
             if vim_area_int not in vim['areas']:
                 raise ValueError('area {} not in VIM {}'.format(vim_area, vim['name']))
-            vim['areas'].pop(vim_area_int)
+            vim['areas'].remove(vim_area_int)
 
         msg = {
             'operation': 'update_vim',

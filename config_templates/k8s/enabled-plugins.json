@@ -1,0 +1,43 @@
+[
+  {
+    "name": "flannel",
+    "type": "network",
+    "installation_modules": [
+      "flannel"
+    ],
+    "daemon_sets": [
+      "flannel"
+    ]
+  },
+  {
+    "name": "openebs",
+    "type": "storage",
+    "installation_modules": [
+      "openebs"
+    ],
+    "daemon_sets": [
+      "openebs-ndm"
+    ]
+  },
+  {
+    "name": "metallb",
+    "type": "metallb",
+    "installation_modules": [
+      "metallb"
+    ],
+    "daemon_sets": [
+      "metallb"
+    ]
+  },
+  {
+    "name": "calico",
+    "type": "network",
+    "installation_modules": [
+      "calico-operator",
+      "calico-custom"
+    ],
+    "daemon_sets": [
+      "calico"
+    ]
+  }
+]

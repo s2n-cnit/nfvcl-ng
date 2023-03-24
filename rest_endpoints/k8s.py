@@ -1,11 +1,13 @@
+from logging import Logger
 from typing import List
 from fastapi import APIRouter, HTTPException, Body, status
 from kubernetes.utils import FailToCreateError
 from models.k8s import K8sModel
 from main import *
+from models.k8s.k8s_models import K8sPluginName
 from topology import Topology
-from utils.k8s import get_k8s_config_from_file_content, apply_def_to_cluster, check_installed_daemons, \
-    install_plugin_to_cluster
+from utils.k8s import get_k8s_config_from_file_content, apply_def_to_cluster, check_installed_plugins, \
+    install_plugins_to_cluster
 from models.k8s import K8sDaemon
 
 k8s_router = APIRouter(
@@ -13,7 +15,7 @@ k8s_router = APIRouter(
     tags=["Kubernetes cluster management"],
     responses={404: {"description": "Not found"}},
 )
-logger = create_logger('K8s REST endpoint')
+logger: Logger = create_logger('K8s Management REST endpoint')
 
 
 def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
@@ -69,6 +71,7 @@ async def apply_to_k8s(cluster_id: str, body=Body(...)):
     try:
         result = apply_def_to_cluster(kube_client_config=k8s_config, dict_to_be_applied=yaml_request)
     except FailToCreateError as err:
+        logger.error(err)
         if err.args[0][0].status == status.HTTP_409_CONFLICT:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                                 detail="The resource already exist")
@@ -83,7 +86,7 @@ async def apply_to_k8s(cluster_id: str, body=Body(...)):
     return list_to_ret
 
 
-@k8s_router.get("/{cluster_id}/plugins", response_model=List[K8sDaemon], summary="", description="")
+@k8s_router.get("/{cluster_id}/plugins", response_model=List[K8sPluginName], summary="", description="")
 async def get_installed_plugins(cluster_id: str):
     """
     Return installed plugins on a cluster
@@ -100,13 +103,13 @@ async def get_installed_plugins(cluster_id: str):
     cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
-    installed_plugins = check_installed_daemons(kube_client_config=k8s_config)
+    installed_plugins = check_installed_plugins(kube_client_config=k8s_config)
 
     return installed_plugins
 
 
 @k8s_router.put("/{cluster_id}/plugins", response_model=dict)
-async def install_plugins(cluster_id: str, message: List[K8sDaemon], detailed: bool = False):
+async def install_plugins(cluster_id: str, message: List[K8sPluginName], detailed: bool = False):
     """
     Install required plugins to the target k8s clusters.
 
@@ -129,9 +132,10 @@ async def install_plugins(cluster_id: str, message: List[K8sDaemon], detailed: b
 
     try:
         # Try to install plugins to cluster
-        installation_result: dict = install_plugin_to_cluster(kube_client_config=k8s_config, plugins_to_install=message)
+        installation_result: dict = install_plugins_to_cluster(kube_client_config=k8s_config,
+                                                               plugins_to_install=message)
     except ValueError as val_err:
-        logging.error(val_err)
+        logger.error(val_err)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
 
     # If detailed parse all the content from k8s otherwise just a list of installed plugins

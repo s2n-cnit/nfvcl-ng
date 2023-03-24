@@ -43,6 +43,7 @@ class K8sDaemon(str, Enum):
     FLANNEL = 'flannel'
     OPEN_EBS = 'openebs-ndm'
     METALLB = 'metallb'
+    CALICO = 'calico-node'
 
 
 class K8sVersion(str, Enum):
@@ -54,3 +55,35 @@ class K8sVersion(str, Enum):
     @classmethod
     def has_value(cls, value):
         return value in cls._value2member_map_
+
+
+class K8sPluginName(str, Enum):
+    """
+
+    """
+    FLANNEL = 'flannel'
+    OPEN_EBS = 'openebs'
+    METALLB = 'metallb'
+    CALICO = 'calico'
+
+
+class K8sPluginType(str, Enum):
+    """
+    Represent the type of plugins that can be installed. This is useful to understand if there are conflicts
+    when installing plugins.
+    """
+    NETWORK = 'network'
+    STORAGE = 'storage'
+    METALLB = 'metallb'
+
+
+class K8sPlugin(BaseModel):
+    """
+    Plugin representation
+    """
+    name: K8sPluginName = Field(description="Plugin name")
+    type: K8sPluginType = Field(description="Type of plugin, must me a valid value in enum K8sPluginType")
+    installation_modules: List[str] = Field(default=[], description="List of modules to be installed when adding plugin"
+                                                                    " to cluster")
+    daemon_sets: List = Field(default=[], description="List of daemon sets present when the plugin is correctly "
+                                                      "installed")

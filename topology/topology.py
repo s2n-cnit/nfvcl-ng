@@ -1,3 +1,5 @@
+from logging import Logger
+
 from models.k8s import K8sModel
 from utils.k8s import parse_k8s_clusters_from_dict
 from utils.log import create_logger
@@ -17,7 +19,7 @@ from utils.redis.redis_manager import get_redis_instance
 topology_msg_queue = Queue()
 topology_lock = RLock()
 
-logger = create_logger('Topology')
+logger: Logger = create_logger('Topology')
 redis_cli = get_redis_instance()
 
 
@@ -54,7 +56,7 @@ class Topology:
             nbiutil: the NbiUtil
             lock: the resource lock
         Returns:
-            TopologyModel: The instance of the topology from the database
+            Topology: The instance of the topology from the database
         """
         topo = db.findone_DB("topology", {})
         if topo:
@@ -648,6 +650,7 @@ class Topology:
         cluster = next(item for item in self._data['kubernetes'] if item['name'] == name)
         if cluster['nfvo_status'] != 'onboarded' and 'nfvo_onboard' in data and data['nfvo_onboard']:
             cluster.update(data)
+            logger.info("Updated k8s cluster {} data with {}".format(name, data))
             cluster['nfvo_status'] = 'onboarding'
             # Fixme use pydantic model?
             if self.nbiutil.add_k8s_cluster(
@@ -658,7 +661,14 @@ class Topology:
                     cluster['networks']
             ):
                 cluster['nfvo_status'] = 'onboarded'
+                logger.info("K8s cluster {} onboarded".format(name))
             else:
                 cluster['nfvo_status'] = 'error'
+                logger.error("K8s cluster {} onboard failed".format(name))
+        else:
+            # Update data also in case 'not onboarding'
+            cluster.update(data)
+            logger.info("Updated k8s cluster {} data with {}".format(name, data))
+
         redis_cli.publish('topology', json.dumps(data))
         self.save_topology()

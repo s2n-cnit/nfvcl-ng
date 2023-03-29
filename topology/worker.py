@@ -52,8 +52,8 @@ def topology_worker(db: OSSdb, nbiutil: NbiUtil, queue: Queue, lock: RLock):
             elif ops_type == "del_k8s":
                 topology.del_k8scluster(msg)
             elif ops_type == "update_k8s":
-                topology.update_k8scluster(msg)
-
+                cluster_id = msg.pop("cluster_id")
+                topology.update_k8scluster(name=cluster_id,data=msg)
             else:
                 logger.error('message not supported: {}'.format(msg))
         except Exception:

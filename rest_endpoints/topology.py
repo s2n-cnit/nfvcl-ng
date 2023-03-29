@@ -296,6 +296,7 @@ async def update_k8scluster(cluster_updates: K8sModelUpdateRequest, cluster_id):
                             .format(cluster_id))
 
     msg.update({'ops_type': 'update_k8s'})
+    msg.update({'cluster_id': cluster_id})
     topology_msg_queue.put(msg)
     return {'id': 'topology'}
 

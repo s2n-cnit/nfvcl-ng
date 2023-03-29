@@ -652,12 +652,18 @@ class Topology:
             cluster.update(data)
             logger.info("Updated k8s cluster {} data with {}".format(name, data))
             cluster['nfvo_status'] = 'onboarding'
+
+            vims = self.nbiutil.get_vims()
+            # retrieve vim_id using vim_name
+            vim_id = next((item['_id'] for item in vims if item['name'] == cluster['vim_name'] and '_id' in item), None)
+            if vim_id is None:
+                raise ValueError('VIM (name={}) has not a vim_id'.format(cluster['vim_name']))
             # Fixme use pydantic model?
             if self.nbiutil.add_k8s_cluster(
                     cluster['name'],
                     cluster['credentials'],
                     cluster['k8s_version'],
-                    cluster['vim_name'],
+                    vim_id,
                     cluster['networks']
             ):
                 cluster['nfvo_status'] = 'onboarded'

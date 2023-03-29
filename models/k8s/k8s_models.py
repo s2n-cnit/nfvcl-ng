@@ -47,6 +47,10 @@ class K8sDaemon(str, Enum):
 
 
 class K8sVersion(str, Enum):
+    """
+    This class represent a k8s version. This should represent supported versions of k8s clusters by k8s manager.
+    It has the utilities for checking if the version is present and to compare versions.
+    """
     V1_24 = 'v1.24'
     V1_25 = 'v1.25'
     V1_26 = 'v1.26'
@@ -56,10 +60,26 @@ class K8sVersion(str, Enum):
     def has_value(cls, value):
         return value in cls._value2member_map_
 
+    def is_minor(self, to_compare) -> bool:
+        """
+        Check if this version is less than another
+
+        Args:
+            to_compare: the K8sVersion to be compared to this one
+
+        Returns:
+            true if this is minor
+        """
+        if not isinstance(to_compare, K8sVersion):
+            return NotImplemented
+        this_version = self.value[1:]
+        other_version = to_compare.value[1:]
+        return float(this_version) < float(other_version)
+
 
 class K8sPluginName(str, Enum):
     """
-
+    Supported plugin names by the k8s manager
     """
     FLANNEL = 'flannel'
     OPEN_EBS = 'openebs'
@@ -87,3 +107,20 @@ class K8sPlugin(BaseModel):
                                                                     " to cluster")
     daemon_sets: List = Field(default=[], description="List of daemon sets present when the plugin is correctly "
                                                       "installed")
+
+
+class K8sOperationType(str, Enum):
+    """
+    Types of operation supported from k8s management engine
+    """
+    INSTALL_PLUGIN = 'install_plugin'
+    APPLY_YAML = 'apply_yaml'
+
+
+class K8sModelManagement(BaseModel):
+    """
+    Model to support message exchange from NFVCL core and K8S management (through Redis sub/pub)
+    """
+    k8s_ops: K8sOperationType = Field(description="Type of operation to be applied at the desired cluser")
+    cluster_id: str = Field(description="The identifier of the k8s cluster")
+    data: str = Field(description="Data to be parsed, change depending on the operation type")

@@ -67,3 +67,14 @@ def obj_multiprocess_lock(func):
         return r
 
     return wrapper
+
+
+def deprecated(func):
+    """
+    Deprecated decorator. When a function is tagged with this decorator, every time the function is called, it prints
+    that the function is deprecated.
+    """
+    def wrapper(*args, **kwargs):
+        print('Function', func.__name__, 'is deprecated.')
+        return func(*args, **kwargs)
+    return wrapper

@@ -1,19 +1,64 @@
-import logging
 import tempfile
+import yaml
+from logging import Logger
 from typing import List
 import kubernetes.client
 import kubernetes.utils
 from kubernetes import config
-from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, V1APIGroupList, VersionInfo
+from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, VersionInfo, V1ConfigMap
 from kubernetes.client.rest import ApiException
 from config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
-
 from models.k8s import K8sModel, K8sDaemon, K8sVersion
 from models.k8s.k8s_models import K8sPluginName, K8sPluginType
 from utils.log import create_logger
-from logging import Logger
+from utils.util import deprecated
 
+TIMEOUT_SECONDS = 10
 logger: Logger = create_logger("K8S UTILS")
+
+# TODO split this file: API method goes in a dedicated file
+
+
+class check_k8s_version(object):
+    """
+    This is a DECORATOR. Allow to decorate a method to require a minimum version of k8s cluster
+    The decorated method (or function) **must** have as first parameter the kubernetes.client.Configuration for building the k8s
+    client.
+
+    Raises:
+        ValueError if the decorator is used on not compatible method or if the k8s version is too low for it.
+    """
+    def __init__(self, min_version: K8sVersion):
+        """
+        Args:
+            min_version: the minimum version required
+        """
+        # this is actually needed in the complete code
+        self.min_version: K8sVersion = min_version
+
+    def __call__(self, func):
+        """
+        This method is called when the decorated method is called.
+        """
+        def wrapped_f(*args, **kwargs):
+            if len(args) > 0:
+                if isinstance(args[0], kubernetes.client.Configuration):
+                    target_config: kubernetes.client.Configuration = args[0]
+                    actual_version = get_k8s_version(target_config)
+                    if not actual_version.is_minor(self.min_version):
+                        return func(*args, **kwargs)
+                    else:
+                        msg_err = "The version of k8s cluster is too low. Requested APIs for this method are not" \
+                                  "implemented."
+                        logger.error(msg_err)
+                        raise ValueError(msg_err)
+
+            # In any unforeseen case, throw error.
+            msg_err = "The decorator has been used on incompatible method, first argument must be instance " \
+                      "of kubernetes.client.Configuration"
+            logger.error(msg_err)
+            raise ValueError(msg_err)
+        return wrapped_f
 
 
 def get_k8s_config_from_file_content(kube_client_config_file_content: str) -> kubernetes.client.Configuration:
@@ -71,7 +116,7 @@ def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configurati
         api_instance_core = kubernetes.client.CoreV1Api(api_client)
         pod_list: V1PodList = None
         try:
-            pod_list = api_instance_core.list_namespaced_pod(namespace=namespace.lower())
+            pod_list = api_instance_core.list_namespaced_pod(namespace=namespace.lower(), timeout_seconds=TIMEOUT_SECONDS)
         except ApiException as error:
             logger.error("Exception when calling CoreV1Api>list_namespaced_pod: {}\n".format(error))
             raise error
@@ -97,9 +142,9 @@ def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespa
         api_instance_appsV1 = kubernetes.client.AppsV1Api(api_client)
         try:
             if namespace:
-                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_namespaced_daemon_set(namespace=namespace)
+                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_namespaced_daemon_set(namespace=namespace, timeout_seconds=TIMEOUT_SECONDS)
             else:
-                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_daemon_set_for_all_namespaces()
+                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_daemon_set_for_all_namespaces(timeout_seconds=TIMEOUT_SECONDS)
         except ApiException as error:
             logger.error("Exception when calling appsV1->list_daemon_set: {}\n".format(error))
             raise error
@@ -225,7 +270,6 @@ def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins
     common_elements = list(set(installed_plugins).intersection(plugins_to_install))
     if len(common_elements) > 0:
         msg_err = "Plugins {} are already present in the cluster.".format(common_elements)
-        logger.error(msg_err)
         raise ValueError(msg_err)
 
     types: List[str] = []
@@ -241,7 +285,6 @@ def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins
         if plugin_type in types:
             msg_err = "There is a conflict between installed plugins + ones to be installed. 2 or more plugins of " \
                       "the same type have been found (Example calico and flannel)"
-            logger.error(msg_err)
             raise ValueError(msg_err)
         types.append(plugin_type)
 
@@ -264,7 +307,7 @@ def get_k8s_version(kube_client_config: kubernetes.client.Configuration) -> K8sV
         try:
             api_version: VersionInfo = version_api.get_code()
         except ApiException as error:
-            logging.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
+            logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
             raise error
         finally:
             api_client.close()
@@ -274,6 +317,82 @@ def get_k8s_version(kube_client_config: kubernetes.client.Configuration) -> K8sV
         if not K8sVersion.has_value(main_ver):
             raise ValueError("K8s version is not included among those provided")
         return K8sVersion(main_ver)
+
+
+@check_k8s_version(min_version=K8sVersion.V1_26)
+def get_k8s_cidr_info(kube_client_config: kubernetes.client.Configuration):
+    """
+        Return the pod CIDR of a k8s cluster
+
+        Args:
+            kube_client_config: the configuration of K8s on which the client is built.
+
+        Returns:
+            A String representing the pod CIDR
+
+        Warnings:
+            Require k8s>1.26
+        """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        networking_v1_alpha = kubernetes.client.NetworkingV1alpha1Api(api_client)
+        try:
+            cluster_cidr_list = networking_v1_alpha.list_cluster_cidr()
+        except ApiException as error:
+            logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return cluster_cidr_list
+
+
+@deprecated
+def get_k8s_cidr(kube_client_config: kubernetes.client.Configuration) -> str:
+    """
+    Return the pod CIDR of a k8s cluster
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+
+    Returns:
+        A String representing the pod CIDR
+    """
+    config_map = read_namespaced_config_map(kube_client_config=kube_client_config, config_name="kubeadm-config", namespace="kube-system")
+
+    cluster_conf_str: str = config_map.data['ClusterConfiguration']
+    cluster_conf_dict: dict = yaml.safe_load(cluster_conf_str)
+    pod_subnet_str: str = cluster_conf_dict['networking']['podSubnet']
+
+    return pod_subnet_str
+
+
+def read_namespaced_config_map(kube_client_config: kubernetes.client.Configuration, namespace: str, config_name: str) -> V1ConfigMap:
+    """
+    Read and return a config map from a namespace
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace: the namespace containing the config map
+        config_name: the name of the config map
+
+    Returns:
+        The desired config map in the target namespace
+
+    Raises:
+        ApiException when k8s client fail
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        core_v1_api = kubernetes.client.CoreV1Api(api_client)
+        try:
+            config_map: V1ConfigMap = core_v1_api.read_namespaced_config_map(name=config_name,
+                                                                             namespace=namespace)
+        except ApiException as error:
+            logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return config_map
 
 
 def parse_k8s_clusters_from_dict(k8s_list: dict) -> List[K8sModel]:
@@ -292,3 +411,53 @@ def parse_k8s_clusters_from_dict(k8s_list: dict) -> List[K8sModel]:
         k8s_object = K8sModel.parse_obj(k8s)
         k8s_obj_list.append(k8s_object)
     return k8s_obj_list
+
+
+def find_k8s_from_list_by_id(cluster_list: List[K8sModel], cluster_id: str) -> K8sModel:
+    """
+    Get the k8s corresponding cluster from the list.
+
+    Args:
+
+        cluster_list: the list in which the method search the corresponding cluster
+
+        cluster_id: the cluster ID that identify a k8s cluster in the list.
+
+    Returns:
+
+        The matching k8s cluster or Throw ValueError if NOT found.
+    """
+    try:
+        match = next((x for x in cluster_list if x.name == cluster_id), None)
+
+        if match:
+            return match
+        else:
+            msg_err = "The k8s cluster {} has not been found in the topology".format(cluster_id)
+            raise ValueError(msg_err)
+    except Exception as err:
+        logger.error(err)
+        raise err
+
+
+def convert_str_list_2_plug_name(list_to_convert: List[str]) -> List[K8sPluginName]:
+    """
+    Convert a list of string into a list of K8sPluginName.
+
+    Args:
+        list_to_convert: the list of string to be converted.
+
+    Returns:
+        the converted List[K8sPluginName]
+
+    Raises:
+        ValueError if one or more strings are not valid K8sPluginNames.
+    """
+    to_return: List[K8sPluginName] = []
+    for str in list_to_convert:
+        try:
+            to_return.append(K8sPluginName(str))
+        except ValueError as e:
+            logger.error("Error in conversion from {} to K8sPluginName. This is not a valid enum value.".format(str))
+            raise e
+    return to_return

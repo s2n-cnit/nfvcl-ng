@@ -4,6 +4,7 @@ from topology import topology_worker, topology_lock, topology_msg_queue
 from nfvo import PNFmanager, NbiUtil
 from multiprocessing import Process
 from blueprints import LCMWorkers
+from subscribe_endpoints.k8s_manager import K8sManager
 
 
 logger = create_logger('Main')
@@ -13,6 +14,9 @@ workers = LCMWorkers(topology_lock)
 pnf_manager = PNFmanager()
 
 Process(target=topology_worker, args=(db, nbiUtil, topology_msg_queue, topology_lock)).start()
+
+logger.info("Starting subscribers")
+k8s_manager: K8sManager = K8sManager(db=db, nbiutil=nbiUtil, lock=topology_lock).initialize_k8s_man_subscriber()
 
 # !!!
 # For FastAPI and routers instantiation look in the nfvcl.py file!

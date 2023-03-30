@@ -2,12 +2,14 @@ import json
 from logging import Logger
 from typing import List
 from fastapi import APIRouter, HTTPException, Body, status
+from kubernetes.client import V1PodList
 from models.k8s import K8sModel
 from main import *
 from models.k8s.k8s_models import K8sPluginName, K8sOperationType, K8sModelManagement
 from rest_endpoints.rest_callback import RestAnswer202
 from topology import Topology
-from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins, get_k8s_cidr
+from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins, \
+    get_k8s_cidr_info, get_pods_for_k8s_namespace
 from utils.redis.redis_manager import get_redis_instance
 
 k8s_router = APIRouter(
@@ -144,10 +146,41 @@ async def get_k8s_cidr(cluster_id: str):
 
     try:
         # Try to install plugins to cluster
-        cidr_info = get_k8s_cidr(k8s_config)
+        cidr_info = get_k8s_cidr_info(k8s_config)
 
     except ValueError as val_err:
         logger.error(val_err)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
 
     return {"cidr": cidr_info}
+
+
+@k8s_router.get("/{cluster_id}/pods", response_model=dict)
+async def get_k8s_pods(cluster_id: str, namespace: str = ""):
+    """
+    Return pods from the desired cluster, filtered by namespace
+
+    Args:
+
+        cluster_id: the k8s cluster ID from witch the pods are obtained
+
+        namespace: the namespace of pods to be retrieved, if empty pods are retrieved for all namespaces
+
+    Returns:
+
+        a V1PodList list with pod belonging to the specified namespace
+    """
+
+    # Get k8s cluster and k8s config for client
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+
+    try:
+        # Try to install plugins to cluster
+        pod_list: V1PodList = get_pods_for_k8s_namespace(kube_client_config=k8s_config, namespace=namespace)
+
+    except ValueError as val_err:
+        logger.error(val_err)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
+
+    return pod_list.to_dict()

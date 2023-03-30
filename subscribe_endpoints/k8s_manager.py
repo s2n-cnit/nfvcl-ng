@@ -1,4 +1,5 @@
 import json
+import threading
 from logging import Logger
 from multiprocessing import Process, RLock
 from typing import List
@@ -29,6 +30,29 @@ class K8sManager:
         self.db: OSSdb = db
         self.nbiutil: NbiUtil = nbiutil
         self.lock: RLock = lock
+        self.stop: bool = False
+        self.locker = threading.RLock()
+
+    def is_closed(self) -> bool:
+        """
+        Check is this manager is closed. THREAD SAFE
+        Returns:
+            True if closed
+        """
+        self.locker.acquire()
+        is_stopped = self.stop
+        self.locker.release()
+        return is_stopped
+
+    def close(self):
+        """
+        Close this manager. THREAD SAFE
+        """
+        logger.debug("Closing process...")
+        self.locker.acquire()
+        self.stop = True
+        self.locker.release()
+        logger.debug("Process closed.")
 
     def get_k8s_cluster_by_id(self, cluster_id: str) -> K8sModel:
         """
@@ -71,6 +95,9 @@ class K8sManager:
         When a new message comes from the redis subscription
         """
         for message in subscriber.listen():
+            # If stop the for loop is exited and the process die
+            if self.is_closed():
+                break
             try:
                 self._delegate_operation(message)
             except Exception as e:

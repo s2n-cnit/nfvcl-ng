@@ -320,7 +320,7 @@ def get_k8s_version(kube_client_config: kubernetes.client.Configuration) -> K8sV
 
 
 @check_k8s_version(min_version=K8sVersion.V1_26)
-def get_k8s_cidr_info(kube_client_config: kubernetes.client.Configuration):
+def get_k8s_cidr_info2s(kube_client_config: kubernetes.client.Configuration):
     """
         Return the pod CIDR of a k8s cluster
 
@@ -347,7 +347,7 @@ def get_k8s_cidr_info(kube_client_config: kubernetes.client.Configuration):
 
 
 @deprecated
-def get_k8s_cidr(kube_client_config: kubernetes.client.Configuration) -> str:
+def get_k8s_cidr_info(kube_client_config: kubernetes.client.Configuration) -> str:
     """
     Return the pod CIDR of a k8s cluster
 

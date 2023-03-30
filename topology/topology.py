@@ -81,7 +81,13 @@ class Topology:
             logger.error('not possible to allocate a new topology, since another one is already declared')
             raise ValueError('not possible to allocate a new topology, since another one is already declared')
         self._data = topo
-        for vim in self._data['vims']:
+
+        # Moving vim in the request into tmp array, in this way, when performing operation to populate vims, a loop is
+        # avoided.
+        tmp_vims = self._data['vims']
+        self._data['vims'] = []
+
+        for vim in tmp_vims:
             logger.info('starting terraforming VIM {}'.format(vim['name']))
             # self.os_terraformer[vim['name']] = VimTerraformer(vim)
             self.add_vim(vim, terraform=terraform)
@@ -98,14 +104,14 @@ class Topology:
             logger.error('not possible to delete the topology. No topology is currently allocated')
             raise ValueError('not possible to delete the topology. No topology is currently allocated')
 
-        if terraform:
-            for vim in self._data['vims']:
-                error: Exception
-                try:
-                    self.del_vim(vim)
-                except Exception as error:
-                    logger.error("{}".format(error))
-                    raise error
+        # Check for terraform is done inside del_vim method
+        for vim in self._data['vims']:
+            error: Exception
+            try:
+                self.del_vim(vim)
+            except Exception as error:
+                logger.error("{}".format(error))
+                raise error
 
         self._os_terraformer = {}
         self._data = {'vims': [], 'networks': [], 'routers': [], 'kubernetes': [], 'pdus': []}
@@ -164,6 +170,7 @@ class Topology:
     @obj_multiprocess_lock
     def del_vim(self, vim, terraform=False):
         # FixMe: if there are services on the VIM, OSM will not delete it
+        # In every case (of terraform) we need to delete VIM account from OSM.
         try:
             osm_vim = self.nbiutil.get_vim_by_tenant_and_name(vim['name'], vim['vim_tenant_name'])
             logger.debug(osm_vim)
@@ -174,6 +181,7 @@ class Topology:
             data = self.nbiutil.del_vim(osm_vim['_id'])
             logger.debug(data)
 
+        # If terraform is enabled then we need to delete also OpenStack resources
         if terraform:
             # remove all networks, ports and routers
             for router in self._data['routers']:

@@ -2,14 +2,14 @@ import json
 from logging import Logger
 from typing import List
 from fastapi import APIRouter, HTTPException, Body, status
-from kubernetes.client import V1PodList
+from kubernetes.client import V1PodList, V1Namespace, ApiException
 from models.k8s import K8sModel
 from main import *
 from models.k8s.k8s_models import K8sPluginName, K8sOperationType, K8sModelManagement
 from rest_endpoints.rest_callback import RestAnswer202
 from topology import Topology
 from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins, \
-    get_k8s_cidr_info, get_pods_for_k8s_namespace
+    get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
 from utils.redis.redis_manager import get_redis_instance
 
 k8s_router = APIRouter(
@@ -184,3 +184,35 @@ async def get_k8s_pods(cluster_id: str, namespace: str = ""):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
 
     return pod_list.to_dict()
+
+
+@k8s_router.put("/{cluster_id}/namespace/{name}", response_model=dict)
+async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = Body(...)):
+    """
+    Create a namespace on the target k8s cluster.
+
+    Args:
+
+        cluster_id: the k8s cluster ID on witch the namespace is created
+
+        name: the name to be given at the new namespace
+
+        labels: the labels to be applied at the namespace
+
+    Returns:
+        the created namespace
+    """
+
+    # Get k8s cluster and k8s config for client
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+
+    try:
+        # Try to install plugins to cluster
+        created_namespace: V1Namespace = k8s_create_namespace(k8s_config, namespace_name=name, labels=labels)
+
+    except (ValueError, ApiException) as val_err:
+        logger.error(val_err)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
+
+    return created_namespace.to_dict()

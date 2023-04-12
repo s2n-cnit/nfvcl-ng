@@ -35,6 +35,7 @@ class K8sManager:
         self.lock: RLock = lock
         self.stop: bool = False
         self.locker = threading.RLock()
+        subscriber.subscribe(K8S_MANAGEMENT_TOPIC)
 
     def is_closed(self) -> bool:
         """

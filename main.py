@@ -4,7 +4,7 @@ from topology import topology_worker, topology_lock, topology_msg_queue
 from nfvo import PNFmanager, NbiUtil
 from multiprocessing import Process
 from blueprints import LCMWorkers
-from subscribe_endpoints.k8s_manager import K8sManager
+from subscribe_endpoints.k8s_manager import initialize_k8s_man_subscriber_test, K8sManager
 import signal
 import atexit
 
@@ -17,12 +17,12 @@ pnf_manager = PNFmanager()
 Process(target=topology_worker, args=(db, nbiUtil, topology_msg_queue, topology_lock)).start()
 
 
-# Starting subscribe manager, add on_close() in handle_exit when adding a new subscriber to events.
+# Starting subscribe managers. Add close() in handle_exit when adding a new subscriber to redis events.
 logger.info("Starting subscribers")
-k8s_manager: K8sManager = K8sManager(db=db, nbiutil=nbiUtil, lock=topology_lock)
-k8s_manager.initialize_k8s_man_subscriber()
+k8s_manager: K8sManager = initialize_k8s_man_subscriber_test(db, nbiUtil, topology_lock)
 
 # ----------------------- ON CLOSE SECTION --------------------
+
 
 def handle_exit(*args):
     """
@@ -32,12 +32,13 @@ def handle_exit(*args):
         logger.info("Closing all subscribers endpoints processes")
         k8s_manager.close()
         logger.info("Successfully closed all subscriber endpoints processes")
-    except BaseException as exception:
+    except BaseException as err:
         logger.error("Error while closing subscriber endpoints!!!")
-        logger.error(exception)
+        logger.error(err)
 
 
 # Setup on close handler. It does NOT work with Pycharm stop button! Only with CTRL+C or SIGTERM or SIGINT"!!!!
+# Pycharm terminate the process such that handle_exit is not called.
 atexit.register(handle_exit)
 signal.signal(signal.SIGTERM, handle_exit)
 signal.signal(signal.SIGINT, handle_exit)

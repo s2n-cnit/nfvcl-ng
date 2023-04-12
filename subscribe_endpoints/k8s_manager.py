@@ -16,14 +16,17 @@ from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_conte
 from utils.log import create_logger
 from utils.persistency import OSSdb
 from utils.redis.redis_manager import get_redis_instance
+from utils.redis.topic_list import K8S_MANAGEMENT_TOPIC
 
-K8S_MANAGEMENT_TOPIC = "K8S_MAN"
-
+# ------ Utils
 redis_cli: redis.Redis = get_redis_instance()
 subscriber: PubSub = redis_cli.pubsub()
-
 logger: Logger = create_logger("K8S MAN")
 
+
+#
+# Look at the bottom for singleton pattern implementation!
+#
 
 class K8sManager:
     def __init__(self, db: OSSdb, nbiutil: NbiUtil, lock: RLock):
@@ -81,13 +84,6 @@ class K8sManager:
         except Exception as err:
             logger.error(err)
 
-    def initialize_k8s_man_subscriber(self):
-        """
-        Subscribe to the K8S_MAN topic and start a process that will handle kubernetes management operations.
-        """
-        subscriber.subscribe("K8S_MAN")
-        Process(target=self.listen_to_k8s_management, args=()).start()
-
     def listen_to_k8s_management(self):
         """
         This function is continuously listening for new message on the K8S_MANAGEMENT_TOPIC.
@@ -106,7 +102,8 @@ class K8sManager:
 
     def _delegate_operation(self, message: dict):
         """
-        The operation is delegated to the correct function.
+        The operation is delegated to the correct function. It looks for the operation type.
+
         Args:
             message: the received message
         """
@@ -125,6 +122,7 @@ class K8sManager:
                 msg_err = "Received model, from subscription, is impossible to validate"
                 logger.error(msg_err)
                 raise ValidationError
+            logger.info("Received operation {}. Starting processing the request...".format(management_model.k8s_ops))
             if management_model.k8s_ops == K8sOperationType.INSTALL_PLUGIN:
                 self.install_plugins(management_model.cluster_id, json.loads(management_model.data))
             elif management_model.k8s_ops == K8sOperationType.APPLY_YAML:
@@ -198,3 +196,35 @@ class K8sManager:
             list_to_ret.append(element.to_dict())
 
         logger.info("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
+
+
+#
+k8s_instance: K8sManager = None
+
+
+def initialize_k8s_man_subscriber_test(db: OSSdb, nbiutil: NbiUtil, lock: RLock) -> K8sManager:
+    """
+    Instantiate a k8s manager if it is not already present. Then it start the manager that will listen on his redis topic.
+
+    Args:
+        db: The database
+        nbiutil: The nbiUtil from main
+        lock: The topology lock
+
+    Returns:
+        The instantiated K8s manager
+    """
+    global k8s_instance
+    if k8s_instance is None:
+        k8s_instance = K8sManager(db, nbiutil, lock)
+    # Start a sub process that will listen on redis topic
+    Process(target=__start).start()
+    return k8s_instance
+
+
+def __start():
+    """
+    This method is necessary because Process start require that the method is in the file namespace, not inside a class.
+    """
+    global k8s_instance
+    k8s_instance.listen_to_k8s_management()

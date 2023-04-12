@@ -330,6 +330,18 @@ class Free5GC_K8s(Blue5GBase):
             self.nsd_.append(nsd_item)
             param_name_list.append(param['name'])
         return param_name_list
+    def add_tac_nsd(self, model_msg) -> list:
+        nsd_names = []
+        msg = model_msg.dict()
+        for area in msg['areas']:
+            if "core" in area and area["core"]:
+                # if area is core, do nothing
+                pass
+            else:
+                vim = self.get_vim_name(area['id'])
+                nsd_names.append(self.ran_nsd(area, vim))
+                nsd_names.extend(self.edge_nsd(area, vim))
+        return nsd_names
 
     def add_ext_nsd(self, msg) -> list:
         """

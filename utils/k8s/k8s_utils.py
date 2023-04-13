@@ -5,7 +5,7 @@ from typing import List
 import kubernetes.client
 import kubernetes.utils
 from kubernetes import config
-from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, VersionInfo, V1ConfigMap
+from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, VersionInfo, V1ConfigMap, V1Namespace, V1ObjectMeta
 from kubernetes.client.rest import ApiException
 from config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
 from models.k8s import K8sModel, K8sDaemon, K8sVersion
@@ -105,10 +105,12 @@ def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configurati
     """
     Get pods from a k8s instance that belongs to the given namespace
 
-    @param kube_client_config the configuration of K8s on which the client is built.
+    Args:
+        kube_client_config: kube_client_config the configuration of K8s on which the client is built.
+        namespace: The namespace in witch this function looks.
 
-    @rtype V1PodList
-    @return: Return the list of pods (as V1PodList) belonging to that namespace in the given k8s cluster.
+    Returns:
+        Return the list of pods (as V1PodList) belonging to that namespace in the given k8s cluster.
     """
     # Enter a context with an instance of the API kubernetes.client
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
@@ -200,6 +202,7 @@ def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, di
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         try:
             if dict_to_be_applied:
+                # TODO Does not support Custom Resources like below
                 result_dict = kubernetes.utils.create_from_dict(api_client, dict_to_be_applied)
             if yaml_file_to_be_applied:
                 result_yaml = kubernetes.utils.create_from_yaml(api_client, yaml_file_to_be_applied)
@@ -233,6 +236,7 @@ def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configurati
     result: dict = {}
 
     # Checking plugins to be installed
+    # Raise error if problem
     check_plugin_to_be_installed(installed_plugins=installed_plugins, plugins_to_install=plugins_to_install)
 
     for plugin in plugins_to_install:
@@ -246,6 +250,34 @@ def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configurati
             result_list.append(apply_def_to_cluster(kube_client_config, yaml_file_to_be_applied=yaml_file)[1])
         result[plugin.value] = result_list
     return result
+
+
+def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str, labels: dict) -> V1Namespace:
+    """
+    Create a namespace in a k8s cluster.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace: The name of the namespace
+
+    Returns:
+        The created namespace
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        object_metadata = V1ObjectMeta(name=namespace_name, labels=labels)
+        namespace: V1Namespace = V1Namespace(api_version='v1', kind='Namespace', metadata=object_metadata)
+        try:
+            namespace = api_instance_core.create_namespace(body=namespace)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api--->create_namespace: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return namespace
 
 
 def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins_to_install: List[K8sPluginName]):

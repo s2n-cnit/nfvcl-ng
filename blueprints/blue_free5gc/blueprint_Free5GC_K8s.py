@@ -97,7 +97,8 @@ class Free5GC_K8s(Blue5GBase):
             }],
         }
         self.primitives = []
-        self.vnfd = {'core': [], 'area': []}
+        if "core" not in self.vnfd or "area" not in self.vnfd:
+            self.vnfd = {'core': [], 'area': []}
         self.userManager = Configurator_Free5GC_User()
         self.coreManager = Configurator_Free5GC_Core(copy.deepcopy(free5GC_default_config.default_config))
 
@@ -632,10 +633,10 @@ class Free5GC_K8s(Blue5GBase):
         try:
             vim = next((item for item in self.get_vims() if item['name'] == ns['vim']), None)
             if vim is None:
-                raise ValueError("get_ip vim is None")
+                raise ValueError("get_ip: vim is None")
             area_id = next((item for item in vim['areas'] if item == ns['area']), None)
             if area_id is None:
-                raise ValueError("get_ip tac is None")
+                raise ValueError("get_ip: Area is None")
 
             logger.info('(EXT)Setting IP addresses for {} nsi for Area {} on VIM {}'
                         .format(ns['type'].upper(), area_id, vim['name']))

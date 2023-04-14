@@ -122,6 +122,7 @@ class VnfEE:
             playbooks = sorted(config['playbooks'], key=lambda x: x['prio'])
             self.logger.debug('downloading playbooks and config files from NFVCL')
             for file_ in conf_files + playbooks:
+                self.logger.debug("Retrieving file {} from {}".format(file_['name'], file_['src']))
                 result = urllib.request.urlretrieve(file_['src'], '{}/{}'.format(self.PLAYBOOK_PATH, file_['name']))
                 self.logger.debug('{} --> {}\n'.format(file_['src'], file_['name']))
 

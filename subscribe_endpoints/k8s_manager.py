@@ -1,4 +1,7 @@
+import atexit
 import json
+import os
+import signal
 import threading
 from logging import Logger
 from multiprocessing import Process, RLock
@@ -48,15 +51,16 @@ class K8sManager:
         self.locker.release()
         return is_stopped
 
-    def close(self):
+    def close(self, *args):
         """
         Close this manager. THREAD SAFE
         """
-        logger.debug("Closing process...")
+        logger.debug("Closing K8S manager...")
         self.locker.acquire()
         self.stop = True
         self.locker.release()
-        logger.debug("Process closed.")
+        logger.debug("Killing K8S manager...")
+        os.kill(os.getpid(), signal.SIGKILL)
 
     def get_k8s_cluster_by_id(self, cluster_id: str) -> K8sModel:
         """
@@ -199,33 +203,33 @@ class K8sManager:
         logger.info("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
 
 
-#
-k8s_instance: K8sManager = None
+# ----- Global functions for multiprocessing compatibility -----
+# It requires functions in the namespace of the file (not in classes)
 
-
-def initialize_k8s_man_subscriber_test(db: OSSdb, nbiutil: NbiUtil, lock: RLock) -> K8sManager:
+def initialize_k8s_man_subscriber(db: OSSdb, nbiutil: NbiUtil, lock: RLock):
     """
-    Instantiate a k8s manager if it is not already present. Then it start the manager that will listen on his redis topic.
+    Start new K8S manager.
 
     Args:
         db: The database
         nbiutil: The nbiUtil from main
         lock: The topology lock
-
-    Returns:
-        The instantiated K8s manager
     """
-    global k8s_instance
-    if k8s_instance is None:
-        k8s_instance = K8sManager(db, nbiutil, lock)
+
     # Start a sub process that will listen on redis topic
-    Process(target=__start).start()
-    return k8s_instance
+    Process(target=__start, args=(db, nbiutil, lock)).start()
 
 
-def __start():
+def __start(db: OSSdb, nbiutil: NbiUtil, lock: RLock):
     """
-    This method is necessary because Process start require that the method is in the file namespace, not inside a class.
+    Generate a new manager in order to listen at the k8s management topic.
+    Setup signals handler for closing K8S manager.
+    Start listening at the incoming messages from redis.
     """
-    global k8s_instance
+    k8s_instance = K8sManager(db, nbiutil, lock)
+
+    atexit.register(k8s_instance.close)
+    signal.signal(signal.SIGTERM, k8s_instance.close)
+    signal.signal(signal.SIGINT, k8s_instance.close)
+
     k8s_instance.listen_to_k8s_management()

@@ -1,7 +1,11 @@
 #!/usr/bin/python3
+from starlette import status
+
 import rest_endpoints.blue
 from main import *
 from fastapi import FastAPI
+
+from rest_endpoints.rest_callback import RestAnswer202
 from rest_endpoints.topology import topology_router
 from rest_endpoints.blue import blue_router
 from rest_endpoints.day2action import day2_router
@@ -40,3 +44,10 @@ if not os.path.exists(day2_files):
 app.mount("/nfvcl_day2/day2", StaticFiles(directory="day2_files"), name="day2_files")
 app.mount("/helm_repo", StaticFiles(directory="helm_charts"), name="helm_repo")
 
+@app.post("/close", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED)
+async def close_nfvcl():
+    """
+    Terminate the NFVCL.
+    """
+    os.kill(os.getpid(), signal.SIGTERM)
+    return RestAnswer202(id="close", description="Closing")

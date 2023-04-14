@@ -34,19 +34,15 @@ def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
 
         The matching k8s cluster or Throw HTTPException if NOT found.
     """
-    try:
-        topology = Topology.from_db(db, nbiUtil, topology_lock)
-        k8s_clusters: List[K8sModel] = topology.get_k8scluster_model()
-        match = next((x for x in k8s_clusters if x.name == cluster_id), None)
+    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    k8s_clusters: List[K8sModel] = topology.get_k8scluster_model()
+    match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
-        if match:
-            return match
-        else:
-            logger.error("K8s cluster {} not found".format(cluster_id))
-            raise HTTPException(status_code=404, detail="K8s cluster {} not found".format(cluster_id))
-    except Exception as err:
-        logger.error(err)
-        raise HTTPException(status_code=400, detail="Failed getting k8s cluster {}".format(cluster_id))
+    if match:
+        return match
+    else:
+        logger.error("K8s cluster {} not found".format(cluster_id))
+        raise HTTPException(status_code=404, detail="K8s cluster {} not found".format(cluster_id))
 
 
 @k8s_router.get("/{cluster_id}/plugins", response_model=List[K8sPluginName], summary="", description="")

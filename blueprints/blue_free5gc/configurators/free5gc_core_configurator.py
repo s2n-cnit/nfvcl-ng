@@ -734,10 +734,16 @@ class Configurator_Free5GC_Core():
         """
         snssaiInfos = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"] \
             ["configurationBase"]["snssaiInfos"]
-        userplaneInformationLinks = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"] \
-            ["configurationBase"]["userplaneInformation"]["links"]
-        userplaneInformationUpNodes = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"] \
-            ["configurationBase"]["userplaneInformation"]["upNodes"]
+        try:
+            userplaneInformationLinks = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"] \
+                ["configurationBase"]["userplaneInformation"]["links"]
+        except Exception as e:
+            userplaneInformationLinks = []
+        try:
+            userplaneInformationUpNodes = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"] \
+                ["configurationBase"]["userplaneInformation"]["upNodes"]
+        except Exception as e:
+            userplaneInformationUpNodes = {}
 
         if sliceList != None:
             for snssiInfosIndex, snssiInfosItem in enumerate(snssaiInfos):
@@ -1241,7 +1247,8 @@ class Configurator_Free5GC_Core():
 
         return res
 
-    def del_slice(self, msg: dict) -> None:
+    def del_slice(self, msgModel) -> None:
+        msg = msgModel.dict()
         if msg is None:
             logger.warn("Conf is None")
             return

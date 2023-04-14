@@ -7,7 +7,7 @@ class ConfiguratorUeUeRanSim(Configurator_Flex):
     def __init__(self, nsd_id, m_id, blue_id, args):
         self.type = "UE_ueransim"
         super(ConfiguratorUeUeRanSim, self).__init__(nsd_id, m_id, blue_id)
-        self.addPlaybook("blueprints/blue_ueransim/config_scripts/playbook_ue_ueransim_init.yaml")
+        self.addPlaybook("blueprints/blue_ueransim/config_scripts/playbook_ue_ueransim_init.yaml", vars_={})
         logger.debug("ConfiguratorUeUeRanSim created.\ngnbSearchList: {}".format(args['vim_gnbs_ips']))
         for sim_index, sim in enumerate(args['sims']):
             jinja_vars = {

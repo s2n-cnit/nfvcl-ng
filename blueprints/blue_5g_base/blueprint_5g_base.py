@@ -8,6 +8,29 @@ from utils.util import create_logger
 # create logger
 logger = create_logger('Abstract5GBlue')
 
+class SstConvertion():
+    sstType = {"EMBB": 1, "URLLC": 2, "MMTC": 3}
+
+    def __init__(self) -> None:
+        pass
+
+    @classmethod
+    def to_string(cls, value: int = None) -> str:
+        return next((k for k, v in cls.sstType.items() if v == value), None)
+
+    @classmethod
+    def to_int(cls, value: str = None) -> int:
+        return next((v for k,v in cls.sstType.items() if k == value), None)
+
+class NssiConvertion(SstConvertion):
+    @classmethod
+    def toNssi(cls, fromSlice: dict = None):
+        return {"sst": cls.to_int(fromSlice["sliceType"]), "sd": fromSlice["sliceId"]}
+
+    @classmethod
+    def toSlice(cls, fromNssi: dict = None):
+        return {"sliceType": cls.to_string(fromNssi["sst"]),"sliceId": fromNssi["sd"]}
+
 
 class Blue5GBase(BlueprintBase, ABC):
 
@@ -143,7 +166,6 @@ class Blue5GBase(BlueprintBase, ABC):
         area = next(item for item in self.conf['areas'] if item['id'] == nsd_item['area'])
         vim = self.get_vim_name(nsd_item['area'])
         pdu_item = self.topology_get_pdu_by_area_and_type(area['id'], 'nb')
-        # pdu_item = db.findone_DB('pdu', {'tac': str( tac['id'] )})
 
         # TODO: here we should probably check which kind of RAN we are going to realize (4G, 5G NSA, 5G SA, ...)
         # TODO: support tunnels
@@ -176,8 +198,11 @@ class Blue5GBase(BlueprintBase, ABC):
             conf_data['amf_ip'] = self.conf['config']['amf_ip']
 
         # add already enabled slices to the ran
-        if 'nssai' in self.conf:  #Fixme update to the new intent schema
-            conf_data['nssai'] = self.conf['nssai']
+        if 'slices' in area:
+            conf_data['nssai'] = [NssiConvertion.toNssi(i) for i in area['slices']]
+        #if 'nssai' in self.conf:  #Fixme update to the new intent schema
+        # conf_data['nssai'] = self.conf['nssai']
+
         # override gnb settings from arg
         if 'nb_config' in self.conf:
             conf_data['nb_config'] = self.conf['nb_config']

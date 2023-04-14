@@ -33,7 +33,7 @@ class Configurator_UeRanSimNB(Configurator_Flex):
 
 
         if 'nssai' in args:
-            if isinstance(self.conf['nssai'], list):
+            if isinstance(args['nssai'], list):
                 self.conf['nssai'] = args['nssai']
             else:
                 self.conf['nssai'] = [args['nssai']]

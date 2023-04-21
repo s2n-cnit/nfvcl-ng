@@ -99,8 +99,84 @@ class Free5GC_K8s(Blue5GBase):
         self.primitives = []
         if "core" not in self.vnfd or "area" not in self.vnfd:
             self.vnfd = {'core': [], 'area': []}
+        if "running_free5gc_configuration" not in self.conf:
+            self.conf["running_free5gc_configuration"] = free5GC_default_config.default_config
         self.userManager = Configurator_Free5GC_User()
-        self.coreManager = Configurator_Free5GC_Core(copy.deepcopy(free5GC_default_config.default_config))
+        self.coreManager = Configurator_Free5GC_Core(self.conf["running_free5gc_configuration"], self.conf)
+
+    def sumConfig(self, conf1: dict, conf2: dict):
+        """
+        Add "conf2" to "conf1"
+        @param conf1:
+        @param conf2:
+        @return:
+        """
+        if "config" not in conf1:
+            if "config" in conf2:
+                conf1["config"] = copy.deepcopy(conf2["config"])
+        else:
+            if "config" in conf2:
+                config1 = conf1["config"]
+                config2 = conf2["config"]
+                if "network_endpoints" not in config1:
+                    if "network_endpoints" in config2:
+                        config1["network_endpoints"] = copy.deepcopy(config2["network_endpoints"])
+                else:
+                    if "network_endpoints" in config2:
+                        network_endpoints1 = config1["network_endpoints"]
+                        network_endpoints2 = config2["network_endpoints"]
+                        if "data_nets" not in network_endpoints1 or network_endpoints1["data_nets"] is None:
+                            if "data_nets" in network_endpoints2:
+                                network_endpoints1["data_nets"] = copy.deepcopy(network_endpoints2["data_nets"])
+                        else:
+                            data_nets1 = network_endpoints1["data_nets"]
+                            data_nets2 = network_endpoints2["data_nets"]
+                            for data2 in data_nets2:
+                                data1 = next((item for index, item in enumerate(data_nets1) if item["dnn"] == data2["dnn"]),
+                                             None)
+                                if data1:
+                                    data_nets1.remove(data1)
+                                data_nets1.append(copy.deepcopy(data2))
+                if "sliceProfiles" not in config1:
+                    if "sliceProfiles" not in config2:
+                        config1["sliceProfiles"] = copy.deepcopy(config2["sliceProfiles"])
+                else:
+                    if "sliceProfiles" in config2:
+                        sliceProfiles1 = config1["sliceProfiles"]
+                        sliceProfiles2 = config2["sliceProfiles"]
+                        for slice2 in sliceProfiles2:
+                            slice1 = next((item for index, item in enumerate(sliceProfiles1)
+                                           if item["sliceId"] == slice2["sliceId"] and item["sliceType"] == slice2["sliceType"]), None)
+                            if slice1:
+                                sliceProfiles1.remove(slice1)
+                            sliceProfiles1.append(copy.deepcopy(slice2))
+                if "subscribers" not in config1:
+                    if "subscribers" in config2:
+                        config1["subscribers"] = copy.deepcopy(config2["subscribers"])
+                else:
+                    if "subscribers" in config2:
+                        subscribers1 = config1["subscribers"]
+                        subscribers2 = config2["subscribers"]
+                        for s2 in subscribers2:
+                            s1 = next((item for index, item in enumerate(subscribers1)
+                                                if item["imsi"] == s2["imsi"]), None)
+                            if s1:
+                                subscribers1.remove(s1)
+                            subscribers1.append(copy.deepcopy(s2))
+        if "areas" not in conf1:
+            if "areas" in conf2:
+                conf1["areas"] = copy.deepcopy(conf2["areas"])
+        else:
+            if "areas" in conf2:
+                areas1 = conf1["areas"]
+                areas2 = conf2["areas"]
+                for a2 in areas2:
+                    a1 = next((item for index, item in enumerate(areas1) if item["id"] == a2["id"]), None)
+                    if a1:
+                        areas1.remove(a1)
+                    areas1.append(copy.deepcopy(a2))
+
+
 
     def set_baseCoreVnfd(self, vls) -> None:
         if not vls:
@@ -243,6 +319,7 @@ class Free5GC_K8s(Blue5GBase):
                                              gatewayIP=core_gatewayIP )
 
         self.coreManager.add_tacs_and_slices(self.conf)
+        self.to_db()
 
         vnfd_ = self.getVnfd('core')
         # Kubernetes
@@ -331,9 +408,12 @@ class Free5GC_K8s(Blue5GBase):
             self.nsd_.append(nsd_item)
             param_name_list.append(param['name'])
         return param_name_list
+
     def add_tac_nsd(self, model_msg) -> list:
         nsd_names = []
         msg = model_msg.dict()
+        self.sumConfig(self.conf, msg)
+        self.to_db()
         for area in msg['areas']:
             if "core" in area and area["core"]:
                 # if area is core, do nothing
@@ -421,6 +501,7 @@ class Free5GC_K8s(Blue5GBase):
         tail_res = []
 
         self.coreManager.day2_conf(self.conf)
+        self.to_db()
 
         for n in self.nsd_:
             # configuration of external (ie. VM, not in k8s) 5G core modules, if exists (like "AMF", "UPF", etc)
@@ -479,15 +560,32 @@ class Free5GC_K8s(Blue5GBase):
                     self.nsd_.pop(nsd_i)
         return nsi_to_delete
 
-    def add_tac_conf(self, msg) -> list:
-        res = self.coreManager.add_tac_conf(msg)
+    def add_tac_conf(self, model_msg) -> list:
+        res = []
+        # "areas" msg information were merged in "add_tac_nsd" function
+        msg = model_msg.dict()
+        self.coreManager.add_tacs_and_slices(msg)
+        self.coreManager.day2_conf(msg)
+
+        if "areas" in msg:
+            for n in self.nsd_:
+                if n["area"] in [item["id"] for item in msg["areas"]]:
+                    if n['type'] == 'ran':
+                        res += self.ran_day2_conf(msg, n)
+                    elif n['type'] in edge_vnfd_type:
+                        # configuration of edge 5G core modules (like "UPFs")
+                        res += self.edge_day2_conf(msg, n)
+
+        #res = self.coreManager.add_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
+        self.to_db()
         res += self.core_upXade({'config': self.coreManager.getConfiguration()})
         return res
 
     def del_tac_conf(self, msg) -> list:
         res = self.coreManager.del_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
+        self.to_db()
         res += self.core_upXade({'config': self.coreManager.getConfiguration()})
         return res
 
@@ -528,6 +626,7 @@ class Free5GC_K8s(Blue5GBase):
 
         res += self.coreManager.add_slice(msg)
         self.coreManager.config_5g_core_for_reboot()
+        self.to_db()
         res += tail_res + self.core_upXade({'config': self.coreManager.getConfiguration()})
 
         return res
@@ -592,6 +691,7 @@ class Free5GC_K8s(Blue5GBase):
 
         self.coreManager.del_slice(msg)
         self.coreManager.config_5g_core_for_reboot()
+        self.to_db()
         res += self.core_upXade({'config': self.coreManager.getConfiguration()}) + tail_res
 
         return res
@@ -699,6 +799,10 @@ class Free5GC_K8s(Blue5GBase):
 
             if key:
                 if key not in self.conf['config']: self.conf['config'][key] = []
+                # delete the old element if exists
+                for index, item in enumerate(self.conf["config"][key]):
+                    if item["nsi_id"] == n["nsi_id"]:
+                        self.conf["config"][key].pop(index)
                 self.conf['config'][key].append({
                     'ip': vlds["data"][0]["ip"],
                     'nsi_id': n['nsi_id'],

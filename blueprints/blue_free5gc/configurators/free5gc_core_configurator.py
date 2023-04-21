@@ -29,15 +29,30 @@ class SstConvertion():
 
 
 class Configurator_Free5GC_Core():
-    def __init__(self, running_free5gc_conf: string = None) -> None:
+    def __init__(self, running_free5gc_conf: string = None, conf: dict = None) -> None:
         if running_free5gc_conf == None:
             raise ValueError("The Free5GC configuration file is empty")
         self.running_free5gc_conf = running_free5gc_conf
+        if conf == None:
+            raise ValueError("The \"conf\" configuration is empty")
+        self.conf = conf
         # used for NSSF configuration
         self.nsiIdCounter = 0
-        self.smfName = "SMF-{0:06X}".format(random.randrange(0x000000, 0xFFFFFF))
-        self.n3iwfId = random.randint(1, 9999)
-        self.nssfName = "{0:06x}".format(random.randrange(0x000000, 0xFFFFFF))
+        try:
+            self.smfName = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]\
+                ["configurationBase"]["smfName"]
+        except Exception:
+            self.smfName = "SMF-{0:06X}".format(random.randrange(0x000000, 0xFFFFFF))
+        try:
+            self.n3iwfId = self.running_free5gc_conf["free5gc-n3iwf"]["n3iwf"]["configuration"]\
+                ["configurationBase"]["N3IWFInformation"]["Name"]
+        except Exception:
+            self.n3iwfId = random.randint(1, 9999)
+        try:
+            self.nssfName = self.running_free5gc_conf["free5gc-nssf"]["nssf"]["configuration"]\
+                ["configurationBase"]["nssfName"]
+        except Exception:
+            self.nssfName = "{0:06x}".format(random.randrange(0x000000, 0xFFFFFF))
 
     def get_dnn_list_from_net_names(self, msg: dict = None, netNames: list = None) -> List:
         """
@@ -1023,8 +1038,6 @@ class Configurator_Free5GC_Core():
                     dnnInfoList: list = None):
         """
         Add UPF(s) data to the configuration of SMF and restart SMF module in Free5GC deployment
-
-        :return: day2 object to add to "res" list for execution
         """
         if conf is None:
             logger.warn("Conf is None")
@@ -1103,8 +1116,9 @@ class Configurator_Free5GC_Core():
                                            groupName=groupName)
         self.config_5g_core_for_reboot()
 
+        return []
+
     def day2_conf(self, msg: dict):
-        #tail_res = []
         smfName = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]["smfName"]
 
         if "areas" in msg:
@@ -1113,9 +1127,9 @@ class Configurator_Free5GC_Core():
                 if "slices" in area:
                     for slice in area["slices"]:
                         s = {"sd": slice["sliceId"], "sst": SstConvertion.to_int(slice["sliceType"]) }
-                        message_dnnList = self.get_dnn_list_from_net_names(msg,
-                                self.get_dnn_names_from_slice(msg, slice["sliceType"], slice["sliceId"]))
-                        self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=s,
+                        message_dnnList = self.get_dnn_list_from_net_names(self.conf,
+                                self.get_dnn_names_from_slice(self.conf, slice["sliceType"], slice["sliceId"]))
+                        self.smf_add_upf(conf=self.conf, smfName=smfName, tac=area["id"], slice=s,
                                                 dnnInfoList=message_dnnList)
                         for dnn in message_dnnList:
                             if dnn not in dnnList:
@@ -1123,15 +1137,13 @@ class Configurator_Free5GC_Core():
 
                 if len(dnnList) != 0:
                     #  add default and slices Dnn list to UPF conf
-                    for upf in msg["config"]["upf_nodes"]:
+                    for upf in self.conf["config"]["upf_nodes"]:
                         if upf["area"] == area["id"]:
                             if "dnnList" in upf:
                                 upf["dnnList"].extend(dnnList)
                             else:
                                 upf["dnnList"] = copy.deepcopy(dnnList)
                             break
-
-        #return tail_res
 
     def add_tac_conf(self, msg: dict) -> list:
         res = []
@@ -1142,9 +1154,9 @@ class Configurator_Free5GC_Core():
                 # add specific slices
                 if "slices" in area:
                     for slice in area["slices"]:
-                        dnnList = self.get_dnn_list_from_net_names(msg,
-                                        self.get_dnn_names_from_slice(msg, slice["sliceType"], slice["sliceId"]))
-                        res += self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"],
+                        dnnList = self.get_dnn_list_from_net_names(self.conf,
+                                        self.get_dnn_names_from_slice(self.conf, slice["sliceType"], slice["sliceId"]))
+                        res += self.smf_add_upf(conf=self.conf, smfName=smfName, tac=area["id"],
                                     slice={"sst": SstConvertion.to_int(slice["sliceType"]),
                                            "sd": slice["sliceId"]}, dnnInfoList=dnnList)
 
@@ -1163,9 +1175,9 @@ class Configurator_Free5GC_Core():
                                         "tacList": [{"id": area["id"]}]}
                             sliceList.append(newSlice)
 
-        if sliceList:
-            message = {"config": {"slices": sliceList}}
-            self.add_slice(message)
+        # if sliceList:
+        #     message = {"config": {"slices": sliceList}}
+        #     self.add_slice(message)
 
         return res
 

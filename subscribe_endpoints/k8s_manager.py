@@ -6,39 +6,53 @@ import threading
 from logging import Logger
 from multiprocessing import Process, RLock
 from typing import List
+
+import kubernetes
 import redis
+import traceback
 import yaml
 from kubernetes.utils import FailToCreateError
 from pydantic import ValidationError
 from redis.client import PubSub
-from models.k8s.k8s_models import K8sModelManagement, K8sOperationType, K8sModel, K8sPluginName
+
+from models.k8s.blue_k8s_model import LBPool
+from models.k8s.k8s_models import K8sModelManagement, K8sOperationType, K8sModel, K8sPluginName, K8sPluginsToInstall, \
+    K8sTemplateFillData
 from nfvo import NbiUtil
 from topology import Topology
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, \
-    convert_str_list_2_plug_name, apply_def_to_cluster
+    convert_str_list_2_plug_name, apply_def_to_cluster, get_k8s_cidr_info
 from utils.log import create_logger
 from utils.persistency import OSSdb
 from utils.redis.redis_manager import get_redis_instance
 from utils.redis.topic_list import K8S_MANAGEMENT_TOPIC
 
-# ------ Utils
-redis_cli: redis.Redis = get_redis_instance()
-subscriber: PubSub = redis_cli.pubsub()
-logger: Logger = create_logger("K8S MAN")
-
-
-#
-# Look at the bottom for singleton pattern implementation!
-#
 
 class K8sManager:
+    redis_cli: redis.Redis = get_redis_instance()
+    subscriber: PubSub = redis_cli.pubsub()
+    logger: Logger
+    db: OSSdb
+    nbiutil: NbiUtil
+    lock: RLock
+    stop: bool
+
     def __init__(self, db: OSSdb, nbiutil: NbiUtil, lock: RLock):
-        self.db: OSSdb = db
-        self.nbiutil: NbiUtil = nbiutil
-        self.lock: RLock = lock
-        self.stop: bool = False
+        """
+        Initialize the object and start logger + redis client.
+        """
+        self.db = db
+        self.nbiutil = nbiutil
+        self.lock = lock
+        self.stop = False
         self.locker = threading.RLock()
-        subscriber.subscribe(K8S_MANAGEMENT_TOPIC)
+
+        self.redis_cli = get_redis_instance()
+        self.subscriber = self.redis_cli.pubsub()
+        self.logger = create_logger(K8S_MANAGEMENT_TOPIC)
+
+        self.subscriber.subscribe(K8S_MANAGEMENT_TOPIC)
+
 
     def is_closed(self) -> bool:
         """
@@ -55,11 +69,11 @@ class K8sManager:
         """
         Close this manager. THREAD SAFE
         """
-        logger.debug("Closing K8S manager...")
+        self.logger.debug("Closing K8S manager...")
         self.locker.acquire()
         self.stop = True
         self.locker.release()
-        logger.debug("Killing K8S manager...")
+        self.logger.debug("Killing K8S manager...")
         os.kill(os.getpid(), signal.SIGKILL)
 
     def get_k8s_cluster_by_id(self, cluster_id: str) -> K8sModel:
@@ -73,21 +87,17 @@ class K8sManager:
 
         Returns:
 
-            The matching k8s cluster or Throw HTTPException if NOT found.
+            The matching k8s cluster or Throw ValueError if NOT found.
         """
-        try:
-            topology = Topology.from_db(self.db, self.nbiutil, self.lock)
-            k8s_clusters: List[K8sModel] = topology.get_k8scluster_model()
-            match = next((x for x in k8s_clusters if x.name == cluster_id), None)
+        topology = Topology.from_db(self.db, self.nbiutil, self.lock)
+        k8s_clusters: List[K8sModel] = topology.get_k8scluster_model()
+        match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
-            if match:
-                return match
-            else:
-                msg_err = "K8s cluster {} not found".format(cluster_id)
-                logger.error(msg_err)
-                raise ValueError(msg_err)
-        except Exception as err:
-            logger.error(err)
+        if match:
+            return match
+        else:
+            msg_err = "K8s cluster {} not found".format(cluster_id)
+            raise ValueError(msg_err)
 
     def listen_to_k8s_management(self):
         """
@@ -95,15 +105,20 @@ class K8sManager:
 
         When a new message comes from the redis subscription
         """
-        for message in subscriber.listen():
+        # Alerting if there are no subscriptions
+        if(len(self.subscriber.channels)) <= 0:
+            self.logger.warning("There are NO active subscriptions to events!!!")
+
+        for message in self.subscriber.listen():
             # If stop the for loop is exited and the process die
             if self.is_closed():
                 break
             try:
                 self._delegate_operation(message)
-            except Exception as e:
-                logger.error("Error while executing required operation: {}".format(message))
-                logger.error(e)
+            except Exception as exct:
+                self.logger.error("Error while executing requested operation: {}".format(message))
+                self.logger.error(exct)
+                traceback.print_exc()
 
     def _delegate_operation(self, message: dict):
         """
@@ -116,61 +131,73 @@ class K8sManager:
         data = message['data']
         if message['type'] == 'subscribe':
             # Subscription confirmation
-            logger.info("Successfully subscribed to topic: {}".format(K8S_MANAGEMENT_TOPIC))
+            self.logger.info("Successfully subscribed to topic: {}".format(K8S_MANAGEMENT_TOPIC))
         elif message['type'] == 'unsubscribe':
             # Unsubscription confirmation
-            logger.info("Successfully unsubscribed from topic: {}".format(K8S_MANAGEMENT_TOPIC))
+            self.logger.info("Successfully unsubscribed from topic: {}".format(K8S_MANAGEMENT_TOPIC))
         elif message['type'] == 'message':
+            # --- Parsing the message in the model for k8s management ---
             try:
                 management_model: K8sModelManagement = K8sModelManagement.parse_obj(json.loads(data))
-            except ValidationError:
-                msg_err = "Received model, from subscription, is impossible to validate"
-                logger.error(msg_err)
-                raise ValidationError
-            logger.info("Received operation {}. Starting processing the request...".format(management_model.k8s_ops))
+            except ValidationError as val_err:
+                msg_err = "Received model is impossible to validate."
+                self.logger.error(msg_err)
+                raise val_err
+
+            self.logger.info("Received operation {}. Starting processing the request...".format(management_model.k8s_ops))
             if management_model.k8s_ops == K8sOperationType.INSTALL_PLUGIN:
-                self.install_plugins(management_model.cluster_id, json.loads(management_model.data))
+                self.install_plugins(management_model.cluster_id,
+                                     K8sPluginsToInstall.parse_obj(json.loads(management_model.data)))
             elif management_model.k8s_ops == K8sOperationType.APPLY_YAML:
                 self.apply_to_k8s(management_model.cluster_id, management_model.data)
             else:
-                logger.warning("Operation {} not supported".format(management_model.k8s_ops))
+                self.logger.warning("Operation {} not supported".format(management_model.k8s_ops))
         else:
             msg_err = "Redis message type not recognized."
-            logger.error(msg_err)
+            self.logger.error(msg_err)
             raise ValidationError(msg_err)
 
-    def install_plugins(self, cluster_id: str, plug_to_install: List[str]):
+    def install_plugins(self, cluster_id: str, plug_to_install_list: K8sPluginsToInstall):
         """
         Install a plugin to a target k8s cluster
 
         Args:
             cluster_id: The target k8s cluster
 
-            plug_to_install: The list, of enabled plugins, to be installed
+            plug_to_install_list: The list of enabled plugins to be installed together with data to fill plugin file
+            templates.
         """
         # Getting k8s cluster from topology
         cluster = self.get_k8s_cluster_by_id(cluster_id)
 
+        # Extracting names from K8sPluginToInstall list
+        plugin_names_raw_list: List[K8sPluginName] = plug_to_install_list.plugin_list
+        # Extracting additional data from K8sPluginToInstall list
+        template_fill_data: K8sTemplateFillData = plug_to_install_list.template_fill_data
+
         # Converting List[str] to List[K8sPluginNames]
-        plugin_list: List[K8sPluginName] = convert_str_list_2_plug_name(plug_to_install)
+        plugin_name_list: List[K8sPluginName] = convert_str_list_2_plug_name(plugin_names_raw_list)
 
         # Get k8s cluster and k8s config for client
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
-        try:
-            # Try to install plugins to cluster
-            installation_result: dict = install_plugins_to_cluster(kube_client_config=k8s_config,
-                                                                   plugins_to_install=plugin_list)
-            # Inspect installation_result for detailed info on the installation
-        except ValueError as val_err:
-            raise val_err
+        # Checking data that will be used to fill file templates. Setting default values if empty.
+        template_fill_data = self.check_and_reserve_template_data(template_fill_data, plugin_name_list, k8s_config,
+                                                                  cluster_id=cluster_id)
+
+        # Try to install plugins to cluster
+        installation_result: dict = install_plugins_to_cluster(kube_client_config=k8s_config,
+                                                               plugins_to_install=plugin_name_list,
+                                                               template_fill_data=template_fill_data,
+                                                               cluster_id=cluster_id,
+                                                               skip_plug_checks=plug_to_install_list.skip_plug_checks)
 
         # Return only the name of installed plugins
         to_print = []
         for plugin_result in installation_result:
             to_print.append(plugin_result)
 
-        logger.info("Plugins {} have been installed".format(to_print))
+        self.logger.info("Plugins {} have been installed".format(to_print))
 
     def apply_to_k8s(self, cluster_id: str, body):
         """
@@ -183,16 +210,19 @@ class K8sManager:
         cluster: K8sModel = self.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
-        yaml_request = yaml.safe_load(body)
+        # Loading a yaml in this way result in a dictionary
+        dict_request = yaml.safe_load_all(body)
 
         try:
-            result = apply_def_to_cluster(kube_client_config=k8s_config, dict_to_be_applied=yaml_request)
+            # The dictionary can be composed of multiple documents (divided by --- in the yaml)
+            for document in dict_request:
+                result = apply_def_to_cluster(kube_client_config=k8s_config, dict_to_be_applied=document)
         except FailToCreateError as err:
-            logger.error(err)
+            self.logger.error(err)
             if err.args[0][0].status == 409:
                 msg_err = "At least one of the yaml resources already exist"
             else:
-                msg_err = "Error while creating resources"
+                msg_err = err
             raise ValueError(msg_err)
         # Element in position zero because apply_def_to_cluster is working on dictionary, please look at the source
         # code of apply_def_to_cluster
@@ -200,7 +230,62 @@ class K8sManager:
         for element in result[0]:
             list_to_ret.append(element.to_dict())
 
-        logger.info("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
+        self.logger.info("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
+
+    def check_and_reserve_template_data(self, template_data: K8sTemplateFillData, plugin_to_install: List[K8sPluginName],
+                                        kube_client_config: kubernetes.client.Configuration,
+                                        cluster_id: str) -> K8sTemplateFillData:
+        """
+        Check the data to fill the template with.
+        It is not possible to reserve the desire range of LBpool but only the range e the net name should be present.
+
+        Args:
+            template_data: The data that will be checked
+            plugin_to_install: The list of plugins that will be installed (plugins templates require different data)
+            kube_client_config: The config of cluster on witch we are working. (Used to retrieve pod cidr if not specified in the
+            template data).
+            cluster_id: The ID of cluster on witch we are working
+
+        Returns:
+            The checked template data, filled with missing information.
+        """
+
+        # Flannel and calico require pod_network_cidr to be configured
+        if K8sPluginName.FLANNEL in plugin_to_install or K8sPluginName.CALICO in plugin_to_install:
+            if not template_data.pod_network_cidr:
+                template_data.pod_network_cidr = get_k8s_cidr_info(kube_client_config)
+
+        # Metallb require an IP pool to be assigned at the load balancers
+        if K8sPluginName.METALLB in plugin_to_install:
+            cluster: K8sModel = self.get_k8s_cluster_by_id(cluster_id)
+
+            topology: Topology = Topology.from_db(db=self.db, nbiutil=self.nbiutil, lock=self.lock)
+
+            if not template_data.lb_pools:
+                # If no load balancer pool is given
+                # Taking the FIRST network of the k8s cluster and reserving 20 addresses. THERE SHOULD BE AT LEAST 1.
+                network_name = cluster.networks[0]
+                result = topology.reserve_range(net_name=network_name, range_length=20, owner=cluster_id)
+                lb_pool = LBPool(mode='layer2', net_name=network_name, ip_start=result['start'],
+                                 ip_end=result['end'], range_length=20)
+                template_data.lb_pools = [lb_pool]
+            else:
+                # Checking that every single network is in k8s cluster and reserving the desired range length.
+                # Ignoring ip_start and ip_end if present. If no range length, 20 is assumed.
+                for pool in template_data.lb_pools:
+                    network_name = pool.net_name
+                    if network_name in cluster.networks:
+                        if not pool.range_length:
+                            pool.range_length = 20
+                        result = topology.reserve_range(net_name=network_name, range_length=pool.range_length,
+                                                        owner=cluster_id)
+                        pool.ip_start = result['start']
+                        pool.ip_end = result['end']
+                    else:
+                        raise ValueError("The network {} is not present inside k8s {} cluster.".format(network_name,
+                                                                                                       cluster.name))
+            # Returning checked template data
+            return template_data
 
 
 # ----- Global functions for multiprocessing compatibility -----

@@ -1,20 +1,25 @@
 import tempfile
+import time
 import yaml
 from logging import Logger
 from typing import List
 import kubernetes.client
 import kubernetes.utils
 from kubernetes import config
-from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, VersionInfo, V1ConfigMap, V1Namespace, V1ObjectMeta
+from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, VersionInfo, V1ConfigMap, \
+    V1Namespace, V1ObjectMeta
 from kubernetes.client.rest import ApiException
+import utils.util
 from config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
-from models.k8s import K8sModel, K8sDaemon, K8sVersion
-from models.k8s.k8s_models import K8sPluginName, K8sPluginType
+from models.k8s import K8sModel, K8sLabel, K8sVersion
+from models.k8s.k8s_models import K8sPluginName, K8sPluginType, K8sTemplateFillData
+from utils.k8s.k8s_client_extension import create_from_yaml_custom
 from utils.log import create_logger
 from utils.util import deprecated
 
 TIMEOUT_SECONDS = 10
 logger: Logger = create_logger("K8S UTILS")
+
 
 # TODO split this file: API method goes in a dedicated file
 
@@ -28,6 +33,7 @@ class check_k8s_version(object):
     Raises:
         ValueError if the decorator is used on not compatible method or if the k8s version is too low for it.
     """
+
     def __init__(self, min_version: K8sVersion):
         """
         Args:
@@ -40,6 +46,7 @@ class check_k8s_version(object):
         """
         This method is called when the decorated method is called.
         """
+
         def wrapped_f(*args, **kwargs):
             if len(args) > 0:
                 if isinstance(args[0], kubernetes.client.Configuration):
@@ -58,6 +65,7 @@ class check_k8s_version(object):
                       "of kubernetes.client.Configuration"
             logger.error(msg_err)
             raise ValueError(msg_err)
+
         return wrapped_f
 
 
@@ -101,13 +109,15 @@ def get_config_for_k8s_from_dict(kube_client_config_dict: dict) -> kubernetes.cl
     return kube_client_config
 
 
-def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configuration, namespace: str) -> V1PodList:
+def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configuration, namespace: str,
+                               label_selector: str = "") -> V1PodList:
     """
     Get pods from a k8s instance that belongs to the given namespace
 
     Args:
         kube_client_config: kube_client_config the configuration of K8s on which the client is built.
         namespace: The namespace in witch this function looks.
+        label_selector: a label selector to allow filtering on the cluster side (e.g. k8s-app=metrics-server)
 
     Returns:
         Return the list of pods (as V1PodList) belonging to that namespace in the given k8s cluster.
@@ -118,7 +128,9 @@ def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configurati
         api_instance_core = kubernetes.client.CoreV1Api(api_client)
         pod_list: V1PodList = None
         try:
-            pod_list = api_instance_core.list_namespaced_pod(namespace=namespace.lower(), timeout_seconds=TIMEOUT_SECONDS)
+            pod_list = api_instance_core.list_namespaced_pod(namespace=namespace.lower(),
+                                                             label_selector=label_selector,
+                                                             timeout_seconds=TIMEOUT_SECONDS)
         except ApiException as error:
             logger.error("Exception when calling CoreV1Api>list_namespaced_pod: {}\n".format(error))
             raise error
@@ -144,9 +156,11 @@ def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespa
         api_instance_appsV1 = kubernetes.client.AppsV1Api(api_client)
         try:
             if namespace:
-                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_namespaced_daemon_set(namespace=namespace, timeout_seconds=TIMEOUT_SECONDS)
+                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_namespaced_daemon_set(namespace=namespace,
+                                                                                                  timeout_seconds=TIMEOUT_SECONDS)
             else:
-                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_daemon_set_for_all_namespaces(timeout_seconds=TIMEOUT_SECONDS)
+                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_daemon_set_for_all_namespaces(
+                    timeout_seconds=TIMEOUT_SECONDS)
         except ApiException as error:
             logger.error("Exception when calling appsV1->list_daemon_set: {}\n".format(error))
             raise error
@@ -158,10 +172,14 @@ def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespa
 
 def check_installed_plugins(kube_client_config: kubernetes.client.Configuration) -> List[K8sPluginName]:
     """
-    Check which daemons, among the known ones(see K8sDaemons enum), are present in the k8s cluster.
+    Check which plugin is installed on a k8s cluster. To this goal, daemon sets and pods in 'kube system' are iterated.
+    The function check if there are labels that highlight the presence of a plugin.
 
-    @param kube_client_config the configuration of K8s on which the client is built.
-    @return: The list of detected daemons
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+
+    Returns
+        the list of detected plugins in a k8s cluster
     """
     daemon_sets = get_daemon_sets(kube_client_config)
     to_return = []
@@ -170,23 +188,30 @@ def check_installed_plugins(kube_client_config: kubernetes.client.Configuration)
     daemon: V1DaemonSet
     for daemon in daemon_sets.items:
         if 'app' in daemon.spec.selector.match_labels:
-            if daemon.spec.selector.match_labels['app'] == K8sDaemon.FLANNEL.value:
+            if daemon.spec.selector.match_labels['app'] == K8sLabel.FLANNEL.value:
                 to_return.append(K8sPluginName.FLANNEL)
-            if daemon.spec.selector.match_labels['app'] == K8sDaemon.METALLB.value:
+            if daemon.spec.selector.match_labels['app'] == K8sLabel.METALLB.value:
                 to_return.append(K8sPluginName.METALLB)
         if 'name' in daemon.spec.selector.match_labels:
-            if daemon.spec.selector.match_labels['name'] == K8sDaemon.OPEN_EBS.value:
+            if daemon.spec.selector.match_labels['name'] == K8sLabel.OPEN_EBS.value:
                 to_return.append(K8sPluginName.OPEN_EBS)
         if 'k8s-app' in daemon.spec.selector.match_labels:
-            if daemon.spec.selector.match_labels['k8s-app'] == K8sDaemon.CALICO.value:
+            if daemon.spec.selector.match_labels['k8s-app'] == K8sLabel.CALICO.value:
                 to_return.append(K8sPluginName.CALICO)
+
+    pods_in_ksystem = get_pods_for_k8s_namespace(kube_client_config=kube_client_config, namespace='kube-system',
+                                                 label_selector='k8s-app=metrics-server')
+    for pod in pods_in_ksystem.items:
+        if 'k8s-app' in pod.metadata.labels:
+            if pod.metadata.labels['k8s-app'] == K8sLabel.METRIC_SERVER.value:
+                to_return.append(K8sPluginName.METRIC_SERVER)
     return to_return
 
 
 def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, dict_to_be_applied: dict = None,
                          yaml_file_to_be_applied: str = None):
     """
-    This method can apply a definition to a k8s cluster. The data origin to apply can be a dictionary or a yaml file.
+    This method can apply a definition (yaml) to a k8s cluster. The data origin to apply can be a dictionary or a yaml file.
 
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
@@ -202,10 +227,9 @@ def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, di
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         try:
             if dict_to_be_applied:
-                # TODO Does not support Custom Resources like below
                 result_dict = kubernetes.utils.create_from_dict(api_client, dict_to_be_applied)
             if yaml_file_to_be_applied:
-                result_yaml = kubernetes.utils.create_from_yaml(api_client, yaml_file_to_be_applied)
+                result_yaml = create_from_yaml_custom(api_client, yaml_file_to_be_applied)
         except ApiException as error:
             logger.error("Exception when calling create_from_yaml: {}\n".format(error))
             raise error
@@ -215,50 +239,82 @@ def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, di
 
 
 def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configuration,
-                               plugins_to_install: List[K8sPluginName]) -> dict:
+                               plugins_to_install: List[K8sPluginName],
+                               template_fill_data: K8sTemplateFillData,
+                               cluster_id: str,
+                               skip_plug_checks: bool = False) -> dict:
     """
     Install a plugin list at the target k8s cluster.
 
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
-        plugins_to_install: List[K8sPluginName] the list of plugins to install on the cluster
+
+        plugins_to_install: List[K8sPluginName] the list of plugins to install on the cluster.
+
+        template_fill_data: data to fill plugins yaml file templates. If additional_data.pod_network_cidr is null,
+        the function is retrieving this value from k8s cluster.
+
+        cluster_id: The ID of the k8s cluster, used to give a name to configuration files
+
+        skip_plug_checks: skip plugin checks (already installed...)
 
     Returns:
         A dict[List[List[K8sTypes]: for each plugin a new key for the dictionary is created witch contains a list of resource types
         (V1Pod, V1DaemonSet, ...) and for each resource type there is a list of elements.
 
     Raises:
-        ValueError if some plugins are already installed or there is a clonflict
+        ValueError if some plugins are already installed or there is a conflict
     """
     version: K8sVersion = get_k8s_version(kube_client_config)
+
     installed_plugins: List[K8sPluginName] = check_installed_plugins(kube_client_config)
 
     result: dict = {}
 
-    # Checking plugins to be installed
+    # Checking plugins to be installed, that ones to be installed are not already present.
     # Raise error if problem
-    check_plugin_to_be_installed(installed_plugins=installed_plugins, plugins_to_install=plugins_to_install)
+    if not skip_plug_checks:
+        check_plugin_to_be_installed(installed_plugins=installed_plugins, plugins_to_install=plugins_to_install)
 
     for plugin in plugins_to_install:
         # Yaml files to be applied to the cluster for each plugin
-        yaml_file_configs = get_yaml_files_for_plugin(version, plugin)
+        yaml_file_configs_templates = get_yaml_files_for_plugin(version, plugin)
 
-        # Element in position 1 because apply_def_to_cluster is working on yaml file, please look at the source
-        # code of apply_def_to_cluster
+        rendered_files_list = utils.util.render_files_from_template(paths=yaml_file_configs_templates,
+                                                                    render_dict=template_fill_data.dict(),
+                                                                    files_name_prefix=cluster_id)
+
         result_list = []
-        for yaml_file in yaml_file_configs:
+        logger.info("Plugin <{}> installation is starting.".format(plugin.name))
+        for yaml_file in rendered_files_list:
+            # Element in position 1 because apply_def_to_cluster is working on yaml file, please look at the source
+            # code of apply_def_to_cluster
             result_list.append(apply_def_to_cluster(kube_client_config, yaml_file_to_be_applied=yaml_file)[1])
+            # If it is the last does not wait
+            if not rendered_files_list[-1] == yaml_file:
+                logger.info(
+                    "Yaml definition for {} have been applied. Waiting 30 seconds before next definition.".format(
+                        plugin.name))
+                time.sleep(30)
         result[plugin.value] = result_list
+
+        # If it is the last does not wait
+        if not plugins_to_install[-1] == plugin:
+            logger.info(
+                "Plugin <{}> definitions have been applied. Waiting 30 seconds before next plugin.".format(plugin.name))
+            time.sleep(30)
     return result
 
 
-def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str, labels: dict) -> V1Namespace:
+def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str,
+                         labels: dict) -> V1Namespace:
     """
     Create a namespace in a k8s cluster.
 
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
-        namespace: The name of the namespace
+        namespace_name: The name of the namespace
+        labels: K8s labels to be applied at the namespace.
 
     Returns:
         The created namespace
@@ -272,7 +328,7 @@ def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, na
         try:
             namespace = api_instance_core.create_namespace(body=namespace)
         except ApiException as error:
-            logger.error("Exception when calling CoreV1Api--->create_namespace: {}\n".format(error))
+            logger.error("Exception when calling CoreV1Api>create_namespace: {}\n".format(error))
             raise error
         finally:
             api_client.close()
@@ -309,12 +365,13 @@ def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins
     # Getting enabled plugins list of the union (installed+to be installed).
     filtered_enabled_plugins = get_enabled_plugins(union)
 
-    # Create a list for k8s plugin types
+    # Create a list for k8s plugin types, in order to check if there are conflicts.
     types: List[K8sPluginType] = []
     for plugin in filtered_enabled_plugins:
         plugin_type = K8sPluginType(plugin.type)
         # If type is already present -> Conflict
-        if plugin_type in types:
+        # If type is generic -> No need to check for conflict
+        if plugin_type in types and plugin_type is not K8sPluginType.GENERIC:
             msg_err = "There is a conflict between installed plugins + ones to be installed. 2 or more plugins of " \
                       "the same type have been found (Example calico and flannel)"
             raise ValueError(msg_err)
@@ -389,7 +446,8 @@ def get_k8s_cidr_info(kube_client_config: kubernetes.client.Configuration) -> st
     Returns:
         A String representing the pod CIDR
     """
-    config_map = read_namespaced_config_map(kube_client_config=kube_client_config, config_name="kubeadm-config", namespace="kube-system")
+    config_map = read_namespaced_config_map(kube_client_config=kube_client_config, config_name="kubeadm-config",
+                                            namespace="kube-system")
 
     cluster_conf_str: str = config_map.data['ClusterConfiguration']
     cluster_conf_dict: dict = yaml.safe_load(cluster_conf_str)
@@ -398,7 +456,8 @@ def get_k8s_cidr_info(kube_client_config: kubernetes.client.Configuration) -> st
     return pod_subnet_str
 
 
-def read_namespaced_config_map(kube_client_config: kubernetes.client.Configuration, namespace: str, config_name: str) -> V1ConfigMap:
+def read_namespaced_config_map(kube_client_config: kubernetes.client.Configuration, namespace: str,
+                               config_name: str) -> V1ConfigMap:
     """
     Read and return a config map from a namespace
 

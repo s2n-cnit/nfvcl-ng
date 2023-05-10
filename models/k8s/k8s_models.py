@@ -2,6 +2,8 @@ from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field, conlist
 
+from models.k8s.blue_k8s_model import LBPool
+
 
 class K8sModel(BaseModel):
     name: str = Field(title="Name of k8s cluster")
@@ -39,11 +41,15 @@ class K8sModelCreateFromExternalCluster(BaseModel):
     cni: Optional[str]
 
 
-class K8sDaemon(str, Enum):
+class K8sLabel(str, Enum):
+    """
+    Known labels that help to identify what is installed in a k8s cluster
+    """
     FLANNEL = 'flannel'
     OPEN_EBS = 'openebs-ndm'
     METALLB = 'metallb'
     CALICO = 'calico-node'
+    METRIC_SERVER = 'metrics-server'
 
 
 class K8sVersion(str, Enum):
@@ -85,6 +91,7 @@ class K8sPluginName(str, Enum):
     OPEN_EBS = 'openebs'
     METALLB = 'metallb'
     CALICO = 'calico'
+    METRIC_SERVER = 'metric-server'
 
 
 class K8sPluginType(str, Enum):
@@ -95,6 +102,7 @@ class K8sPluginType(str, Enum):
     NETWORK = 'network'
     STORAGE = 'storage'
     METALLB = 'metallb'
+    GENERIC = 'generic'
 
 
 class K8sPlugin(BaseModel):
@@ -124,3 +132,25 @@ class K8sModelManagement(BaseModel):
     k8s_ops: K8sOperationType = Field(description="Type of operation to be applied at the desired cluser")
     cluster_id: str = Field(description="The identifier of the k8s cluster")
     data: str = Field(description="Data to be parsed, change depending on the operation type")
+    options: dict = Field(default={}, description="Hold optional parameters for k8s management")
+
+
+class K8sTemplateFillData(BaseModel):
+    """
+    Model that represent data to be used for filling the plugin template files.
+    CIDR is used by flannel and calico.
+    lb_pools is used by metallb to give a range of IPs for load balancers
+    """
+    pod_network_cidr: Optional[str]
+    lb_pools: Optional[List[LBPool]]
+
+
+class K8sPluginsToInstall(BaseModel):
+    """
+    Model used to represent a list of plugins to be installed with specific parameters needed by the plugins.
+    """
+    plugin_list: List[K8sPluginName]
+    template_fill_data: K8sTemplateFillData = Field(default=K8sTemplateFillData())
+    skip_plug_checks: bool = Field(default=False)
+
+

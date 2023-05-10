@@ -1,4 +1,6 @@
-from blueprints.blue_k8s.models import K8sBlueprintCreate, K8sBlueprintScale
+# TODO move models relative to specific k8s blueprint back to the blueprint folder.
+from models.k8s.blue_k8s_model import K8sBlueprintCreate, K8sBlueprintScale
+
 from blueprints.blue_5g_base.models import Create5gModel
 from blueprints.blue_free5gc.models import Free5gck8sBlueCreateModel, Free5gck8sBlueUpdateModel
 from blueprints.blue_mqtt.models import MqttRequestBlueprintInstance

@@ -23,7 +23,8 @@
     "name": "metallb",
     "type": "metallb",
     "installation_modules": [
-      "metallb"
+      "metallb",
+      "metallb-config"
     ],
     "daemon_sets": [
       "metallb"
@@ -38,6 +39,16 @@
     ],
     "daemon_sets": [
       "calico"
+    ]
+  },
+  {
+    "name": "metric-server",
+    "type": "generic",
+    "installation_modules": [
+      "metric-server"
+    ],
+    "daemon_sets": [
+      "metric-server"
     ]
   }
 ]

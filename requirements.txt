@@ -11,3 +11,4 @@ ruamel.yaml.jinja2
 kubernetes~=26.1.0
 uvicorn
 pydantic
+pyOpenSSL

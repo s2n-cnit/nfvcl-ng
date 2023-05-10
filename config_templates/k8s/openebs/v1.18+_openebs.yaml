@@ -982,6 +982,7 @@ metadata:
       #Default value is /var/openebs/local
       - name: BasePath
         value: "/var/openebs/local/"
+    storageclass.kubernetes.io/is-default-class: "true"
 provisioner: openebs.io/local
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete

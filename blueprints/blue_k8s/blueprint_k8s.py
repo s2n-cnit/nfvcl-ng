@@ -1,8 +1,10 @@
 from blueprints import BlueprintBase, parse_ansible_output
+from models.k8s.k8s_models import K8sPluginName, K8sTemplateFillData
 from . import ConfiguratorK8s
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
-from typing import Union, List, Dict, Optional
-from .models import K8sBlueprintCreate, K8sBlueprintScale
+from typing import Union, Dict, Optional
+from models.k8s.blue_k8s_model import K8sBlueprintCreate, K8sBlueprintScale
+from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 import traceback
 from main import *
 
@@ -33,7 +35,8 @@ class K8s(BlueprintBase):
                 'day0': [{'method': 'bootstrap_day0'}],
                 'day2': [{'method': 'init_controller_day2_conf', 'callback': 'get_master_key'},
                          {'method': 'add_worker_day2'},
-                         {'method': 'add_worker_area_label', 'callback': 'add_to_topology'}],
+                         {'method': 'add_worker_area_label', 'callback': 'add_to_topology'},
+                         {'method': 'install_plugins'}],
                 'dayN': []
             }],
             'scale': [{
@@ -81,8 +84,8 @@ class K8s(BlueprintBase):
                         raise ValueError('Blue {} - no VIMs at area {}'.format(self.get_id(), area['id']))
                     # check if the load-balancing network exists at the VIM
                     if lb_pool['net_name'] not in vim['networks']:
-                        raise ValueError('Blue {} - network {} not available at VIM {}'
-                                         .format(self.get_id(), vim['name'], area['id']))
+                        raise ValueError('Blue {} - network ->{}<- not available at VIM {}'
+                                         .format(self.get_id(), lb_pool['net_name'], vim['name']))
 
                 net = self.topology_get_network(lb_pool['net_name'])
 
@@ -109,7 +112,7 @@ class K8s(BlueprintBase):
                 vm_flavor_request: Optional[dict] = None) -> None:
         logger.debug("setting VNFd for " + area)
 
-        vm_flavor = {'memory-mb': '4096', 'storage-gb': '8', 'vcpu-count': '2'}
+        vm_flavor = {'memory-mb': '6144', 'storage-gb': '8', 'vcpu-count': '2'}
         if vm_flavor_request is not None:
             vm_flavor.update(vm_flavor_request)
 
@@ -467,12 +470,49 @@ class K8s(BlueprintBase):
         self.topology_update_k8scluster({'nfvo_onboarded': True})
         return []"""
 
+    def install_plugins(self, msg: dict):
+        """
+        Day 2 operation. Install k8s plugins after the cluster has been initialized. Suppose that there are no plugin
+        installed.
+
+        Args:
+            msg: The received message. IT is not used but necessary otherwise crash.
+
+        Returns:
+            Empty primitive list such that caller does not crash
+        """
+        client_config = get_k8s_config_from_file_content(self.conf['config']['master_credentials'])
+        # Build plugin list
+        plug_list: List[K8sPluginName] = []
+        if self.conf['config']['cni'] == 'flannel':
+            plug_list.append(K8sPluginName.FLANNEL)
+        elif self.conf['config']['cni'] == 'calico':
+            plug_list.append(K8sPluginName.CALICO)
+        plug_list.append(K8sPluginName.METALLB)
+        plug_list.append(K8sPluginName.OPEN_EBS)
+        plug_list.append(K8sPluginName.METRIC_SERVER)
+
+        # Get the pool list for metal load balancer
+        pool_list = self.conf['config']['network_endpoints']['data_nets']
+        # Get the k8s pod network cidr
+        pod_network_cidr = get_k8s_cidr_info(client_config)
+        # create additional data for plugins (lbpool and cidr)
+        add_data = K8sTemplateFillData(pod_network_cidr=pod_network_cidr, lb_pools=pool_list)
+
+        install_plugins_to_cluster(kube_client_config=client_config, plugins_to_install=plug_list,
+                                   template_fill_data=add_data, cluster_id=self.id)
+
+        # Returning empty primitives to avoid error.
+        return []
+
     def _destroy(self):
         logger.info("Destroying")
         if self.conf['config']['nfvo_onboarded']:
             nbiUtil.delete_k8s_cluster(self.get_id())
 
         nbiUtil.delete_k8s_repo(self.get_id())
+
+        self.topology_del_k8scluster()
 
         # release the reserved IP addresses for the LB
         self.topology_release_ip_range()

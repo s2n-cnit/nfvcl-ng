@@ -12,4 +12,5 @@ vnf_charms/flexcharmvyos/lib/*
 /vnf_packages/
 /.idea/
 /docs/*
-
+config_dev.yaml
+main_debug.py

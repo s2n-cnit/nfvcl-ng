@@ -32,6 +32,7 @@ class ConfiguratorK8s(Configurator_Flex):
                 # {'pod_network_manifest_file': args['pod_network_manifest_file']},
                 {'metallb_configmap_file': "~/metallb_config.yaml"},
                 {'cni': args['config']['cni']}
+                # Default cni is flannel -> See K8sConfig model
             ]
             if 'linkerd' in args:
                 ansible_vars.append({'linkerd': args['linkerd']})
@@ -42,63 +43,6 @@ class ConfiguratorK8s(Configurator_Flex):
         self.addPlaybook('blueprints/blue_k8s/config_scripts/playbook_kubernetes_common.yaml', vars_=ansible_vars)
 
         if self.role == 'master':
-            if args['config']['cni'] == 'flannel':
-                self.addJinjaTemplateFile(
-                    {'template': 'blueprints/blue_k8s/config_scripts/k8s_kube_flannel.yaml',
-                     'path': '~/',
-                     'transfer_name': "flannel_config_{}.yaml".format(blue_id),
-                     'name': "kube_cni.yaml"
-                     }, jinja_vars)
-            if args['config']['cni'] == 'calico':
-                self.addJinjaTemplateFile(
-                    {'template': 'blueprints/blue_k8s/config_scripts/k8s_calico.yaml',
-                     'path': '~/',
-                     'transfer_name': "calico_config_{}.yaml".format(blue_id),
-                     'name': "kube_cni.yaml"
-                     }, jinja_vars)
-                self.addJinjaTemplateFile(
-                    {'template': 'blueprints/blue_k8s/config_scripts/k8s_calico_custom.yaml',
-                     'path': '~/',
-                     'transfer_name': "calico_config_{}.yaml".format(blue_id),
-                     'name': "kube_calico_custom.yaml"
-                     }, jinja_vars)
-
-            self.addJinjaTemplateFile(
-                {'template': 'blueprints/blue_k8s/config_scripts/k8s_metallb_manifest.yaml',
-                 'path': '~/',
-                 'transfer_name': "metallb_manifest_{}.yaml".format(blue_id),
-                 'name': "metallb_manifest.yaml"
-                 }, jinja_vars)
-            self.addJinjaTemplateFile(
-                {'template': 'blueprints/blue_k8s/config_scripts/metallb_config.yaml',
-                 'path': '~/',
-                 'transfer_name': "metallb_config_{}.yaml".format(blue_id),
-                 'name': "metallb_config.yaml"
-                 }, jinja_vars)
-            self.addJinjaTemplateFile(
-                {'template': 'blueprints/blue_k8s/config_scripts/k8s_openebs_operator.yaml',
-                 'path': '~/',
-                 'transfer_name': "openebs_operator_{}.yaml".format(blue_id),
-                 'name': "openebs_operator.yaml"
-                 }, jinja_vars)
-            self.addJinjaTemplateFile(
-                {'template': 'blueprints/blue_k8s/config_scripts/k8s_default_storageclass.yaml',
-                 'path': '~/',
-                 'transfer_name': "default_storageclass_{}.yaml".format(blue_id),
-                 'name': "default_storageclass.yaml"
-                 }, jinja_vars)
-            self.addJinjaTemplateFile({
-                'template': 'blueprints/blue_k8s/config_scripts/k8s_regcred.yaml',
-                'path': '~/',
-                'transfer_name': "regcred_{}.yaml".format(blue_id),
-                'name': "regcred.yaml"
-            }, jinja_vars)
-            self.addJinjaTemplateFile({
-                'template': 'blueprints/blue_k8s/config_scripts/k8s_metricserver.yaml',
-                'path': '~/',
-                'transfer_name': "metricserver_{}.yaml".format(blue_id),
-                'name': "metricserver.yaml"
-            }, jinja_vars)
             self.appendPbTasks('blueprints/blue_k8s/config_scripts/playbook_kubernetes_master.yaml')
 
         if self.role == 'worker':

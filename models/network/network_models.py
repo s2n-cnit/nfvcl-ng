@@ -1,3 +1,4 @@
+import copy
 from pydantic import BaseModel, Field, conlist
 from typing import List, Optional
 from enum import Enum
@@ -27,10 +28,40 @@ class NetworkModel(BaseModel):
     vid: Optional[int]
     dhcp: bool = True
     cidr: IPv4Network
-    gateway_ip: Optional[IPv4Network] = None
+    gateway_ip: Optional[IPv4Network] = None # TODO Should it be IPv4 address?
     allocation_pool: List[IPv4pool] = []
     reserved_ranges: List[IPv4reservedRange] = []
     dns_nameservers: List[IPv4Address] = []
+
+    def to_dict(self) -> dict:
+        """
+        IPv4pool, IPv4reservedRange, IPv4Network ... are NOT json serializable.
+        Trying to solve the problem with this function
+
+        Returns:
+            a dictionary representation of the NetworkModel object.
+        """
+        # todo add translation also of IPv4pool, IPv4reservedRange
+        to_return = copy.deepcopy(self)
+        to_return.cidr = self.cidr.with_prefixlen
+        if to_return.gateway_ip is not None:
+            to_return.gateway_ip = self.gateway_ip.with_prefixlen
+
+        for i in range(0, len(to_return.dns_nameservers)):
+            to_return.dns_nameservers[i] = to_return.dns_nameservers[i].exploded
+
+        for i in range(0, len(to_return.reserved_ranges)):
+            res_range_dict: dict = {"owner": to_return.reserved_ranges[i].owner,
+                                    "end": to_return.reserved_ranges[i].end.exploded,
+                                    "start": to_return.reserved_ranges[i].start.exploded}
+            to_return.reserved_ranges[i] = res_range_dict
+
+        for i in range(0, len(to_return.allocation_pool)):
+            range_dict: dict = {"end":to_return.allocation_pool[i].end.exploded,
+                                "start":to_return.allocation_pool[i].start.exploded}
+            to_return.allocation_pool[i] = range_dict
+
+        return to_return.dict()
 
 
 class RouterModel(BaseModel):

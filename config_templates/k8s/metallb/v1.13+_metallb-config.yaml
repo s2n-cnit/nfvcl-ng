@@ -1,0 +1,19 @@
+{% if confvar.lb_pools %}
+{% for pool in confvar.lb_pools %}
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: {{ pool.net_name }}
+  namespace: metallb-system
+spec:
+  addresses:
+  - {{ pool.ip_start }}-{{ pool.ip_end }}
+{% endfor %}
+{% endif %}
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2-adv-type
+  namespace: metallb-system

@@ -1,13 +1,10 @@
 from logging import Logger
-from typing import List, Tuple
+from typing import List
 
-from models.k8s import K8sVersion
 import os
 import json
-
-from models.k8s import K8sPlugin
-from models.k8s.k8s_models import K8sPluginName
-from utils import create_logger
+from models.k8s import K8sVersion, K8sPluginName, K8sPlugin
+from utils.log import create_logger
 
 PLUGIN_BASE_PATH = './config_templates/k8s/'
 
@@ -75,6 +72,9 @@ def get_plugin_config_files(k8s_version: K8sVersion, plugin_folder_path: str) ->
         # File name is something like 'v1.17-v1.27_plugin_module.yml' or v1.17-v1.17_plugin.yml or v1.17+_plugin_module.yml
         split = path.split('_')
 
+        if len(split) <= 1:
+            raise ValueError("Filename ->{}<- is malformed. E.g. v1.18+_module-name.yaml or v1.17-v1.17_plugin-name.yml".format(path))
+
         # ------ Working on the module name
         # The part where there is the module name
         module_name_part = split[1]
@@ -97,7 +97,7 @@ def get_plugin_config_files(k8s_version: K8sVersion, plugin_folder_path: str) ->
                 # Removing the last char (+) and the first one (v) with [1:-1] and then converting to float
                 lower_version = float(versions[0][1:-1])
             else:
-                raise ValueError("Filename {} is malformed.".format(path))
+                raise ValueError("Filename ->{}<- is malformed. E.g. v1.18+_module-name.yaml or v1.17-v1.17_plugin-name.yml".format(path))
         # Second case 'v1.17-v1.27'
         elif len(versions) == 2:
             # Removing the v from v1.x and v 1.y

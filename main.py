@@ -1,6 +1,6 @@
+import utils.log
 import multiprocessing
 import os
-
 from utils.util import *
 from utils import persistency
 from topology import topology_worker, topology_lock, topology_msg_queue
@@ -11,8 +11,11 @@ from subscribe_endpoints.k8s_manager import initialize_k8s_man_subscriber
 import signal
 import atexit
 
-logger = create_logger('Main')
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nfvcl_config: NFVCLConfigModel = load_nfvcl_config()
+
+logger = utils.log.create_logger('Main')
+nbiUtil = NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,
+                  project=nfvcl_config.osm.project, osm_ip=nfvcl_config.osm.host, osm_port=nfvcl_config.osm.port)
 db = persistency.DB()
 workers = LCMWorkers(topology_lock)
 pnf_manager = PNFmanager()

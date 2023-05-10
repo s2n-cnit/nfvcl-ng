@@ -44,6 +44,7 @@ if not os.path.exists(day2_files):
 app.mount("/nfvcl_day2/day2", StaticFiles(directory="day2_files"), name="day2_files")
 app.mount("/helm_repo", StaticFiles(directory="helm_charts"), name="helm_repo")
 
+
 @app.post("/close", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED)
 async def close_nfvcl():
     """

@@ -26,25 +26,6 @@
      file: 
        path: /root/.kube/cache
        state: absent
-   - name: Create Pod Network
-     command: "{{ item }}"
-     with_items:
-       - kubectl apply -f kube_cni.yaml
-   - name: Calico custom manifest
-     command: "{{ item }}"
-     with_items:
-        - kubectl apply -f kube_calico_custom.yaml
-     when: cni == "calico"
-   - name: Create Pod Network, RBAC, Storage Classes and Load Balancer.
-     command: "{{ item }}"
-     with_items: 
-        - kubectl apply -f openebs_operator.yaml
-        - kubectl apply -f default_storageclass.yaml
-        - kubectl apply -f metallb_manifest.yaml
-        - kubectl apply -f "{{ metallb_configmap_file }}"
-        - kubectl apply -f regcred.yaml
-        - kubectl apply -f metricserver.yaml
-        - kubectl create clusterrolebinding tiller-cluster-admin --clusterrole=cluster-admin  --serviceaccount=kube-system:default
    - name: Install linkerd sidecars
      command: "{{ item }}"
      with_items:

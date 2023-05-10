@@ -1,12 +1,14 @@
 from logging import Logger
 
+from redis.client import Redis
+
 from models.k8s import K8sModel
 from utils.k8s import parse_k8s_clusters_from_dict
 from utils.log import create_logger
 from utils.ipam import *
 from topology.vim_terraform import VimTerraformer
 from models.topology import TopologyModel
-from models.network import PduModel
+from models.network import PduModel, NetworkModel
 from utils.persistency import OSSdb
 from nfvo.osm_nbi_util import NbiUtil
 import typing
@@ -15,12 +17,13 @@ import traceback
 from multiprocessing import RLock, Queue
 from utils.util import obj_multiprocess_lock
 from utils.redis.redis_manager import get_redis_instance
+from utils.redis.topic_list import TOPOLOGY_TOPIC
 
 topology_msg_queue = Queue()
 topology_lock = RLock()
 
 logger: Logger = create_logger('Topology')
-redis_cli = get_redis_instance()
+redis_cli: Redis = get_redis_instance()
 
 
 class Topology:
@@ -75,12 +78,12 @@ class Topology:
         return self._data
 
     @obj_multiprocess_lock
-    def create(self, topo: dict, terraform: bool = False) -> None:
+    def create(self, topo: TopologyModel, terraform: bool = False) -> None:
         logger.debug("terraform: {}".format(terraform))
         if len(self._data['vims']) or len(self._data['networks']) or len(self._data['routers']):
             logger.error('not possible to allocate a new topology, since another one is already declared')
             raise ValueError('not possible to allocate a new topology, since another one is already declared')
-        self._data = topo
+        self._data = topo.dict() # TODO replace self._data with TopologyModel object
 
         # Moving vim in the request into tmp array, in this way, when performing operation to populate vims, a loop is
         # avoided.
@@ -93,9 +96,9 @@ class Topology:
             self.add_vim(vim, terraform=terraform)
         msg = {
             'operation': 'create',
-            'data': topo
+            'data': topo.to_dict()
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
@@ -120,7 +123,7 @@ class Topology:
             'operation': 'delete',
             'data': {}
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     # **************************** VIMs ****************************
     def get_vim(self, vim_name: str) -> Union[dict, None]:
@@ -165,7 +168,7 @@ class Topology:
             'operation': 'create_vim',
             'data': vim
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     @obj_multiprocess_lock
     def del_vim(self, vim, terraform=False):
@@ -196,7 +199,7 @@ class Topology:
             'operation': 'delete_vim',
             'data': vim
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     @obj_multiprocess_lock
     def update_vim(self, update_msg: dict, terraform: bool = True):
@@ -239,7 +242,7 @@ class Topology:
             'operation': 'update_vim',
             'data': vim
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     def get_vim_name_from_area_id(self, area: str) -> Union[str, None]:
         vim = next((item for item in self._data['vims'] if area in item['areas']), None)
@@ -269,7 +272,7 @@ class Topology:
             return net
 
     @obj_multiprocess_lock
-    def add_network(self, network: dict, vim_names_list: Union[list, None] = None, terraform: bool = False):
+    def add_network(self, network: NetworkModel, vim_names_list: Union[list, None] = None, terraform: bool = False):
         # it adds a network to the topology
         self._data['networks'].append(network)
 
@@ -279,31 +282,31 @@ class Topology:
                 if vim is None:
                     raise ValueError('VIM {} not found'.format(vim_name))
                 # vim['networks'].append(network['name'])
-                self.add_vim_net(network['name'], vim, terraform=terraform)
+                self.add_vim_net(network.name, vim, terraform=terraform)
         msg = {
             'operation': 'create_network',
-            'data': network
+            'data': network.to_dict()
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     @obj_multiprocess_lock
-    def del_network(self, network: dict, vim_names_list: Union[list, None] = None, terraform: bool = False):
+    def del_network(self, network: NetworkModel, vim_names_list: Union[list, None] = None, terraform: bool = False):
         if vim_names_list:
             for vim_name in vim_names_list:
                 vim = next((item for item in self._data['vims'] if item['name'] == vim_name), None)
                 if vim is None:
                     raise ValueError('VIM {} not found'.format(vim_name))
 
-                if network['name'] not in vim['networks']:
-                    logger.warn('Network {} not found in VIM {}'.format(network['name'], vim['name']))
+                if network.name not in vim['networks']:
+                    logger.warn('Network {} not found in VIM {}'.format(network.name, vim['name']))
                 else:
-                    self.del_vim_net(network['name'], vim, terraform=terraform)
-        self._data['networks'] = [item for item in self._data['networks'] if item['name'] != network['name']]
+                    self.del_vim_net(network.name, vim, terraform=terraform)
+        self._data['networks'] = [item for item in self._data['networks'] if item['name'] != network.name]
         msg = {
             'operation': 'delete_network',
-            'data': network
+            'data': network.to_dict()
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     # **************************** Routers **************************
 
@@ -332,7 +335,7 @@ class Topology:
             'operation': 'create_router',
             'data': router
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     @obj_multiprocess_lock
     def del_router(self, router: dict, vim_names_list: list = None):
@@ -356,7 +359,7 @@ class Topology:
             'operation': 'delete_router',
             'data': router
         }
-        redis_cli.publish('topology', json.dumps(msg))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
 
     # **************************** VIM updating **********************
 
@@ -394,7 +397,7 @@ class Topology:
     def check_vim_resource(self, resource_name: str, vim: dict, resource_type: str) -> bool:
         res = next((item for item in self._data[resource_type] if item['name'] == resource_name), None)
         if res is None:
-            logger.error('{}} {} not found in the topology'.format(resource_type, resource_name))
+            logger.error('{} {} not found in the topology'.format(resource_type, resource_name))
             raise ValueError('Topology terraforming failed')
         check_vim_resource = next((item for item in vim[resource_type] if item == resource_name), None)
         return check_vim_resource is None
@@ -489,6 +492,7 @@ class Topology:
         ip_range = get_range_in_cidr(net['cidr'], reserved_ips, range_length)
         self.set_reserved_ip_range(ip_range, net_name, owner)
 
+        # TODO add event pubblication?
         self.save_topology()
         return ip_range
 
@@ -502,6 +506,7 @@ class Topology:
             topology_net['reserved_ranges'] = []
         ip_range['owner'] = owner
         topology_net['reserved_ranges'].append(ip_range)
+        # TODO add event pubblication?
 
     @obj_multiprocess_lock
     def release_ranges(self, owner: str, ip_range: typing.Optional[dict] = None, net_name: typing.Optional[str] = None):
@@ -521,6 +526,7 @@ class Topology:
                         n['reserved_ranges'] = [p for p in n['reserved_ranges'] if p['owner'] != owner and
                                                 p['start'] != ip_range['start']]
         self.save_topology()
+        # TODO add event pubblication?
 
     @obj_multiprocess_lock
     def add_pdu(self, pdu_input: Union[PduModel, dict]):
@@ -544,7 +550,7 @@ class Topology:
                 'operation': 'create_pdu',
                 'data': json.loads(PduModel.parse_obj(pdu).json())
             }
-            redis_cli.publish('topology', json.dumps(msg))
+            redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
             self.save_topology()
 
         except Exception:
@@ -555,6 +561,7 @@ class Topology:
             if not pdu_candidate:
                 self._data['pdus'].append(pdu)
             self.save_topology()
+            # TODO add event pubblication?
 
     @obj_multiprocess_lock
     def del_pdu(self, pdu_name: str):
@@ -570,7 +577,7 @@ class Topology:
                 'operation': 'delete_pdu',
                 'data': pdu
             }
-            redis_cli.publish('topology', json.dumps(msg))
+            redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
             self.save_topology()
 
         except ValueError as err:
@@ -626,32 +633,37 @@ class Topology:
                 self._data['kubernetes'][-1]['nfvo_status'] = 'onboarded'
             else:
                 self._data['kubernetes'][-1]['nfvo_status'] = 'error'
-        redis_cli.publish('topology', json.dumps(data))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(data))
         self.save_topology()
 
     @obj_multiprocess_lock
-    def del_k8scluster(self, message: dict):
+    def del_k8scluster(self, cluster_id: str):
+        """
+        Delete a k8s cluster instance from the k8s cluster list of the topology.
+
+        Args:
+            cluster_id: The id (or name) of the cluster to be removed
+        """
         #Obtaining the name of the cluster to delete
-        k8s_name_to_delete = message['name']
-        if not k8s_name_to_delete:
+        if not cluster_id:
             raise ValueError('Error while trying to delete k8s cluster: parsed name is null')
         # check if it exists
-        k8s_matching_cluster_list = [item for item in self._data['kubernetes'] if item['name'] == k8s_name_to_delete]
+        k8s_matching_cluster_list = [item for item in self._data['kubernetes'] if item['name'] == cluster_id]
 
         #Checking if there is at least one element, that is the cluster we want to delete
         if len(k8s_matching_cluster_list)>0:
             k8s_cluster = k8s_matching_cluster_list[0]
             if k8s_cluster['nfvo_status'] == 'onboarded':
-                if not self.nbiutil.delete_k8s_cluster(k8s_name_to_delete):
-                    raise ValueError('Kubernetes {} cannot be de-onboarded... still in use? Aborting...'.format(k8s_name_to_delete))
+                if not self.nbiutil.delete_k8s_cluster(cluster_id):
+                    raise ValueError('Kubernetes {} cannot be de-onboarded... still in use? Aborting...'.format(cluster_id))
 
             #Setting new k8s cluster list as
-            self._data['kubernetes'] = [item for item in self._data['kubernetes'] if item['name'] != k8s_name_to_delete]
+            self._data['kubernetes'] = [item for item in self._data['kubernetes'] if item['name'] != cluster_id]
 
-            redis_cli.publish('topology', json.dumps(k8s_cluster))
+            redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(k8s_cluster))
             self.save_topology()
         else:
-            logger.error("Deleting k8s cluster: no cluster called {} was found".format(k8s_name_to_delete))
+            logger.error("Deleting k8s cluster: no cluster called {} was found".format(cluster_id))
 
     @obj_multiprocess_lock
     def update_k8scluster(self, name: str, data: dict):
@@ -684,5 +696,5 @@ class Topology:
             cluster.update(data)
             logger.info("Updated k8s cluster {} data with {}".format(name, data))
 
-        redis_cli.publish('topology', json.dumps(data))
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(data))
         self.save_topology()

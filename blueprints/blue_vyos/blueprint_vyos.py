@@ -575,14 +575,14 @@ class VyOSBlue(BlueprintBase):
     def to_db(self):
         """
         @override
-        This method is used to save the model inside the self.conf variable. This workaround is needed because otherwise the
-        vyos model is not saved, and the conf var is a useless dict.
+        This method is used to save the model inside the self.conf variable. This workaround is needed because otherwise
+        the vyos model is not saved, and the conf var is a useless dict.
         """
         val = getattr(self, 'vyos_model', None)
 
         if val:
             # If the model is loaded from the db, then we assign to self.conf and call the super method. In this way
-            # the model is saved in the db
+            # the model will be saved in the db
             self.conf = self.vyos_model.dict()
         else:
             # If the blueprint instance is loaded for the first time, then the model is empty, and we can parse the

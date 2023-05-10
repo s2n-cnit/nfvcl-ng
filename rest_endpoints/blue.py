@@ -185,6 +185,18 @@ def delete(blue_id: str):
                  description=BLUE_GET_PODS_DESCRIPTION,
                  summary=BLUE_GET_PODS_SUMMARY)
 def get_pods(blue_id: str):
+    """
+    Obtain pods for a blueprint OVER ALL k8s clusters.
+    Differently from get_pods in k8s management this method iterate over all k8s clusters and check if there are
+    some pods in a namespace that have the same name of the blueprint
+
+    Args:
+
+        blue_id: the blueprint ID of pods we are looking for.
+
+    Returns:
+        The list of pods
+    """
     # TODO replace all common code with a static method
     local_session_id = id_generator()
     try:
@@ -205,14 +217,16 @@ def get_pods(blue_id: str):
 
     k8s_clusters: List[K8sModel] = parse_k8s_clusters_from_dict(k8s_list)
 
-
-    # TODO what if there are multiple k8s clusters?
+    # TODO test code
+    pods_for_cluster: dict = {}
     if len(k8s_clusters) > 0:
-        k8s_config = get_k8s_config_from_file_content(k8s_clusters[0].credentials)
-        pod_list = get_pods_for_k8s_namespace(k8s_config, namespace=blue_id)
+        for k8s_instance in k8s_clusters:
+            k8s_config = get_k8s_config_from_file_content(k8s_clusters[0].credentials)
+            pod_list = get_pods_for_k8s_namespace(k8s_config, namespace=blue_id)
+            pods_for_cluster[k8s_instance.name] = pod_list.to_dict()
     else:
         raise ValueError("The are NO k8s cluster in the topology!")
 
-    to_return = pod_list.to_dict()
+    to_return = pods_for_cluster
 
     return to_return

@@ -36,7 +36,10 @@ def get_available_network_ip(
     if type(cidr) is str:
         cidr = ipaddress.IPv4Network(cidr)
 
-    available_ranges = [{"start": cidr[1], "end": cidr[-2]}]
+    # cidr[1] applied on a IPv4Network return the 2nd adress of the cidr.
+    # Starting from [4] (.3) because .1 and .2 (DHCP) should be used by OpenStack.
+    # Ending [-2] (.254) because .255 is broadcast.
+    available_ranges = [{"start": cidr[4], "end": cidr[-2]}]
 
     ordered_reserved_ranges = sorted(reserved_ranges, key=lambda k: k['start'])
 

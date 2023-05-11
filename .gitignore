@@ -14,3 +14,5 @@ vnf_charms/flexcharmvyos/lib/*
 /docs/*
 config_dev.yaml
 main_debug.py
+helm_charts/charts/*
+helm_charts/index.yaml

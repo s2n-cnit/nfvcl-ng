@@ -5,6 +5,8 @@ sudo apt install -y uvicorn
 
 echo "install redis-server..."
 sudo apt install -y redis-server
+sudo sed -i 's/bind 127.0.0.1/bind 0.0.0.0/g' /etc/redis/redis.conf
+sudo systemctl restart redis
 
 echo "install mongodb..."
 sudo apt install -y mongodb

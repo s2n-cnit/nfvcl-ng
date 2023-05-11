@@ -20,4 +20,4 @@ sudo service restart mongodb
 
 echo "create directories..."
 mkdir -p "helm_charts/charts/"
-mkdir "day2_files"
+mkdir -p "day2_files"

@@ -22,6 +22,7 @@ def create_logger(name: str) -> logging.getLogger:
     """
     # create logger
     logger = logging.getLogger(name)
+    logger.propagate = False
     logger.setLevel(logging.DEBUG)
 
     # create formatter

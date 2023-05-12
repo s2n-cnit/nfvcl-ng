@@ -44,7 +44,8 @@ the public NFVCL IP and change OSM credentials.
 ```commandline
 python3 run.py
 ```
-If you want the NFVCL to stay open in case you will need to use **Screen** CLI utility.
+If you want the NFVCL to stay open in case connection terminate, or you close the terminal, 
+you will need to use **Screen** CLI utility.
 
 
 ## A - OSM installation

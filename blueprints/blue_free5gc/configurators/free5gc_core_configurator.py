@@ -797,8 +797,8 @@ class Configurator_Free5GC_Core():
                     for linkIndex, linkItem in enumerate(userplaneInformationLinks):
                         if upfName in linkItem.items() or gnbName in linkItem.items():
                             userplaneInformationLinks.pop(linkIndex)
-                    for nodeIndex, nodeItem in enumerate(userplaneInformationUpNodes):
-                        if upfName in nodeItem.keys() or gnbName in nodeItem.keys():
+                    for nodeIndex, (nodeItem, nodeValue) in enumerate(userplaneInformationUpNodes.items()):
+                        if upfName in nodeValue.keys() or gnbName in nodeValue.keys():
                             userplaneInformationUpNodes.pop(nodeIndex)
 
     def udm_reset_configuration(self) -> None:
@@ -981,7 +981,7 @@ class Configurator_Free5GC_Core():
 
                         # add dnn to dnnList
                         dnnSliceList = []
-                        for dnn in self.get_dnn_list_from_net_names(conf, self.get_dnn_names_from_slice(conf, slice[
+                        for dnn in self.get_dnn_list_from_net_names(self.conf, self.get_dnn_names_from_slice(self.conf, slice[
                                 "sliceType"], slice["sliceId"])):
                             dnnSliceList.append(dnn)
                             if dnn not in dnnList:
@@ -1021,7 +1021,7 @@ class Configurator_Free5GC_Core():
             logger.warn("Conf is None")
             return
 
-        logger.info("upf_nodes: {}".format(conf["config"]["upf_nodes"]))
+        #logger.info("upf_nodes: {}".format(conf["config"]["upf_nodes"]))
 
         self.smf_unset_configuration(dnnList=dnnInfoList, sliceList=[slice], tacList=[{"id": tac}])
         members = None
@@ -1033,6 +1033,7 @@ class Configurator_Free5GC_Core():
         #
         # msg2up = {'config': self.running_free5gc_conf}
         # return self.core_upXade(msg2up)
+        return []
 
     def smf_add_upf(self, conf: dict, smfName: str, tac: int, links: list = None, slice: dict = None,
                     dnnInfoList: list = None):
@@ -1095,6 +1096,7 @@ class Configurator_Free5GC_Core():
                         upNodes["UPF-{}".format(tac)] = UPF
 
         upNodesList = list(upNodes)
+        groupName = None
         if links == None:
             if len(upNodesList) == 1:
                 # UPF of the core
@@ -1228,8 +1230,8 @@ class Configurator_Free5GC_Core():
                         dnnSliceList = []
                         slice = {"sd": extSlice["sliceId"], "sst": SstConvertion.to_int(extSlice["sliceType"])}
                         sliceList.append(slice)
-                        extDnnList=self.get_dnn_list_from_net_names(msg,
-                                self.get_dnn_names_from_slice(msg, extSlice["sliceType"], extSlice["sliceId"]))
+                        extDnnList=self.get_dnn_list_from_net_names(self.conf,
+                                self.get_dnn_names_from_slice(self.conf, extSlice["sliceType"], extSlice["sliceId"]))
                         dnnSliceList.extend(extDnnList)
                         dnnList.extend(extDnnList)
 
@@ -1238,7 +1240,7 @@ class Configurator_Free5GC_Core():
 
                         # add DNNs to upf configuration
                         if len(dnnSliceList) != 0:
-                            for upf in msg["config"]["upf_nodes"]:
+                            for upf in self.conf["config"]["upf_nodes"]:
                                 if upf["area"] == area["id"]:
                                     if "dnnList" in upf:
                                         upf["dnnList"].extend(dnnSliceList)
@@ -1251,16 +1253,20 @@ class Configurator_Free5GC_Core():
                                 sliceSupportList=[slice])
                         self.nssf_set_configuration(mcc=mcc, mnc=mnc, nssfName=nssfName, sliceList=[slice],
                                 tac=area["id"])
-                        res += self.smf_add_upf(conf=msg, smfName=smfName, tac=area["id"], slice=slice,
-                                dnnInfoList=self.get_dnn_list_from_net_names(msg,
-                                        self.get_dnn_names_from_slice(msg, extSlice["sliceType"], extSlice["sliceId"])))
+                        res += self.smf_add_upf(conf=self.conf, smfName=smfName, tac=area["id"], slice=slice,
+                                dnnInfoList=self.get_dnn_list_from_net_names(self.conf,
+                                        self.get_dnn_names_from_slice(self.conf, extSlice["sliceType"], extSlice["sliceId"])))
                     self.amf_set_configuration(mcc=mcc, mnc=mnc, amfId=amfId, supportedTacList = tacList,
                                 snssaiList = sliceList, dnnList = dnnList)
 
         return res
 
     def del_slice(self, msgModel) -> None:
-        msg = msgModel.dict()
+        if type(msgModel) is dict:
+            msg = msgModel
+        else:
+            msg = msgModel.dict()
+
         if msg is None:
             logger.warn("Conf is None")
             return
@@ -1278,8 +1284,8 @@ class Configurator_Free5GC_Core():
                         dnnSliceList = []
                         sliceList = [{"sd": extSlice["sliceId"], "sst": SstConvertion.to_int(extSlice["sliceType"])}]
                         if "dnnList" in extSlice:
-                            dnnSliceList.extend(self.get_dnn_list_from_net_names(msg,
-                                    self.get_dnn_names_from_slice(msg, extSlice["sliceType"], extSlice["sliceId"])))
+                            dnnSliceList.extend(self.get_dnn_list_from_net_names(self.conf,
+                                    self.get_dnn_names_from_slice(self.conf, extSlice["sliceType"], extSlice["sliceId"])))
                         self.amf_unset_configuration(mcc=mcc, mnc=mnc, snssaiList=sliceList,dnnList=dnnSliceList)
                         self.smf_unset_configuration(dnnList=dnnSliceList, sliceList=sliceList)
                         self.n3iwf_unset_configuration(sliceSupportList=sliceList)

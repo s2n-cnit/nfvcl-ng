@@ -117,3 +117,7 @@ class Create5gModel(BaseModel):
     areas: List[SubArea] = Field(..., description="Set area")
 
 # =========================================== End of main section =====================================================
+
+class AddTacModel(Create5gModel):
+    callbackURL: Optional[HttpUrl] = Field(description="URL that will be used to notify when the topology terraform ends")
+    config: Optional[SubConfig]

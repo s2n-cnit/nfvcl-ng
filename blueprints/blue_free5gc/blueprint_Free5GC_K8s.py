@@ -2,7 +2,7 @@ import ipaddress
 from typing import List, Union, Dict
 from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
-from blueprints.blue_free5gc.models import Free5gck8sBlueCreateModel
+from .models import *
 from . import free5GC_default_config
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services, get_ns_vld_ip
 from .configurators import Configurator_Free5GC, Configurator_Free5GC_User, Configurator_Free5GC_Core
@@ -27,8 +27,61 @@ class Free5GC_K8s(Blue5GBase):
         return cls.api_day0_function(msg)
 
     @classmethod
+    def rest_add_tac(cls, msg: Free5gck8sTacModel, blue_id: str):
+        msg_dict = msg.dict()
+        msg_dict["operation"] = "add_tac"
+        msg = Free5gck8sTacModel.parse_obj(msg_dict)
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def rest_del_tac(cls, msg: Free5gck8sTacModel, blue_id: str):
+        msg_dict = msg.dict()
+        msg_dict["operation"] = "del_tac"
+        msg = Free5gck8sTacModel.parse_obj(msg_dict)
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def rest_add_slice(cls, msg: Free5gck8sSliceModel, blue_id: str):
+        msg_dict = msg.dict()
+        msg_dict["operation"] = "add_slice"
+        msg = Free5gck8sSliceModel.parse_obj(msg_dict)
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def rest_del_slice(cls, msg: Free5gck8sSliceModel, blue_id: str):
+        msg_dict = msg.dict()
+        msg_dict["operation"] = "del_slice"
+        msg = Free5gck8sSliceModel.parse_obj(msg_dict)
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def rest_add_subscriber(cls, msg: Free5gck8sSubscriberModel, blue_id: str):
+        msg_dict = msg.dict()
+        msg_dict["operation"] = "add_ues"
+        msg = Free5gck8sSubscriberModel.parse_obj(msg_dict)
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def rest_del_subscriber(cls, msg: Free5gck8sSubscriberModel, blue_id: str):
+        msg_dict = msg.dict()
+        msg_dict["operation"] = "del_ues"
+        msg = Free5gck8sSubscriberModel.parse_obj(msg_dict)
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
     def day2_methods(cls):
-        # cls.api_router.add_api_route("/{blue_id}", cls.rest_scale, methods=["PUT"])
+        cls.api_router.add_api_route(path="/{blue_id}/add_tac", endpoint=cls.rest_add_tac, methods=["PUT"],
+                                     description=ADD_TAC_DESCRIPTION, summary=ADD_TAC_DESCRIPTION)
+        cls.api_router.add_api_route(path="/{blue_id}/del_tac", endpoint=cls.rest_del_tac, methods=["PUT"],
+                                     description=DEL_TAC_DESCRIPTION, summary=DEL_TAC_DESCRIPTION)
+        cls.api_router.add_api_route(path="/{blue_id}/add_slice", endpoint=cls.rest_add_slice, methods=["PUT"],
+                                     description=ADD_SLICE_DESCRIPTION, summary=ADD_SLICE_DESCRIPTION)
+        cls.api_router.add_api_route(path="/{blue_id}/del_slice", endpoint=cls.rest_del_slice, methods=["PUT"],
+                                     description=DEL_SLICE_DESCRIPTION, summary=DEL_SLICE_DESCRIPTION)
+        cls.api_router.add_api_route(path="/{blue_id}/add_subscriber", endpoint=cls.rest_add_subscriber, methods=["PUT"],
+                                     description=ADD_SUBSCRIBER_DESCRIPTION, summary=ADD_SUBSCRIBER_DESCRIPTION)
+        cls.api_router.add_api_route(path="/{blue_id}/del_subscriber", endpoint=cls.rest_del_subscriber, methods=["PUT"],
+                                     description=DEL_SUBSCRIBER_DESCRIPTION, summary=DEL_SUBSCRIBER_DESCRIPTION)
         pass
 
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None) -> None:
@@ -104,6 +157,38 @@ class Free5GC_K8s(Blue5GBase):
         self.userManager = Configurator_Free5GC_User()
         self.coreManager = Configurator_Free5GC_Core(self.conf["running_free5gc_configuration"], self.conf)
 
+    def dropConfig(self, conf1: dict, conf2: dict):
+        """
+        Drop "conf2" from "conf1"
+        @param conf1:
+        @param conf2:
+        @return:
+        """
+        if "config" in conf1 and "config" in conf2:
+            if "sliceProfiles" in conf1["config"] and "sliceProfiles" in conf2["config"]:
+                sliceProfiles1 = conf1["config"]["sliceProfiles"]
+                sliceProfiles2 = conf2["config"]["sliceProfiles"]
+                for slice2 in sliceProfiles2:
+                    sliceToRemove = next((slice1 for index, slice1 in enumerate(sliceProfiles1)
+                        if slice1["sliceId"] == slice2["sliceId"] and slice1["sliceType"] == slice2["sliceType"]), None)
+                    if sliceToRemove:
+                        sliceProfiles1.remove(sliceToRemove)
+            if "subscribers" in conf1["config"] and "subscribers" in conf2["config"]:
+                subscribers1 = conf1["config"]["subscribers"]
+                subscribers2 = conf2["config"]["subscribers"]
+                for sub2 in subscribers2:
+                    subToRemove = next((sub1 for index, sub1 in enumerate(subscribers1)
+                                        if sub1["imsi"] == sub2["imsi"]), None)
+                    if subToRemove:
+                        subscribers1.remove(subToRemove)
+        if "area" in conf1 and "area" in conf2:
+            for area2 in conf2:
+                areaToRemove = next((item for index, item in enumerate(conf1["area"])
+                                     if item["id"] == area2["id"]), None)
+                if areaToRemove:
+                    conf1["area"].remove(areaToRemove)
+
+
     def sumConfig(self, conf1: dict, conf2: dict):
         """
         Add "conf2" to "conf1"
@@ -172,9 +257,19 @@ class Free5GC_K8s(Blue5GBase):
                 areas2 = conf2["areas"]
                 for a2 in areas2:
                     a1 = next((item for index, item in enumerate(areas1) if item["id"] == a2["id"]), None)
+                    # if a1:
+                    #     areas1.remove(a1)
+                    # areas1.append(copy.deepcopy(a2))
                     if a1:
-                        areas1.remove(a1)
-                    areas1.append(copy.deepcopy(a2))
+                        # copy a1 fields in a2 block
+                        for key, value2 in a2.items():
+                            if isinstance(value2, list) and key in a1:
+                                a1[key].extend(value2)
+                            else:
+                                a1[key] = value2
+
+                    else:
+                        areas1.append(copy.deepcopy(a2))
 
 
 
@@ -547,7 +642,8 @@ class Free5GC_K8s(Blue5GBase):
                     res += self.edge_day2_conf({'vim': vim['name'], 'tac': area['id']}, nsd)
         return res
 
-    def del_tac_nsd(self, msg: dict) -> list:
+    def del_tac_nsd(self, model_msg) -> list:
+        msg = model_msg.dict()
         nsi_to_delete = super().del_area(msg)
         if "areas" in msg:
             for area in msg['areas']:
@@ -558,6 +654,10 @@ class Free5GC_K8s(Blue5GBase):
                         raise ValueError('nsd not found')
                     nsi_to_delete.append(self.nsd_[nsd_i]['nsi_id'])
                     self.nsd_.pop(nsd_i)
+
+        # remove msg from config
+        self.dropConfig(self.conf, msg)
+        self.to_db()
         return nsi_to_delete
 
     def add_tac_conf(self, model_msg) -> list:
@@ -582,16 +682,21 @@ class Free5GC_K8s(Blue5GBase):
         res += self.core_upXade({'config': self.coreManager.getConfiguration()})
         return res
 
-    def del_tac_conf(self, msg) -> list:
+    def del_tac_conf(self, model_msg) -> list:
+        msg = model_msg.dict()
         res = self.coreManager.del_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
         self.to_db()
         res += self.core_upXade({'config': self.coreManager.getConfiguration()})
         return res
 
-    def add_slice(self, msg) -> list:
+    def add_slice(self, msg_model) -> list:
         res = []
         tail_res = []
+
+        msg = msg_model.dict()
+        self.sumConfig(self.conf, msg)
+        self.to_db()
 
         # add callback IP in self.conf
         if "callback" in msg:
@@ -600,6 +705,27 @@ class Free5GC_K8s(Blue5GBase):
         if "areas" in msg:
             for area in msg["areas"]:
                 # Add DNN to UPF
+                if "slices" in area:
+                    for slice in area["slices"]:
+                        # search dnnList used by the slice
+                        sliceDnnListName = next((item["dnnList"] for item in self.conf["config"]["sliceProfiles"]
+                                                 if item["sliceId"] == slice["sliceId"] and item["sliceType"] == item["sliceType"]), None)
+                        if not sliceDnnListName:
+                            raise ValueError("no slice in the setting message")
+                        dnnList = self.coreManager.get_dnn_list_from_net_names(self.conf, sliceDnnListName)
+                        upfNode = next((item for item in self.conf['config']['upf_nodes'] if item["area"] == area["id"]), None)
+                        if upfNode:
+                            for dnnElem in dnnList:
+                                item = next((item for item in upfNode["dnnList"] if item["dnn"] == dnnElem["dnn"]), None)
+                                if item:
+                                    item["dns"] = dnnElem["dns"]
+                                    item["pools"] = dnnElem["pools"]
+                                else:
+                                    upfNode["dnnList"].append(dnnElem)
+                else:
+                    logger.warn("no slice to add for area {}".format(area["id"]))
+                    continue
+
                 for nsd_item in self.nsd_:
                     if "area" in nsd_item and nsd_item['area'] == area["id"]:
                         if nsd_item['type'] in edge_vnfd_type:
@@ -619,10 +745,6 @@ class Free5GC_K8s(Blue5GBase):
                             res += config.dump()
                         elif nsd_item['type'] == 'ran':
                             tail_res += self.ran_day2_conf(msg, nsd_item)
-
-                # self.config_5g_core_for_reboot()
-                # msg2up = {'config': self.running_free5gc_conf}
-                # res += tail_res + self.core_upXade(msg2up)
 
         res += self.coreManager.add_slice(msg)
         self.coreManager.config_5g_core_for_reboot()

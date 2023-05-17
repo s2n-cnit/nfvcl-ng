@@ -5,15 +5,17 @@ import threading
 import time
 import subprocess
 import traceback
+from logging import Logger
 import redis
 from typing import List
 from utils import persistency
 from .blueprint import BlueprintBase
 from .rest_blue import ShortBlueModel, DetailedBlueModel
 from nfvo import NbiUtil, get_nsd_name
-from utils.util import *
+from utils.util import redis_host, redis_port, osm_port, osm_user, osm_ip, osm_proj, osm_passwd
+from utils.log import create_logger
 
-logger = create_logger('BlueLCMWorker')
+logger: Logger = create_logger('BlueLCMWorker')
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 db = persistency.DB()
 redis_cli = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8")

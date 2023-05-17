@@ -3,6 +3,7 @@
 ## Requirements
  - Having OSM running on a reachable machine (See appendix A).
  - An Ubuntu (20.04+ LTS) instance where the NFVCL will be installed and run
+ - Python 3.8.10
 
 ## Installation
 ### 1 - Clone the repository

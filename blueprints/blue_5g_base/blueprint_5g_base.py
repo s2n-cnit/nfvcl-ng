@@ -200,8 +200,6 @@ class Blue5GBase(BlueprintBase, ABC):
         # add already enabled slices to the ran
         if 'slices' in area:
             conf_data['nssai'] = [NssiConvertion.toNssi(i) for i in area['slices']]
-        #if 'nssai' in self.conf:  #Fixme update to the new intent schema
-        # conf_data['nssai'] = self.conf['nssai']
 
         # override gnb settings from arg
         if 'nb_config' in self.conf:

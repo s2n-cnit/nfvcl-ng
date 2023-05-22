@@ -69,6 +69,7 @@ class K8s(BlueprintBase):
         self.topology_terraform(msg)
         return self.nsd()
 
+
     def topology_terraform(self, msg: dict) -> None:
         try:
             logger.debug("Blue {} - terraforming".format(self.get_id()))
@@ -236,6 +237,7 @@ class K8s(BlueprintBase):
 
     def nsd(self) -> List[str]:
         logger.info("Creating K8s Network Service Descriptors")
+        # The first network descriptor is the k8s controller
         nsd_names = [self.controller_nsd()]
 
         for b in self.conf['areas']:
@@ -271,7 +273,7 @@ class K8s(BlueprintBase):
         for area_id in areas_to_label:
             conf_area = next((item for item in self.conf['areas'] if item['id'] == area_id), None)
             if not conf_area:
-                raise ValueError('Blue {} - confifuration area {} not found'.format(self.get_id(), area_id))
+                raise ValueError('Blue {} - configuration area {} not found'.format(self.get_id(), area_id))
 
             # looking for workers' vdu names (they are the names seen by the K8s master)
             vm_names = []

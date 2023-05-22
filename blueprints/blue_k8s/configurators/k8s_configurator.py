@@ -53,8 +53,11 @@ class ConfiguratorK8s(Configurator_Flex):
         logger.info("Adding the worker labels")
         for item in workers_to_label:
             area_id = item['area']
+            vm: str
             for vm in item['vm_names']:
                 task_name = 'Add label to worker {}'.format(vm)
+                vm = vm.replace('_', '-')
+                vm = vm.lower()
                 task_command = 'kubectl label nodes {} area={}'.format(vm, area_id)
                 self.playbook['tasks'].append({'name': task_name, 'command': task_command})
 
@@ -74,6 +77,3 @@ class ConfiguratorK8s(Configurator_Flex):
 
     def destroy(self):
         logger.info("Destroying")
-        # TODO remove prometheus jobs
-
-        # super(Configurator_AmariEPC, self).destroy()

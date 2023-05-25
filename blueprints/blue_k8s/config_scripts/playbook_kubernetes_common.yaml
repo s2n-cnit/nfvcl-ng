@@ -59,9 +59,9 @@
    - name: Install containerd.
      apt: 
        name:
-         - containerd.io
-         - docker-ce
-         - docker-ce-cli
+         - containerd.io=1.6.21-1
+         - docker-ce=5:23.0.6-1~ubuntu.18.04~bionic
+         - docker-ce-cli=5:23.0.6-1~ubuntu.18.04~bionic
        state: present
    - name: Create Docker etc directory
      file:
@@ -105,10 +105,22 @@
    - name: Installing Kubernetes Cluster Packages.
      apt: 
        name:
-         - kubeadm=1.24.7-00
-         - kubectl=1.24.7-00
-         - kubelet=1.24.7-00
+         - kubeadm=1.24.14-00
+         - kubectl=1.24.14-00
+         - kubelet=1.24.14-00
        state: present
+   - name: Hold kubeadm
+     ansible.builtin.dpkg_selections:
+       name: kubeadm
+       selection: hold
+   - name: Hold kubectl
+     ansible.builtin.dpkg_selections:
+       name: kubectl
+       selection: hold
+   - name: Hold kubelet
+     ansible.builtin.dpkg_selections:
+       name: kubelet
+       selection: hold
    - name: Enable service kubelet, and enable persistently
      service: 
        name: kubelet

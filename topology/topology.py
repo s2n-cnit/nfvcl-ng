@@ -3,6 +3,7 @@ from logging import Logger
 from redis.client import Redis
 
 from models.k8s import K8sModel
+from topology.topology_events import TopologyEvent
 from utils.k8s import parse_k8s_clusters_from_dict
 from utils.log import create_logger
 from utils.ipam import *
@@ -94,11 +95,8 @@ class Topology:
             logger.info('starting terraforming VIM {}'.format(vim['name']))
             # self.os_terraformer[vim['name']] = VimTerraformer(vim)
             self.add_vim(vim, terraform=terraform)
-        msg = {
-            'operation': 'create',
-            'data': topo.to_dict()
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        self.trigger_event(TopologyEvent.TOPO_CREATE, topo.to_dict())
 
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
@@ -119,11 +117,8 @@ class Topology:
         self._os_terraformer = {}
         self._data = {'vims': [], 'networks': [], 'routers': [], 'kubernetes': [], 'pdus': []}
         self.db.delete_DB('topology', {'id': 'topology'})
-        msg = {
-            'operation': 'delete',
-            'data': {}
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        self.trigger_event(TopologyEvent.TOPO_DELETE, {})
 
     # **************************** VIMs ****************************
     def get_vim(self, vim_name: str) -> Union[dict, None]:
@@ -164,11 +159,8 @@ class Topology:
         data = self.nbiutil.add_vim(osm_vim)
         if not data:
             raise ValueError("failed to onboard VIM {} onto OSM".format(vim['name']))
-        msg = {
-            'operation': 'create_vim',
-            'data': vim
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        self.trigger_event(TopologyEvent.TOPO_VIM_CREATE, vim)
 
     @obj_multiprocess_lock
     def del_vim(self, vim, terraform=False):
@@ -195,11 +187,8 @@ class Topology:
                     self._os_terraformer[vim['name']].delNet(network['name'])
 
         self._data['vims'] = [item for item in self._data['vims'] if item['name'] != vim['name']]
-        msg = {
-            'operation': 'delete_vim',
-            'data': vim
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        self.trigger_event(TopologyEvent.TOPO_VIM_DEL, vim)
 
     @obj_multiprocess_lock
     def update_vim(self, update_msg: dict, terraform: bool = True):
@@ -238,11 +227,7 @@ class Topology:
                 raise ValueError('area {} not in VIM {}'.format(vim_area, vim['name']))
             vim['areas'].remove(vim_area_int)
 
-        msg = {
-            'operation': 'update_vim',
-            'data': vim
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+        self.trigger_event(TopologyEvent.TOPO_VIM_UPDATE, vim)
 
     def get_vim_name_from_area_id(self, area: str) -> Union[str, None]:
         vim = next((item for item in self._data['vims'] if area in item['areas']), None)
@@ -283,11 +268,8 @@ class Topology:
                     raise ValueError('VIM {} not found'.format(vim_name))
                 # vim['networks'].append(network['name'])
                 self.add_vim_net(network.name, vim, terraform=terraform)
-        msg = {
-            'operation': 'create_network',
-            'data': network.to_dict()
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        self.trigger_event(TopologyEvent.TOPO_CREATE_NETWORK, network.to_dict())
 
     @obj_multiprocess_lock
     def del_network(self, network: NetworkModel, vim_names_list: Union[list, None] = None, terraform: bool = False):
@@ -302,11 +284,8 @@ class Topology:
                 else:
                     self.del_vim_net(network.name, vim, terraform=terraform)
         self._data['networks'] = [item for item in self._data['networks'] if item['name'] != network.name]
-        msg = {
-            'operation': 'delete_network',
-            'data': network.to_dict()
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        self.trigger_event(TopologyEvent.TOPO_DELETE_NETWORK, network.to_dict())
 
     # **************************** Routers **************************
 
@@ -331,11 +310,8 @@ class Topology:
         if router_check:
             raise ValueError("router {} already existing in the topology". format(router['name']))
         self._data['routers'].append(router)
-        msg = {
-            'operation': 'create_router',
-            'data': router
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        self.trigger_event(TopologyEvent.TOPO_CREATE_ROUTER, router)
 
     @obj_multiprocess_lock
     def del_router(self, router: dict, vim_names_list: list = None):
@@ -355,11 +331,8 @@ class Topology:
                     self.del_vim_router(router['name'], vim)
 
         self._data['routers'] = [item for item in self._data['routers'] if item['name'] != router['name']]
-        msg = {
-            'operation': 'delete_router',
-            'data': router
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        self.trigger_event(TopologyEvent.TOPO_DELETE_ROUTER, router)
 
     # **************************** VIM updating **********************
 
@@ -490,13 +463,24 @@ class Topology:
         reserved_ips = net['allocation_pool'] if 'reserved_ranges' not in net \
             else net['allocation_pool'] + net['reserved_ranges']
         ip_range = get_range_in_cidr(net['cidr'], reserved_ips, range_length)
-        self.set_reserved_ip_range(ip_range, net_name, owner)
 
-        # TODO add event pubblication?
+        reserved_range = self.set_reserved_ip_range(ip_range, net_name, owner)
+
         self.save_topology()
+        self.trigger_event(TopologyEvent.TOPO_CREATE_RANGE_RES, reserved_range)
         return ip_range
 
-    def set_reserved_ip_range(self, ip_range: dict, net_name: str, owner: str) -> None:
+    def set_reserved_ip_range(self, ip_range: dict, net_name: str, owner: str) -> dict:
+        """
+        Set up a reserved ip range for a network of the topology.
+        Args:
+            ip_range: the range
+            net_name: The network on witch the range will be reserved
+            owner: The owner (blueprint) of the reservation
+
+        Returns:
+            The reserved IP range
+        """
         topology_net = next((n for n in self._data['networks'] if n['name'] == net_name), None)
         if not topology_net:
             raise ValueError('network {} not found in the topology'.format(net_name))
@@ -506,27 +490,30 @@ class Topology:
             topology_net['reserved_ranges'] = []
         ip_range['owner'] = owner
         topology_net['reserved_ranges'].append(ip_range)
-        # TODO add event pubblication?
+        return ip_range
 
     @obj_multiprocess_lock
     def release_ranges(self, owner: str, ip_range: typing.Optional[dict] = None, net_name: typing.Optional[str] = None):
         if net_name is None:
-            for n in self._data['networks']:
-                if 'reserved_ranges' in n:
-                    n['reserved_ranges'] = [p for p in n['reserved_ranges'] if p['owner'] != owner]
+            for network in self._data['networks']:
+                if 'reserved_ranges' in network:
+                    network['reserved_ranges'] = [p for p in network['reserved_ranges'] if p['owner'] != owner]
         else:
-            n = next((n for n in self._data['networks'] if n['name'] == net_name), None)
-            if n is None:
+            network = next((n for n in self._data['networks'] if n['name'] == net_name), None)
+            if network is None:
                 logger.error('network not found in the topology. Aborting IP range release')
             else:
-                if 'reserved_ranges' in n:
+                if 'reserved_ranges' in network:
                     if ip_range is None:
-                        n['reserved_ranges'] = [p for p in n['reserved_ranges'] if p['owner'] != owner]
+                        # Exclude all reserved range with the target owner
+                        network['reserved_ranges'] = [ip_pool for ip_pool in network['reserved_ranges'] if ip_pool['owner'] != owner]
                     else:
-                        n['reserved_ranges'] = [p for p in n['reserved_ranges'] if p['owner'] != owner and
+                        # Exclude the reserved range with the target owner and the same starting ip.
+                        network['reserved_ranges'] = [p for p in network['reserved_ranges'] if p['owner'] != owner and
                                                 p['start'] != ip_range['start']]
+        self.trigger_event(TopologyEvent.TOPO_DELETE_RANGE_RES, {})
+        #network['reserved_ranges'] TODO IPv4Address is not JSON serializable
         self.save_topology()
-        # TODO add event pubblication?
 
     @obj_multiprocess_lock
     def add_pdu(self, pdu_input: Union[PduModel, dict]):
@@ -546,11 +533,9 @@ class Topology:
             pdu.update({'nfvo-onboarded': False, "details": ""})
             self._data['pdus'].append(pdu)
             self.save_topology()
-            msg = {
-                'operation': 'create_pdu',
-                'data': json.loads(PduModel.parse_obj(pdu).json())
-            }
-            redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+            pdu_dict = PduModel.parse_obj(pdu).dict()
+            self.trigger_event(TopologyEvent.TOPO_CREATE_PDU, pdu_dict)
             self.save_topology()
 
         except Exception:
@@ -573,11 +558,8 @@ class Topology:
                 logger.info("Deleting pdu from OSM, result: {}".format(res))
             if res:
                 self._data['pdus'] = [item for item in self._data['pdus'] if item['name'] != pdu_name]
-            msg = {
-                'operation': 'delete_pdu',
-                'data': pdu
-            }
-            redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+            self.trigger_event(TopologyEvent.TOPO_DELETE_PDU, pdu)
             self.save_topology()
 
         except ValueError as err:
@@ -633,7 +615,8 @@ class Topology:
                 self._data['kubernetes'][-1]['nfvo_status'] = 'onboarded'
             else:
                 self._data['kubernetes'][-1]['nfvo_status'] = 'error'
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(data))
+
+        self.trigger_event(TopologyEvent.TOPO_CREATE_K8S, data)
         self.save_topology()
 
     @obj_multiprocess_lock
@@ -660,7 +643,7 @@ class Topology:
             #Setting new k8s cluster list as
             self._data['kubernetes'] = [item for item in self._data['kubernetes'] if item['name'] != cluster_id]
 
-            redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(k8s_cluster))
+            self.trigger_event(TopologyEvent.TOPO_DELETE_K8S, k8s_cluster)
             self.save_topology()
         else:
             logger.error("Deleting k8s cluster: no cluster called {} was found".format(cluster_id))
@@ -696,5 +679,19 @@ class Topology:
             cluster.update(data)
             logger.info("Updated k8s cluster {} data with {}".format(name, data))
 
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(data))
         self.save_topology()
+        self.trigger_event(TopologyEvent.TOPO_UPDATE_K8S, data)
+
+    def trigger_event(self, event_name: TopologyEvent, data: dict):
+        """
+        Send an event, together with the data that have been updated to REDIS.
+
+        Args:
+            event_name: the name of the event
+            data: the updated data (dict)
+        """
+        msg = {
+            'operation': event_name.value,
+            'data': data
+        }
+        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))

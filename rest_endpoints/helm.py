@@ -3,16 +3,17 @@ from fastapi.responses import FileResponse
 from rest_endpoints.nfvcl_callback import callback_router
 from utils.helm_repository import helm_repo, chart_path, helm_url_prefix
 from rest_endpoints.helm_model import HelmRepo
-import os
+from utils.log import create_logger
 import json
-from main import *
+import os
+from main import nbiUtil, nfvcl_ip, nfvcl_port
 
 helm_router = APIRouter(
     prefix="/helm_repo",
     tags=["Helm repository"],
     responses={404: {"description": "Not found"}},
 )
-logger = create_logger('Helm repository REST endpoint')
+logger = create_logger('Helm REPO REST endpoint')
 
 @helm_router.get("/{chart_type}/{chart_file}")
 def helm_repo_get(chart_type, chart_file):

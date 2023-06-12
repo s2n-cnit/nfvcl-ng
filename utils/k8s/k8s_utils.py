@@ -1,5 +1,6 @@
 import tempfile
 import time
+import traceback
 import yaml
 from logging import Logger
 from typing import List
@@ -9,6 +10,7 @@ from kubernetes import config
 from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, VersionInfo, V1ConfigMap, \
     V1Namespace, V1ObjectMeta
 from kubernetes.client.rest import ApiException
+from kubernetes.utils import FailToCreateError
 import utils.util
 from config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
 from models.k8s import K8sModel, K8sLabel, K8sVersion
@@ -289,16 +291,24 @@ def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configurati
         for yaml_file in rendered_files_list:
             # Element in position 1 because apply_def_to_cluster is working on yaml file, please look at the source
             # code of apply_def_to_cluster
-            result_list.append(apply_def_to_cluster(kube_client_config, yaml_file_to_be_applied=yaml_file)[1])
+            try:
+                result_list.append(apply_def_to_cluster(kube_client_config, yaml_file_to_be_applied=yaml_file)[1])
+            except FailToCreateError as fail:
+                logger.warning(traceback.format_tb(fail.__traceback__))
+                logger.warning("Definition <{}> for plugin <{}> has gone wrong. Retrying in 60 seconds...".
+                               format(yaml_file, plugin.name))
+                time.sleep(60)
+                result_list.append(apply_def_to_cluster(kube_client_config, yaml_file_to_be_applied=yaml_file)[1])
+
             # If it is the last does not wait
             if not rendered_files_list[-1] == yaml_file:
                 logger.info(
-                    "Yaml definition for {} have been applied. Waiting 30 seconds before next definition.".format(
-                        plugin.name))
+                    "Yaml definition ({}/{}) for {} have been applied. Waiting 30 seconds before next definition.".
+                    format(len(result_list), len(rendered_files_list), plugin.name))
                 time.sleep(30)
         result[plugin.value] = result_list
 
-        # If it is the last does not wait
+        # If it is the last plugin it does NOT wait
         if not plugins_to_install[-1] == plugin:
             logger.info(
                 "Plugin <{}> definitions have been applied. Waiting 30 seconds before next plugin.".format(plugin.name))

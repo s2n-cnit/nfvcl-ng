@@ -6,7 +6,7 @@ from redis import Redis
 redis_cli: Redis = get_redis_instance()
 
 
-def create_logger(name: str) -> logging.getLogger:
+def create_logger(name: str) -> logging.Logger:
     """
     Creates a logger that is outputting on: console, redis and on file.
     In this way an external entity to the NFVCL is able to observe what is going on.
@@ -50,6 +50,23 @@ def create_logger(name: str) -> logging.getLogger:
     logger.addHandler(redis_handler)
     return logger
 
+
+def mod_logger(logger: logging.Logger) -> logging.Logger:
+    """
+    This method takes an existing logger and mod it.
+    Delete existing handlers and add custom ones.
+
+    Args:
+        logger: the logger to be erased and replaced.
+
+    Returns:
+        the new logger
+    """
+    # Deleting previous handlers
+    logger.handlers.clear()
+
+    # The method create logger will take the same logger and add custom handlers to it
+    return create_logger(logger.name)
 
 class RedisLoggingHandler(logging.Handler):
     """

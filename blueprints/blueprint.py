@@ -149,6 +149,15 @@ class BlueprintBase(abc.ABC):
     def get_id(self) -> str:
         return self.conf["blueprint_instance_id"]
 
+    def get_id_lower(self) -> str:
+        """
+        Return the lowercase id of the blueprint
+
+        Returns:
+            lowercase id of the blueprint
+        """
+        return str(self.conf["blueprint_instance_id"]).lower()
+
     def set_topology_lock(self, topo_lock) -> None:
         self.topology_lock = topo_lock
 

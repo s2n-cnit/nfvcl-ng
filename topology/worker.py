@@ -1,6 +1,6 @@
 from models.network import NetworkModel
 from models.topology import TopologyModel
-from utils.util import create_logger
+from utils.log import create_logger
 from multiprocessing import Queue, RLock
 from topology import Topology
 import traceback

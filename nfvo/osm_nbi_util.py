@@ -567,7 +567,7 @@ class NbiUtil:
         if self.check_REST_response(r):
             vim_list = r.json()
             if vim_list is None or not vim_list:
-                raise ValueError('VIM not found')
+                raise ValueError('VIM not found on OSM')
             else:
                 return vim_list[0]
         else:

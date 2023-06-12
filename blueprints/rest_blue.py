@@ -45,8 +45,8 @@ class DetailedBlueModel(BaseModel):
     current_operation: Union[str, None] = None
     created: datetime.datetime
     modified: Optional[datetime.datetime] = None
-    supported_ops: Dict[str, List] = None
+    supported_operations: Dict[str, List] = None
     areas: List[dict] = []
-    ns: List[NetworkServiceSummaryModel] = []
+    nsd_: List[NetworkServiceSummaryModel] = []
     vnfd: Dict[str, List[VnfDescriptorReference]] = None
     primitives: Optional[List[dict]]

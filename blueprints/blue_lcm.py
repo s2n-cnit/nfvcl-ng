@@ -43,25 +43,13 @@ class LCMWorkers:
 
     @staticmethod
     def get_blue_detailed_summary(blue_filter: dict) -> List[DetailedBlueModel]:
-        blues = get_blue_by_filter(blue_filter)
-        # logger.debug(blues)
-        # return [item.print_detailed_summary() for item in blues]
-        return [DetailedBlueModel.parse_obj(
-            {
-                'id': item['id'],
-                'type': item['type'],
-                'status': item['status'],
-                'detailed_status': item['detailed_status'],
-                'current_operation': item['current_operation'],
-                'created': item['created'],
-                'modified': item['modified'],
-                'supported_ops': item['supported_operations'],
-                'areas': item['conf']['areas'],
-                'ns': item['nsd_'],
-                'vnfd': item['vnfd'],
-                'primitives': item['primitives']
-            }
-        ) for item in blues]
+        blues_mongo_cursor = get_blue_by_filter(blue_filter)
+        blue_detailed_list: List[DetailedBlueModel] = []
+        for blueprint in blues_mongo_cursor:
+            detailed_blueprint = DetailedBlueModel.parse_obj(blueprint)
+            detailed_blueprint.areas = blueprint['conf']['areas']
+            blue_detailed_list.append(detailed_blueprint)
+        return blue_detailed_list
 
     @staticmethod
     def get_blue_short_summary(blue_filter: dict) -> List[ShortBlueModel]:

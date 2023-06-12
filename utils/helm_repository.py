@@ -1,6 +1,8 @@
 import utils.persistency as persistency
-from utils.util import *
+from utils.log import create_logger
+from utils.util import nfvcl_ip, nfvcl_port
 from datetime import datetime
+import yaml
 import os.path
 import hashlib
 

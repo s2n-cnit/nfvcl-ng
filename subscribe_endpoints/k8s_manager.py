@@ -284,8 +284,8 @@ class K8sManager:
                     else:
                         raise ValueError("The network {} is not present inside k8s {} cluster.".format(network_name,
                                                                                                        cluster.name))
-            # Returning checked template data
-            return template_data
+        # Returning checked template data
+        return template_data
 
 
 # ----- Global functions for multiprocessing compatibility -----

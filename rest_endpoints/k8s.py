@@ -12,7 +12,8 @@ from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins,
     get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
 from utils.redis.redis_manager import get_redis_instance
 from utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
-    k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_to_user
+    k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_to_user, \
+    k8s_delete_namespace
 
 k8s_router = APIRouter(
     prefix="/k8s",
@@ -196,6 +197,10 @@ async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = B
         name: the name to be given at the new namespace
 
         labels: the labels to be applied at the namespace
+        {
+            "label1": "ciao",
+            "label2": "test"
+        }
 
     Returns:
         the created namespace
@@ -208,6 +213,35 @@ async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = B
     try:
         # Try to install plugins to cluster
         created_namespace: V1Namespace = k8s_create_namespace(k8s_config, namespace_name=name, labels=labels)
+
+    except (ValueError, ApiException) as val_err:
+        logger.error(val_err)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
+
+    return created_namespace.to_dict()
+
+@k8s_router.delete("/{cluster_id}/namespace/{name}", response_model=dict)
+async def create_k8s_namespace(cluster_id: str, name: str = ""):
+    """
+    Delete a namespace in the target k8s cluster.
+
+    Args:
+
+        cluster_id: the k8s cluster ID on witch the namespace is deleted
+
+        name: the name of the namespace to be deleted
+
+    Returns:
+        the created namespace
+    """
+
+    # Get k8s cluster and k8s config for client
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+
+    try:
+        # Try to install plugins to cluster
+        created_namespace: V1Namespace = k8s_delete_namespace(k8s_config, namespace_name=name)
 
     except (ValueError, ApiException) as val_err:
         logger.error(val_err)

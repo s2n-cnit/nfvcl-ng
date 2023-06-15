@@ -481,3 +481,29 @@ def k8s_cert_sign_req(kube_client_config: kubernetes.client.Configuration, usern
                      "csr_approved": csr_result.to_dict()}
 
         return to_return
+
+
+def k8s_delete_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str) -> V1Namespace:
+    """
+    Delete a namespace in a k8s cluster.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace_name: The name of the namespace to be deleted
+
+    Returns:
+        The deleted namespace
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        try:
+            namespace = api_instance_core.delete_namespace(namespace_name)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>delete_namespace: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return namespace

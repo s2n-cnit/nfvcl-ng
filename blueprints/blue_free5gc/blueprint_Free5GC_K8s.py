@@ -826,21 +826,25 @@ class Free5GC_K8s(Blue5GBase):
 
                 for nsd_item in self.nsd_:
                     if "area" in nsd_item and nsd_item['area'] == area["id"]:
-                        if nsd_item['type'] in edge_vnfd_type:
-                            conf_data = {
-                                'plmn': str(self.conf['config']['plmn']),
-                                'upf_nodes': self.conf['config']['upf_nodes'],
-                                'tac': area["id"] # tac of the node
-                            }
-
-                            config = Configurator_Free5GC(
-                                nsd_item['descr']['nsd']['nsd'][0]['id'],
-                                1,
-                                self.get_id(),
-                                conf_data
-                            )
-
-                            res += config.dump()
+                        if nsd_item['type'] == 'core':
+                            res += self.core_day2_conf(msg, nsd_item)
+                        elif nsd_item['type'] in edge_vnfd_type:
+                            res += self.edge_day2_conf(msg, nsd_item)
+                            #
+                            # conf_data = {
+                            #     'plmn': str(self.conf['config']['plmn']),
+                            #     'upf_nodes': self.conf['config']['upf_nodes'],
+                            #     'tac': area["id"] # tac of the node
+                            # }
+                            #
+                            # config = Configurator_Free5GC(
+                            #     nsd_item['descr']['nsd']['nsd'][0]['id'],
+                            #     1,
+                            #     self.get_id(),
+                            #     conf_data
+                            # )
+                            #
+                            # res += config.dump()
                         elif nsd_item['type'] == 'ran':
                             tail_res += self.ran_day2_conf(msg, nsd_item)
 

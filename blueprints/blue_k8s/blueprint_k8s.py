@@ -267,8 +267,13 @@ class K8s(BlueprintBase):
 
     def add_worker_area_label(self, msg: dict):
         logger.debug("Blue {} - Triggering Day2 Add area label to workers ".format(self.get_id()))
+        if type(msg) is not dict:
+            msg = msg.dict()
 
-        areas_to_label = [item['id'] for item in msg['areas']]
+        if "areas" in msg: 
+            areas_to_label = [item['id'] for item in msg['areas']]
+        if "add_areas" in msg:
+            areas_to_label = [item['id'] for item in msg['add_areas']]
         workers_to_label = []
         for area_id in areas_to_label:
             conf_area = next((item for item in self.conf['areas'] if item['id'] == area_id), None)
@@ -296,7 +301,12 @@ class K8s(BlueprintBase):
     def del_worker(self, msg: dict) -> List[str]:
         logger.info("Deleting worker from K8S blueprint " + str(self.get_id()))
         nsi_to_delete = []
-        for area in msg['del_areas']:
+        if type(msg) is not dict:
+            msg = msg.dict()
+        areas = []
+        if "del_areas" in msg:
+            areas = msg["del_areas"]
+        for area in areas:
             checked_area = next((item for item in self.conf['areas'] if item['id'] == area['id']), None)
             if not checked_area:
                 raise ValueError("Blue {} - area {} not found".format(self.get_id(), area['id']))
@@ -312,7 +322,10 @@ class K8s(BlueprintBase):
             # Note: this should be probably done, after deletion confirmation from the nfvo
             self.conf['areas'] = [item for item in self.conf['areas'] if item['id'] != area['id']]
 
-        for area in msg['modify_areas']:
+        areas = []
+        if "modify_areas" in msg:
+            areas = msg["modify_areas"]
+        for area in areas:
             # check if area is already existing in self.conf, or it is a new area
             checked_area = next((item for item in self.conf['areas'] if item['id'] == area['id']), None)
             if checked_area:
@@ -330,6 +343,8 @@ class K8s(BlueprintBase):
 
     def add_worker(self, msg: dict) -> List[str]:
         logger.info("Adding worker to K8S blueprint " + str(self.get_id()))
+        if type(msg) is not dict:
+            msg = msg.dict()
         nsd_names = []
         for area in msg['add_areas']:
             logger.info("Blue {} - activating new area {}".format(self.get_id(), area['id']))
@@ -360,9 +375,16 @@ class K8s(BlueprintBase):
         return nsd_names
 
     def add_worker_day2(self, msg: dict):  # FIXME!!!!!
+        if type(msg) is not dict:
+            msg = msg.dict()
         res = []
 
-        for area in msg['areas']:
+        areas = []
+        if "areas" in msg:
+            areas.extend(msg["areas"])
+        if "add_areas" in msg:
+            areas.extend(msg["add_areas"])
+        for area in areas:
             # vdu_names = []
             for n in self.nsd_:
 
@@ -483,6 +505,8 @@ class K8s(BlueprintBase):
         Returns:
             Empty primitive list such that caller does not crash
         """
+        if type(msg) is not dict:
+            msg = msg.dict()
         client_config = get_k8s_config_from_file_content(self.conf['config']['master_credentials'])
         # Build plugin list
         plug_list: List[K8sPluginName] = []

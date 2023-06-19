@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import Enum
 from ipaddress import IPv4Address, IPv4Network
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, Field, conlist
 
 
@@ -27,8 +27,8 @@ class LBPool(BaseModel):
     net_name: str = Field(
         ..., description='name of the network in the topology'
     )
-    ip_start: Optional[IPv4Address] = None
-    ip_end: Optional[IPv4Address] = None
+    ip_start: Optional[Union[str,IPv4Address]] = None
+    ip_end: Optional[Union[str, IPv4Address]] = None
     range_length: Optional[int] = Field(
         None,
         description='Number of IPv4 addresses to reserved if no ip start and end are passed. Default 10 addresses.',
@@ -62,7 +62,7 @@ class K8sConfig(BaseModel):
     version: Optional[str] = "1.24"
     cni: Optional[Cni] = "flannel"
     linkerd: Optional[dict]
-    pod_network_cidr: Optional[IPv4Network] \
+    pod_network_cidr: Optional[Union[str,IPv4Network]] \
         = Field('10.254.0.0/16', description='K8s Pod network IPv4 cidr to init the cluster')
     network_endpoints: K8sNetworkEndpoints
     worker_flavors: VMFlavors = VMFlavors()

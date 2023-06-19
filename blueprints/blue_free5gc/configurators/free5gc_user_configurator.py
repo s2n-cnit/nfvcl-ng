@@ -13,8 +13,10 @@ class UpSecurityType(Enum):
     REQUIRED = 2
 
 class Configurator_Free5GC_User():
-    def __init__(self) -> None:
-        pass
+    def __init__(self, conf: dict = None) -> None:
+        if not conf:
+            raise ValueError("Conf is empty")
+        self.conf = conf
 
     def add_ue_to_db(self, plmn: str, imsi: str, key: str, ocv: str, defaultUeUplink: str = "1 Gbps",
                      defaultUeDownlink: str = "2 Gbps", gpsis: str = "msisdn-0900000000",
@@ -388,14 +390,14 @@ class Configurator_Free5GC_User():
 
     def add_ues(self, msg: dict) -> None:
         mongoDbPath = None
-        if "config" in msg:
-            if "mongodb" in msg["config"]:
-                mongoDbPath = "mongodb://{}:27017/".format(msg["config"]["mongodb"])
+        if "config" in self.conf:
+            if "mongodb" in self.conf["config"]:
+                mongoDbPath = "mongodb://{}:27017/".format(self.conf["config"]["mongodb"])
 
-        if "config" in msg and "plmn" in msg["config"]:
-            if "subscribers" in msg["config"]:
+        if "config" in self.conf and "plmn" in self.conf["config"]:
+            if "config" in msg and "subscribers" in msg["config"]:
                 for subscriber in msg["config"]["subscribers"]:
-                    plmn = msg["config"]["plmn"]
+                    plmn = self.conf["config"]["plmn"]
                     imsi = subscriber["imsi"]
                     if "k" in subscriber and "opc" in subscriber:
                         key = subscriber["k"]
@@ -413,15 +415,15 @@ class Configurator_Free5GC_User():
                             self.add_snssai_to_db(plmn=plmn, imsi=imsi, sst=sst, sd=sd, default=default,
                                                               mongodbServiceHost=mongoDbPath)
 
-                            if "sliceProfiles" in msg["config"]:
-                                for sliceProfile in msg["config"]["sliceProfiles"]:
+                            if "sliceProfiles" in self.conf["config"]:
+                                for sliceProfile in self.conf["config"]["sliceProfiles"]:
                                     if sliceProfile["sliceId"] == snssaiElem["sliceId"] \
                                             and sliceProfile["sliceType"] == snssaiElem["sliceType"]:
                                         if "dnnList" in sliceProfile:
-                                            if "network_endpoints" in msg["config"] \
-                                                    and "data_nets" in msg["config"]["network_endpoints"]:
+                                            if "network_endpoints" in self.conf["config"] \
+                                                    and "data_nets" in self.conf["config"]["network_endpoints"]:
                                                 for net_name in sliceProfile["dnnList"]:
-                                                    for data_net in msg["config"]["network_endpoints"]["data_nets"]:
+                                                    for data_net in self.conf["config"]["network_endpoints"]["data_nets"]:
                                                         if net_name == data_net["net_name"]:
                                                             dnn = data_net["dnn"]
                                                             uplinkAmbr = data_net["uplinkAmbr"]
@@ -453,13 +455,13 @@ class Configurator_Free5GC_User():
 
     def del_ues(self, msg: dict) -> None:
         mongoDbPath = None
-        if "config" in msg:
-            if "mongodb" in msg["config"]:
-                mongoDbPath = "mongodb://{}:27017/".format(msg["config"]["mongodb"])
+        if "config" in self.conf:
+            if "mongodb" in self.conf["config"]:
+                mongoDbPath = "mongodb://{}:27017/".format(self.conf["config"]["mongodb"])
 
-            if "plmn" in msg["config"]:
+            if "plmn" in self.conf["config"]:
                 if "subscribers" in msg["config"]:
                     for subscriber in msg["config"]["subscribers"]:
-                        plmn = msg["config"]["plmn"]
+                        plmn = self.conf["config"]["plmn"]
                         imsi = subscriber["imsi"]
                         self.del_ue_from_db(plmn=plmn, imsi=imsi, mongodbServiceHost=mongoDbPath)

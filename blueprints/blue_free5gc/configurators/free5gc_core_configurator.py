@@ -1,5 +1,6 @@
 import copy
-from typing import List
+from typing import Union, List, Dict
+from pydantic import BaseModel, parse_obj_as
 from main import *
 
 # create logger
@@ -54,7 +55,7 @@ class Configurator_Free5GC_Core():
         except Exception:
             self.nssfName = "{0:06x}".format(random.randrange(0x000000, 0xFFFFFF))
 
-    def get_dnn_list_from_net_names(self, msg: dict = None, netNames: list = None) -> List:
+    def get_dnn_list_from_net_names(self, msg: dict = None, netNames: list = None, addPoolsData: bool = True) -> List:
         """
         It works reading the msg ("slice-intent" message) and match netNames to "data_nets" section
         ex: ["internet"] -> [
@@ -67,7 +68,11 @@ class Configurator_Free5GC_Core():
         """
         if msg is None or netNames is None:
             raise ValueError("configuration or network names of datanets are not valid")
-        dnnList = [{"dnn": i["dnn"], "dns": i["dns"], "pools": i["pools"]} for i
+        if addPoolsData:
+            dnnList = [{"dnn": i["dnn"], "dns": i["dns"], "pools": i["pools"]} for i
+                       in msg["config"]["network_endpoints"]["data_nets"] if i["net_name"] in netNames]
+        else:
+            dnnList = [{"dnn": i["dnn"], "dns": i["dns"]} for i
                    in msg["config"]["network_endpoints"]["data_nets"] if i["net_name"] in netNames]
 
         return dnnList
@@ -552,7 +557,7 @@ class Configurator_Free5GC_Core():
 
         smfConfigurationBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
-            yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False)
+            yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"] = dict()
         smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
@@ -575,6 +580,7 @@ class Configurator_Free5GC_Core():
         smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
 
         if groupName == None:
+            logger.warn("group name is empty")
             return
 
         if smfUeRoutingInfoBase is None or type(smfUeRoutingInfoBase) is not dict:
@@ -591,11 +597,11 @@ class Configurator_Free5GC_Core():
         if links is not None:
             if "topology" not in group:
                 group["topology"] = []
-            group["topology"].extend(links)
+            group["topology"].extend(x for x in links if x not in group["topology"])
         if specificPaths is not None:
             if "specificPath" not in group:
                 group["specificPath"] = []
-            group["specificPath"].extend(specificPaths)
+            group["specificPath"].extend(x for x in specificPaths if x not in group["specificPath"])
 
 
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
@@ -605,7 +611,7 @@ class Configurator_Free5GC_Core():
                                       groupName: str = "UE1", tac: int = None ):
         """
         smf routing unset configuration.
-        Configuration for "uerounting.yaml" in case ULCL (Uplink Classifier) is enabled
+        Configuration for "uerouting.yaml" in case ULCL (Uplink Classifier) is enabled
         :param members:
             list of UEs imsi. ex. ["imsi-208930000000003", "imsi-208930000000004"]
         :param links:
@@ -619,37 +625,39 @@ class Configurator_Free5GC_Core():
         """
         smfUeRoutingInfoBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfoBase"]
 
-        if smfUeRoutingInfoBase is dict:
-            if groupName in smfUeRoutingInfoBase:
-                group = smfUeRoutingInfoBase[groupName]
-                if members is not None:
-                    if "members" in group:
-                        for elem in members:
-                            group["members"].delete("imsi-{}".format(elem))
-                    else:
-                        raise ValueError("\"members\" list is NOT in smf routing configuration")
-                if links is not None:
-                    if "topology" in group:
-                        for elem in links:
-                            group["topology"].delete(elem)
-                    else:
-                        raise ValueError("\"topology\" list is NOT in smf routing configuration")
-                if specificPaths is not None:
-                    if "specificPath" in group:
-                        for elem in specificPaths:
-                            group["specificPath"].delete(elem)
-                if tac is not None:
-                    if "topology" in group:
-                        for elem in group["topology"]:
-                            if "A" in group["topology"] and group["topology"]["A"] == "UPF-{}".format(tac):
-                                group["topology"].delete(elem)
-                                continue
-                            if "B" in group["topology"] and group["topology"]["B"] == "UPF-{}".format(tac):
-                                group["topology"].delete(elem)
-                                continue
+        if isinstance(smfUeRoutingInfoBase, dict):
+            smfUeRoutingInfoBase.pop(groupName, None)
 
-                self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
-                    yaml.dump(smfUeRoutingInfoBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+            # if groupName in smfUeRoutingInfoBase:
+            #     group = smfUeRoutingInfoBase[groupName]
+            #     if members is not None:
+            #         if "members" in group:
+            #             for elem in members:
+            #                 group["members"].delete("imsi-{}".format(elem))
+            #         else:
+            #             raise ValueError("\"members\" list is NOT in smf routing configuration")
+            #     if links is not None:
+            #         if "topology" in group:
+            #             for elem in links:
+            #                 group["topology"].delete(elem)
+            #         else:
+            #             raise ValueError("\"topology\" list is NOT in smf routing configuration")
+            #     if specificPaths is not None:
+            #         if "specificPath" in group:
+            #             for elem in specificPaths:
+            #                 group["specificPath"].delete(elem)
+            #     if tac is not None:
+            #         if "topology" in group:
+            #             for elem in group["topology"]:
+            #                 if "A" in group["topology"] and group["topology"]["A"] == "UPF-{}".format(tac):
+            #                     group["topology"].delete(elem)
+            #                     continue
+            #                 if "B" in group["topology"] and group["topology"]["B"] == "UPF-{}".format(tac):
+            #                     group["topology"].delete(elem)
+            #                     continue
+
+            self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["ueRoutingInfo"] = \
+                yaml.dump(smfUeRoutingInfoBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
     def smf_set_configuration(self, mcc: str, mnc: str, smfName: str = None, dnnList: list = None,
                               sliceList: list = None, links: list = None, upNodes: dict = None) -> str:
@@ -677,12 +685,15 @@ class Configurator_Free5GC_Core():
 
         snssaiInfos = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"] \
             ["configurationBase"]["snssaiInfos"]
+        logger.info("SNSSAIINFOS 1: {}".format(snssaiInfos))
         if sliceList != None:
             for slice in sliceList:
+                logger.info("SLICE TO ADD: {}".format(slice))
                 sNssaiFound = False
                 for item in snssaiInfos:
                     if item["sNssai"] == slice:
                         sNssaiFound = True
+                        logger.info("SLICE FOUND")
                         if dnnList != None:
                             for dnn in dnnList:
                                 dnnFound = False
@@ -695,10 +706,12 @@ class Configurator_Free5GC_Core():
                                 else:
                                     dnnFound = False
                 if sNssaiFound == False:
+                    logger.info("SLICE NOT FOUND")
                     dnnInfos = []
                     for dnn in dnnList:
                         dnnInfos.append({"dnn": dnn["dnn"], "dns": { "ipv4": dnn["dns"]}})
                     snssaiInfos.append({"dnnInfos": dnnInfos, "sNssai": slice})
+                    logger.info("SNSSAINFOS 2: {}".format(snssaiInfos))
                 else:
                     sNssaiFound = False
 
@@ -739,7 +752,7 @@ class Configurator_Free5GC_Core():
 
         smfConfigurationBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]
         self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
-            yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False)
+            yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
 
         return smfName
 
@@ -790,16 +803,23 @@ class Configurator_Free5GC_Core():
                                             sNssaiUpfInfosItem["dnnUpfInfoList"].pop(dnnUpfInfoIndex)
 
         if tacList != None:
-            if tacList != None:
-                for tac in tacList:
-                    upfName = "UPF-{}".format(tac["id"])
-                    gnbName = "gNB-{}".format(tac["id"])
-                    for linkIndex, linkItem in enumerate(userplaneInformationLinks):
-                        if upfName in linkItem.items() or gnbName in linkItem.items():
-                            userplaneInformationLinks.pop(linkIndex)
-                    for nodeIndex, (nodeItem, nodeValue) in enumerate(userplaneInformationUpNodes.items()):
-                        if upfName in nodeValue.keys() or gnbName in nodeValue.keys():
-                            userplaneInformationUpNodes.pop(nodeIndex)
+            removingLinkIndexes = []
+            for tac in tacList:
+                upfName = "UPF-{}".format(tac["id"])
+                gnbName = "gNB-{}".format(tac["id"])
+                for linkIndex, linkItem in enumerate(userplaneInformationLinks):
+                    list1, list2 = zip(*list(linkItem.items()))
+                    if upfName in list2 or gnbName in list2:
+                        removingLinkIndexes.append(linkIndex)
+                for item in removingLinkIndexes[::-1]:
+                    userplaneInformationLinks.pop(item)
+                userplaneInformationUpNodes.pop(upfName, None)
+                userplaneInformationUpNodes.pop(gnbName, None)
+
+        smfConfigurationBase = self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"]
+        self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configuration"] = \
+            yaml.dump(smfConfigurationBase, explicit_start=False, default_flow_style=False, Dumper=NoAliasDumper)
+
 
     def udm_reset_configuration(self) -> None:
         """
@@ -1025,10 +1045,10 @@ class Configurator_Free5GC_Core():
 
         self.smf_unset_configuration(dnnList=dnnInfoList, sliceList=[slice], tacList=[{"id": tac}])
         members = None
-        if "config" in conf and "subscribers" in conf["config"]:
-            subscribers = conf["config"]["subscribers"]
-            members = [elem["imsi"] for elem in subscribers if "imsi" in elem]
-        self.smf_routing_unset_configuration(members=members,tac=tac)
+        # if "config" in conf and "subscribers" in conf["config"]:
+        #     subscribers = conf["config"]["subscribers"]
+        #     members = [elem["imsi"] for elem in subscribers if "imsi" in elem]
+        self.smf_routing_unset_configuration(members=members,tac=tac, groupName="UE-gNB-{0}-UPF-{0}".format(tac))
         self.config_5g_core_for_reboot()
         #
         # msg2up = {'config': self.running_free5gc_conf}
@@ -1078,7 +1098,7 @@ class Configurator_Free5GC_Core():
                     if upf["area"] == tac:
                         dnnUpfInfoList = []
                         for dnnInfo in dnnInfoList:
-                            if slice in coreSlices and upf["type"] != "core":
+                            if slice in coreSlices and upf["type"] != "core" or "pools" not in dnnInfo:
                                 dnnUpfInfoList.append({"dnn": dnnInfo["dnn"]})
                             else:
                                 dnnUpfInfoList.append({"dnn": dnnInfo["dnn"], "pools": dnnInfo["pools"]})
@@ -1114,8 +1134,7 @@ class Configurator_Free5GC_Core():
         if "config" in conf and "subscribers" in conf["config"]:
             subscribers = conf["config"]["subscribers"]
             members = [elem["imsi"] for elem in subscribers if "imsi" in elem]
-        self.smf_routing_set_configuration(members=members, links=links,
-                                           groupName=groupName)
+        self.smf_routing_set_configuration(members=members, links=links, groupName=groupName)
         self.config_5g_core_for_reboot()
 
         return []
@@ -1196,9 +1215,57 @@ class Configurator_Free5GC_Core():
         # if sliceList != []:
         #     message = {"config": {"slices": sliceList}}
         #     self.del_slice(message)
-        self.del_slice(msg)
+        #self.del_slice(msg)
 
         return res
+
+    def checkSliceAndDnnInsideUpfNodes(self, sd: str = None , sst: int = None, dnns: List[str] = None) -> bool:
+        if not sd or not sst or not dnns:
+            raise ValueError("sd ({}) and/or sst ({}) and/or dnn ({}) is None".format(sd, sst, dnns))
+        # define model
+        class SNssai(BaseModel):
+            sd: str
+            sst: int
+
+        class Cidr(BaseModel):
+            cidr: str
+
+        class Dnn(BaseModel):
+            dnn: str
+            pools: List[Cidr] = None
+
+        class SNssaiUpfInfo(BaseModel):
+            dnnUpfInfoList: List[Dnn]
+            sNssai: SNssai
+
+
+        class UpfNodeInterface(BaseModel):
+            endpoints: List[str]
+            interfaceType: str
+            networkInstance: str
+
+
+        class UpfNode(BaseModel):
+            interfaces: List[UpfNodeInterface]
+            nodeID: str
+            sNssaiUpfInfos: List[SNssaiUpfInfo]
+            type: str
+
+        class GnbNode(BaseModel):
+            an_ip: str
+            type: str
+
+        upNodes = parse_obj_as(Dict[str, Union[UpfNode, GnbNode]], self.running_free5gc_conf["free5gc-smf"]["smf"]["configuration"]["configurationBase"] \
+            ["userplaneInformation"]["upNodes"])
+
+        for value in upNodes.values():
+            if value.type == "UPF":
+                for nssaiInfo in value.sNssaiUpfInfos:
+                    if nssaiInfo.sNssai.sd == sd and nssaiInfo.sNssai.sst == sst:
+                        for upfInfo in nssaiInfo.dnnUpfInfoList:
+                            if upfInfo.dnn in dnns and upfInfo.pools:
+                                return True
+        return False
 
     def add_slice(self, msg: dict) -> list:
         if msg is None:
@@ -1230,8 +1297,9 @@ class Configurator_Free5GC_Core():
                         dnnSliceList = []
                         slice = {"sd": extSlice["sliceId"], "sst": SstConvertion.to_int(extSlice["sliceType"])}
                         sliceList.append(slice)
-                        extDnnList=self.get_dnn_list_from_net_names(self.conf,
-                                self.get_dnn_names_from_slice(self.conf, extSlice["sliceType"], extSlice["sliceId"]))
+                        dnnNames = self.get_dnn_names_from_slice(self.conf, extSlice["sliceType"], extSlice["sliceId"])
+                        addPool = self.checkSliceAndDnnInsideUpfNodes(slice["sd"], slice["sst"], dnnNames)
+                        extDnnList=self.get_dnn_list_from_net_names(self.conf, dnnNames, addPool)
                         dnnSliceList.extend(extDnnList)
                         dnnList.extend(extDnnList)
 
@@ -1239,14 +1307,14 @@ class Configurator_Free5GC_Core():
                                                    sliceList=[slice])
 
                         # add DNNs to upf configuration
-                        if len(dnnSliceList) != 0:
-                            for upf in self.conf["config"]["upf_nodes"]:
-                                if upf["area"] == area["id"]:
-                                    if "dnnList" in upf:
-                                        upf["dnnList"].extend(dnnSliceList)
-                                    else:
-                                        upf["dnnList"] = copy.deepcopy(dnnSliceList)
-                                    break
+                        # if len(dnnSliceList) != 0:
+                        #     for upf in self.conf["config"]["upf_nodes"]:
+                        #         if upf["area"] == area["id"]:
+                        #             if "dnnList" in upf:
+                        #                 upf["dnnList"].extend(dnnSliceList)
+                        #             else:
+                        #                 upf["dnnList"] = copy.deepcopy(dnnSliceList)
+                        #             break
 
                         tacList.append(area["id"])
                         self.n3iwf_set_configuration(mcc=mcc, mnc= mnc, n3iwfId=n3iwfId, tac=area["id"],
@@ -1254,8 +1322,7 @@ class Configurator_Free5GC_Core():
                         self.nssf_set_configuration(mcc=mcc, mnc=mnc, nssfName=nssfName, sliceList=[slice],
                                 tac=area["id"])
                         res += self.smf_add_upf(conf=self.conf, smfName=smfName, tac=area["id"], slice=slice,
-                                dnnInfoList=self.get_dnn_list_from_net_names(self.conf,
-                                        self.get_dnn_names_from_slice(self.conf, extSlice["sliceType"], extSlice["sliceId"])))
+                                dnnInfoList=self.get_dnn_list_from_net_names(self.conf, dnnNames, addPool))
                     self.amf_set_configuration(mcc=mcc, mnc=mnc, amfId=amfId, supportedTacList = tacList,
                                 snssaiList = sliceList, dnnList = dnnList)
 

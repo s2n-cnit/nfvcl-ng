@@ -1,5 +1,5 @@
 import ipaddress
-from typing import List, Union, Dict
+from typing import Union, Dict
 from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
 from .models import *
@@ -154,40 +154,124 @@ class Free5GC_K8s(Blue5GBase):
             self.vnfd = {'core': [], 'area': []}
         if "running_free5gc_configuration" not in self.conf:
             self.conf["running_free5gc_configuration"] = free5GC_default_config.default_config
-        self.userManager = Configurator_Free5GC_User()
+        self.userManager = Configurator_Free5GC_User(self.conf)
         self.coreManager = Configurator_Free5GC_Core(self.conf["running_free5gc_configuration"], self.conf)
 
-    def dropConfig(self, conf1: dict, conf2: dict):
+    # def dropConfig(self, conf1: dict, conf2: dict):
+    #     """
+    #     Drop "conf2" from "conf1"
+    #     @param conf1:
+    #     @param conf2:
+    #     @return:
+    #     """
+    #     if "config" in conf1 and "config" in conf2:
+    #         if "sliceProfiles" in conf1["config"] and "sliceProfiles" in conf2["config"]:
+    #             sliceProfiles1 = conf1["config"]["sliceProfiles"]
+    #             sliceProfiles2 = conf2["config"]["sliceProfiles"]
+    #             for slice2 in sliceProfiles2:
+    #                 sliceToRemove = next((slice1 for index, slice1 in enumerate(sliceProfiles1)
+    #                     if slice1["sliceId"] == slice2["sliceId"] and slice1["sliceType"] == slice2["sliceType"]), None)
+    #                 if sliceToRemove:
+    #                     sliceProfiles1.remove(sliceToRemove)
+    #         if "subscribers" in conf1["config"] and "subscribers" in conf2["config"]:
+    #             subscribers1 = conf1["config"]["subscribers"]
+    #             subscribers2 = conf2["config"]["subscribers"]
+    #             for sub2 in subscribers2:
+    #                 subToRemove = next((sub1 for index, sub1 in enumerate(subscribers1)
+    #                                     if sub1["imsi"] == sub2["imsi"]), None)
+    #                 if subToRemove:
+    #                     subscribers1.remove(subToRemove)
+    #     if "areas" in conf1 and "areas" in conf2:
+    #         for area2 in conf2:
+    #             areaToRemove = next((item for index, item in enumerate(conf1["areas"])
+    #                                  if item["id"] == area2["id"]), None)
+    #             if areaToRemove:
+    #                 conf1["areas"].remove(areaToRemove)
+
+    def dropTacConfig(self, conf1: dict, conf2: dict):
         """
-        Drop "conf2" from "conf1"
+        Drop tac config "conf2" from "conf1"
         @param conf1:
         @param conf2:
         @return:
         """
-        if "config" in conf1 and "config" in conf2:
-            if "sliceProfiles" in conf1["config"] and "sliceProfiles" in conf2["config"]:
-                sliceProfiles1 = conf1["config"]["sliceProfiles"]
-                sliceProfiles2 = conf2["config"]["sliceProfiles"]
-                for slice2 in sliceProfiles2:
-                    sliceToRemove = next((slice1 for index, slice1 in enumerate(sliceProfiles1)
+        if "areas" not in conf1:
+            logger.warn("config \"areas\" section is empty")
+            return
+
+        if "areas" in conf2:
+            for area2 in conf2["areas"]:
+                if "id" in area2 and "nci" in area2:
+                    areaToRemove = next((area1 for area1 in conf1["areas"]
+                                         if area1["id"] == area2["id"] and area1["nci"] == area2["nci"]), None)
+                    if areaToRemove:
+                        conf1["areas"].remove(areaToRemove)
+                else:
+                    logger.warn("\"id\" and/or \"nci\" are/is empty for area: {}".format(area2))
+
+    def dropSliceConfig(self, conf1: dict, conf2: dict):
+        """
+        Drop slice config "conf2" from "conf1"
+        @param conf1:
+        @param conf2:
+        @return:
+        """
+        if "sliceProfiles" not in conf1["config"]:
+            logger.warn("\"sliceProfiles\" section in saved configuration not exists")
+            return
+
+        if "network_endpoints" not in conf1["config"]:
+            logger.warn("\"network_enpoints\" section in saved configuration not exists")
+            return
+
+        if "data_nets" not in conf1["config"]["network_endpoints"]:
+            logger.warn("\"data_nets\" section in saved configuration not exists")
+            return
+
+        if "network_endpoints" in conf2["config"]:
+            if "data_nets" in conf2["config"]["network_endpoints"]:
+                for dataNet2 in conf2["config"]["network_endpoints"]["data_nets"]:
+                    dataNetToRemove = next((dataNet1 for dataNet1 in conf1["config"]["network_endpoints"]["data_nets"]
+                                            if dataNet1["net_name"] == dataNet2["net_name"]), None)
+                    if dataNetToRemove:
+                        conf1["config"]["network_endpoints"]["data_nets"].remove(dataNetToRemove)
+
+        if "sliceProfiles" in conf2["config"]:
+            for slice2 in conf2["config"]["sliceProfiles"]:
+                if "sliceId" in slice2 and "sliceType" in slice2:
+                    # remove slice from "sliceProfiles" section
+                    sliceToRemove = next((slice1 for slice1 in conf1["config"]["sliceProfiles"]
                         if slice1["sliceId"] == slice2["sliceId"] and slice1["sliceType"] == slice2["sliceType"]), None)
                     if sliceToRemove:
-                        sliceProfiles1.remove(sliceToRemove)
-            if "subscribers" in conf1["config"] and "subscribers" in conf2["config"]:
-                subscribers1 = conf1["config"]["subscribers"]
-                subscribers2 = conf2["config"]["subscribers"]
-                for sub2 in subscribers2:
-                    subToRemove = next((sub1 for index, sub1 in enumerate(subscribers1)
-                                        if sub1["imsi"] == sub2["imsi"]), None)
-                    if subToRemove:
-                        subscribers1.remove(subToRemove)
-        if "area" in conf1 and "area" in conf2:
-            for area2 in conf2:
-                areaToRemove = next((item for index, item in enumerate(conf1["area"])
-                                     if item["id"] == area2["id"]), None)
-                if areaToRemove:
-                    conf1["area"].remove(areaToRemove)
+                        conf1["config"]["sliceProfiles"].remove(sliceToRemove)
+                    # remove slice from "areas" section
+                    if "areas" in conf1:
+                        for area1 in conf1["areas"]:
+                            slicesToSave = []
+                            if "slices" in area1:
+                                slicesToSave.extend(x for x in area1["slices"]
+                                    if x["sliceType"] != slice2["sliceType"] or x["sliceId"] != slice2["sliceId"])
+                                area1["slices"] = slicesToSave
+                else:
+                    logger.warn("\"sliceId\" and/or \"sliceTypw\" are/is not defined")
 
+
+    def dropUeConfig(self, conf1: dict, conf2: dict):
+        """
+        Drop Ue config "conf2" from "conf1"
+        @param conf1:
+        @param conf2:
+        @return:
+        """
+        if "subscribers" not in conf1["config"]:
+            logger.warn("\"subscribers\" configuration section does not exist")
+            return
+
+        if "subscribers" in conf2["config"]:
+            for ue2 in conf2["config"]["subscribers"]:
+                ueToRemove = next((ue1 for ue1 in conf1["config"]["subscribers"] if ue1["imsi" == ue2["imsi"]]), None)
+                if ueToRemove:
+                    conf1["config"]["subscribers"].remove(ueToRemove)
 
     def sumConfig(self, conf1: dict, conf2: dict):
         """
@@ -217,6 +301,7 @@ class Free5GC_K8s(Blue5GBase):
                             data_nets1 = network_endpoints1["data_nets"]
                             data_nets2 = network_endpoints2["data_nets"]
                             for data2 in data_nets2:
+                                # looking for duplicate items to be removed before update
                                 data1 = next((item for index, item in enumerate(data_nets1) if item["dnn"] == data2["dnn"]),
                                              None)
                                 if data1:
@@ -507,6 +592,7 @@ class Free5GC_K8s(Blue5GBase):
     def add_tac_nsd(self, model_msg) -> list:
         nsd_names = []
         msg = model_msg.dict()
+
         self.sumConfig(self.conf, msg)
         self.to_db()
         for area in msg['areas']:
@@ -656,7 +742,7 @@ class Free5GC_K8s(Blue5GBase):
                     self.nsd_.pop(nsd_i)
 
         # remove msg from config
-        self.dropConfig(self.conf, msg)
+        self.dropTacConfig(self.conf, msg)
         self.to_db()
         return nsi_to_delete
 
@@ -664,6 +750,11 @@ class Free5GC_K8s(Blue5GBase):
         res = []
         # "areas" msg information were merged in "add_tac_nsd" function
         msg = model_msg.dict()
+
+        # add callback IP in self.conf
+        if "callbackURL" in msg:
+            self.conf["callback"] = msg["callbackURL"]
+
         self.coreManager.add_tacs_and_slices(msg)
         self.coreManager.day2_conf(msg)
 
@@ -684,6 +775,9 @@ class Free5GC_K8s(Blue5GBase):
 
     def del_tac_conf(self, model_msg) -> list:
         msg = model_msg.dict()
+        # add callback IP in self.conf
+        if "callbackURL" in msg:
+            self.conf["callback"] = msg["callbackURL"]
         res = self.coreManager.del_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
         self.to_db()
@@ -699,8 +793,8 @@ class Free5GC_K8s(Blue5GBase):
         self.to_db()
 
         # add callback IP in self.conf
-        if "callback" in msg:
-            self.conf["callback"] = msg["callback"]
+        if "callbackURL" in msg:
+            self.conf["callback"] = msg["callbackURL"]
 
         if "areas" in msg:
             for area in msg["areas"]:
@@ -713,10 +807,14 @@ class Free5GC_K8s(Blue5GBase):
                         if not sliceDnnListName:
                             raise ValueError("no slice in the setting message")
                         dnnList = self.coreManager.get_dnn_list_from_net_names(self.conf, sliceDnnListName)
+                        logger.info("DNNLIST: {}".format(dnnList))
                         upfNode = next((item for item in self.conf['config']['upf_nodes'] if item["area"] == area["id"]), None)
+                        logger.info("UPFNODE: {}".format(upfNode))
                         if upfNode:
                             for dnnElem in dnnList:
+                                logger.info("DNNELEM: {}".format(dnnElem))
                                 item = next((item for item in upfNode["dnnList"] if item["dnn"] == dnnElem["dnn"]), None)
+                                logger.info("ITEM: {}".format(item))
                                 if item:
                                     item["dns"] = dnnElem["dns"]
                                     item["pools"] = dnnElem["pools"]
@@ -728,21 +826,25 @@ class Free5GC_K8s(Blue5GBase):
 
                 for nsd_item in self.nsd_:
                     if "area" in nsd_item and nsd_item['area'] == area["id"]:
-                        if nsd_item['type'] in edge_vnfd_type:
-                            conf_data = {
-                                'plmn': str(self.conf['config']['plmn']),
-                                'upf_nodes': self.conf['config']['upf_nodes'],
-                                'tac': area["id"] # tac of the node
-                            }
-
-                            config = Configurator_Free5GC(
-                                nsd_item['descr']['nsd']['nsd'][0]['id'],
-                                1,
-                                self.get_id(),
-                                conf_data
-                            )
-
-                            res += config.dump()
+                        if nsd_item['type'] == 'core':
+                            res += self.core_day2_conf(msg, nsd_item)
+                        elif nsd_item['type'] in edge_vnfd_type:
+                            res += self.edge_day2_conf(msg, nsd_item)
+                            #
+                            # conf_data = {
+                            #     'plmn': str(self.conf['config']['plmn']),
+                            #     'upf_nodes': self.conf['config']['upf_nodes'],
+                            #     'tac': area["id"] # tac of the node
+                            # }
+                            #
+                            # config = Configurator_Free5GC(
+                            #     nsd_item['descr']['nsd']['nsd'][0]['id'],
+                            #     1,
+                            #     self.get_id(),
+                            #     conf_data
+                            # )
+                            #
+                            # res += config.dump()
                         elif nsd_item['type'] == 'ran':
                             tail_res += self.ran_day2_conf(msg, nsd_item)
 
@@ -753,15 +855,47 @@ class Free5GC_K8s(Blue5GBase):
 
         return res
 
-    def add_ues(self, msg) -> list:
+    def add_ues(self, msg_model) -> list:
+        logger.info("add_ues method starts ... type(msg_model) = {}".format(type(msg_model)))
+        if isinstance(msg_model, dict):
+            msg = msg_model
+        else:
+            msg = msg_model.dict()
+        # add callback IP in self.conf
+        if "callbackURL" in msg:
+            self.conf["callback"] = msg["callbackURL"]
+        self.sumConfig(self.conf, msg)
+        self.to_db()
+
         self.userManager.add_ues(msg)
         return []
 
-    def del_ues(self, msg) -> list:
+    def del_ues(self, msg_model) -> list:
+        if isinstance(msg_model, dict):
+            msg = msg_model
+        else:
+            msg = msg_model.dict()
+
+        # add callback IP in self.conf
+        if "callbackURL" in msg:
+            self.conf["callback"] = msg["callbackURL"]
+
         self.userManager.del_ues(msg)
+
+        # remove msg from config
+        self.dropUeConfig(self.conf, msg)
+        self.to_db()
+
         return []
 
-    def del_slice(self, msg) -> list:
+    def del_slice(self, msg_model) -> list:
+        logger.info("del_ues method starts ... type(msg_model) = {}".format(type(msg_model)))
+        msg = msg_model.dict()
+
+        # add callback IP in self.conf
+        if "callbackURL" in msg:
+            self.conf["callback"] = msg["callbackURL"]
+
         res = []
         tail_res = []
 
@@ -813,7 +947,11 @@ class Free5GC_K8s(Blue5GBase):
 
         self.coreManager.del_slice(msg)
         self.coreManager.config_5g_core_for_reboot()
+
+        # remove msg from config
+        self.dropSliceConfig(self.conf, msg)
         self.to_db()
+
         res += self.core_upXade({'config': self.coreManager.getConfiguration()}) + tail_res
 
         return res
@@ -883,7 +1021,11 @@ class Free5GC_K8s(Blue5GBase):
 
             if '{}_nodes'.format(ns['type']) not in self.conf['config']:
                 self.conf['config']['{}_nodes'.format(ns['type'])] = []
-            self.conf['config']['{}_nodes'.format(ns['type'])].append({
+            node, nodeIndex = next(((item, index) for index, item in enumerate(self.conf["config"]["{}_nodes".format(ns["type"])])
+                         if item["nsi_id"] == ns["nsi_id"]), (dict(), None))
+            if nodeIndex == None:
+                self.conf["config"]["{}_nodes".format(ns["type"])].append(node)
+            node.update({
                 'ip': area_ip,
                 'nsi_id': ns['nsi_id'],
                 'ns_id': ns['descr']['nsd']['nsd'][0]['id'],
@@ -921,11 +1063,12 @@ class Free5GC_K8s(Blue5GBase):
 
             if key:
                 if key not in self.conf['config']: self.conf['config'][key] = []
-                # delete the old element if exists
-                for index, item in enumerate(self.conf["config"][key]):
-                    if item["nsi_id"] == n["nsi_id"]:
-                        self.conf["config"][key].pop(index)
-                self.conf['config'][key].append({
+                # update the old element if exists
+                node, nodeIndex = next(((item, index) for index, item in enumerate(self.conf["config"][key])
+                                        if item["nsi_id"] == n["nsi_id"]), (dict(), None))
+                if nodeIndex == None:
+                    self.conf["config"][key].append(node)
+                node.update({
                     'ip': vlds["data"][0]["ip"],
                     'nsi_id': n['nsi_id'],
                     'ns_id': n['descr']['nsd']['nsd'][0]['id'],

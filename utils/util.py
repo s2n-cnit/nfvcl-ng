@@ -3,6 +3,7 @@ import logging
 import os
 import string
 import random
+import glob
 from typing import List
 import OpenSSL
 import yaml
@@ -268,3 +269,20 @@ def convert_from_base64(content: str) -> str:
     content_str = content_bytes.decode("ascii")
 
     return content_str
+
+
+def remove_files_by_pattern(folder: str, name_pattern: str):
+    """
+    Remove all files in the target folder that match the pattern condition
+    Args:
+        folder: the folder in witch files are located. ("./day2_files" or "day2_files" or "/tmp/nsd_packages"
+
+        name_pattern: a file name ("DV87AO_vyos_2-3.yaml") or a pattern for multiple files ("DV87AO_*")
+
+    Returns:
+
+    """
+    path: str = "{}/{}".format(folder,name_pattern)
+    file_list = glob.glob(path)
+    for file in file_list:
+        os.remove(file)

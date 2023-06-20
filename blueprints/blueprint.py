@@ -423,6 +423,12 @@ class BlueprintBase(abc.ABC):
             return topology.get_vim_from_area_id(area['id'])
 
     def get_vims(self):
+        """
+        For each area, it returns the FIRST VIM of the area.
+
+        Returns:
+            a list of VIMs, at most, one per area
+        """
         deployment_areas = set()
         for area in self.conf['areas']:
             deployment_areas.add(area) if type(area) is int else deployment_areas.add(area['id'])

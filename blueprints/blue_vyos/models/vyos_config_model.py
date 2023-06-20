@@ -1,6 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
-
+from pydantic import BaseModel, Field
 from .vyos_router_network_endpoint_model import VyOSRouterNetworkEndpoints
 from .vyos_vm_flavors_model import VMFlavors
 from .vyos_nat_rules_model import VyOSDestNATRule, VyOSSourceNATRule
@@ -12,6 +11,8 @@ class VyOSConfig(BaseModel):
     nsd_name: Optional[str]
     nsd_id: Optional[str]
     network_endpoints: VyOSRouterNetworkEndpoints
+    admin_username: str = Field(default='vyos')
+    admin_password: str = Field(default='vyos')
     vyos_router_flavors: Optional[VMFlavors]
     snat_rules: Optional[List[VyOSSourceNATRule]]
     dnat_rules: Optional[List[VyOSDestNATRule]]

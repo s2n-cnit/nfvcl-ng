@@ -1,4 +1,5 @@
 from blueprints import BlueprintBase
+from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimLink
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from typing import Union, List, Dict, Optional
 from .models import *
@@ -10,7 +11,7 @@ import traceback
 import re
 
 db = persistency.DB()
-logger = create_logger('VyOSBlue')
+logger = create_logger('VyOS Blue')
 nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
 
 
@@ -54,7 +55,8 @@ class VyOSBlue(BlueprintBase):
         self.supported_operations = {
             'init': [{
                 'day0': [{'method': 'bootstrap_day0'}],
-                'day2': [{'method': 'init_day2_conf', 'callback': 'get_interface_info'}]
+                'day2': [{'method': 'init_day2_conf', 'callback': 'get_interface_info'},
+                         {'method': 'setup_credentials'}]
             }],
             'snat': [{
                 'day0': [],
@@ -162,7 +164,7 @@ class VyOSBlue(BlueprintBase):
                 device_index = 0
                 for config in area.config_list:
                     # Setting the name as it is set in the nsd
-                    config.name = '{}_vyos_router_area_{}_{}'.format(self.get_id(), area.id, device_index)
+                    config.name = '{}_vyos_A{}_{}'.format(self.get_id(), area.id, device_index)
                     # Check if the management network exist in the vim. If it does, the network is
                     # added to the list
                     man_network = config.network_endpoints.mgt
@@ -187,13 +189,11 @@ class VyOSBlue(BlueprintBase):
             raise ValueError("Terraforming Error")
 
     def setVnfd(self, area_id: Optional[int] = None, vld: Optional[list] = None,
-                vm_flavor_request: Optional[dict] = None, device_number: int = 0) -> None:
+                vm_flavor_request: Optional[dict] = None, device_number: int = 0,
+                target_config: VyOSConfig = None) -> dict:
         logger.debug("setting VNFd of VyOS for area " + str(area_id))
 
-        vyos_username = 'vyos'  # TODO make then dynamic, and these values for default
-        vyos_password = 'vyos'
-
-        vm_flavor = {'memory-mb': '4098', 'storage-gb': '16', 'vcpu-count': '4'}
+        vm_flavor = {'memory-mb': '4098', 'storage-gb': '16', 'vcpu-count': '2'}
 
         # If there is an explicit request for the flavor, we update it
         if vm_flavor_request is not None:
@@ -201,35 +201,37 @@ class VyOSBlue(BlueprintBase):
 
         if vld is None:
             # Management interface
-            interfaces = [{'vld': 'mgt', 'name': 'ens3', "mgt": True}]
+            interfaces = [VimLink.parse_obj({'vld': 'mgt', 'name': 'ens3', "mgt": True})]
         else:
             interfaces = []
             intf_index = 3  # starting from ens3
-            for router_link in vld:
-                interfaces.append(
-                    {
-                        "vld": router_link["vld"],
-                        "name": "ens{}".format(intf_index),
-                        "mgt": router_link["mgt"],
-                        "port-security-enabled": False
-                    }
-                )
+            for l_ in vld:
+                interfaces.append(VimLink.parse_obj({"vld": l_["vld"], "name": "ens{}".format(intf_index),
+                                                     "mgt": l_["mgt"], "port-security-enabled": False}))
                 intf_index += 1
 
-        vnfd = sol006_VNFbuilder(self.nbiutil, self.db, {
-            'username': vyos_username,
-            'password': vyos_password,
-            'id': '{}_vyos_{}_{}'.format(self.get_id(), str(area_id), device_number),
-            'name': '{}_vyos_{}_{}'.format(self.get_id(), str(area_id), device_number),
-            'vdu': [{
-                'count': 1,
-                'id': 'VM',
-                'image': 'VyOS',
-                'vm-flavor': vm_flavor,
-                'interface': interfaces
-            }]}, charm_name='helmflexvnfm')
-        self.vnfd['area'].append(
-            {'area_id': area_id, 'vnfd': [{'id': 'vnfd', 'name': vnfd.get_id(), 'vl': interfaces}]})
+        vdu_id: str = 'VM'
+        vdu = VirtualDeploymentUnit(id=vdu_id, image='VyOS')
+        vdu.vm_flavor = vm_flavor
+        vdu.interface = interfaces
+
+        vnfd_id = '{}_vyos_A{}_{}'.format(self.get_id(), str(area_id), device_number)
+        vnfd = VirtualNetworkFunctionDescriptor.parse_obj({
+            'username': 'vyos',
+            'password': 'vyos',
+            'id': vnfd_id,
+            'name': vnfd_id
+        })
+        vnfd.vdu = [vdu]
+
+        complete_vnfd = sol006_VNFbuilder(self.nbiutil, self.db, vnfd.dict(by_alias=True), charm_name='helmflexvnfm')
+
+        area_vnfd = {'area_id': area_id, 'id': 'vnfd', 'name': complete_vnfd.get_id(),
+                     'vl': [i.dict() for i in interfaces]}
+        self.vnfd['area'].append(area_vnfd)
+        self.to_db()
+
+        return area_vnfd
 
     def getVnfd(self, area_id: int = None) -> list:
         """Retrieve the virtual network function descriptor of the VyOS instance in the area"""
@@ -253,8 +255,8 @@ class VyOSBlue(BlueprintBase):
         logger.info("Building VyOS router NSD")
 
         param = {
-            'name': '{}_vyos_router_area_{}_{}'.format(self.get_id(), area_id, device_number),
-            'id': '{}_vyos_router_area_{}_{}'.format(self.get_id(), area_id, device_number),
+            'name': target_config.name,
+            'id': target_config.name,
             'type': 'VyOSBlue'
         }
 
@@ -278,10 +280,10 @@ class VyOSBlue(BlueprintBase):
         else:
             vm_flavor = target_config.vyos_router_flavors.copy()
 
-        self.setVnfd(area_id, vld=vim_net_mapping, vm_flavor_request=vm_flavor, device_number=device_number)
+        created_vnfd = [self.setVnfd(area_id, vld=vim_net_mapping, vm_flavor_request=vm_flavor, device_number=device_number,
+                     target_config=target_config)]
 
-        n_obj = sol006_NSD_builder(
-            self.getVnfd(area_id), self.get_vim_name(area_id), param, vim_net_mapping)
+        n_obj = sol006_NSD_builder(created_vnfd, self.get_vim_name(area_id), param, vim_net_mapping)
 
         n_ = n_obj.get_nsd()
         n_['area'] = area_id
@@ -337,9 +339,10 @@ class VyOSBlue(BlueprintBase):
                             raise ValueError('Blue {} - No network_endpoints for router {} has been found!'.format(
                                 self.vyos_model.blueprint_instance_id, router_config.name))
 
-                        ## TODO Save configurator in the object. Right now it is not possible cause configurator in not
+                        # TODO Save configurator in the object. Right now it is not possible cause configurator in not
                         # compatible with pydantic. So we need to create it every time
                         # Once we have found the corresponding router, we can spawn the configurator
+                        # !!! The first time credentials are 'vyos', 'vyos' so it is not necessary to indicate admin pwd
                         vyos_configurator = Configurator_VyOS(
                             area_id=area.id,
                             nsd_name=nsd_item['descr']['nsd']['nsd'][0]['id'],
@@ -352,6 +355,27 @@ class VyOSBlue(BlueprintBase):
                         res += vyos_configurator.dump()
         # Saving self to database
         self.to_db()
+        return res
+
+    def setup_credentials(self, msg):
+        """
+        Set up admin password if different from the default one ('vyos')
+        """
+        res = []
+        area: VyOSArea
+        for area in self.vyos_model.areas:
+            router_config: VyOSConfig
+            for router_config in area.config_list:
+                # If the password is the default we don't need to configure it
+                if router_config.admin_password != 'vyos':
+                    vyos_configurator = Configurator_VyOS(
+                        area_id=area.id,
+                        nsd_name=router_config.name,
+                        m_id=1,
+                        blue_id=self.get_id()
+                    )
+                    vyos_configurator.change_password_user(username='vyos', password=router_config.admin_password)
+                    res += vyos_configurator.dump()
         return res
 
     def set_snat_rules(self, msg: dict, request: VyOSBlueprintSNATCreate = None):
@@ -385,7 +409,8 @@ class VyOSBlue(BlueprintBase):
             area_id=target_area.id,
             nsd_name=target_router.nsd_name,
             m_id=1,
-            blue_id=self.get_id()
+            blue_id=self.get_id(),
+            admin_password=target_router.admin_password
         )
         vyos_configurator.setup_snat_rules(request.rules)
 
@@ -429,7 +454,8 @@ class VyOSBlue(BlueprintBase):
             area_id=target_area.id,
             nsd_name=target_router.nsd_name,
             m_id=1,
-            blue_id=self.get_id()
+            blue_id=self.get_id(),
+            admin_password=target_router.admin_password
         )
         vyos_configurator.setup_dnat_rules(request.rules)
 
@@ -558,7 +584,8 @@ class VyOSBlue(BlueprintBase):
             area_id=target_area.id,
             nsd_name=target_router.nsd_name,
             m_id=1,
-            blue_id=self.get_id()
+            blue_id=self.get_id(),
+            admin_password=target_router.admin_password
         )
 
         vyos_configurator.delete_nat_rule(snat_rule_list, dnat_rule_list)

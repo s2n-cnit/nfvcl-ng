@@ -100,7 +100,7 @@ class K8sBeta(BlueprintBase):
 
     def bootstrap_day0(self, msg: dict) -> list:
         """
-        This is the FIRST M
+        This is the FIRST function called on creation
         Args:
             msg:
 

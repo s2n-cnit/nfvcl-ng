@@ -237,6 +237,14 @@ class Topology:
             return None
 
     def get_vim_from_area_id(self, area: str) -> dict:
+        """
+        Returns the FIRST VIM given the area id
+        Args:
+            area: The area id from witch the VIM is obtained.
+
+        Returns:
+            The FIRST vim belonging to that area.
+        """
         return next((item for item in self._data['vims'] if area in item['areas']), None)
 
     # **************************** Networks *************************
@@ -684,7 +692,7 @@ class Topology:
 
     def trigger_event(self, event_name: TopologyEvent, data: dict):
         """
-        Send an event, together with the data that have been updated to REDIS.
+        Send an event, together with the data that have been updated, to REDIS.
 
         Args:
             event_name: the name of the event

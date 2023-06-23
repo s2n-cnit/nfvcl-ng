@@ -311,5 +311,15 @@ class UeRanSim(BlueprintBase):
         logger.debug("deleting radio net")
         area_ids = [item["id"] for item in self.conf["areas"]]
 
-        net = {"name": "radio_{}".format(self.get_id())}
+        net = {
+            "name": "radio_{}".format(self.get_id()),
+            "external": False,
+            "type": "vxlan",
+            "cidr": '10.168.0.0/16',
+            "allocation_pool": [{'start': '10.168.0.2', 'end': '10.168.255.253'}],
+            "gateway_ip": None,
+            "enable_dhcp": True,
+            "dns_nameservers": [],
+            "host_routes": []
+        }
         self.topology_del_network(net, area_ids)

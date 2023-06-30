@@ -599,7 +599,7 @@ class BlueprintBase(abc.ABC):
         return primitive['result']['details']['detailed-status']
 
     def rest_callback(self, requested_operation, session_id, status):
-        if "callback" in self.conf:
+        if "callback" in self.conf and self.conf["callback"] and self.conf["callback"] != "":
             logger.info("generating callback message")
             headers = {
                 "Content-type": "application/json",

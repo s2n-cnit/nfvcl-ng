@@ -1160,10 +1160,11 @@ class Configurator_Free5GC_Core():
                     #  add default and slices Dnn list to UPF conf
                     for upf in self.conf["config"]["upf_nodes"]:
                         if upf["area"] == area["id"]:
-                            if "dnnList" in upf:
-                                upf["dnnList"].extend(dnnList)
-                            else:
-                                upf["dnnList"] = copy.deepcopy(dnnList)
+                            if "dnnList" not in upf:
+                                upf["dnnList"] = []
+                            for dnn in dnnList:
+                                if dnn not in upf["dnnList"]:
+                                    upf["dnnList"].append(dnn)
                             break
 
     def add_tac_conf(self, msg: dict) -> list:

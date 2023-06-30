@@ -156,6 +156,9 @@ class Free5GC_K8s(Blue5GBase):
             self.conf["running_free5gc_configuration"] = free5GC_default_config.default_config
         self.userManager = Configurator_Free5GC_User(self.conf)
         self.coreManager = Configurator_Free5GC_Core(self.conf["running_free5gc_configuration"], self.conf)
+        # "msg" is used if day0 modified the msg and day2 need to use the modified version of the message
+        # It is a dict where every node is in the form {"operation": "message"}, ex: {"add_slice": "...message..."}
+        self.msg = dict()
 
     # def dropConfig(self, conf1: dict, conf2: dict):
     #     """
@@ -593,7 +596,27 @@ class Free5GC_K8s(Blue5GBase):
         nsd_names = []
         msg = model_msg.dict()
 
+        # save msg because "add_tac_nsd" modifies it and "add_tac_conf" uses the changed version.
+        self.msg["add_tac"] = msg
+
         self.sumConfig(self.conf, msg)
+
+        # add edge slices (msg) to the core (self.conf)
+        coreArea = next((item for item in self.conf["areas"] if "core" in item and item["core"]), None)
+        if coreArea:
+            if "slices" not in coreArea:
+                coreArea["slices"] = []
+            if "areas" in msg:
+                for area in msg["areas"]:
+                    if "slices" in area:
+                        for slice in area["slices"]:
+                            if slice not in coreArea["slices"]:
+                                coreArea["slices"].append(slice)
+                # if msg has the core area node, change it with the coreArea (updated version)
+                msgCoreArea = next((item for item in msg["areas"] if "core" in item and item["core"]), None)
+                if msgCoreArea:
+                    msg["areas"].remove(msgCoreArea)
+                msg["areas"].append(coreArea)
         self.to_db()
         for area in msg['areas']:
             if "core" in area and area["core"]:
@@ -748,24 +771,52 @@ class Free5GC_K8s(Blue5GBase):
 
     def add_tac_conf(self, model_msg) -> list:
         res = []
-        # "areas" msg information were merged in "add_tac_nsd" function
-        msg = model_msg.dict()
+        # here use the msg modified by "add_tac_nsd"
+        #msg = model_msg.dict()
+        msg = self.msg["add_tac"]
 
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
 
         self.coreManager.add_tacs_and_slices(msg)
+
         self.coreManager.day2_conf(msg)
 
         if "areas" in msg:
+            # update upf core adding dnn (from dnnList) of all other upfs
+            upfNodes = self.conf['config']['upf_nodes']
+            coreUpfNode = next((item for item in upfNodes if item['type'] == 'core'), None)
+            if coreUpfNode:
+                for upfNode in upfNodes:
+                    if upfNode["type"] != "core":
+                        coreUpfNode["dnnList"].extend(
+                            [item for item in upfNode["dnnList"] if item not in coreUpfNode["dnnList"]])
+            #
+            upfCoreRebootRequested = False
+            upfCoreRebootDoing = False
             for n in self.nsd_:
                 if n["area"] in [item["id"] for item in msg["areas"]]:
-                    if n['type'] == 'ran':
+                    if n['type'] == 'core':
+                        # split return a list. nsd_name is something like "DEGFE_amf_00101". We need the first characters
+                        nsd_type = (n["descr"]["nsd"]["nsd"][0]["name"]).split("_")
+                        if nsd_type and isinstance(nsd_type[1], str) and nsd_type[1].lower() in edge_vnfd_type:
+                            res += self.core_day2_conf(msg, n)
+                            upfCoreRebootDoing = True
+                    elif n['type'] == 'ran':
                         res += self.ran_day2_conf(msg, n)
+                        upfCoreRebootRequested = True
                     elif n['type'] in edge_vnfd_type:
                         # configuration of edge 5G core modules (like "UPFs")
                         res += self.edge_day2_conf(msg, n)
+
+            if upfCoreRebootRequested and not upfCoreRebootDoing:
+                coreNsds = [item for item in self.nsd_ if item["type"] == "core"]
+                for n in coreNsds:
+                    # split return a list. nsd_name is something like "DEGFE_amf_00101". We need the first characters
+                    nsd_type = (n["descr"]["nsd"]["nsd"][0]["name"]).split("_")
+                    if nsd_type and isinstance(nsd_type[1], str) and nsd_type[1].lower() in edge_vnfd_type:
+                        res += self.core_day2_conf(msg,n)
 
         #res = self.coreManager.add_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
@@ -824,29 +875,29 @@ class Free5GC_K8s(Blue5GBase):
                     logger.warn("no slice to add for area {}".format(area["id"]))
                     continue
 
+                upfCoreRebootRequested = False
+                upfCoreRebootDoing = False
                 for nsd_item in self.nsd_:
                     if "area" in nsd_item and nsd_item['area'] == area["id"]:
                         if nsd_item['type'] == 'core':
-                            res += self.core_day2_conf(msg, nsd_item)
+                            # split return a list. nsd_name is something like "DEGFE_amf_00101". We need the first characters
+                            nsd_type = (nsd_item["descr"]["nsd"]["nsd"][0]["name"]).split("_")
+                            if nsd_type and isinstance(nsd_type[1], str) and nsd_type[1].lower() in edge_vnfd_type:
+                                res += self.core_day2_conf(msg, nsd_item)
+                                upfCoreRebootDoing = True
                         elif nsd_item['type'] in edge_vnfd_type:
                             res += self.edge_day2_conf(msg, nsd_item)
-                            #
-                            # conf_data = {
-                            #     'plmn': str(self.conf['config']['plmn']),
-                            #     'upf_nodes': self.conf['config']['upf_nodes'],
-                            #     'tac': area["id"] # tac of the node
-                            # }
-                            #
-                            # config = Configurator_Free5GC(
-                            #     nsd_item['descr']['nsd']['nsd'][0]['id'],
-                            #     1,
-                            #     self.get_id(),
-                            #     conf_data
-                            # )
-                            #
-                            # res += config.dump()
+                            upfCoreRebootRequested = True
                         elif nsd_item['type'] == 'ran':
                             tail_res += self.ran_day2_conf(msg, nsd_item)
+
+                if upfCoreRebootRequested and not upfCoreRebootDoing:
+                    coreNsds = [item for item in self.nsd_ if item["type"] == "core"]
+                    for n in coreNsds:
+                        # split return a list. nsd_name is something like "DEGFE_amf_00101". We need the first characters
+                        nsd_type = (n["descr"]["nsd"]["nsd"][0]["name"]).split("_")
+                        if nsd_type and isinstance(nsd_type[1], str) and nsd_type[1].lower() in edge_vnfd_type:
+                            res += self.core_day2_conf(msg, n)
 
         res += self.coreManager.add_slice(msg)
         self.coreManager.config_5g_core_for_reboot()
@@ -919,29 +970,30 @@ class Free5GC_K8s(Blue5GBase):
                                                 upf["dnnList"].pop(dnnIndex)
 
                         if len(removingDnnList) != 0:
+                            upfCoreRebootRequested = False
+                            upfCoreRebootDoing = False
                             for nsd_item in self.nsd_:
                                 if "area" in nsd_item and nsd_item['area'] == area["id"]:
                                     if nsd_item['type'] == 'core':
-                                        res += self.core_day2_conf(msg, nsd_item)
+                                        # split return a list. nsd_name is something like "DEGFE_amf_00101". We need the first characters
+                                        nsd_type = (nsd_item["descr"]["nsd"]["nsd"][0]["name"]).split("_")
+                                        if nsd_type and isinstance(nsd_type[1], str) and nsd_type[1].lower() in edge_vnfd_type:
+                                            res += self.core_day2_conf(msg, nsd_item)
+                                            upfCoreRebootDoing = True
                                     elif nsd_item['type'] in edge_vnfd_type:
                                         res += self.edge_day2_conf(msg, nsd_item)
-                                        # conf_data = {
-                                        #     'plmn': str(self.conf['config']['plmn']),
-                                        #     'upf_nodes': self.conf['config']['upf_nodes'],
-                                        #     'tac': area["id"],  # tac of the node
-                                        #     'removingDnnList': removingDnnList
-                                        # }
-                                        #
-                                        # config = Configurator_Free5GC(
-                                        #     nsd_item['descr']['nsd']['nsd'][0]['id'],
-                                        #     1,
-                                        #     self.get_id(),
-                                        #     conf_data
-                                        # )
-                                        #
-                                        # res += config.dump()
+                                        upfCoreRebootRequested = True
                                     elif nsd_item['type'] == 'ran':
                                         tail_res += self.ran_day2_conf(msg,nsd_item)
+
+                            if upfCoreRebootRequested and not upfCoreRebootDoing:
+                                coreNsds = [item for item in self.nsd_ if item["type"] == "core"]
+                                for n in coreNsds:
+                                    # split return a list. nsd_name is something like "DEGFE_amf_00101". We need the first characters
+                                    nsd_type = (n["descr"]["nsd"]["nsd"][0]["name"]).split("_")
+                                    if nsd_type and isinstance(nsd_type[1], str) and nsd_type[
+                                        1].lower() in edge_vnfd_type:
+                                        res += self.core_day2_conf(msg, n)
 
         self.coreManager.del_slice(msg)
         self.coreManager.config_5g_core_for_reboot()

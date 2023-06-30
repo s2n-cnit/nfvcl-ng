@@ -40,7 +40,7 @@ class SubpduSessions(BaseModel):
 
 class SubProfileParams(BaseModel):
     isolationLevel: Literal["ISOLATION", "NO_ISOLATION"]
-    sliceAmbr: Optional[str] = Field('1000Mbps', description="Set sliceAmber, exp: 1000Mbps")
+    sliceAmbr: Optional[str] = Field('1000Mbps', description="Set sliceAmbr, exp: 1000Mbps")
     ueAmbr: Optional[str] = Field('50Mbps', description="Set ueAmbr, exp: 50Mbps")
     maximumNumberUE: Optional[int]
     pduSessions: List[SubpduSessions]

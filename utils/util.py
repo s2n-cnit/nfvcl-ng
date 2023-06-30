@@ -283,6 +283,13 @@ def remove_files_by_pattern(folder: str, name_pattern: str):
 
     """
     path: str = "{}/{}".format(folder,name_pattern)
-    file_list = glob.glob(path)
-    for file in file_list:
-        os.remove(file)
+    element_list = glob.glob(path) # list of file and/or directory
+    removingDirectories = []
+    for element in element_list:
+        if os.path.isfile(element):
+            os.remove(element)
+        else:
+            removingDirectories.append(element)
+    if removingDirectories:
+        for directory in removingDirectories:
+            remove_files_by_pattern(directory, "*")

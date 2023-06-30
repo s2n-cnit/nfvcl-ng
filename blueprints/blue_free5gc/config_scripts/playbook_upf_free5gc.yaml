@@ -3,6 +3,7 @@
   tasks:
   - name: remove old upf process
     shell: |
+       ps ax | grep "bin/upf" | awk '{ print $1 }' | xargs kill
        ps ax | grep free5gc-upfd | awk '{ print $1 }' | xargs kill
     ignore_errors: yes
   - name: remove gtp kernel module

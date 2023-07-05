@@ -22,3 +22,4 @@ sudo systemctl restart mongodb
 echo "create directories..."
 mkdir -p "helm_charts/charts/"
 mkdir -p "day2_files"
+mkdir -p "logs"

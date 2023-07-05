@@ -1,5 +1,5 @@
 import logging
-
+from logging.handlers import RotatingFileHandler
 from utils.redis.redis_manager import get_redis_instance
 from redis import Redis
 
@@ -38,7 +38,7 @@ def create_logger(name: str) -> logging.Logger:
 
     # Adding file handler to post log into file
     # w = every restart log is cleaned
-    log_file_handler = logging.FileHandler("nfvcl.log", mode="w")
+    log_file_handler = RotatingFileHandler("logs/nfvcl.log", maxBytes=50000, backupCount=4)
     log_file_handler.setLevel(logging.DEBUG)
     log_file_handler.setFormatter(formatter)
     logger.addHandler(log_file_handler)

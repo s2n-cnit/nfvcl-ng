@@ -752,7 +752,7 @@ class Free5GC_K8s(Blue5GBase):
         msg = model_msg.dict()
 
         # add callback IP in self.conf
-        if "callbackURL" in msg:
+        if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
 
         self.coreManager.add_tacs_and_slices(msg)
@@ -776,7 +776,7 @@ class Free5GC_K8s(Blue5GBase):
     def del_tac_conf(self, model_msg) -> list:
         msg = model_msg.dict()
         # add callback IP in self.conf
-        if "callbackURL" in msg:
+        if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
         res = self.coreManager.del_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
@@ -793,7 +793,7 @@ class Free5GC_K8s(Blue5GBase):
         self.to_db()
 
         # add callback IP in self.conf
-        if "callbackURL" in msg:
+        if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
 
         if "areas" in msg:
@@ -862,7 +862,7 @@ class Free5GC_K8s(Blue5GBase):
         else:
             msg = msg_model.dict()
         # add callback IP in self.conf
-        if "callbackURL" in msg:
+        if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
         self.sumConfig(self.conf, msg)
         self.to_db()
@@ -877,7 +877,7 @@ class Free5GC_K8s(Blue5GBase):
             msg = msg_model.dict()
 
         # add callback IP in self.conf
-        if "callbackURL" in msg:
+        if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
 
         self.userManager.del_ues(msg)
@@ -893,15 +893,11 @@ class Free5GC_K8s(Blue5GBase):
         msg = msg_model.dict()
 
         # add callback IP in self.conf
-        if "callbackURL" in msg:
+        if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
 
         res = []
         tail_res = []
-
-        # add callback IP in self.conf
-        if "callback" in msg:
-            self.conf["callback"] = msg["callback"]
 
         if "areas" in msg:
             for area in msg["areas"]:
@@ -925,23 +921,25 @@ class Free5GC_K8s(Blue5GBase):
                         if len(removingDnnList) != 0:
                             for nsd_item in self.nsd_:
                                 if "area" in nsd_item and nsd_item['area'] == area["id"]:
-                                    if nsd_item['type'] in edge_vnfd_type:
-                                        conf_data = {
-                                            'plmn': str(self.conf['config']['plmn']),
-                                            'upf_nodes': self.conf['config']['upf_nodes'],
-                                            'tac': area["id"],  # tac of the node
-                                            'removingDnnList': removingDnnList
-                                        }
-
-                                        config = Configurator_Free5GC(
-                                            nsd_item['descr']['nsd']['nsd'][0]['id'],
-                                            1,
-                                            self.get_id(),
-                                            conf_data
-                                        )
-
-                                        res += config.dump()
-
+                                    if nsd_item['type'] == 'core':
+                                        res += self.core_day2_conf(msg, nsd_item)
+                                    elif nsd_item['type'] in edge_vnfd_type:
+                                        res += self.edge_day2_conf(msg, nsd_item)
+                                        # conf_data = {
+                                        #     'plmn': str(self.conf['config']['plmn']),
+                                        #     'upf_nodes': self.conf['config']['upf_nodes'],
+                                        #     'tac': area["id"],  # tac of the node
+                                        #     'removingDnnList': removingDnnList
+                                        # }
+                                        #
+                                        # config = Configurator_Free5GC(
+                                        #     nsd_item['descr']['nsd']['nsd'][0]['id'],
+                                        #     1,
+                                        #     self.get_id(),
+                                        #     conf_data
+                                        # )
+                                        #
+                                        # res += config.dump()
                                     elif nsd_item['type'] == 'ran':
                                         tail_res += self.ran_day2_conf(msg,nsd_item)
 

@@ -275,12 +275,21 @@ class Topology:
                 if vim is None:
                     raise ValueError('VIM {} not found'.format(vim_name))
                 # vim['networks'].append(network['name'])
-                self.add_vim_net(network.name, vim, terraform=terraform)
+                if isinstance(network, dict):
+                    networkName = network['name']
+                else:
+                    networkName = network.name
+                self.add_vim_net(networkName, vim, terraform=terraform)
 
-        self.trigger_event(TopologyEvent.TOPO_CREATE_NETWORK, network.to_dict())
+        if isinstance(network, dict):
+            self.trigger_event(TopologyEvent.TOPO_CREATE_NETWORK, network)
+        else:
+            self.trigger_event(TopologyEvent.TOPO_CREATE_NETWORK, network.to_dict())
 
     @obj_multiprocess_lock
     def del_network(self, network: NetworkModel, vim_names_list: Union[list, None] = None, terraform: bool = False):
+        if isinstance(network, dict):
+            network = NetworkModel.parse_obj(network)
         if vim_names_list:
             for vim_name in vim_names_list:
                 vim = next((item for item in self._data['vims'] if item['name'] == vim_name), None)

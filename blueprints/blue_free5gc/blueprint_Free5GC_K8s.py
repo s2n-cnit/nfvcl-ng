@@ -760,9 +760,17 @@ class Free5GC_K8s(Blue5GBase):
                     nsd_i = next((index for index, item in enumerate(self.nsd_)
                                   if item['area'] == area['id'] and item['type'] == type), None)
                     if nsd_i is None:
-                        raise ValueError('nsd not found')
-                    nsi_to_delete.append(self.nsd_[nsd_i]['nsi_id'])
-                    self.nsd_.pop(nsd_i)
+                        #raise ValueError('nsd not found')
+                        logger.error("nsd not found: area = {} - type = {}".format(area['id'], type))
+                    nsi_id = self.nsd_[nsd_i]['nsi_id']
+                    nsi_to_delete.append(nsi_id)
+                    # the "pop" of the object is done by the LCM.
+                    # LCM use nsd_, so don't remove it
+                    #self.nsd_.pop(nsd_i)
+                    # delete upf from "upf_nodes" list
+                    upfNode = next((item for item in self.conf['config']['upf_nodes'] if item['nsi_id'] == nsi_id), None)
+                    if upfNode:
+                        self.conf['config']['upf_nodes'].remove(upfNode)
 
         # remove msg from config
         self.dropTacConfig(self.conf, msg)
@@ -770,18 +778,19 @@ class Free5GC_K8s(Blue5GBase):
         return nsi_to_delete
 
     def add_tac_conf(self, model_msg) -> list:
+        # return res + tail_res -> in order reboot: UPFs - Free5GC core - gNBs
         res = []
+        tail_res = []
         # here use the msg modified by "add_tac_nsd"
         #msg = model_msg.dict()
         msg = self.msg["add_tac"]
 
+        # execute this function two times (first time)
+        self.coreManager.day2_conf(msg)
+
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
-
-        self.coreManager.add_tacs_and_slices(msg)
-
-        self.coreManager.day2_conf(msg)
 
         if "areas" in msg:
             # update upf core adding dnn (from dnnList) of all other upfs
@@ -804,11 +813,16 @@ class Free5GC_K8s(Blue5GBase):
                             res += self.core_day2_conf(msg, n)
                             upfCoreRebootDoing = True
                     elif n['type'] == 'ran':
-                        res += self.ran_day2_conf(msg, n)
+                        # in the next "if", all gNBs are rebooted
+                        #tail_res += self.ran_day2_conf(msg, n)
                         upfCoreRebootRequested = True
                     elif n['type'] in edge_vnfd_type:
                         # configuration of edge 5G core modules (like "UPFs")
                         res += self.edge_day2_conf(msg, n)
+                # reboot all gNBs, because when add a "tac" to the core, the AMF module is rebooted and
+                # so gNBs need to re-create the connection to the AMF
+                if n['type'] == 'ran':
+                    tail_res += self.ran_day2_conf(msg, n)
 
             if upfCoreRebootRequested and not upfCoreRebootDoing:
                 coreNsds = [item for item in self.nsd_ if item["type"] == "core"]
@@ -818,18 +832,24 @@ class Free5GC_K8s(Blue5GBase):
                     if nsd_type and isinstance(nsd_type[1], str) and nsd_type[1].lower() in edge_vnfd_type:
                         res += self.core_day2_conf(msg,n)
 
+        # execute this function two times (2nd time)
+        self.coreManager.day2_conf(msg)
+        self.coreManager.add_tacs_and_slices(msg)
+
         #res = self.coreManager.add_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
         self.to_db()
         res += self.core_upXade({'config': self.coreManager.getConfiguration()})
+        res += tail_res
         return res
 
     def del_tac_conf(self, model_msg) -> list:
         msg = model_msg.dict()
+        res = []
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
-        res = self.coreManager.del_tac_conf(msg)
+        self.coreManager.del_tac_conf(msg)
         self.coreManager.config_5g_core_for_reboot()
         self.to_db()
         res += self.core_upXade({'config': self.coreManager.getConfiguration()})

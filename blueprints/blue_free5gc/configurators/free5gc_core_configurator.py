@@ -1102,15 +1102,31 @@ class Configurator_Free5GC_Core():
                                 dnnUpfInfoList.append({"dnn": dnnInfo["dnn"]})
                             else:
                                 dnnUpfInfoList.append({"dnn": dnnInfo["dnn"], "pools": dnnInfo["pools"]})
-                        interfaces = None
+                        interfaces = []
                         if upf["type"] == "core":
-                            interfaces = [{"endpoints": [upf["ip"]], "interfaceType": "N9",
-                                "networkInstance": dnnInfoList[0]["dnn"]}]
+                            if "dnnList" in upf:
+                                # in the case of this function is called by "add_tac"
+                                for dnnElem in upf["dnnList"]:
+                                    interfaces.append({"endpoints": [upf["ip"]], "interfaceType": "N9",
+                                                   "networkInstance": dnnElem["dnn"]})
+                            else:
+                                # in the case of this function is called by "init"
+                                interfaces = [{"endpoints": [upf["ip"]], "interfaceType": "N9",
+                                  "networkInstance": dnnInfoList[0]["dnn"]}]
                         else:
-                            interfaces = [{"endpoints": [upf["ip"]], "interfaceType": "N3",
-                                "networkInstance": dnnInfoList[0]["dnn"]},
-                                {"endpoints": [upf["ip"]], "interfaceType": "N9",
-                                "networkInstance": dnnInfoList[0]["dnn"]}]
+                            if "dnnList" in upf:
+                                # in the case of this function is called by "add_tac"
+                                for dnnElem in upf["dnnList"]:
+                                    interfaces.extend([{"endpoints": [upf["ip"]], "interfaceType": "N3",
+                                    "networkInstance": dnnElem["dnn"]},
+                                    {"endpoints": [upf["ip"]], "interfaceType": "N9",
+                                    "networkInstance": dnnElem["dnn"]}])
+                            else:
+                                # in the case of this function is called by "init"
+                                interfaces = [{"endpoints": [upf["ip"]], "interfaceType": "N3",
+                                    "networkInstance": dnnInfoList[0]["dnn"]},
+                                    {"endpoints": [upf["ip"]], "interfaceType": "N9",
+                                    "networkInstance": dnnInfoList[0]["dnn"]}]
                         UPF = {"nodeID": upf["ip"], "type": "UPF", "interfaces": interfaces,
                                "sNssaiUpfInfos": [{"dnnUpfInfoList": dnnUpfInfoList, "sNssai": slice}]}
                         upNodes["UPF-{}".format(tac)] = UPF

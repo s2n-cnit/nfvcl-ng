@@ -77,6 +77,8 @@ class SubSubscribers(BaseModel):
     k: constr(regex=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
     opc: constr(regex=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
     snssai: List[SubSnssai]
+    authenticationMethod: Optional[str] = Field("5G_AKA")
+    authenticationManagementField: Optional[str] = Field("8000")
 
 
 class SubConfig(BaseModel):

@@ -6,17 +6,17 @@ logger = logging.getLogger('Configurator_Amari_gNb')
 
 
 class Configurator_AmariGNB(Configurator_Flex):
-    def __init__(self, nsd_id: str, m_id: int, blue_id: str, args: dict) -> None:
-
+    def __init__(self, nsd_id: str, m_id: int, blue_id: str, args: dict, pdu: dict) -> None:
+        if pdu is None or "config" not in pdu:
+            raise ValueError("not a valid pdu - pdu = {}".format(pdu))
         self.type = "amarignb"
         super(Configurator_AmariGNB, self).__init__(nsd_id, m_id, blue_id)
         logger.info("{} Configurator_AMARIGNB allocated [nsd: {} vnf_id {}".format(blue_id, nsd_id, m_id))
-        self.day2_conf_file_name = 'amari_gnb_tac_' + args['tac'] + '_plmn_' + str(args['plmn']) + "_blue_" + blue_id \
+        self.day2_conf_file_name = 'amari_gnb_tac_' + str(args['tac']) + '_plmn_' + str(args['plmn']) + "_blue_" + blue_id \
                                    + '.conf'
 
         # self.db = persistency.db()
-        persistent_data = db.findone_DB('pdu', {'tac': args['tac']})
-        self.conf = persistent_data['config']  # we start with the config data saved in the db
+        self.conf = pdu['config']  # we start with the config data saved in the db
         if 'nb_config' in args:
             self.conf.update(args['nb_config'])
 
@@ -32,8 +32,8 @@ class Configurator_AmariGNB(Configurator_Flex):
             ]
             self.addShellCmds({'template': 'config_templates/vxlan.shell'}, vxlan_dict)
 
-        self.conf['amf_addr'] = args['amf_addr'] if 'amf_addr' in args else args['mme_ip']
-        self.conf['gtp_addr'] = args['gtp_ip']
+        self.conf['amf_ip'] = args['amf_ip'] if 'amf_ip' in args else args['mme_ip']
+        self.conf['gtp_ip'] = args['gtp_ip']
 
         plmn_obj = {
             'tac': int(args['tac']),
@@ -67,7 +67,7 @@ class Configurator_AmariGNB(Configurator_Flex):
         '''
 
         self.addJinjaTemplateFile(
-            {'template': 'config_templates/amariGNb.jinja2',
+            {'template': 'blueprints/blue_5g_base/config_scripts/amariGNb.jinja2',
              'path': '/root/enb/config/',
              'transfer_name': self.day2_conf_file_name,
              'name': 'enb.cfg'

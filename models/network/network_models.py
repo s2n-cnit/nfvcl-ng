@@ -1,6 +1,6 @@
 import copy
 from pydantic import BaseModel, Field, conlist
-from typing import List, Optional
+from typing import List, Optional, Union
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
 
@@ -76,7 +76,7 @@ class RouterModel(BaseModel):
 class PduInterface(BaseModel):
     vld: str
     name: str
-    ip_address: IPv4Address = Field(alias='ip-address')
+    ip_address: Union[str,IPv4Address] = Field(alias='ip-address')
     network_name: str = Field(alias='vim-network-name')
     mgt: bool
 

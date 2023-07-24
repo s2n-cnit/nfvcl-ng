@@ -42,12 +42,12 @@
   amf_list: [
     {
       /* address of AMF for NGAP connection. Must be modified if the AMF runs on a different host. */
-      amf_addr: "{{ confvar.amf_addr }}",
+      amf_addr: "{{ confvar.amf_ip }}",
     },
   ],
   /* GTP bind address (=address of the ethernet interface connected to
      the AMF). Must be modified if the AMF runs on a different host. */
-  gtp_addr: "{{ confvar.gtp_addr }}",
+  gtp_addr: "{{ confvar.gtp_ip }}",
 
   gnb_id_bits: {{ confvar.gnb_id_bits }},
   gnb_id: 0x{{ confvar.gnb_id }},

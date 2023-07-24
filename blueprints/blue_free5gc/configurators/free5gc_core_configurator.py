@@ -66,6 +66,7 @@ class Configurator_Free5GC_Core():
         }
         ]
         """
+        logger.info(" -> netNames: {} -- addPoolsData: {}".format(netNames, addPoolsData))
         if msg is None or netNames is None:
             raise ValueError("configuration or network names of datanets are not valid")
         if addPoolsData:
@@ -75,6 +76,7 @@ class Configurator_Free5GC_Core():
             dnnList = [{"dnn": i["dnn"], "dns": i["dns"]} for i
                    in msg["config"]["network_endpoints"]["data_nets"] if i["net_name"] in netNames]
 
+        logger.info(" -->> dnnList: {}".format(dnnList))
         return dnnList
 
     def get_dnn_names_from_slice(self, msg: dict = None, sliceType: str = None, sliceId: str = None) -> List:
@@ -1098,9 +1100,12 @@ class Configurator_Free5GC_Core():
                     if upf["area"] == tac:
                         dnnUpfInfoList = []
                         for dnnInfo in dnnInfoList:
+                            logger.info("dnnInfo: {}".format(dnnInfo))
                             if slice in coreSlices and upf["type"] != "core" or "pools" not in dnnInfo:
+                                logger.info("NO POOLS")
                                 dnnUpfInfoList.append({"dnn": dnnInfo["dnn"]})
                             else:
+                                logger.info("POOLS")
                                 dnnUpfInfoList.append({"dnn": dnnInfo["dnn"], "pools": dnnInfo["pools"]})
                         interfaces = []
                         if upf["type"] == "core":
@@ -1237,6 +1242,18 @@ class Configurator_Free5GC_Core():
         return res
 
     def checkSliceAndDnnInsideUpfNodes(self, sd: str = None , sst: int = None, dnns: List[str] = None) -> bool:
+        """
+        It checks if an UPF with this Slice and DNN inside node list of smf-configmap
+        @param sd: 
+        @param sst: 
+        @param dnns: 
+        @return: 
+        """"""
+        @param sd: 
+        @param sst: 
+        @param dnns: 
+        @return: 
+        """
         if not sd or not sst or not dnns:
             raise ValueError("sd ({}) and/or sst ({}) and/or dnn ({}) is None".format(sd, sst, dnns))
         # define model
@@ -1315,7 +1332,8 @@ class Configurator_Free5GC_Core():
                         slice = {"sd": extSlice["sliceId"], "sst": SstConvertion.to_int(extSlice["sliceType"])}
                         sliceList.append(slice)
                         dnnNames = self.get_dnn_names_from_slice(self.conf, extSlice["sliceType"], extSlice["sliceId"])
-                        addPool = self.checkSliceAndDnnInsideUpfNodes(slice["sd"], slice["sst"], dnnNames)
+                        # addPool specify if add pools data or not. It is the reverse of "exist question". Add only if not exists
+                        addPool = not(self.checkSliceAndDnnInsideUpfNodes(slice["sd"], slice["sst"], dnnNames))
                         extDnnList=self.get_dnn_list_from_net_names(self.conf, dnnNames, addPool)
                         dnnSliceList.extend(extDnnList)
                         dnnList.extend(extDnnList)

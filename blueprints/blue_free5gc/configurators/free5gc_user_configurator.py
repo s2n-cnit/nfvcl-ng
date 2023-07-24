@@ -20,6 +20,7 @@ class Configurator_Free5GC_User():
 
     def add_ue_to_db(self, plmn: str, imsi: str, key: str, ocv: str, defaultUeUplink: str = "1 Gbps",
                      defaultUeDownlink: str = "2 Gbps", gpsis: str = "msisdn-0900000000",
+                     authenticationMethod: str = "5G_AKA", authenticationManagementField: str = "8000",
                      mongodbServiceHost: str = "mongodb://mongodb:27017/") -> None:
         client = MongoClient(mongodbServiceHost)
         db = client["free5gc"]
@@ -63,14 +64,14 @@ class Configurator_Free5GC_User():
                 },
                 "$set": {
                         "ueId": "imsi-{}".format(imsi),
-                        "authenticationMethod":"5G_AKA",
+                        "authenticationMethod": format(authenticationMethod),
                         "permanentKey": {
                             "permanentKeyValue": format(key),
                             "encryptionKey": 0,
                             "encryptionAlgorithm":0
                         },
-                        "sequenceNumber": "16f3b3f70fc2",
-                        "authenticationManagementField": "8000",
+                        "sequenceNumber": "000000000000", #"16f3b3f70fc2",
+                        "authenticationManagementField": format(authenticationManagementField),
                         "milenage": {
                             "op": {
                                 "opValue": "",
@@ -403,8 +404,20 @@ class Configurator_Free5GC_User():
                         key = subscriber["k"]
                         opc = subscriber["opc"]
 
+                        if "authenticationMethod" in subscriber:
+                            authenticationMethod = subscriber["authenticationMethod"]
+                        else:
+                            authenticationMethod = "5G_AKA" # or "EAP_AKA_PRIME"
+
+                        if "authenticationManagementField" in subscriber:
+                            authenticationManagementField = subscriber["authenticationManagementField"]
+                        else:
+                            authenticationManagementField = "8000"
+
                         self.add_ue_to_db(plmn=plmn, imsi=imsi, key=key, ocv=opc,
-                                                      mongodbServiceHost=mongoDbPath)
+                                                      mongodbServiceHost=mongoDbPath,
+                                          authenticationMethod=authenticationMethod,
+                                          authenticationManagementField=authenticationManagementField)
 
                     if "snssai" in subscriber:
                         for snssaiElem in subscriber["snssai"]:

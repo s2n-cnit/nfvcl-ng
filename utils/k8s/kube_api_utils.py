@@ -1,10 +1,11 @@
 import time
+from typing import List
 import kubernetes
 from logging import Logger
 from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccount, V1ClusterRoleList, V1ClusterRole, \
     V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, V1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
-    V1CertificateSigningRequestCondition, V1Role, V1PolicyRule
+    V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1PodSpec, V1Container
 from utils.log import create_logger
 from utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
 
@@ -507,3 +508,28 @@ def k8s_delete_namespace(kube_client_config: kubernetes.client.Configuration, na
             api_client.close()
 
         return namespace
+
+
+def k8s_add_sidecar_namespaced_pod(kube_client_config: kubernetes.client.Configuration, namespace_name: str,
+                                   pod_name: str) -> V1Namespace:
+    """
+
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+
+        pod_to_be_patched: V1Pod = api_instance_core.read_namespaced_pod(name=pod_name, namespace=namespace_name)
+
+        pod_spec: V1PodSpec = pod_to_be_patched.spec
+        pod_containers : List[V1Container] = pod_spec.containers
+        pod_containers.append() # TODO finire
+
+        try:
+            patched_pod = api_instance_core.patch_namespaced_pod(name=pod_name, namespace=namespace_name, body=None) # TODO replace body with updated pod
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>patch_namespaced_pod: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return patched_pod

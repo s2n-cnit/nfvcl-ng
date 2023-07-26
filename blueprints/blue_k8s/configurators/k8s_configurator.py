@@ -1,6 +1,6 @@
 from configurators.flex_configurator import Configurator_Flex
 from utils import persistency
-from utils.util import *
+from utils.log import create_logger
 
 logger = create_logger('Configurator_K8s')
 
@@ -63,8 +63,7 @@ class ConfiguratorK8s(Configurator_Flex):
 
     def dump(self):
         logger.debug("Blue {}: Dumping nsd {}".format(self.blue_id, self.nsd_id))
-        self.dumpAnsibleFile(10, 'ansible_k8s_' + str(self.nsd_id) +
-                             '_' + str(self.nsd['member-vnfd-id']))
+        self.dumpAnsibleFile(10, str(self.nsd_id) + '_ansible_k8s_' + str(self.nsd['member-vnfd-id']))
         return super(ConfiguratorK8s, self).dump()
 
     def get_logpath(self):

@@ -1,9 +1,9 @@
 from logging import Logger
-
 from redis.client import Redis
-
+from models.event import Event
 from models.k8s import K8sModel
-from topology.topology_events import TopologyEvent
+from models.prometheus.prometheus_model import PrometheusServerModel
+from topology.topology_events import TopologyEventType
 from utils.k8s import parse_k8s_clusters_from_dict
 from utils.log import create_logger
 from utils.ipam import *
@@ -17,7 +17,7 @@ import json
 import traceback
 from multiprocessing import RLock, Queue
 from utils.util import obj_multiprocess_lock
-from utils.redis.redis_manager import get_redis_instance
+from utils.redis.redis_manager import get_redis_instance, trigger_redis_event
 from utils.redis.topic_list import TOPOLOGY_TOPIC
 
 topology_msg_queue = Queue()
@@ -48,7 +48,7 @@ class Topology:
                 logger.debug('creating terraformer object for VIM {}'.format(vim['name']))
                 self._os_terraformer[vim['name']] = VimTerraformer(vim)
         else:
-            logger.warn("topology information are not existing")
+            logger.warning("topology information are not existing")
             self._data = {'vims': [], 'networks': [], 'routers': [], 'kubernetes': [], 'pdus': []}
 
     @classmethod
@@ -96,7 +96,7 @@ class Topology:
             # self.os_terraformer[vim['name']] = VimTerraformer(vim)
             self.add_vim(vim, terraform=terraform)
 
-        self.trigger_event(TopologyEvent.TOPO_CREATE, topo.to_dict())
+        self.trigger_event(TopologyEventType.TOPO_CREATE, topo.to_dict())
 
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
@@ -118,7 +118,7 @@ class Topology:
         self._data = {'vims': [], 'networks': [], 'routers': [], 'kubernetes': [], 'pdus': []}
         self.db.delete_DB('topology', {'id': 'topology'})
 
-        self.trigger_event(TopologyEvent.TOPO_DELETE, {})
+        self.trigger_event(TopologyEventType.TOPO_DELETE, {})
 
     # **************************** VIMs ****************************
     def get_vim(self, vim_name: str) -> Union[dict, None]:
@@ -160,7 +160,7 @@ class Topology:
         if not data:
             raise ValueError("failed to onboard VIM {} onto OSM".format(vim['name']))
 
-        self.trigger_event(TopologyEvent.TOPO_VIM_CREATE, vim)
+        self.trigger_event(TopologyEventType.TOPO_VIM_CREATE, vim)
 
     @obj_multiprocess_lock
     def del_vim(self, vim, terraform=False):
@@ -188,7 +188,7 @@ class Topology:
 
         self._data['vims'] = [item for item in self._data['vims'] if item['name'] != vim['name']]
 
-        self.trigger_event(TopologyEvent.TOPO_VIM_DEL, vim)
+        self.trigger_event(TopologyEventType.TOPO_VIM_DEL, vim)
 
     @obj_multiprocess_lock
     def update_vim(self, update_msg: dict, terraform: bool = True):
@@ -227,16 +227,25 @@ class Topology:
                 raise ValueError('area {} not in VIM {}'.format(vim_area, vim['name']))
             vim['areas'].remove(vim_area_int)
 
-        self.trigger_event(TopologyEvent.TOPO_VIM_UPDATE, vim)
+        self.trigger_event(TopologyEventType.TOPO_VIM_UPDATE, vim)
 
-    def get_vim_name_from_area_id(self, area: str) -> Union[str, None]:
+    def get_vim_name_from_area_id(self, area: int) -> Union[str, None]:
+        """
+        Return the FIRST VIM name, given the area
+        Args:
+            area: the area for witch the vim is searched.
+
+        Returns:
+            The FIRST matching VIM for that area
+        """
         vim = next((item for item in self._data['vims'] if area in item['areas']), None)
         if vim:
             return vim['name']
         else:
+            logger.warning("No VIM has been found for area {}".format(area))
             return None
 
-    def get_vim_from_area_id(self, area: str) -> dict:
+    def get_vim_from_area_id(self, area: int) -> dict:
         """
         Returns the FIRST VIM given the area id
         Args:
@@ -245,7 +254,10 @@ class Topology:
         Returns:
             The FIRST vim belonging to that area.
         """
-        return next((item for item in self._data['vims'] if area in item['areas']), None)
+        vim = next((item for item in self._data['vims'] if area in item['areas']), None)
+        if vim is None:
+            raise ValueError("No VIM has been found for area {}!".format(area))
+        return vim
 
     # **************************** Networks *************************
     def get_network(self, net_name: str, vim_name: typing.Optional[str] = None) -> dict:
@@ -282,9 +294,9 @@ class Topology:
                 self.add_vim_net(networkName, vim, terraform=terraform)
 
         if isinstance(network, dict):
-            self.trigger_event(TopologyEvent.TOPO_CREATE_NETWORK, network)
+            self.trigger_event(TopologyEventType.TOPO_CREATE_NETWORK, network)
         else:
-            self.trigger_event(TopologyEvent.TOPO_CREATE_NETWORK, network.to_dict())
+            self.trigger_event(TopologyEventType.TOPO_CREATE_NETWORK, network.to_dict())
 
     @obj_multiprocess_lock
     def del_network(self, network: NetworkModel, vim_names_list: Union[list, None] = None, terraform: bool = False):
@@ -297,12 +309,12 @@ class Topology:
                     raise ValueError('VIM {} not found'.format(vim_name))
 
                 if network.name not in vim['networks']:
-                    logger.warn('Network {} not found in VIM {}'.format(network.name, vim['name']))
+                    logger.warning('Network {} not found in VIM {}'.format(network.name, vim['name']))
                 else:
                     self.del_vim_net(network.name, vim, terraform=terraform)
         self._data['networks'] = [item for item in self._data['networks'] if item['name'] != network.name]
 
-        self.trigger_event(TopologyEvent.TOPO_DELETE_NETWORK, network.to_dict())
+        self.trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, network.to_dict())
 
     # **************************** Routers **************************
 
@@ -328,7 +340,7 @@ class Topology:
             raise ValueError("router {} already existing in the topology". format(router['name']))
         self._data['routers'].append(router)
 
-        self.trigger_event(TopologyEvent.TOPO_CREATE_ROUTER, router)
+        self.trigger_event(TopologyEventType.TOPO_CREATE_ROUTER, router)
 
     @obj_multiprocess_lock
     def del_router(self, router: dict, vim_names_list: list = None):
@@ -343,13 +355,13 @@ class Topology:
                     raise ValueError('VIM {} not found'.format(vim_name))
 
                 if router['name'] not in [item['name'] for item in vim['routers']]:
-                    logger.warn('Router {} not found in VIM {}'.format(router['name'], vim['name']))
+                    logger.warning('Router {} not found in VIM {}'.format(router['name'], vim['name']))
                 else:
                     self.del_vim_router(router['name'], vim)
 
         self._data['routers'] = [item for item in self._data['routers'] if item['name'] != router['name']]
 
-        self.trigger_event(TopologyEvent.TOPO_DELETE_ROUTER, router)
+        self.trigger_event(TopologyEventType.TOPO_DELETE_ROUTER, router)
 
     # **************************** VIM updating **********************
 
@@ -476,6 +488,17 @@ class Topology:
     @obj_multiprocess_lock
     def reserve_range(self, net_name: str, range_length: int, owner: str, vim_name: typing.Optional[str] = None) \
             -> dict:
+        """
+        Reserve a range in a network of the topology. The range has an owner. The network can be retrieved from a VIM.
+        Args:
+            net_name: The name of the network in witch the range will be reserved
+            range_length: The range length of the reservation
+            owner: The owner of the range
+            vim_name: The OPTIONAL vim to witch the network is must be part.
+
+        Returns:
+            The IP range -> {'start': '192.168.0.1', 'end': '192.168.0.100'}
+        """
         net = self.get_network(net_name, vim_name)
         reserved_ips = net['allocation_pool'] if 'reserved_ranges' not in net \
             else net['allocation_pool'] + net['reserved_ranges']
@@ -484,8 +507,8 @@ class Topology:
         reserved_range = self.set_reserved_ip_range(ip_range, net_name, owner)
 
         self.save_topology()
-        self.trigger_event(TopologyEvent.TOPO_CREATE_RANGE_RES, reserved_range)
-        return ip_range
+        self.trigger_event(TopologyEventType.TOPO_CREATE_RANGE_RES, reserved_range)
+        return ip_range  # TODO should return LBPool object, for more information.
 
     def set_reserved_ip_range(self, ip_range: dict, net_name: str, owner: str) -> dict:
         """
@@ -528,7 +551,7 @@ class Topology:
                         # Exclude the reserved range with the target owner and the same starting ip.
                         network['reserved_ranges'] = [p for p in network['reserved_ranges'] if p['owner'] != owner and
                                                 p['start'] != ip_range['start']]
-        self.trigger_event(TopologyEvent.TOPO_DELETE_RANGE_RES, {})
+        self.trigger_event(TopologyEventType.TOPO_DELETE_RANGE_RES, {})
         #network['reserved_ranges'] TODO IPv4Address is not JSON serializable
         self.save_topology()
 
@@ -552,7 +575,7 @@ class Topology:
             self.save_topology()
 
             pdu_dict = PduModel.parse_obj(pdu).dict()
-            self.trigger_event(TopologyEvent.TOPO_CREATE_PDU, pdu_dict)
+            self.trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_dict)
             self.save_topology()
 
         except Exception:
@@ -576,7 +599,7 @@ class Topology:
             if res:
                 self._data['pdus'] = [item for item in self._data['pdus'] if item['name'] != pdu_name]
 
-            self.trigger_event(TopologyEvent.TOPO_DELETE_PDU, pdu)
+            self.trigger_event(TopologyEventType.TOPO_DELETE_PDU, pdu)
             self.save_topology()
 
         except ValueError as err:
@@ -633,7 +656,7 @@ class Topology:
             else:
                 self._data['kubernetes'][-1]['nfvo_status'] = 'error'
 
-        self.trigger_event(TopologyEvent.TOPO_CREATE_K8S, data)
+        self.trigger_event(TopologyEventType.TOPO_CREATE_K8S, data)
         self.save_topology()
 
     @obj_multiprocess_lock
@@ -660,7 +683,7 @@ class Topology:
             #Setting new k8s cluster list as
             self._data['kubernetes'] = [item for item in self._data['kubernetes'] if item['name'] != cluster_id]
 
-            self.trigger_event(TopologyEvent.TOPO_DELETE_K8S, k8s_cluster)
+            self.trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_cluster)
             self.save_topology()
         else:
             logger.error("Deleting k8s cluster: no cluster called {} was found".format(cluster_id))
@@ -697,9 +720,69 @@ class Topology:
             logger.info("Updated k8s cluster {} data with {}".format(name, data))
 
         self.save_topology()
-        self.trigger_event(TopologyEvent.TOPO_UPDATE_K8S, data)
+        self.trigger_event(TopologyEventType.TOPO_UPDATE_K8S, data)
 
-    def trigger_event(self, event_name: TopologyEvent, data: dict):
+    @obj_multiprocess_lock
+    def add_prometheus_server(self, prom_server: PrometheusServerModel):
+        # Check if there is an instance with the same id
+        prom_instance = next((prom_instance for prom_instance in self._data['prometheus_srv']
+                              if prom_instance['id'] == prom_server.id), None)
+        if prom_instance is not None:
+            raise ValueError("There is already a prometheus instance with that ID")
+
+        self._data['prometheus_srv'].append(prom_server.dict())
+        self.save_topology()
+        self.trigger_event(TopologyEventType.TOPO_CREATE_PROM_SRV, prom_server.dict())
+
+    @obj_multiprocess_lock
+    def del_prometheus_server(self, prom_server_id: str, force: bool = False):
+        # Getting the position of the prom server to be deleted
+        prom_instance_index = next((index for index, prom_instance in enumerate(self._data['prometheus_srv'])
+                                    if prom_instance['id'] == prom_server_id), None)
+
+        if prom_instance_index is None:
+            raise ValueError("The prometheus instance to be deleted has not been found")
+
+        # Removing the prom instance from the topology, and saving it to trigger the event
+        if len(self._data['prometheus_srv']['jobs']) > 0 and not force:
+            raise ValueError("The prometheus instance to be deleted has configured jobs. You have to remove active"
+                             "jobs or force the deletion in the request.")
+        else:
+            prom_instance = self._data['prometheus_srv'].pop(prom_instance_index)
+            self.save_topology()
+            self.trigger_event(TopologyEventType.TOPO_DELETE_PROM_SRV, prom_instance)
+
+    def update_prometheus_server(self, prom_server: PrometheusServerModel):
+        prom_instance_index = next((index for index, prom_instance in enumerate(self._data['prometheus_srv'])
+                                    if prom_instance['id'] == prom_server.id), None)
+
+        if prom_instance_index is None:
+            raise ValueError("The prometheus instance to be updated has not been found")
+
+        prom_instance = self._data['prometheus_srv'][prom_instance_index]
+        prom_instance.update(prom_server.dict())
+
+        self.save_topology()
+        self.trigger_event(TopologyEventType.TOPO_UPDATE_PROM_SRV, prom_instance)
+
+
+    def get_prometheus_server(self, prom_server_id: str) -> PrometheusServerModel:
+        prom_instance = next((prom_instance for prom_instance in self._data['prometheus_srv']
+                              if prom_instance['id'] == prom_server_id), None)
+        if prom_instance is None:
+            raise ValueError("The prometheus instance to be returned has not been found")
+
+        return PrometheusServerModel.parse_obj(prom_instance)
+
+    def get_prometheus_servers_model(self) -> List[PrometheusServerModel]:
+        list_model = [PrometheusServerModel.parse_obj(item) for item in self._data['prometheus_srv']]
+        return list_model
+
+    def get_prometheus_servers(self) -> List[PrometheusServerModel]:
+        list_model = self._data['prometheus_srv']
+        return list_model
+
+    def trigger_event(self, event_name: TopologyEventType, data: dict):
         """
         Send an event, together with the data that have been updated, to REDIS.
 
@@ -707,8 +790,6 @@ class Topology:
             event_name: the name of the event
             data: the updated data (dict)
         """
-        msg = {
-            'operation': event_name.value,
-            'data': data
-        }
-        redis_cli.publish(TOPOLOGY_TOPIC, json.dumps(msg))
+
+        event: Event = Event(operation=event_name.value, data=data)
+        trigger_redis_event(redis_cli, TOPOLOGY_TOPIC, event)

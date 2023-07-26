@@ -1,4 +1,5 @@
-from utils.util import osm_user, osm_passwd, osm_proj, osm_ip, osm_port
+from models.config_model import NFVCLConfigModel
+from utils.util import get_nfvcl_config
 from utils import persistency
 from nfvo.osm_nbi_util import NbiUtil
 from neutronclient.v2_0 import client as neutron_client
@@ -8,7 +9,10 @@ from keystoneauth1 import session
 import ipaddress
 import logging
 
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
+
+nbiUtil = NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,
+                  project=nfvcl_config.osm.project, osm_ip=nfvcl_config.osm.host, osm_port=nfvcl_config.osm.port)
 db = persistency.DB()
 
 logger = logging.getLogger('keystoneauth')

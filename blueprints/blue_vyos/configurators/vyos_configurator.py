@@ -26,7 +26,7 @@ class Configurator_VyOS(Configurator_Flex):
         super(Configurator_VyOS, self).__init__(nsd_name, m_id, blue_id)
 
         # Do not set as second arg an empty list, or it will override the playbook vars
-        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_vyos.yaml')
+        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_empty_vyos.yaml')
 
         self.add_vyos_config_vars(username=self.admin_username, password=self.admin_password)
         logger.info("Configurator_VyOs created")
@@ -34,14 +34,19 @@ class Configurator_VyOS(Configurator_Flex):
     def initial_configuration(self):
         """
         Perform initial configuration for VyOS router, this includes:
-        -Playbook loading
-        -setup account and password for ansible (in order to configure vyos)
-        -add configuration task to playbook for data interfaces
-        -add configuration task to playbook for loopback in
+        - Set up a name to management interface
+        - Setup data interfaces
+        - Configure loopback IP
+        - Add Vyos Info task to retrieve information from VyOS in the callback
         """
+        self.setup_man_interface_descr()
         self.setup_data_interfaces()
         self.setup_loopback_ip()
         self.add_vyos_info_task()
+
+    def setup_man_interface_descr(self):
+        lines = ["set interface ethernet eth0 description 'Management Network'"]
+        self.add_vyos_config_task('Description of eth0', 'vyos.vyos.vyos_config', lines)
 
     def setup_loopback_ip(self):
         lines = []
@@ -92,8 +97,6 @@ class Configurator_VyOS(Configurator_Flex):
             lines.append(
                 "set nat source rule {} translation address {}".format(rule.rule_number, rule.virtual_ip))
 
-        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_empty_vyos.yaml')
-
         self.add_vyos_config_task('Configure SNAT rules', 'vyos.vyos.vyos_config', lines)
 
     def setup_dnat_rules(self, rule_list: List[VyOSDestNATRule]):
@@ -113,8 +116,6 @@ class Configurator_VyOS(Configurator_Flex):
             lines.append(
                 "set nat destination rule {} description '{}'".format(rule.rule_number, rule.description))
 
-        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_empty_vyos.yaml')
-
         self.add_vyos_config_task('Configure SNAT rules', 'vyos.vyos.vyos_config', lines)
 
     def delete_nat_rule(self, snat_rule_list: List[VyOSSourceNATRule], dnat_rule_list: List[VyOSDestNATRule]):
@@ -131,8 +132,6 @@ class Configurator_VyOS(Configurator_Flex):
         for dnat_rule in dnat_rule_list:
             lines.append(
                 "delete nat destination rule {} ".format(dnat_rule.rule_number, dnat_rule.inbound_interface))
-
-        self.addPlaybook('blueprints/blue_vyos/config_scripts/playbook_empty_vyos.yaml')
 
         self.add_vyos_config_task('Deleting NAT rules', 'vyos.vyos.vyos_config', lines)
 
@@ -171,6 +170,7 @@ class Configurator_VyOS(Configurator_Flex):
             self.playbook['vars'] = []
         self.playbook['vars'].append({'ansible_user': username})
         self.playbook['vars'].append({'ansible_ssh_pass': password})
+        self.playbook['vars'].append({'ansible_password': password})
 
     def dump(self):
         logger.info("Dumping")

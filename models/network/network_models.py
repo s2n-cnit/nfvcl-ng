@@ -28,7 +28,7 @@ class NetworkModel(BaseModel):
     vid: Optional[int]
     dhcp: bool = True
     cidr: IPv4Network
-    gateway_ip: Optional[IPv4Network] = None # TODO Should it be IPv4 address?
+    gateway_ip: Optional[IPv4Network] = None  # TODO Should it be IPv4 address?
     allocation_pool: List[IPv4pool] = []
     reserved_ranges: List[IPv4reservedRange] = []
     dns_nameservers: List[IPv4Address] = []
@@ -57,8 +57,8 @@ class NetworkModel(BaseModel):
             to_return.reserved_ranges[i] = res_range_dict
 
         for i in range(0, len(to_return.allocation_pool)):
-            range_dict: dict = {"end":to_return.allocation_pool[i].end.exploded,
-                                "start":to_return.allocation_pool[i].start.exploded}
+            range_dict: dict = {"end": to_return.allocation_pool[i].end.exploded,
+                                "start": to_return.allocation_pool[i].start.exploded}
             to_return.allocation_pool[i] = range_dict
 
         return to_return.dict()

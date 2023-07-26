@@ -3,31 +3,39 @@ import json
 import queue
 import threading
 import time
-import subprocess
 import traceback
 from logging import Logger
 import redis
 from typing import List
 from utils import persistency
 from .blueprint import BlueprintBase
-from .rest_blue import ShortBlueModel, DetailedBlueModel
+from .blueprint_beta import BlueprintBaseBeta
+from models.blueprint.rest_blue import ShortBlueModel, DetailedBlueModel
 from nfvo import NbiUtil, get_nsd_name
-from utils.util import redis_host, redis_port, osm_port, osm_user, osm_ip, osm_proj, osm_passwd, remove_files_by_pattern
+from nfvo.osm_nbi_util import get_osm_nbi_utils
+from utils.util import remove_files_by_pattern, get_nfvcl_config, NFVCLConfigModel
 from utils.log import create_logger
+from utils.redis.redis_manager import get_redis_instance
 
 logger: Logger = create_logger('BlueLCMWorker')
-osmNbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
-db = persistency.DB()
-redis_cli = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8")
+nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
-def get_blue_by_filter(blue_filter: dict) -> List[dict]:
+
+def get_blue_by_filter(blue_filter: dict, db: persistency.DB) -> List[dict]:
     return db.find_DB("blueprint-instances", blue_filter)
 
 
 class LCMWorkers:
+    osmNbiUtil: NbiUtil
+    db: persistency.DB
+    redis_cli: redis.Redis
+
     def __init__(self, topology_lock):
         self.worker_queue = {}
         self.topology_lock = topology_lock
+        self.osmNbiUtil = get_osm_nbi_utils()
+        self.db = persistency.DB()
+        self.redis_cli = get_redis_instance()
 
     def set_worker(self, blue: BlueprintBase) -> queue.Queue:
         self.worker_queue[blue.get_id()] = queue.Queue()
@@ -43,7 +51,17 @@ class LCMWorkers:
 
     @staticmethod
     def get_blue_detailed_summary(blue_filter: dict) -> List[DetailedBlueModel]:
-        blues_mongo_cursor = get_blue_by_filter(blue_filter)
+        """
+        Create and return a LIST of DetailedBlueModel (for all blueprints) that are used for showing blueprints data to
+        the user.
+        Args:
+            blue_filter: the ??? TODO
+
+        Returns:
+            A list that contains a the details for each blueprint.
+        """
+        db = persistency.DB()
+        blues_mongo_cursor = get_blue_by_filter(blue_filter, db)
         blue_detailed_list: List[DetailedBlueModel] = []
         for blueprint in blues_mongo_cursor:
             detailed_blueprint = DetailedBlueModel.parse_obj(blueprint)
@@ -53,22 +71,30 @@ class LCMWorkers:
 
     @staticmethod
     def get_blue_short_summary(blue_filter: dict) -> List[ShortBlueModel]:
-        blues = get_blue_by_filter(blue_filter)
+        """
+        Create and return a LIST of ShortBlueModel (for all blueprints) that are used to summarize blueprints data to
+        the user.
+        Args:
+            blue_filter: the ??? TODO
 
-        return [ShortBlueModel.parse_obj(
-            {
-                'id': item['id'],
-                'type': item['type'],
-                'status': item['status'],
-                'detailed_status': item['detailed_status'],
-                'current_operation': item['current_operation'],
-                'created': item['created'],
-                'modified': item['modified'],
-                'no_areas': len(item['conf']['areas']),
-                'no_nsd': len(item['nsd_']),
-                'no_primitives': len(item['primitives']),
-            }
-        ) for item in blues]
+        Returns:
+            A list that contains a summary for each blueprint.
+        """
+        db = persistency.DB()
+        blues_mongo_cursor = get_blue_by_filter(blue_filter, db)
+
+        blue_undetailed_list: List[ShortBlueModel] = []
+        # For each blueprint in the DB we create a summary
+        for blueprint in blues_mongo_cursor:
+            blueprint_short: ShortBlueModel = ShortBlueModel.parse_obj(blueprint)
+            # We add summary data that need to be calculated
+            blueprint_short.no_areas = len(blueprint['conf']['areas'])
+            blueprint_short.no_nsd = len(blueprint['nsd_'])
+            blueprint_short.no_primitives = len(blueprint['primitives'])
+
+            blue_undetailed_list.append(blueprint_short)
+
+        return blue_undetailed_list
 
     def get_worker(self, blue_id: str) -> queue.Queue:
         if self.worker_queue.get(blue_id):
@@ -78,7 +104,7 @@ class LCMWorkers:
                 logger.warning("worker {} not running, trying to reinitialize".format(blue_id))
                 # recover the blue from the persistency
                 # blue = unpickle_one_blue_by_id(blue_id)
-                blue = BlueprintBase.from_db(blue_id)
+                blue = BlueprintBaseBeta.from_db(blue_id)
                 self.start_worker(blue)
             return self.worker_queue.get(blue_id)
 
@@ -99,13 +125,20 @@ class LCMWorkers:
 
 
 class BlueLCMworker:
+    osmNbiUtil: NbiUtil
+    db: persistency.DB
+    redis_cli: redis.Redis
+
     def __init__(self, session_queue: queue.Queue, blue: BlueprintBase, sessions: list = None, state: dict = None):
         # current_state = {session: str, day: str, stage: int, handler: str}
+        self.osmNbiUtil = get_osm_nbi_utils()
+        self.db = persistency.DB()
+        self.redis_cli = get_redis_instance()
         self.blue = blue
         self.sessions = sessions
         self.state = state
         self.queue = session_queue
-        self.update_db()
+        self.update_db()  # TODO is it necessary? Isn't that just loaded from the DB?
 
         while True:
             logger.info('worker {} awaiting for new job'.format(self.blue.get_id()))
@@ -165,7 +198,7 @@ class BlueLCMworker:
         except FileNotFoundError as error:
             logger.info("{}".format(error))
 
-        db.delete_DB("action_output", {'blue_id': self.blue.get_id()})
+        self.db.delete_DB("action_output", {'blue_id': self.blue.get_id()})
         self.blue.delete_db()
         self.blue.destroy()
 
@@ -191,8 +224,8 @@ class BlueLCMworker:
 
         self.blue.status = 'processing'
         self.blue.current_operation = requested_operation
-        self.update_db()
-        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+        self.update_db() # Updating the status to processing and requested operation
+        self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
         # for each session we might have multiple stages, each one composed by day0, day2, and dayN lists of handlers
         session_methods = self.blue.get_operation_methods(requested_operation)
         # logger.info(session_methods)
@@ -202,41 +235,41 @@ class BlueLCMworker:
                 if "day0" in stage:
                     self.blue.detailed_status = 'Day0/1'
                     self.update_db()
-                    redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+                    self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
                     for handler in stage['day0']:
                         if not self.day0_operation(handler, checked_vims, msg):
                             raise (AssertionError('error in Day0 operations'))
                         self.update_db()
-                        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+                        self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
 
                 if "day2" in stage:
                     self.blue.detailed_status = 'Day2'
                     self.update_db()
-                    redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+                    self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
                     for handler in stage['day2']:
                         self.day2_operation(handler, msg)
                         self.update_db()
-                        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+                        self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
 
                 if "dayN" in stage:
                     self.blue.detailed_status = 'DayN'
                     self.update_db()
-                    redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+                    self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
                     for handler in stage['dayN']:
                         self.dayN_operation(handler, msg)
                         self.update_db()
-                        redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+                        self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
 
             self.blue.status = 'idle'
-            self.blue.current_operation = None
-            self.blue.detailed_status = None
+            self.blue.current_operation = ""
+            self.blue.detailed_status = ""
             logger.info("Blue {} - session {} finalized".format(self.blue.get_id(), session_id))
             self.update_db()
-            redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+            self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
             self.blue.rest_callback(requested_operation, session_id, "ready")
 
         except AssertionError as error:
-            redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+            self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
             self.blue.rest_callback(requested_operation, session_id, "failed")
             self.abort_session(str(error), requested_operation, session_id)
 
@@ -281,6 +314,7 @@ class BlueLCMworker:
             the input list if all the VIMs are onboarded on OSM.
         """
         vim_list = list()
+        osmNbiUtil = get_osm_nbi_utils()
 
         for vim in vims:
             vim_object = osmNbiUtil.get_vim_by_tenant_and_name(vim['name'], vim['vim_tenant_name'])
@@ -304,7 +338,7 @@ class BlueLCMworker:
         for nsd_name in nsd_names:
             # NOTE: we could support here OSM catalogues
 
-            r = osmNbiUtil.nsd_reonboard(nsd_name)
+            r = self.osmNbiUtil.nsd_reonboard(nsd_name)
 
             if r['error']:
                 logger.error("Blue {} - Day0 onboarding nsd {} failed, reason: {}"
@@ -329,7 +363,7 @@ class BlueLCMworker:
 
             nsd_name = nsd_item['descr']['nsd']['nsd'][0]['name']
             vim_ = next(v_ for v_ in vims if v_['name'] == nsd_item['vim'])
-            r = osmNbiUtil.instantiate_ns(
+            r = self.osmNbiUtil.instantiate_ns(
                 nsd_item['nsd_id'],
                 nsd_name,
                 "automatically generated by CNIT S2N NFVCL",
@@ -373,7 +407,7 @@ class BlueLCMworker:
                 nsd_name = get_nsd_name(ns_item['descr'])
                 if nsd_name in ns_to_check:
                     try:
-                        r = osmNbiUtil.check_ns_instance(ns_item['nsi_id'])
+                        r = self.osmNbiUtil.check_ns_instance(ns_item['nsi_id'])
                     except ValueError as value_exception:
                         logger.error('ValueError received')
                         logger.error(value_exception)
@@ -381,9 +415,9 @@ class BlueLCMworker:
                                 "Deploying at VIM: b\'\'" in value_exception.args[0]:
                             logger.warning("Blue {} - NSI {} failed during day1 operations. Trying to recover."
                                            .format(self.blue.get_id(), ns_item['nsi_id']))
-                            osmNbiUtil.ns_delete(ns_item['nsi_id'], True)
+                            self.osmNbiUtil.ns_delete(ns_item['nsi_id'], True)
                             nsd_name = ns_item['descr']['nsd']['nsd'][0]['name']
-                            r = osmNbiUtil.instantiate_ns(
+                            r = self.osmNbiUtil.instantiate_ns(
                                 ns_item['nsd_id'],
                                 nsd_name,
                                 "automatically generated by CNIT S2N NFVCL",
@@ -395,12 +429,12 @@ class BlueLCMworker:
                                              .format(self.blue.get_id(), nsd_name, json.dumps(r['data'])))
                                 raise ValueError('Healing operation on NS not successful')
                             self.blue.add_osm_nsi(nsd_name, r['data']['id'])
-                            logger.warn('Blue {} - the new nsi_id is {}'.format(self.blue.get_id(), r['data']['id']))
+                            logger.warning('Blue {} - the new nsi_id is {}'.format(self.blue.get_id(), r['data']['id']))
                             self.blue.set_osm_status(nsd_name, 'day1')
                             # restart day 1 waiting loop
                             return self.wait_for_blue_day1(ns_to_check)
                         else:
-                            logger.warn('Exception not handled for self-healing')
+                            logger.warning('Exception not handled for self-healing')
                             raise value_exception
 
                     logger.info("Blue {} - nsi: {} status: {}"
@@ -438,7 +472,7 @@ class BlueLCMworker:
 
             nsi_id = osm_ns['nsi_id'] if 'nsi_id' not in p else p['nsi_id']
             
-            r = osmNbiUtil.execute_primitive(nsi_id, p['primitive_data'])
+            r = self.osmNbiUtil.execute_primitive(nsi_id, p['primitive_data'])
 
             results.append({"result": r, "primitive": p, "time": datetime.datetime.now()})
             self.blue.store_primitives(results[-1])
@@ -468,7 +502,7 @@ class BlueLCMworker:
             blue_callback(results)
 
         self.blue.get_timestamp('Blue {} - Day 2 end'.format(self.blue.get_id()))
-        db.insert_DB("nfv_performance", self.blue.get_performance())
+        self.db.insert_DB("nfv_performance", self.blue.get_performance())
         return True
 
     def init_dayN(self, nsi_list):
@@ -483,7 +517,7 @@ class BlueLCMworker:
         for nsi in nsi_list:
             nsd_conf = next((item for item in self.blue.nsd_ if item.get('nsi_id') == nsi), None)
             if nsd_conf is None:
-                logger.warn('nsi {} non found in blue {}, continuing...'.format(nsi, self.blue.get_id()))
+                logger.warning('nsi {} non found in blue {}, continuing...'.format(nsi, self.blue.get_id()))
                 continue
             if 'nsd_id' in nsd_conf:
                 nsd_to_delete.append(nsd_conf['nsd_id'])
@@ -492,14 +526,14 @@ class BlueLCMworker:
 
         for nsi in nsi_list:
             logger.debug("Blue {} - DayN - terminating nsi {}".format(self.blue.get_id(), nsi))
-            r = osmNbiUtil.ns_delete(nsi)
+            r = self.osmNbiUtil.ns_delete(nsi)
             logger.debug("Blue {} - DayN - nsi {} termination result: {}".format(self.blue.get_id(), nsi, json.dumps(r)))
 
         nsi_to_check = nsi_list[:]  # copy not by reference
         while len(nsi_to_check) > 0:
-            vnfo_nsi_list = osmNbiUtil.get_nsi_list()
+            vnfo_nsi_list = self.osmNbiUtil.get_nsi_list()
             if vnfo_nsi_list is None:
-                logger.warn("Blue {} - nsi list not found in the NFVO. Skipping...".format(self.blue.get_id()))
+                logger.warning("Blue {} - nsi list not found in the NFVO. Skipping...".format(self.blue.get_id()))
                 break
 
             for n_index, n_value in enumerate(nsi_to_check):
@@ -510,10 +544,10 @@ class BlueLCMworker:
 
         for nsd in nsd_to_delete:
             logger.debug("Blue {} - DayN - deleting nsd {}".format(self.blue.get_id(), nsd))
-            r = osmNbiUtil.nsd_delete(nsd)
+            r = self.osmNbiUtil.nsd_delete(nsd)
             logger.debug("Blue {} - DayN - nsd {} deletion result: {}".format(self.blue.get_id(), nsd, json.dumps(r)))
 
-        nfvo_vnfd_list = osmNbiUtil.get_vnfd_list()
+        nfvo_vnfd_list = self.osmNbiUtil.get_vnfd_list()
         logger.info("Blue {}: VNFD to be deleted: {}".format(self.blue.get_id(), vnfd_to_delete))
         for vnfd in vnfd_to_delete:
             nfvo_vnfd = next((item for item in nfvo_vnfd_list if item['id'] == vnfd), None)
@@ -521,7 +555,7 @@ class BlueLCMworker:
                 continue
             logger.debug("Blue {} - DayN - deleting vnfd {} {}".format(self.blue.get_id(), nfvo_vnfd['id'],
                                                                       nfvo_vnfd['_id']))
-            r = osmNbiUtil.delete_vnfd(nfvo_vnfd['_id'])
+            r = self.osmNbiUtil.delete_vnfd(nfvo_vnfd['_id'])
             logger.debug("Blue {} - DayN - vnfd {} {} deletion result:".format(self.blue.get_id(), nfvo_vnfd['id'],
                                                                               nfvo_vnfd['_id'], json.dumps(r)))
 

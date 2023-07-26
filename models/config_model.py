@@ -1,3 +1,5 @@
+from typing import Dict
+
 from pydantic import BaseModel
 
 
@@ -23,7 +25,12 @@ class MongoParameters(BaseModel):
 
 class RedisParameters(BaseModel):
     host: str
-    port: str
+    port: int
+
+
+class BlueDescription(BaseModel):
+    class_name: str
+    module_name: str
 
 
 class NFVCLConfigModel(BaseModel):
@@ -37,3 +44,4 @@ class NFVCLConfigModel(BaseModel):
 
     redis: RedisParameters
 
+    blue_types: Dict[str, BlueDescription]

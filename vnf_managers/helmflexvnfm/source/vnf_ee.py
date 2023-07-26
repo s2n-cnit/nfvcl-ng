@@ -109,7 +109,7 @@ class VnfEE:
                 f.write(h1)
 
             self.logger.debug('config-content parsing\n')
-            config = yaml.load(params['config-content'])
+            config = yaml.safe_load(params['config-content'])
             # self.log_to_file(config)
 
             action_id = config['action_id']

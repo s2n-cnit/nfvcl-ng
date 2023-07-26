@@ -9,7 +9,7 @@ global:
 replicaCount: 1
 
 image:
-  repository: illoret/grpcee
+  repository: vnfm_ee
   tag: latest
   pullPolicy: IfNotPresent
 

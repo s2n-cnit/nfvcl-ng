@@ -23,3 +23,7 @@ echo "create directories..."
 mkdir -p "helm_charts/charts/"
 mkdir -p "day2_files"
 mkdir -p "logs"
+
+echo "Building VNFM image"
+
+docker build -t vnfm_ee ./vnf_managers/helmflexvnfm --no-cache

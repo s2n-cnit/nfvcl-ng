@@ -2,16 +2,18 @@ from blueprints import BlueprintBase, parse_ansible_output
 from models.k8s.k8s_models import K8sPluginName, K8sTemplateFillData
 from . import ConfiguratorK8s
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from typing import Union, Dict, Optional
 from models.k8s.blue_k8s_model import K8sBlueprintCreate, K8sBlueprintScale
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 import traceback
 from main import *
+from utils.log import create_logger
 
 
 db = persistency.DB()
 logger = create_logger('K8sBlue')
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nbiUtil = get_osm_nbi_utils()
 
 
 class K8s(BlueprintBase):
@@ -45,11 +47,6 @@ class K8s(BlueprintBase):
                          {'method': 'add_worker_area_label'}],
                 'dayN': [{'method': 'del_worker'}]
             }],
-            'monitor': [{
-                'day0': [],
-                'day2': [{'method': 'enable_prometheus'}],
-                'dayN': []
-            }],
             'log': [{
                 'day0': [],
                 'day2': [{'method': 'enable_elk'}],
@@ -68,7 +65,6 @@ class K8s(BlueprintBase):
     def bootstrap_day0(self, msg: dict) -> list:
         self.topology_terraform(msg)
         return self.nsd()
-
 
     def topology_terraform(self, msg: dict) -> None:
         try:

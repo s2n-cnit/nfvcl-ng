@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, Query, status, HTTPException
 from models.k8s import K8sModel, K8sModelCreateFromBlueprint, K8sModelCreateFromExternalCluster, K8sModelUpdateRequest
+from models.prometheus.prometheus_model import PrometheusServerModel
 from models.topology import TopologyModel
 from models.network import NetworkModel, RouterModel, PduModel
 from models.vim import VimModel, UpdateVimModel
@@ -180,12 +181,8 @@ async def create_router(router: RouterModel):
     return {'id': 'topology'}
 
 
-@topology_router.delete(
-    "/router/{router_id}",
-    response_model=RestAnswer202,
-    status_code=status.HTTP_202_ACCEPTED,
-    callbacks=callback_router.routes
-)
+@topology_router.delete("/router/{router_id}", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                        callbacks=callback_router.routes)
 async def delete_router(router_id: str):
     return produce_msg_worker('routers', router_id, 'del_router')
 
@@ -210,14 +207,10 @@ async def create_pdu(router: PduModel):
     return {'id': 'topology'}
 
 
-@topology_router.delete(
-    "/router/{router_id}",
-    response_model=RestAnswer202,
-    status_code=status.HTTP_202_ACCEPTED,
-    callbacks=callback_router.routes
-)
-async def delete_router(router_id: str):
-    return produce_msg_worker('pdus', router_id, 'del_pdu')
+@topology_router.delete("/pdu/{pdu_id}", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                        callbacks=callback_router.routes)
+async def delete_pdu(pdu_id: str):
+    return produce_msg_worker('pdus', pdu_id, 'del_pdu')
 
 
 # ################################### K8s ###################################
@@ -279,11 +272,9 @@ async def add_external_k8scluster(cluster: K8sModelCreateFromExternalCluster):
     return {'id': 'topology'}
 
 
-@topology_router.put(
-    "/kubernetes/{cluster_id}",
-    response_model=RestAnswer202,
-    status_code=status.HTTP_202_ACCEPTED,
-    callbacks=callback_router.routes)
+@topology_router.put("/kubernetes/{cluster_id}", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                     callbacks=callback_router.routes, summary=UPD_K8SCLUSTER_SUMMARY,
+                     description=UPD_PROM_SRV_DESCRIPTION)
 async def update_k8scluster(cluster_updates: K8sModelUpdateRequest, cluster_id):
     msg = cluster_updates.dict()
 
@@ -301,12 +292,8 @@ async def update_k8scluster(cluster_updates: K8sModelUpdateRequest, cluster_id):
     return {'id': 'topology'}
 
 
-@topology_router.delete(
-    "/kubernetes/{cluster_id}",
-    response_model=RestAnswer202,
-    status_code=status.HTTP_202_ACCEPTED,
-    callbacks=callback_router.routes
-)
+@topology_router.delete("/kubernetes/{cluster_id}", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                        callbacks=callback_router.routes)
 async def delete_k8scluster(cluster_id: str):
     return produce_msg_worker('kubernetes', cluster_id, 'del_k8s')
 
@@ -315,3 +302,59 @@ async def delete_k8scluster(cluster_id: str):
 async def get_k8scluster():
     topology = Topology.from_db(db, nbiUtil, topology_lock)
     return topology.get_k8scluster()
+
+
+@topology_router.post("/prometheus", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                      callbacks=callback_router.routes, summary=ADD_PROM_SRV_SUMMARY,
+                      description=ADD_K8SCLUSTER_DESCRIPTION)
+async def add_prom(prom_srv: PrometheusServerModel):
+    msg = prom_srv.dict()
+    msg.update({'ops_type': 'add_prom'})
+    topology_msg_queue.put(msg)
+
+    return {'id': 'topology'}
+
+
+@topology_router.put("/prometheus", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                     callbacks=callback_router.routes, summary=UPD_PROM_SRV_SUMMARY,
+                     description=UPD_PROM_SRV_DESCRIPTION)
+async def upd_prom(prom_srv: PrometheusServerModel):
+    msg = prom_srv.dict()
+    msg.update({'ops_type': 'upd_prom'})
+    topology_msg_queue.put(msg)
+
+    return {'id': 'topology'}
+
+
+@topology_router.delete("/prometheus/{prom_srv_id}", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
+                        callbacks=callback_router.routes, summary=DEL_PROM_SRV_SUMMARY,
+                        description=DEL_PROM_SRV_DESCRIPTION)
+async def del_prom(prom_srv_id: str):
+    msg = {}
+    msg.update({'id': prom_srv_id})
+    msg.update({'ops_type': 'del_prom'})
+    topology_msg_queue.put(msg)
+
+    return {'id': 'topology'}
+
+
+@topology_router.get("/prometheus", response_model=List[PrometheusServerModel], status_code=status.HTTP_202_ACCEPTED,
+                     callbacks=callback_router.routes, summary=GET_PROM_LIST_SRV_SUMMARY,
+                     description=GET_PROM_LIST_SRV_DESCRIPTION)
+async def get_prom_list():
+    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    prom_list = topology.get_prometheus_servers_model()
+    return prom_list
+
+
+@topology_router.get("/prometheus/{id}", response_model=PrometheusServerModel, status_code=status.HTTP_202_ACCEPTED,
+                     callbacks=callback_router.routes, summary=GET_PROM_SRV_SUMMARY,
+                     description=GET_PROM_SRV_DESCRIPTION)
+async def get_prom(prom_id: str):
+    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    try:
+        prom_inst = topology.get_prometheus_server(prom_server_id=prom_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail='Prometheus server ->{}<- cannot be found in the topology'.format(prom_id))
+    return prom_inst

@@ -38,7 +38,7 @@ def create_logger(name: str) -> logging.Logger:
 
     # Adding file handler to post log into file
     # w = every restart log is cleaned
-    log_file_handler = RotatingFileHandler("logs/nfvcl.log", maxBytes=50000, backupCount=4)
+    log_file_handler = RotatingFileHandler("logs/nfvcl.log", maxBytes=10000000, backupCount=4)
     log_file_handler.setLevel(logging.DEBUG)
     log_file_handler.setFormatter(formatter)
     logger.addHandler(log_file_handler)

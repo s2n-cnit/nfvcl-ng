@@ -19,7 +19,7 @@ from models.k8s.blue_k8s_model import LBPool
 from models.k8s.k8s_models import K8sModelManagement, K8sOperationType, K8sModel, K8sPluginName, K8sPluginsToInstall, \
     K8sTemplateFillData
 from nfvo import NbiUtil
-from topology import Topology
+from topology.topology import Topology
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, \
     convert_str_list_2_plug_name, apply_def_to_cluster, get_k8s_cidr_info
 from utils.log import create_logger

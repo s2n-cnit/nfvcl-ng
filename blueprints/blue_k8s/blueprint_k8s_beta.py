@@ -1,22 +1,28 @@
 from enum import Enum
 from ipaddress import IPv4Address
 from logging import Logger
-from blueprints import BlueprintBase, parse_ansible_output
+from blueprints import parse_ansible_output
+from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
+from models.blueprint.common import BlueEnablePrometheus
+from models.blueprint.rest_blue import BlueGetDataModel
 from models.k8s.k8s_models import K8sPluginName, K8sTemplateFillData
 from models.vim.vim_models import VimLink, VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor
+from models.virtual_link_desc import VirtLinkDescr
 from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip, NbiUtil
 from typing import Union, Dict, Optional, List
-from models.k8s.blue_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, VMFlavors
+from models.k8s.blue_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, VMFlavors, \
+    K8sNsdInterfaceDesc
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
-from main import nfvcl_config, persistency
+from main import persistency
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils.log import create_logger
 from .models.blue_k8s_model import LBPool, K8sAreaInfo
+from ..blueprint_beta import BlueprintBaseBeta
 
 db = persistency.DB()
 logger: Logger = create_logger('K8s Blue BETA')
-nbiUtil = NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,
-                  project=nfvcl_config.osm.project, osm_ip=nfvcl_config.osm.host, osm_port=nfvcl_config.osm.port)
+nbiUtil: NbiUtil = get_osm_nbi_utils()
 
 
 class AreaType(Enum):
@@ -24,8 +30,8 @@ class AreaType(Enum):
     AREA = 2
 
 
-class K8sBeta(BlueprintBase):
-    config_model: K8sBlueprintModel
+class K8sBeta(BlueprintBaseBeta):
+    k8s_model: K8sBlueprintModel
 
     @classmethod
     def rest_create(cls, msg: K8sBlueprintCreate):
@@ -43,12 +49,20 @@ class K8sBeta(BlueprintBase):
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
+    def en_prom(cls, msg: BlueEnablePrometheus, blue_id: str):
+        """
+        Defines scale REST for this blueprint. In particular the type of message to be accepted by the scale APIs.
+        """
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
     def day2_methods(cls):
         """
         Defines the day 2 APIs for this blueprint. In particular the type of message to be accepted by the day 2 APIs,
         and the type of call (PUT).
         """
         cls.api_router.add_api_route("/{blue_id}/scale_new", cls.rest_scale, methods=["PUT"])
+        cls.api_router.add_api_route("/{blue_id}/en_prom", cls.en_prom, methods=["PUT"])
 
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         """
@@ -58,9 +72,9 @@ class K8sBeta(BlueprintBase):
         The supported operations define the order of creation operations (init phase) and the ones to be executed during
         scale and other types of operations
         """
-        BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
+        BlueprintBaseBeta.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         logger.info("Creating K8S Blueprint")
-        self.supported_operations = {
+        self.base_model.supported_operations = {
             'init': [{
                 'day0': [{'method': 'bootstrap_day0'}],
                 'day2': [{'method': 'init_controller_day2_conf', 'callback': 'get_master_key'},
@@ -86,27 +100,25 @@ class K8sBeta(BlueprintBase):
                 'dayN': []
             }],
         }
-        # !!! Self.to_db() is not only saving the data in the DB, but it fills also the self.config_model variable.
-        self.to_db()
-
-        self.config_model.config.nfvo_onboarded = False
-        self.primitives = []
-        self.vnfd = {'core': [], 'area': []}
-        core_area = next((item for item in self.config_model.areas if item.core), None)
-        if core_area:
-            self.config_model.config.core_area = core_area
-        else:
-            raise ValueError('Core area not found in the input')
+        # DO NOT remove -> model initialization.
+        self.k8s_model = K8sBlueprintModel.parse_obj(self.base_model.conf)
+        # Avoid to put self.db
 
     def bootstrap_day0(self, msg: dict) -> list:
         """
-        This is the FIRST function called on creation
+        This is the FIRST function called on day0
         Args:
-            msg:
+            msg: K8sBlueprintCreate, the message used to create the k8s cluster.
 
         Returns:
-
+            a list of created NSD.
         """
+        core_area = next((item for item in self.k8s_model.areas if item.core), None)
+        if core_area:
+            self.k8s_model.config.core_area = core_area
+        else:
+            raise ValueError('Core area not found in the input')
+
         msg_model = K8sBlueprintCreate.parse_obj(msg)
         self.topology_terraform(msg_model)
 
@@ -147,17 +159,19 @@ class K8sBeta(BlueprintBase):
             # If the starting IP of this load balancer pool in not present then we generate automatically a range
             if lb_pool.ip_start is None:
                 logger.debug("{} retrieving lb IP range".format(self.get_id()))
-                range_length = lb_pool.range_length if lb_pool.range_length else 20
+                if not lb_pool.range_length:
+                    lb_pool.range_length = 20
 
                 # !!! llb_range is returned as a dictionary
-                llb_range = self.topology_reserve_ip_range(lb_pool.dict(), range_length)
+                llb_range = self.topology_reserve_ip_range(lb_pool)
                 logger.info("Blue {} taking range {}-{} on network {} for lb"
                             .format(self.get_id(), llb_range['start'], llb_range['end'], lb_pool.net_name))
                 lb_pool.ip_start = IPv4Address(llb_range['start'])
                 lb_pool.ip_end = IPv4Address(llb_range['end'])
             lb_pool_list.append(lb_pool)
 
-        self.config_model.config.network_endpoints.data_nets = lb_pool_list
+        self.k8s_model.config.network_endpoints.data_nets = lb_pool_list
+        self.to_db()
         logger.info("asd")
 
     def nsd(self) -> List[str]:
@@ -171,7 +185,7 @@ class K8sBeta(BlueprintBase):
 
         area: K8sAreaInfo
         # For each area we can have multiple workers (depending on workers replicas)
-        for area in self.config_model.areas:
+        for area in self.k8s_model.areas:
             logger.info(
                 "Blue {} - Creating K8s Worker Service Descriptors on area {}".format(self.get_id(), area.id))
             for replica_id in range(area.workers_replica):
@@ -196,12 +210,12 @@ class K8sBeta(BlueprintBase):
         }
         # Maps the 'mgt' to the vim_net
         vim_net_mapping = [
-            {'vld': 'mgt', 'vim_net': self.config_model.config.network_endpoints.mgt, "mgt": True}
+            {'vld': 'mgt', 'vim_net': self.k8s_model.config.network_endpoints.mgt, "mgt": True}
         ]
 
         # For each data network that should be connected to the worker it creates a map between vld net name and the vim
         # net name.
-        for pool in self.config_model.config.network_endpoints.data_nets:
+        for pool in self.k8s_model.config.network_endpoints.data_nets:
             if pool.net_name != vim_net_mapping[0]['vim_net']:
                 vim_net_mapping.append(
                     {'vld': 'data_{}'.format(pool.net_name), 'vim_net': pool.net_name, "mgt": False}
@@ -211,29 +225,29 @@ class K8sBeta(BlueprintBase):
         created_vnfd = [self.set_vnfd(AreaType.CORE, vld=vim_net_mapping)]  # sol006_NSD_builder expect a list
 
         n_obj = sol006_NSD_builder(
-            created_vnfd, self.get_vim_name(self.config_model.config.core_area.dict()), param, vim_net_mapping)
+            created_vnfd, self.get_vim_name(self.k8s_model.config.core_area.dict()), param, vim_net_mapping)
 
         # Append to the NSDs the just created NSD for the controller
-        self.nsd_.append(n_obj.get_nsd())
+        self.base_model.nsd_.append(BlueNSD.parse_obj(n_obj.get_nsd()))
         return param['name']
 
     def worker_nsd(self, area: K8sAreaInfo, replica_id: int) -> str:
         logger.info("Blue {} - building worker NSD for replica {} at area {}"
                     .format(self.get_id(), replica_id, area.id))
         vim_net_mapping = [
-            {'vld': 'mgt', 'vim_net': self.config_model.config.network_endpoints.mgt, "mgt": True}
+            {'vld': 'mgt', 'vim_net': self.k8s_model.config.network_endpoints.mgt, "mgt": True}
         ]
 
         # For each data network that should be connected to the worker it creates a map between vld net name and the vim
         # net name.
-        for pool in self.config_model.config.network_endpoints.data_nets:
+        for pool in self.k8s_model.config.network_endpoints.data_nets:
             if pool.net_name != vim_net_mapping[0]['vim_net']:
                 vim_net_mapping.append(
                     {'vld': 'data_{}'.format(pool.net_name), 'vim_net': pool.net_name, "mgt": False}
                 )
 
         # The default values are already filled in self.config_model.config.worker_flavors
-        vm_flavor = self.config_model.config.worker_flavors.copy()
+        vm_flavor = self.k8s_model.config.worker_flavors.copy()
         # If flavor is given in the k8s creation request then use these values
         if area.worker_flavor_override:
             vm_flavor = area.worker_flavor_override
@@ -252,9 +266,9 @@ class K8sBeta(BlueprintBase):
             created_vnfd, self.get_vim_name(area.id), param, vim_net_mapping)
 
         n_ = n_obj.get_nsd()
-        n_['area'] = area.id
+        n_['area_id'] = area.id
         n_['replica_id'] = replica_id
-        self.nsd_.append(n_)
+        self.base_model.nsd_.append(BlueNSD.parse_obj(n_))
         return param['name']
 
     def set_vnfd(self, area_type: AreaType, area_id: Optional[int] = None, vld: Optional[list] = None,
@@ -325,11 +339,11 @@ class K8sBeta(BlueprintBase):
             'name': '{}_AC'.format(self.get_id()),
         })
         vnfd.vdu = [vdu]
-        complete_vnfd = sol006_VNFbuilder(self.nbiutil, self.db, vnfd.dict(by_alias=True),
+        complete_vnfd = sol006_VNFbuilder(nbiUtil, self.db, vnfd.dict(by_alias=True),
                                           charm_name='helmflexvnfm', cloud_init=True)
         id_vnfd = {'id': 'vnfd', 'name': complete_vnfd.get_id(),
-                   'vl':  [i.dict() for i in interfaces]}
-        self.vnfd['core'].append(id_vnfd)
+                   'vl': [i.dict() for i in interfaces]}
+        self.base_model.vnfd.core.append(BlueVNFD.parse_obj(id_vnfd))
         self.to_db()
 
         return id_vnfd
@@ -357,12 +371,12 @@ class K8sBeta(BlueprintBase):
         })
         vnfd.vdu = [vdu]
 
-        complete_vnfd = sol006_VNFbuilder(self.nbiutil, self.db, vnfd.dict(by_alias=True), charm_name='helmflexvnfm',
+        complete_vnfd = sol006_VNFbuilder(nbiUtil, self.db, vnfd.dict(by_alias=True), charm_name='helmflexvnfm',
                                           cloud_init=True)
 
         area_vnfd = {'area_id': area_id, 'id': 'vnfd', 'name': complete_vnfd.get_id(),
                      'vl': [i.dict() for i in interfaces]}
-        self.vnfd['area'].append(area_vnfd)
+        self.base_model.vnfd.area.append(BlueVNFD.parse_obj(area_vnfd))
         self.to_db()
 
         return area_vnfd
@@ -380,13 +394,13 @@ class K8sBeta(BlueprintBase):
         logger.debug("Triggering Day2 Config for K8S blueprint " + str(self.get_id()))
         res = []
         # Looks for the NSD of the master (or k8s controller)
-        master_nsd = next(item for item in self.nsd_ if item['type'] == 'master')
+        master_nsd = next(item for item in self.base_model.nsd_ if item.type == 'master')
         # Create a configurator for the k8s controller and dumps the actions to be executed into conf_dump
-        conf_dump = ConfiguratorK8sBeta(master_nsd['descr']['nsd']['nsd'][0]['id'], 1, self.get_id(), self.config_model,
+        conf_dump = ConfiguratorK8sBeta(master_nsd.descr.nsd.nsd[0].id, 1, self.get_id(), self.k8s_model,
                                         role='master', step=1).dump()
         # saving the id of the action because we need to post process its output
         # self.action_to_check.append(conf_[0]['param_value']['action_id'])
-        self.action_to_check.append(conf_dump[0]['primitive_data']['primitive_params']['config-content'])
+        self.base_model.action_to_check.append(conf_dump[0]['primitive_data']['primitive_params']['config-content'])
         res += conf_dump
         logger.debug("K8s master configuration built")
 
@@ -417,10 +431,10 @@ class K8sBeta(BlueprintBase):
             logger.debug('**** retrieved action_output {}'.format(action_output['action_id']))
 
             # retrieve data from action output
-            self.config_model.config.master_key_add_worker = parse_ansible_output(action_output, playbook_name,
-                                                                                  'worker join key', 'msg')
-            self.config_model.config.master_credentials = parse_ansible_output(action_output, playbook_name,
-                                                                               'k8s credentials', 'msg')['stdout']
+            self.k8s_model.config.master_key_add_worker = parse_ansible_output(action_output, playbook_name,
+                                                                               'worker join key', 'msg')
+            self.k8s_model.config.master_credentials = parse_ansible_output(action_output, playbook_name,
+                                                                            'k8s credentials', 'msg')['stdout']
         self.to_db()
 
     def add_worker(self, msg: K8sBlueprintScale) -> List[str]:
@@ -434,17 +448,17 @@ class K8sBeta(BlueprintBase):
         for area in msg.add_areas:
             logger.info("Blue {} - activating new area {}".format(self.get_id(), area.id))
             # check if area is already existing in self.conf, or it is a new area
-            checked_area = next((item for item in self.config_model.areas if item.id == area.id), None)
+            checked_area = next((item for item in self.k8s_model.areas if item.id == area.id), None)
             if checked_area:
                 raise ValueError("Blue {} - area {} already exists!".format(self.get_id(), area.id))
-            for index in range(1, area.workers_replica+1):
+            for index in range(1, area.workers_replica + 1):
                 logger.info("Blue {} - adding worker {} on area {}".format(self.get_id(), index, area.id))
                 nsd_names.append(self.worker_nsd(area, index))
-            self.config_model.areas.append(area)
+            self.k8s_model.areas.append(area)
 
         for area in msg.modify_areas:
             # check if area is already existing in self.conf, or it is a new area
-            checked_area = next((item for item in self.config_model.areas if item.id == area.id), None)
+            checked_area = next((item for item in self.k8s_model.areas if item.id == area.id), None)
             if checked_area:
                 # area already existing, checking replicas
                 if checked_area.workers_replica < area.workers_replica:
@@ -472,7 +486,7 @@ class K8sBeta(BlueprintBase):
             # If the request is coming from initial config, msg is a dict (depends on NFVCL code).
             # But since the message is the same on witch the object is build we can use the data in config model that is
             # the same.
-            areas = self.config_model.areas
+            areas = self.k8s_model.areas
         elif type(msg) is K8sBlueprintScale:
             # Otherwise, for example in scaling operation, we receive an object of type K8sBlueprintScale
             msg_ojb: K8sBlueprintScale = msg
@@ -482,18 +496,18 @@ class K8sBeta(BlueprintBase):
             areas = []
 
         for area in areas:
-            for n in self.nsd_:
+            for n in self.base_model.nsd_:
                 # For each network service descriptor in the area we check that the NS is a 'worker'
-                if n['type'] == 'worker' and n['area'] == area.id:
+                if n.type == 'worker' and n.area_id == area.id:
                     # We build a configurator that will give us back the instructions to be executed via ansible on the
                     # worker
                     res += ConfiguratorK8sBeta(
-                        n['descr']['nsd']['nsd'][0]['id'],
+                        n.descr.nsd.nsd[0].name,
                         1,
                         self.get_id(),
-                        self.config_model,
+                        self.k8s_model,
                         role='worker',
-                        master_key=self.config_model.config.master_key_add_worker
+                        master_key=self.k8s_model.config.master_key_add_worker
                     ).dump()
 
         logger.debug("K8s worker configuration built")
@@ -515,7 +529,7 @@ class K8sBeta(BlueprintBase):
             # If the request is coming from initial config, msg is a dict (depends on NFVCL code).
             # But since the message is the same on witch the object is build we can use the data in config model that is
             # the same.
-            areas = self.config_model.areas
+            areas = self.k8s_model.areas
         elif type(msg) is K8sBlueprintScale:
             # Otherwise, for example in scaling operation, we receive an object of type K8sBlueprintScale
             msg_ojb: K8sBlueprintScale = msg
@@ -528,23 +542,23 @@ class K8sBeta(BlueprintBase):
         workers_to_label = []
         for area_id in areas_to_label:
             # Looks for the workers to be labeled in the k8s cluster
-            conf_area = next((item for item in self.config_model.areas if item.id == area_id), None)
+            conf_area = next((item for item in self.k8s_model.areas if item.id == area_id), None)
             if not conf_area:
                 raise ValueError('Blue {} - configuration area {} not found'.format(self.get_id(), area_id))
 
             # looking for workers' vdu names (they are the names seen by the K8s master)
             vm_names = []
-            for n in self.nsd_:
-                if n['type'] == 'worker' and n['area'] == area_id:
-                    vnfi = self.nbiutil.get_vnfi_list(n['nsi_id'])[0]
+            for n in self.base_model.nsd_:
+                if n.type == 'worker' and n.area_id == area_id:
+                    vnfi = nbiUtil.get_vnfi_list(n.nsi_id)[0]
                     vm_names.append(vnfi['vdur'][0]['name'])
             workers_to_label.append({'area': area_id, 'vm_names': vm_names})
 
         configurator = ConfiguratorK8sBeta(
-            next(item['descr']['nsd']['nsd'][0]['id'] for item in self.nsd_ if item['type'] == 'master'),
+            next(item.descr.nsd.nsd[0].id for item in self.base_model.nsd_ if item.type == 'master'),
             1,
             self.get_id(),
-            self.config_model,
+            self.k8s_model,
             role='master',
             step=2
         )
@@ -564,12 +578,12 @@ class K8sBeta(BlueprintBase):
             'name': self.get_id(),
             'provided_by': 'blueprint',
             'blueprint_ref': self.get_id(),
-            'k8s_version': self.conf['config']['version'],
-            'credentials': self.conf['config']['master_credentials'],
-            'vim_account': self.get_vim(self.conf['config']['core_area']),
-            'vim_name': self.get_vim(self.conf['config']['core_area'])['name'],
-            'networks': [item['net_name'] for item in self.conf['config']['network_endpoints']['data_nets']],
-            'areas': [item['id'] for item in self.conf['areas']],
+            'k8s_version': self.k8s_model.config.version,
+            'credentials': self.k8s_model.config.master_credentials,
+            'vim_account': self.get_vim(self.k8s_model.config.core_area.id),
+            'vim_name': self.get_vim(self.k8s_model.config.core_area.id)['name'],
+            'networks': [item.net_name for item in self.k8s_model.config.network_endpoints.data_nets],
+            'areas': [item.id for item in self.k8s_model.areas],
             'nfvo_onboarded': False
         }
         self.topology_add_k8scluster(k8s_data)
@@ -583,31 +597,31 @@ class K8sBeta(BlueprintBase):
             msg: The received message. IT is not used but necessary otherwise crash.
 
         Returns:
-            Empty primitive list such that caller does not crash
+            Empty primitive list such that caller does not crash.
         """
-        client_config = get_k8s_config_from_file_content(self.conf['config']['master_credentials'])
+        client_config = get_k8s_config_from_file_content(self.k8s_model.config.master_credentials)
         # Build plugin list
         plug_list: List[K8sPluginName] = []
 
-        if self.conf['config']['cni'] == 'flannel':
+        if self.k8s_model.config.cni == 'flannel':
             plug_list.append(K8sPluginName.FLANNEL)
-        elif self.conf['config']['cni'] == 'calico':
+        elif self.k8s_model.config.cni == 'calico':
             plug_list.append(K8sPluginName.CALICO)
         plug_list.append(K8sPluginName.METALLB)
         plug_list.append(K8sPluginName.OPEN_EBS)
         plug_list.append(K8sPluginName.METRIC_SERVER)
 
         # Get the pool list for metal load balancer
-        pool_list = self.config_model.config.network_endpoints.data_nets
+        pool_list = self.k8s_model.config.network_endpoints.data_nets
         # Get the k8s pod network cidr
         pod_network_cidr = get_k8s_cidr_info(client_config)
         # create additional data for plugins (lbpool and cidr)
         add_data = K8sTemplateFillData(pod_network_cidr=pod_network_cidr, lb_pools=pool_list)
 
         install_plugins_to_cluster(kube_client_config=client_config, plugins_to_install=plug_list,
-                                   template_fill_data=add_data, cluster_id=self.id)
+                                   template_fill_data=add_data, cluster_id=self.base_model.id)
 
-        # Returning empty primitives to avoid error.
+        # Returning empty primitive list to avoid error.
         return []
 
     def del_worker(self, msg: K8sBlueprintScale) -> List[str]:
@@ -622,28 +636,28 @@ class K8sBeta(BlueprintBase):
         logger.info("Deleting worker from K8S blueprint " + str(self.get_id()))
         nsi_to_delete = []
         for area in msg.del_areas:
-            checked_area = next((item for item in self.config_model.areas if item.id == area.id), None)
+            checked_area = next((item for item in self.k8s_model.areas if item.id == area.id), None)
             if not checked_area:
                 raise ValueError("Blue {} - area {} not found".format(self.get_id(), area.id))
 
             logger.debug("Blue {} - deleting K8s workers on area {}".format(self.get_id(), area.id))
             # find nsi to be deleted
-            for n in self.nsd_:
-                if n['type'] == 'worker':
-                    if n['area'] == area.id:
-                        logger.debug("Worker on area {} has nsi_id: {}".format(area.id, n['nsi_id']))
-                        nsi_to_delete.append(n['nsi_id'])
+            for nsd in self.base_model.nsd_:
+                if nsd.type == 'worker':
+                    if nsd.area_id == area.id:
+                        logger.debug("Worker on area {} has nsi_id: {}".format(area.id, nsd.nsi_id))
+                        nsi_to_delete.append(nsd.nsi_id)
             # removing items from conf
             # Note: this should be probably done, after deletion confirmation from the nfvo
-            self.config_model.areas = [item for item in self.config_model.areas if item.id != area.id]
+            self.k8s_model.areas = [item for item in self.k8s_model.areas if item.id != area.id]
 
         for area in msg.modify_areas:
             # check if area is already existing in self.conf, or it is a new area
-            checked_area = next((item for item in self.config_model.areas if item.id == area.id), None)
+            checked_area = next((item for item in self.k8s_model.areas if item.id == area.id), None)
             if checked_area:
                 # area already existing, checking replicas
                 if checked_area.workers_replica > area.workers_replica:
-                    nsi_ids = [item for item in self.nsd_ if item['area'] == area.id]
+                    nsi_ids = [item for item in self.base_model.nsd_ if item.area_id == area.id]
                     logger.info("Blue {} - from area {} removing service instances: {}"
                                 .format(self.get_id(), area.id, nsi_ids))
                     nsi_to_delete.extend(nsi_ids[0:(checked_area['workers_replica'] - area.id)])
@@ -661,18 +675,18 @@ class K8sBeta(BlueprintBase):
         This method is used to save the model inside the self.conf variable.
         This workaround is needed because otherwise the vyos model is not saved, and the self.conf variable is a dict.
         """
-        val = getattr(self, 'config_model', None)
+        val = getattr(self, 'k8s_model', None)
         # If this is the first time the config model will be 'None' and we need to load the data from self.conf (that is
         # coming from the database)
 
         if val:
             # We update self.conf that is SAVED into the DB, differently from self.config_model.
             # In this way the model will be saved into the DB
-            self.conf = self.config_model.dict()
+            self.base_model.conf = self.k8s_model.dict()
         else:
             # If the blueprint instance is loaded for the first time, then the model is empty, and we can parse the
             # dictionary into the model
-            self.config_model = K8sBlueprintModel.parse_obj(self.conf)
+            self.k8s_model = K8sBlueprintModel.parse_obj(self.base_model.conf)
         # To save the data (in particular the self.conf variable) we call the super method
         super(K8sBeta, self).to_db()
 
@@ -680,10 +694,9 @@ class K8sBeta(BlueprintBase):
         """
         Called when the blueprint is destroyed.
         """
-
         # If onboarded, the k8s cluster is removed from OSM.
         logger.info("Destroying")
-        if self.config_model.config.nfvo_onboarded:
+        if self.k8s_model.config.nfvo_onboarded:
             nbiUtil.delete_k8s_cluster(self.get_id())
 
         # The k8s repo is removed from OSM
@@ -704,29 +717,84 @@ class K8sBeta(BlueprintBase):
         """
         logger.debug('getting IP addresses from vnf instances')
 
-        for n in self.nsd_:
-            if n['type'] == 'master':
+        for nsd in self.base_model.nsd_:
+            if nsd.type == 'master':
                 # Retrieve the complete virtual link descriptors for the only interface of the k8s controller!
-                vlds = get_ns_vld_ip(n['nsi_id'], ["mgt"])
-                self.config_model.config.controller_ip = vlds["mgt"][0]['ip']
-            if n['type'] == 'worker':
+                vlds = get_ns_vld_ip(nsd.nsi_id, ["mgt"])
+                self.k8s_model.config.controller_ip = vlds["mgt"][0]['ip']
+            if nsd.type == 'worker':
                 # Looking for the area corresponding to the actual NSD
-                target_area = next(area for area in self.config_model.areas if area.id == n['area'])
+                target_area = next(area for area in self.k8s_model.areas if area.id == nsd.area_id)
                 if not target_area.worker_data_int:
                     target_area.worker_data_int = {}
                 # links
                 vld_names = ["mgt"]
-                for pool in self.config_model.config.network_endpoints.data_nets:
+                for pool in self.k8s_model.config.network_endpoints.data_nets:
                     # If the net is not the management one
-                    if pool.net_name != self.config_model.config.network_endpoints.mgt:
+                    if pool.net_name != self.k8s_model.config.network_endpoints.mgt:
                         # Then append the net to virtual link descriptors
                         vld_names.append('data_{}'.format(pool.net_name))
 
                 # Retrieve the complete virtual link descriptors for every link of the network service (k8s WORKER)!
-                vlds = get_ns_vld_ip(n['nsi_id'], vld_names)
+                vlds = get_ns_vld_ip(nsd.nsi_id, vld_names)
 
-                # need to add interfaces names such that we can assign the correct ip later on!
-                target_area.worker_mgt_int = vlds["mgt"][0]
-                target_area.worker_data_int[n['replica_id']] = [{"net": item, "ip": vlds[item][0]} for item in
-                                                                vlds]
+                # Need to add interfaces names such that we can assign the correct ip later on!
+                target_area.worker_mgt_int[nsd.replica_id] = K8sNsdInterfaceDesc(
+                    nsd_id=nsd.nsi_id,
+                    nsd_name=nsd.descr.nsd.nsd[0].name,
+                    vld=[VirtLinkDescr.parse_obj(vlds["mgt"][0])])
+
+                nsd_data_int_key = next(item for item in vlds if item != 'mgt')
+                target_area.worker_data_int[nsd.replica_id] = K8sNsdInterfaceDesc(
+                    nsd_id=nsd.nsi_id,
+                    nsd_name=nsd.descr.nsd.nsd[0].name,
+                    vld=[VirtLinkDescr.parse_obj(item) for item in vlds[nsd_data_int_key]])
             self.to_db()
+
+    def get_data(self, get_request: BlueGetDataModel) -> dict:
+        # TODO IMPLEMENT IF NECESSARY
+        logger.info(get_request.json())
+
+        return {}
+
+    def enable_prometheus(self, args):
+        res = []
+
+        #For each area we install, through APT install, the package node prometheus-node-exporter on every NSD
+
+        for nsd in self.base_model.nsd_:
+            nsd_item = nsd.descr.nsd.nsd[0]
+            configurator = ConfiguratorK8sBeta(
+                nsd_item.id,
+                1,
+                self.get_id(),
+                self.k8s_model,
+                role='worker',
+                master_key=self.k8s_model.config.master_key_add_worker
+            )
+            configurator.resetPlaybook()
+
+            # We need to set mgt IP to addd prometheus node exporter, of each NSD, as prometheus target on the server.
+            # If it is master
+            if nsd.type == 'master':
+                configurator.set_mng_ip(self.k8s_model.config.controller_ip)
+            else:
+                # In case of worker we need to identify witch is the correct mgt IP of this worker
+                # We select the correct area
+                area = next((area for area in self.k8s_model.areas if area.id == nsd.area_id), None)
+                if area is not None:
+                    router_nsd_int: K8sNsdInterfaceDesc
+                    # In the area we get the router that have the same nsd_name
+                    target_router_nsd_int = next((router_nsd_int for router_nsd_int in area.worker_mgt_int.values()
+                                                  if router_nsd_int.nsd_name == nsd_item.name), None)
+                    if target_router_nsd_int is not None:
+                        # Add the FIRST management IP as management IP
+                        configurator.set_mng_ip(target_router_nsd_int.vld[0].ip)
+                else:
+                    logger.warning("Area not found when trying to enable prometheus")
+                    continue  # Skip the current iteration
+
+            # We dump the content to be executed on the node for each node
+            res += configurator.enable_prometheus()
+            # TODO add node exporter as prometheus target on a prom server of the topology.
+        return res

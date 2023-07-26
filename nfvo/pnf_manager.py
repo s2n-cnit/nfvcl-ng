@@ -1,11 +1,13 @@
 from utils import persistency
 from nfvo import NbiUtil
-from utils.util import *
+from utils.util import create_logger, get_nfvcl_config, NFVCLConfigModel
 import typing
 
 logger = create_logger('PNF-Manager')
+nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nbiUtil = NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,
+                  project=nfvcl_config.osm.project, osm_ip=nfvcl_config.osm.host, osm_port=nfvcl_config.osm.port)
 db = persistency.DB()
 
 

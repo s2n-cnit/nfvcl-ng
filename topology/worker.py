@@ -1,8 +1,9 @@
 from models.network import NetworkModel
+from models.prometheus.prometheus_model import PrometheusServerModel
 from models.topology import TopologyModel
 from utils.log import create_logger
 from multiprocessing import Queue, RLock
-from topology import Topology
+from topology.topology import Topology
 import traceback
 from utils.persistency import OSSdb
 from nfvo import NbiUtil
@@ -58,6 +59,12 @@ def topology_worker(db: OSSdb, nbiutil: NbiUtil, queue: Queue, lock: RLock):
             elif ops_type == "update_k8s":
                 cluster_id = msg.pop("cluster_id")
                 topology.update_k8scluster(name=cluster_id, data=msg)
+            elif ops_type == "add_prom":
+                topology.add_prometheus_server(prom_server=PrometheusServerModel.parse_obj(msg))
+            elif ops_type == "del_prom":
+                topology.del_prometheus_server(msg['id'])
+            elif ops_type == "upd_prom":
+                topology.update_prometheus_server(prom_server=PrometheusServerModel.parse_obj(msg))
             else:
                 logger.error('message not supported: {}'.format(msg))
         except Exception:

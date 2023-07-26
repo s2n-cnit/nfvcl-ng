@@ -7,6 +7,7 @@ import glob
 from typing import List
 import OpenSSL
 import yaml
+import shutil
 from OpenSSL.crypto import PKey
 from jinja2 import Environment, FileSystemLoader
 from models.config_model import NFVCLConfigModel
@@ -15,7 +16,12 @@ from models.config_model import NFVCLConfigModel
 _nfvcl_config: NFVCLConfigModel
 
 # TODO remove this code as soon as all reference to this variables are removed. Use the next function
-with open("config.yaml", 'r') as stream:
+if os.path.exists("config_dev.yaml"):
+    config_file = open("config_dev.yaml", 'r')
+else:
+    config_file = open("config.yaml", 'r')
+
+with config_file as stream:
     try:
         nfvcl_conf = yaml.safe_load(stream)
     except yaml.YAMLError as exc:
@@ -57,15 +63,15 @@ def get_nfvcl_config() -> NFVCLConfigModel:
     if '_nfvcl_config' in globals():
         # If none, generate new one. Else return existing one
         if _nfvcl_config is None:
-            _nfvcl_config = load_nfvcl_config()
+            _nfvcl_config = _load_nfvcl_config()
             return _nfvcl_config
         else:
             return _nfvcl_config
     # In case there is a problem reading and returning the config
-    return load_nfvcl_config()
+    return _load_nfvcl_config()
 
 
-def load_nfvcl_config() -> NFVCLConfigModel:
+def _load_nfvcl_config() -> NFVCLConfigModel:
     """
     Read the NFVCL config from the configuration file. If config_dev.yaml is present, this function load from this file,
     otherwise the function read the default config.yaml
@@ -282,14 +288,10 @@ def remove_files_by_pattern(folder: str, name_pattern: str):
     Returns:
 
     """
-    path: str = "{}/{}".format(folder,name_pattern)
-    element_list = glob.glob(path) # list of file and/or directory
-    removingDirectories = []
-    for element in element_list:
-        if os.path.isfile(element):
-            os.remove(element)
+    source_path: str = "{}/{}".format(folder, name_pattern)
+    path_list = glob.glob(source_path)
+    for path in path_list:
+        if os.path.isdir(path):
+            shutil.rmtree(path)
         else:
-            removingDirectories.append(element)
-    if removingDirectories:
-        for directory in removingDirectories:
-            remove_files_by_pattern(directory, "*")
+            os.remove(path)

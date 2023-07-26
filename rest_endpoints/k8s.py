@@ -7,13 +7,14 @@ from models.k8s import K8sModel
 from main import *
 from models.k8s.k8s_models import K8sPluginName, K8sOperationType, K8sModelManagement, K8sPluginsToInstall
 from rest_endpoints.rest_callback import RestAnswer202
-from topology import Topology
+from topology.topology import Topology
 from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins, \
     get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
 from utils.redis.redis_manager import get_redis_instance
 from utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
     k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_to_user, \
     k8s_delete_namespace
+from utils.log import create_logger
 
 k8s_router = APIRouter(
     prefix="/k8s",
@@ -315,7 +316,7 @@ async def get_k8s_roles(cluster_id: str, rolename: str = "", namespace: str = ""
 
 
 @k8s_router.get("/{cluster_id}/namespaces", response_model=dict)
-async def get_k8s_namespaces(cluster_id: str, namespace: str = ""):
+async def get_k8s_namespace_list(cluster_id: str, namespace: str = ""):
     """
     Returns a list of namespaces
 
@@ -594,3 +595,24 @@ async def create_k8s_kubectl_user(cluster_id: str, username: str, expire_seconds
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
 
     return auth_response
+
+
+@k8s_router.post("/{cluster_id}/sidecar/{namespace}/{pod_name}", response_model=dict)
+async def add_k8s_sidecar_to_pod(cluster_id: str, namespace: str, pod_name: str):
+    """
+    Add a sidecar to a Pod
+    Args:
+        cluster_id:
+        namespace:
+        pod_name:
+
+    Returns:
+
+    """
+    # Get k8s cluster and k8s config for client
+    for i in range(0, 1000):
+        logger.info(f"Number is {i}, take note!!!")
+        logger.debug(f"Number is {i}, take note!!!")
+        logger.warning(f"Number is {i}, take note!!!")
+        logger.error(f"Number is {i}, take note!!!")
+

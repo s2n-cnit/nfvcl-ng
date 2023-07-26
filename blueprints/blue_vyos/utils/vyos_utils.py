@@ -38,10 +38,10 @@ def check_rule_exists_in_router(rule_number: str, target_router_config: VyOSConf
 
     for snat_rule in target_router_config.snat_rules:
         if snat_rule.rule_number == rule_number:
-            to_return[0]=snat_rule
+            to_return[0] = snat_rule
     for dnat_rule in target_router_config.dnat_rules:
         if dnat_rule.rule_number == rule_number:
-            to_return[1]=dnat_rule
+            to_return[1] = dnat_rule
     return to_return
 
 
@@ -51,7 +51,7 @@ def search_for_target_router_in_area(area_list: List[VyOSArea], target_area_id: 
 
     @param area_list: the area list to search from
 
-    @param target_area: the area to search for the router
+    @param target_area_id: the area to search for the router
 
     @param target_router_name: the router to search in the area
 
@@ -71,3 +71,23 @@ def search_for_target_router_in_area(area_list: List[VyOSArea], target_area_id: 
         raise ValueError("Error while looking for the area {}: area list does NOT contain that area".format(target_area_id))
 
     return [target_area, target_router_config]
+
+
+def search_for_routers_in_area(area_list: List[VyOSArea], target_area_id: int) -> List[VyOSConfig]:
+    """
+    Looks for the target router inside each area in the areas list.
+
+    @param area_list: the area list to work on
+
+    @param target_area_id: the area to retrieve routers from.
+
+    @return the corresponding area and the target router if the router is present in the target area.
+    """
+
+    target_areas = [area_iterator for area_iterator in area_list if area_iterator.id == target_area_id]
+    if len(target_areas) > 0:
+        target_area = target_areas[0]
+        return target_area.config_list
+    else:
+        raise ValueError("Error while looking for the area {}: area list does NOT contain that area".
+                         format(target_area_id))

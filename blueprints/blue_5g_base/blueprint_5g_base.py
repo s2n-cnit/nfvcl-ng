@@ -3,7 +3,7 @@ from typing import List, Optional
 from abc import ABC, abstractmethod
 from blueprints import BlueprintBase
 from nfvo import sol006_NSD_builder, sol006_VNFbuilder, get_ns_vld_ip
-from utils.util import create_logger
+from utils.log import create_logger
 
 # create logger
 logger = create_logger('Abstract5GBlue')

@@ -3,19 +3,19 @@ import datetime
 import requests
 from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
+from utils.util import deprecated
 from .db_blue_model import DbBlue
-from blueprints.blue_types import blueprint_types
+from models.blueprint.blue_types import blueprint_types
 from typing import List, Dict, Union, Callable
 from fastapi import APIRouter
 import traceback
 import importlib
 import abc
-from topology import Topology
+from topology.topology import Topology
 from utils import persistency, create_logger
 
 
 _db = persistency.DB()
-
 # create logger
 logger = create_logger('blueprint')
 
@@ -48,6 +48,7 @@ class BlueprintBase(abc.ABC):
         cls.day2_methods()
         return cls.api_router
 
+    @deprecated
     def __init__(
             self,
             conf: dict,
@@ -94,8 +95,8 @@ class BlueprintBase(abc.ABC):
             self.config_len = {}
             self.created = datetime.datetime.now()
             self.status = 'idle'
-            self.detailed_status = None
-            self.current_operation = None
+            self.detailed_status = ""
+            self.current_operation = ""
             self.modified = datetime.datetime.now()
             self.supported_operations = {}
             self.blue_type = self.__class__.__name__

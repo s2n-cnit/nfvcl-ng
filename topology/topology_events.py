@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class TopologyEvent(Enum):
+class TopologyEventType(Enum):
     TOPO_CREATE = "create"
     TOPO_DELETE = "delete"
     TOPO_VIM_CREATE = "create_vim"
@@ -18,3 +18,6 @@ class TopologyEvent(Enum):
     TOPO_CREATE_K8S = "create_k8s_cluster"
     TOPO_DELETE_K8S = "delete_k8s_cluster"
     TOPO_UPDATE_K8S = "update_k8s_cluster"
+    TOPO_CREATE_PROM_SRV = "create_prom_srv"
+    TOPO_DELETE_PROM_SRV = "delete_prom_srv"
+    TOPO_UPDATE_PROM_SRV = "update_prom_srv"

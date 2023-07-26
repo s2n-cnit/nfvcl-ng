@@ -280,8 +280,8 @@ class Configurator_Flex(Configurator_Base):
         # virtual function
         return []
 
-    def enable_prometheus(self, args):
-        global PrometheusMan
+    def enable_prometheus(self):
+        # global PrometheusMan
 
         self.monitoring_tools.append("prometheus")
         targets = []
@@ -294,10 +294,13 @@ class Configurator_Flex(Configurator_Base):
             targets.append(t)
 
         labels = {'nsd_id': str(self.nsd_id), 'vnf_id': str(self.nsd['member-vnfd-id']), 'type': str(self.type)}
-        if 'plmn' in self.conf:
-            labels['plmn'] = str(self.conf['plmn'])
 
-        PrometheusMan.addJob(targets, labels)
+        if hasattr(self, 'conf'):
+            if 'plmn' in self.conf:
+                labels['plmn'] = str(self.conf['plmn'])
+
+        # TODO enable adding job to prometheus in automatic way
+        # PrometheusMan.addJob(targets, labels)
 
         return self.dump()
 

@@ -35,8 +35,8 @@ class DbBlue(BaseModel):
     config_len: dict = {}
     created: datetime.datetime
     status: str = "bootstraping"
-    detailed_status: Union[str, None] = None
-    current_operation: Union[str, None] = None
+    detailed_status: Union[str, None] = ""
+    current_operation: Union[str, None] = ""
     modified: Optional[datetime.datetime]
     supported_operations: Dict[str, List]
     type: str

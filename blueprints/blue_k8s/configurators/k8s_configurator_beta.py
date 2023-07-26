@@ -1,9 +1,10 @@
+from logging import Logger
 from configurators.flex_configurator import Configurator_Flex
 from models.k8s.blue_k8s_model import K8sBlueprintModel
 from utils import persistency
-from utils.util import *
+from utils.log import create_logger
 
-logger = create_logger('Configurator_K8s')
+logger: Logger = create_logger('K8S CONF')
 
 
 class ConfiguratorK8sBeta(Configurator_Flex):
@@ -28,7 +29,7 @@ class ConfiguratorK8sBeta(Configurator_Flex):
 
         if self.role == 'master':
             ansible_vars = [
-                {'pod_network_cidr': config_model.config.pod_network_cidr.with_prefixlen },
+                {'pod_network_cidr': config_model.config.pod_network_cidr.with_prefixlen},
                 {'k8s_master_ip': config_model.config.controller_ip}
                 # ^-- They are used as ansible vars in playbook_kubernetes_master.yml
             ]
@@ -56,8 +57,7 @@ class ConfiguratorK8sBeta(Configurator_Flex):
 
     def dump(self):
         logger.debug("Blue {}: Dumping nsd {}".format(self.blue_id, self.nsd_id))
-        self.dumpAnsibleFile(10, 'ansible_k8s_' + str(self.nsd_id) +
-                             '_' + str(self.nsd['member-vnfd-id']))
+        self.dumpAnsibleFile(10, str(self.nsd_id) + '_ansible_k8s_' + str(self.nsd['member-vnfd-id']))
         return super(ConfiguratorK8sBeta, self).dump()
 
     def get_logpath(self):
@@ -65,8 +65,8 @@ class ConfiguratorK8sBeta(Configurator_Flex):
         return []
 
     def custom_prometheus_exporter(self):
-        # self.addPackage('screen')
-        pass
+
+        return []
 
     def destroy(self):
         logger.info("Destroying")

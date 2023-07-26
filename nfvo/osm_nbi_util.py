@@ -7,9 +7,9 @@ import tarfile
 import yaml
 from pathlib import Path
 from typing import List
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from urllib3.exceptions import InsecureRequestWarning
 from utils import create_logger
-
+from utils.util import get_nfvcl_config
 
 # Disable the InsecureRequestWarning for the requests to OSM
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -39,6 +39,7 @@ def nsd_build_package(name, nsd):
     with tarfile.open('/tmp/nsd_packages/' + name + '.tar.gz', "w:gz") as tar:
         tar.add('/tmp/nsd_packages/' + name, arcname=name)
     # os.chdir('../..')
+
 
 # Decorator to validate authorization prior API call
 def check_authorization(f):
@@ -113,7 +114,7 @@ class NbiUtil:
         headers["Content-type"] = "application/json"
         headers["Accept"] = "application/json"
         url = "{0}{1}".format(self.osm_nbi_url, rest_url)
-        #logger.debug(json.dumps(data))
+        # logger.debug(json.dumps(data))
         try:
             r = requests.post(url, json=data, params=None, verify=False, stream=True, headers=headers)
             return r
@@ -159,6 +160,10 @@ class NbiUtil:
             return res.json()
 
     def check_ns_instance(self, ns_id: str) -> dict:
+        if len(ns_id) <= 0:
+            msg = "The ns_id is empty, all NS would be retrieved instead of 1"
+            logger.error(msg)
+            raise ValueError(msg)
         res = self.get_x("/nslcm/v1/ns_instances/{}".format(ns_id))
         if self.check_REST_response(res):
             nsr = res.json()
@@ -351,25 +356,25 @@ class NbiUtil:
     def subscribe_ns_notifications(self, nsi: str, callback_uri: str):
         data = {
             "filter": {
-                #"nsInstanceSubscriptionFilter": {'nsInstanceIds': [nsi]},
-                #"notificationTypes": ["NsLcmOperationOccurrenceNotification"],
+                # "nsInstanceSubscriptionFilter": {'nsInstanceIds': [nsi]},
+                # "notificationTypes": ["NsLcmOperationOccurrenceNotification"],
                 # "nsInstanceSubscriptionFilter": {'nsInstanceIds': [nsi]},
                 "notificationTypes": ["NsChangeNotification"],
-                #"notificationTypes": [NsIdentifierCreationNotification, NsIdentifierDeletionNotification, NsLcmOperationOccurrenceNotification, NsChangeNotification],
-                #"operationTypes": ['INSTANTIATE', 'SCALE', 'TERMINATE', 'UPDATE', 'HEAL'],
+                # "notificationTypes": [NsIdentifierCreationNotification, NsIdentifierDeletionNotification, NsLcmOperationOccurrenceNotification, NsChangeNotification],
+                # "operationTypes": ['INSTANTIATE', 'SCALE', 'TERMINATE', 'UPDATE', 'HEAL'],
                 # "operationTypes": ['INSTANTIATE'],
-                #"operationStates": ['ANY'],
+                # "operationStates": ['ANY'],
                 "nsComponentTypes": ['NS'],
                 "lcmOpNameImpactingNsComponent": ['NS_INSTANTIATE'],
                 "lcmOpOccStatusImpactingNsComponent": ['COMPLETED'],
-                #"operationStates": ['PROCESSING', 'COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED', 'FAILED_TEMP',
+                # "operationStates": ['PROCESSING', 'COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED', 'FAILED_TEMP',
                 #                    'ROLLING_BACK', 'ROLLED_BACK'],
-                #"nsComponentTypes": ['VNF', 'NS', 'PNF'],
-                #"lcmOpNameImpactingNsComponent": ['VNF_INSTANTIATE', 'VNF_SCALE', 'VNF_SCALE_TO_LEVEL',
+                # "nsComponentTypes": ['VNF', 'NS', 'PNF'],
+                # "lcmOpNameImpactingNsComponent": ['VNF_INSTANTIATE', 'VNF_SCALE', 'VNF_SCALE_TO_LEVEL',
                 #                                  'VNF_CHANGE_FLAVOUR', 'VNF_TERMINATE', 'VNF_HEAL', 'VNF_OPERATE',
                 #                                  'VNF_CHANGE_EXT_CONN', 'VNF_MODIFY_INFO', 'NS_INSTANTIATE',
                 #                                  'NS_SCALE', 'NS_UPDATE', 'NS_TERMINATE', 'NS_HEAL'],
-                #"lcmOpOccStatusImpactingNsComponent": ['START', 'COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED',
+                # "lcmOpOccStatusImpactingNsComponent": ['START', 'COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED',
                 #                                       'ROLLED_BACK']
             },
             "CallbackUri": callback_uri,
@@ -380,7 +385,7 @@ class NbiUtil:
             return True
         return False
 
-    #def execute_primitive(self, ns_id: str, vnf_index: int, primitive_name: str, param_key: str, param_value: str) -> dict:
+    # def execute_primitive(self, ns_id: str, vnf_index: int, primitive_name: str, param_key: str, param_value: str) -> dict:
     def execute_primitive(self, ns_id: str, pdata: dict) -> dict:
         if 'member_vnf_index' in pdata and type(pdata['member_vnf_index']) is not str:
             pdata['member_vnf_index'] = str(pdata['member_vnf_index'])
@@ -467,7 +472,7 @@ class NbiUtil:
             return False
         k8s_nets = {}
         for net_name in k8s_net_names:
-            k8s_nets[net_name]= net_name
+            k8s_nets[net_name] = net_name
 
         data = {
             "name": name,
@@ -621,3 +626,12 @@ class NbiUtil:
                     if k['kdu-name'] == kdu_name:
                         return k['services']
         raise ValueError('kdur {} not found'.format(kdu_name))
+
+
+def get_osm_nbi_utils() -> NbiUtil:
+    """
+    Utils created to avoid importing all the parameters into subclasses.
+    """
+    nfvcl_config = get_nfvcl_config()
+    return NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,
+                   project=nfvcl_config.osm.project, osm_ip=nfvcl_config.osm.host, osm_port=nfvcl_config.osm.port)

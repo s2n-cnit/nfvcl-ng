@@ -1,13 +1,15 @@
-from nfvo import NbiUtil
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils import persistency
-from utils.util import *
+from utils.util import get_nfvcl_config, NFVCLConfigModel
+from utils.log import create_logger
 
 sol006 = True
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
+nbiUtil = get_osm_nbi_utils()
 db = persistency.DB()
 
 # create logger
-logger = create_logger('nsd_manager')
+logger = create_logger('NSD MANAGER')
 
 
 def get_nsd_name(nsd_descr: dict) -> str:
@@ -18,6 +20,15 @@ def get_nsd_name(nsd_descr: dict) -> str:
 
 
 def get_ns_vld_ip(ns_id: str, ns_vlds: list) -> dict:
+    """
+
+    Args:
+        ns_id: The network service identifier (NSI)
+        ns_vlds:
+
+    Returns:
+
+    """
     res = {}
     vnfi_list = nbiUtil.get_vnfi_list(ns_id)
     for vld in ns_vlds:

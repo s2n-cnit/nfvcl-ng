@@ -1,8 +1,8 @@
 from __future__ import annotations
-
 from typing import Optional, Literal
 from pydantic import BaseModel, Field, conlist
 from .vyos_area_model import VyOSArea
+
 
 class VyOSBlueprint(BaseModel):
     """
@@ -18,5 +18,5 @@ class VyOSBlueprint(BaseModel):
         description='list of areas (with relative configuration) to instantiate the Blueprint. ',
     )
 
-    blueprint_instance_id : str
-    blueprint_type: str
+    blueprint_instance_id: str
+    type: str

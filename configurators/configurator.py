@@ -21,6 +21,8 @@ class Configurator_Base(object):
             return ""
 
     def dump_(self) -> list:
+        # TODO Fix: this function is working because self.nsd_id and self.nsd_name usually have the same value. But they
+        # are different variables. Can they differ?
         res = [
             {
                 'ns-name': self.nsd_id,

@@ -1,5 +1,7 @@
 # Main file to run NFVCL
 import uvicorn
+from nfvcl import app
+
 
 if __name__ == "__main__":
-    uvicorn.run("nfvcl:app", host="0.0.0.0", port=5002)
+    uvicorn.run(app, host="0.0.0.0", port=5002)

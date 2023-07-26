@@ -1,6 +1,6 @@
 from topology.os_nbi import OSclient
 from utils import persistency
-from utils.util import *
+from utils.log import create_logger
 
 db = persistency.DB()
 logger = create_logger('VimTerraformer')
@@ -24,7 +24,7 @@ class VimTerraformer:
 
     def createRouter(self, router) -> dict:
         if self.osClient.find_router_by_name(router['name']) is not None:
-            logger.warn("router {} already existing... deleting and re-creating".format(router['name']))
+            logger.warning("router {} already existing... deleting and re-creating".format(router['name']))
             self.osClient.delete_router(router['name'])
 
         if "external_gateway_info" in router:
@@ -57,7 +57,7 @@ class VimTerraformer:
         #         'vid' in msg and \
         #         openstack_l2net["provider:segmentation_id"] == msg['vid']:
         if openstack_l2net is not None:
-            logger.warn("network {} already existing... skipping! If you want to modify the existing net, please"
+            logger.warning("network {} already existing... skipping! If you want to modify the existing net, please"
                         " delete and recreate it".format(net['name']))
 
             res['l2net_id'] = openstack_l2net['id']
@@ -68,7 +68,7 @@ class VimTerraformer:
         # checking L3 subnet
         openstack_l3nets = self.osClient.list_subnets(l2net_id=openstack_l2net['id'])
         if len(openstack_l3nets) > 0:
-            logger.warn("L3 subnet for {} already existing... skipping! If you want to modify the existing net, please"
+            logger.warning("L3 subnet for {} already existing... skipping! If you want to modify the existing net, please"
                         " delete and recreate it".format(net['name']))
             res['l3net_id'] = openstack_l3nets[0]['id']  # taking the first element of the list
         else:
@@ -88,12 +88,12 @@ class VimTerraformer:
 
     def delNet(self, net_name):
         if self.osClient.find_network_by_name(net_name) is None:
-            logger.warn("network {} not existing".format(net_name))
+            logger.warning("network {} not existing".format(net_name))
             return
         return self.osClient.delete_network(network_name=net_name)
 
     def delRouter(self, router_name):
         if self.osClient.find_router_by_name(router_name) is None:
-            logger.warn("router {} not existing".format(router_name))
+            logger.warning("router {} not existing".format(router_name))
             return
         return self.osClient.delete_router(name=router_name)

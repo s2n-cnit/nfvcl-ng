@@ -1,3 +1,8 @@
+from typing import Dict
+
+import yaml
+from pydantic import BaseModel
+
 blueprint_types = {
     # "Amari5G": {"class_name": "Amari5G", "module_name": "blue_amari5G"},
     "Free5GC_K8s": {"class_name": "Free5GC_K8s", "module_name": "blue_free5gc"},
@@ -9,16 +14,3 @@ blueprint_types = {
     "Trex": {"class_name": "Trex", "module_name": "blue_trex"},
     "VyOSBlue": {"class_name": "VyOSBlue", "module_name": "blue_vyos"}
 }
-
-
-""""
-
-    
-    "open5gs": {"class_name": "open5GS", "module_name": "blue_open5gs"},
-    "open5gsK8s": {"class_name": "Open5GsK8s", "module_name": "blue_open5gs"},
-    "open5gsHybrid": {"class_name": "Open5GS_K8s_ext_upf", "module_name": "blue_open5gs"},
-    
-    
-    "multi_vyos": {"class_name": "VyOsMultipleTunnels", "module_name": "blue_vyos"},
-    "Vyos": {"class_name": "VyOSBlue", "module_name": "blue_vyos"}
-    """

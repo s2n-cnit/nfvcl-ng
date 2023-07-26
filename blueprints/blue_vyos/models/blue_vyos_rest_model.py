@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, conlist
 from .vyos_area_model import VyOSArea
 from .vyos_nat_rules_model import VyOSSourceNATRule, VyOSDestNATRule, VyOS1to1NATRule
 
+
 class VyOSBlueprintCreate(BaseModel):
     """Class used to represent creation model for Vyos blueprint.
     This class is used to list fields used when calling the creation
@@ -21,15 +22,17 @@ class VyOSBlueprintCreate(BaseModel):
     class Config:
         use_enum_values = True
 
+
 class VyOSBlueprintSNATCreate(BaseModel):
     callbackURL: Optional[str] = Field(
         None,
         description='url that will be used to notify when the blueprint processing finishes',
     )
     operation: Literal['snat']
-    area : int
-    router_name : str
+    area: int
+    router_name: str
     rules: List[VyOSSourceNATRule]
+
 
 class VyOSBlueprintDNATCreate(BaseModel):
     callbackURL: Optional[str] = Field(
@@ -37,9 +40,10 @@ class VyOSBlueprintDNATCreate(BaseModel):
         description='url that will be used to notify when the blueprint processing finishes',
     )
     operation: Literal['dnat']
-    area : int
-    router_name : str
+    area: int
+    router_name: str
     rules: List[VyOSDestNATRule]
+
 
 class VyOSBlueprintNAT1to1Create(BaseModel):
     callbackURL: Optional[str] = Field(
@@ -51,12 +55,18 @@ class VyOSBlueprintNAT1to1Create(BaseModel):
     router_name : str
     rules: List[VyOS1to1NATRule]
 
+
 class VyOSBlueprintNATdelete(BaseModel):
     callbackURL: Optional[str] = Field(
         None,
-        description='url that will be used to notify when the blueprint processing finishes',
+        description='URL that will be used to notify when the blueprint processing finishes',
     )
     operation: Literal['del_nat']
-    area : int
-    router_name : str
+    area: int
+    router_name: str
     rules: List[int] = Field(title="List of rules to delete in the specified vyos instance of the blueprint")
+
+
+class VyOSBlueprintGetRouters(BaseModel):
+    area: int
+    router_name: str = Field(default="")

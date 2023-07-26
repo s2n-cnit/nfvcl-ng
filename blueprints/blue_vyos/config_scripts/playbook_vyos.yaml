@@ -11,6 +11,6 @@
   - name: description of eth0
     vyos.vyos.vyos_config:
       lines:
-      - set interface ethernet eth0 description 'Managenent Network'
+      - set interface ethernet eth0 description 'Management Network'
       save: yes
 ...

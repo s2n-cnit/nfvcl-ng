@@ -17,8 +17,8 @@ import json
 import traceback
 from multiprocessing import RLock, Queue
 from utils.util import obj_multiprocess_lock
-from utils.redis.redis_manager import get_redis_instance, trigger_redis_event
-from utils.redis.topic_list import TOPOLOGY_TOPIC
+from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
+from utils.redis_utils.topic_list import TOPOLOGY_TOPIC
 
 topology_msg_queue = Queue()
 topology_lock = RLock()

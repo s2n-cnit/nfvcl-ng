@@ -1,9 +1,20 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from utils.redis.redis_manager import get_redis_instance
+from utils.redis_utils.redis_manager import get_redis_instance
 from redis import Redis
 
-redis_cli: Redis = get_redis_instance()
+_redis_cli: Redis = get_redis_instance()
+_log_level = logging.DEBUG
+
+
+def set_log_level(level):
+    """
+    Set the level of the loggers that will be created. Old loggers will have the old value.
+    Args:
+        level: the level to be set
+    """
+    global _log_level
+    _log_level = level
 
 
 def create_logger(name: str) -> logging.Logger:
@@ -20,8 +31,10 @@ def create_logger(name: str) -> logging.Logger:
 
         The created logger
     """
+    global _log_level
     # create logger
     logger = logging.getLogger(name)
+    logger.handlers = []
     logger.propagate = False
     logger.setLevel(logging.DEBUG)
 
@@ -30,7 +43,7 @@ def create_logger(name: str) -> logging.Logger:
 
     # create console handler and set level to debug
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(_log_level)
     # add formatter to console handler
     ch.setFormatter(formatter)
     # add console handler to logger
@@ -39,13 +52,13 @@ def create_logger(name: str) -> logging.Logger:
     # Adding file handler to post log into file
     # w = every restart log is cleaned
     log_file_handler = RotatingFileHandler("logs/nfvcl.log", maxBytes=10000000, backupCount=4)
-    log_file_handler.setLevel(logging.DEBUG)
+    log_file_handler.setLevel(_log_level)
     log_file_handler.setFormatter(formatter)
     logger.addHandler(log_file_handler)
 
     # Adding Redis handler to output the log to redis through publish
-    redis_handler = RedisLoggingHandler(redis_cli)
-    redis_handler.setLevel(logging.DEBUG)
+    redis_handler = RedisLoggingHandler(_redis_cli)
+    redis_handler.setLevel(_log_level)
     redis_handler.setFormatter(formatter)
     logger.addHandler(redis_handler)
     return logger

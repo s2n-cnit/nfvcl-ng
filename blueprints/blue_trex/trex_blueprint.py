@@ -3,7 +3,7 @@ from . import Configurator_trex
 from .models import TrexRequestBlueprintInstance
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from main import *
-from utils.util import *
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from typing import Union, Dict
 
 # Insert functions to work with db(mango db)
@@ -11,7 +11,7 @@ db = persistency.DB()
 logger = create_logger('trexBlueprint')
 
 # log into osm with user and pass
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nbiUtil = get_osm_nbi_utils()
 
 
 class Trex(BlueprintBase):

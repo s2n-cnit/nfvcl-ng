@@ -7,7 +7,7 @@ import yaml
 import utils.persistency
 from . import NbiUtil, PNFmanager
 from utils.persistency import DB
-from utils import create_logger
+from utils.log import create_logger
 
 
 logger = create_logger('vnfd_manager')

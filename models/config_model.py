@@ -34,6 +34,8 @@ class BlueDescription(BaseModel):
 
 
 class NFVCLConfigModel(BaseModel):
+    log_level: int
+
     nfvcl: NFVCLParameters
 
     osm: OSMParameters

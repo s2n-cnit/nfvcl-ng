@@ -10,7 +10,7 @@ from rest_endpoints.rest_callback import RestAnswer202
 from topology.topology import Topology
 from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins, \
     get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
-from utils.redis.redis_manager import get_redis_instance
+from utils.redis_utils.redis_manager import get_redis_instance
 from utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
     k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_to_user, \
     k8s_delete_namespace

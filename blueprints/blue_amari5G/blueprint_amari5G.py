@@ -4,10 +4,12 @@ from blueprints.blue_5g_base import Blue5GBase
 from .configurators.amari5GC_configurator import Configurator_Amari5GC
 from blueprints.blue_5g_base.models import Create5gModel
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
-from main import *
+from nfvo.osm_nbi_util import get_osm_nbi_utils
+from utils.log import create_logger
+from utils.persistency import DB
 
-db = persistency.DB()
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+db = DB()
+nbiUtil = get_osm_nbi_utils()
 # create logger
 logger = create_logger('Amari5GBlue')
 

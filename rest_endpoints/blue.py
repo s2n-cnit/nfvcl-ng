@@ -20,8 +20,8 @@ from main import old_workers, db, persistency, id_generator, nbiUtil, topology_l
 from utils.k8s import get_pods_for_k8s_namespace, get_k8s_config_from_file_content, parse_k8s_clusters_from_dict
 from utils.log import create_logger
 from .rest_description import *
-from utils.redis.redis_manager import get_redis_instance, trigger_redis_event
-from utils.redis.topic_list import BLUEPRINT
+from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
+from utils.redis_utils.topic_list import BLUEPRINT
 
 blue_router = APIRouter(
     prefix="/nfvcl/v1/api/blue",

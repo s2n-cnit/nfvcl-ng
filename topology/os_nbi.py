@@ -1,7 +1,7 @@
 from models.config_model import NFVCLConfigModel
 from utils.util import get_nfvcl_config
 from utils import persistency
-from nfvo.osm_nbi_util import NbiUtil
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from neutronclient.v2_0 import client as neutron_client
 from typing import Optional
 from keystoneauth1.identity import v3
@@ -11,10 +11,8 @@ import logging
 
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
-nbiUtil = NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,
-                  project=nfvcl_config.osm.project, osm_ip=nfvcl_config.osm.host, osm_port=nfvcl_config.osm.port)
+nbiUtil = get_osm_nbi_utils()
 db = persistency.DB()
-
 logger = logging.getLogger('keystoneauth')
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARN)
@@ -24,7 +22,6 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 # logger.setLevel(logging.WARN)
-
 
 
 def get_nova_credentials(os_account: dict) -> dict:

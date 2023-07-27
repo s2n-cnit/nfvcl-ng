@@ -1,14 +1,13 @@
 from blueprints import BlueprintBase
-from nfvo import sol006_VNFbuilder,  sol006_NSD_builder, get_ns_vld_ip, NbiUtil
+from nfvo import sol006_VNFbuilder,  sol006_NSD_builder, get_ns_vld_ip
 from .configurators.ueransim_configurator import ConfiguratorUeUeRanSim
-# from main import create_logger, nbiUtil
 from utils import persistency
 from utils.util import *
-from typing import Union, Dict, Callable
+from typing import Union, Dict
 from .models import UeranSimBlueprintRequestInstance
-from fastapi import APIRouter
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nbiUtil = get_osm_nbi_utils()
 db = persistency.DB()
 logger = create_logger('UeRanSim')
 

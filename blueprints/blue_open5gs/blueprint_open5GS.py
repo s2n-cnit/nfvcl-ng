@@ -1,9 +1,10 @@
 from blueprints.blue_amari5G import Amari5G
 from nfvo import sol006_VNFbuilder
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from main import *
 
 db = persistency.DB()
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nbiUtil = get_osm_nbi_utils()
 # create logger
 logger = create_logger('open5GS')
 

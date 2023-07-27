@@ -1,10 +1,7 @@
-import json
-
 import redis
 from redis import Redis
-
 from models.event import Event
-from utils.util import redis_host, redis_port, get_nfvcl_config
+from utils.util import get_nfvcl_config
 
 # Private instance of redis to be distributed on need
 redis_instance: Redis = None

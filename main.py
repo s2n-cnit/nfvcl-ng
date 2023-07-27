@@ -5,7 +5,7 @@ from utils.util import *
 from utils import persistency
 from topology.topology import topology_lock, topology_msg_queue
 from topology.worker import topology_worker
-from nfvo import PNFmanager, NbiUtil
+from nfvo import PNFmanager
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from multiprocessing import Process
 from blueprints import LCMWorkers

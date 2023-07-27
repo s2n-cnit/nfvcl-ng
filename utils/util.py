@@ -85,10 +85,10 @@ def _load_nfvcl_config() -> NFVCLConfigModel:
     else:
         config_file = open("config.yaml", 'r')
 
-    with config_file as stream:
+    with config_file as stream_file:
         config: NFVCLConfigModel
         try:
-            nfvcl_conf = yaml.safe_load(stream)
+            nfvcl_conf = yaml.safe_load(stream_file)
         except yaml.YAMLError as exc:
             print(exc)
 

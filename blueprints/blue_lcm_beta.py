@@ -15,11 +15,11 @@ from models.blueprint.blue_events import BlueEventType
 from nfvo import NbiUtil
 from utils.log import create_logger
 from utils.lcm_utils import day0_operation, day2_operation, checkVims, dayN_operation, destroy_blueprint
-from utils.redis.redis_manager import get_redis_instance, trigger_redis_event
-from utils.redis.topic_list import BLUEPRINT
+from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
+from utils.redis_utils.topic_list import BLUEPRINT
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 
-logger: Logger = create_logger('BlueLCMWorker')
+logger: Logger = create_logger('BLUELCMWORKER_BETA')
 
 
 def get_blue_by_filter(blue_filter: dict, db: persistency.DB) -> List[dict]:

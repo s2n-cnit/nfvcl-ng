@@ -3,7 +3,6 @@ import datetime
 import requests
 from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
-from utils.util import deprecated
 from .db_blue_model import DbBlue
 from models.blueprint.blue_types import blueprint_types
 from typing import List, Dict, Union, Callable
@@ -12,12 +11,13 @@ import traceback
 import importlib
 import abc
 from topology.topology import Topology
-from utils import persistency, create_logger
+from utils.persistency import DB
+from utils.log import create_logger
 
 
-_db = persistency.DB()
+_db = DB()
 # create logger
-logger = create_logger('blueprint')
+logger = create_logger('BASE_BLUEPRINT')
 
 
 class BlueprintBase(abc.ABC):
@@ -48,16 +48,15 @@ class BlueprintBase(abc.ABC):
         cls.day2_methods()
         return cls.api_router
 
-    @deprecated
     def __init__(
             self,
             conf: dict,
             id_: str,
             data: Union[Dict, None] = None,
-            db: persistency.DB = None,
+            db: DB = None,
             nbiutil: NbiUtil = None
     ):
-
+        logger.warning("Blueprint v1 has been deprecated! Implement v2 instead!")
         if data:
             self.id = id_
             self.conf = data['conf']

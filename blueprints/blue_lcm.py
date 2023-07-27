@@ -15,9 +15,9 @@ from nfvo import NbiUtil, get_nsd_name
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils.util import remove_files_by_pattern, get_nfvcl_config, NFVCLConfigModel
 from utils.log import create_logger
-from utils.redis.redis_manager import get_redis_instance
+from utils.redis_utils.redis_manager import get_redis_instance
 
-logger: Logger = create_logger('BlueLCMWorker')
+logger: Logger = create_logger('BLUELCMWORKER')
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 
@@ -186,7 +186,7 @@ class BlueLCMworker:
         self.init_dayN(nsi_list)
         self.blue.detailed_status = 'destroying blueprint and temporary files'
         self.update_db()
-        logger.info("Blue {} - destroying blueprint".format(self.blue.get_id(), ))
+        logger.info("Blue {} - destroying blueprint".format(self.blue.get_id()))
 
         logger.debug("Blue {} - removing temporary day2 files".format(self.blue.get_id(), ))
         try:

@@ -1,7 +1,18 @@
 #!/usr/bin/python3
+# DO NOT MOVE THIS PIECE OF CODE -------
+# Log level must be set before loggers are created!
+from utils.log import mod_logger, set_log_level
+from utils.util import get_nfvcl_config
+
+_nfvcl_config = get_nfvcl_config()
+set_log_level(_nfvcl_config.log_level)
+# DO NOT MOVE THIS PIECE OF CODE -------
+
 from starlette import status
 import rest_endpoints.blue
-from main import *
+import logging
+import signal
+import os
 from fastapi import FastAPI
 from rest_endpoints.rest_callback import RestAnswer202
 from rest_endpoints.topology import topology_router
@@ -10,8 +21,8 @@ from rest_endpoints.day2action import day2_router
 from rest_endpoints.k8s import k8s_router
 from rest_endpoints.helm import helm_router
 from fastapi.staticfiles import StaticFiles
-import os
-from utils.log import mod_logger
+
+
 
 app = FastAPI(
     title="NFVCL",

@@ -14,13 +14,14 @@ from models.blueprint.blue_types import blueprint_types
 from typing import List, Dict, Union, Callable
 from fastapi import APIRouter
 from topology.topology import Topology
-from utils import persistency, create_logger
+from utils.persistency import DB
+from utils.log import create_logger
 
 
-_db = persistency.DB()
+_db = DB()
 
 # create logger
-logger = create_logger('blueprint')
+logger = create_logger('BASE_BLUEPRINT_BETA')
 
 
 class BlueprintBaseBeta(abc.ABC):
@@ -52,7 +53,7 @@ class BlueprintBaseBeta(abc.ABC):
         cls.day2_methods()
         return cls.api_router
 
-    def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None, db: persistency.DB = None,
+    def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None, db: DB = None,
                  nbiutil: NbiUtil = None):
         if data:
             self.base_model = BlueprintBaseModel.parse_obj(data)

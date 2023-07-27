@@ -1,13 +1,14 @@
 from blueprints import BlueprintBase
 from utils import persistency
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, NbiUtil
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils.util import *
 from .models import MqttRequestBlueprintInstance
 from typing import Union, Dict
 
 db = persistency.DB()
 logger = create_logger('MQTT Broker')
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nbiUtil = get_osm_nbi_utils()
 
 
 class MqttBroker(BlueprintBase):

@@ -6,7 +6,6 @@ import threading
 from logging import Logger
 from multiprocessing import Process, RLock
 from typing import List
-
 import kubernetes
 import redis
 import traceback
@@ -14,7 +13,6 @@ import yaml
 from kubernetes.utils import FailToCreateError
 from pydantic import ValidationError
 from redis.client import PubSub
-
 from models.k8s.blue_k8s_model import LBPool
 from models.k8s.k8s_models import K8sModelManagement, K8sOperationType, K8sModel, K8sPluginName, K8sPluginsToInstall, \
     K8sTemplateFillData
@@ -24,8 +22,8 @@ from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_conte
     convert_str_list_2_plug_name, apply_def_to_cluster, get_k8s_cidr_info
 from utils.log import create_logger
 from utils.persistency import OSSdb
-from utils.redis.redis_manager import get_redis_instance
-from utils.redis.topic_list import K8S_MANAGEMENT_TOPIC
+from utils.redis_utils.redis_manager import get_redis_instance
+from utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 
 
 class K8sManager:

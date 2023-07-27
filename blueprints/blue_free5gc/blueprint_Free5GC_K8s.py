@@ -8,9 +8,10 @@ from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services, get_ns
 from .configurators import Configurator_Free5GC, Configurator_Free5GC_User, Configurator_Free5GC_Core
 import copy
 from main import *
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 
 db = persistency.DB()
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nbiUtil = get_osm_nbi_utils()
 
 # create logger
 logger = create_logger('Free5GC_K8s')

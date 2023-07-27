@@ -1,11 +1,12 @@
 from blueprints.blue_5g_base import Blue5GBase
 from blueprints import BlueprintBase
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 import typing
 from main import *
 
 db = persistency.DB()
-nbiUtil = NbiUtil(username=osm_user, password=osm_passwd, project=osm_proj, osm_ip=osm_ip, osm_port=osm_port)
+nbiUtil = get_osm_nbi_utils()
 # create logger
 logger = create_logger('Open5GsK8s')
 

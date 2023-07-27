@@ -8,7 +8,7 @@ import yaml
 from pathlib import Path
 from typing import List
 from urllib3.exceptions import InsecureRequestWarning
-from utils import create_logger
+from utils.log import create_logger
 from utils.util import get_nfvcl_config
 
 # Disable the InsecureRequestWarning for the requests to OSM

@@ -249,9 +249,11 @@ async def delete_k8s_namespace(cluster_id: str, name: str = ""):
 
     except (ValueError, ApiException) as val_err:
         logger.error(val_err)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
+        resp = OssCompliantResponse(status=OssStatus.failed, detail=val_err, result={})
+        return resp
 
-    return created_namespace.to_dict()
+    resp = OssCompliantResponse(status=OssStatus.ready, detail="Namespace deleted", result=created_namespace.to_dict())
+    return resp
 
 
 @k8s_router.get("/{cluster_id}/sa", response_model=dict)

@@ -28,7 +28,7 @@ class NetworkEndPoints(BaseModel):
 class SubFlows(BaseModel):
     flowId: str = Field(..., description="set flow Id, exp: f0")
     ipAddrFilter: Optional[str] = Field(None, description="set IP address filter")
-    qi: constr(regex=r"[0-9]")
+    qi: constr(pattern=r"[0-9]")
     gfbr: Optional[str] = Field(..., description="set gfbr, exp: 100Mbps")
 
 
@@ -49,7 +49,7 @@ class SubProfileParams(BaseModel):
 class SubLocationConstraints(BaseModel):
     geographicalAreaId: str
     # fixme: Double check for the length
-    tai: constr(regex=r"^[0-9]+$") = Field(..., min_length=10, max_length=11)
+    tai: constr(pattern=r"^[0-9]+$") = Field(..., min_length=10, max_length=11)
 
 
 class SubEnabledUEList(BaseModel):
@@ -73,9 +73,9 @@ class SubSnssai(BaseModel):
 
 
 class SubSubscribers(BaseModel):
-    imsi: constr(regex=r'^[0-9]*$', min_length=15, max_length=15)
-    k: constr(regex=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
-    opc: constr(regex=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
+    imsi: constr(pattern=r'^[0-9]*$', min_length=15, max_length=15)
+    k: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
+    opc: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
     snssai: List[SubSnssai]
     authenticationMethod: Optional[str] = Field("5G_AKA")
     authenticationManagementField: Optional[str] = Field("8000")
@@ -83,7 +83,7 @@ class SubSubscribers(BaseModel):
 
 class SubConfig(BaseModel):
     network_endpoints: NetworkEndPoints
-    plmn: constr(regex=r'^[0-9]*$', min_length=5, max_length=6) = Field(
+    plmn: constr(pattern=r'^[0-9]*$', min_length=5, max_length=6) = Field(
         ...,
         description='PLMN identifier of the mobile network'
     )

@@ -1,55 +1,14 @@
 from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field, conlist
-
-from models.k8s.blue_k8s_model import LBPool
-
-
-class K8sModel(BaseModel):
-    name: str = Field(title="Name of k8s cluster")
-    provided_by: str
-    blueprint_ref: str = Field(default="", title="Reference blueprint, empty if k8s cluster is external")
-    credentials: str = Field(title="Content of k8s crediential file (example admin.conf)")
-    vim_name: str = Field(title="Reference VIM, where k8s cluster is deployed (example OpenStack)")
-    k8s_version: str
-    networks: List[str] = Field(title="List of attached networks", min_items=1)
-    areas: List[str] = Field(title="Competence areas", min_items=1)
-    cni: Optional[str]
-    nfvo_status: str = 'not_onboarded'
+from models.k8s.common_k8s_model import LBPool
 
 
-class K8sModelCreateFromBlueprint(BaseModel):
-    name: str
-    nfvo_onboard: bool = False
-    blueprint_ref: str
-
-
-class K8sModelUpdateRequest(BaseModel):
-    nfvo_onboard: bool = False
-    networks: conlist(str, min_items=1)
-    areas: conlist(int, min_items=1)
-
-
-class K8sModelCreateFromExternalCluster(BaseModel):
-    name: str
-    nfvo_onboard: bool = False
-    credentials: str
-    vim_name: str
-    k8s_version: str
-    networks: conlist(str, min_items=1)
-    areas: conlist(int, min_items=1)
-    cni: Optional[str]
-
-
-class K8sLabel(str, Enum):
-    """
-    Known labels that help to identify what is installed in a k8s cluster
-    """
-    FLANNEL = 'flannel'
-    OPEN_EBS = 'openebs-ndm'
-    METALLB = 'metallb'
-    CALICO = 'calico-node'
-    METRIC_SERVER = 'metrics-server'
+class NfvoStatus(Enum):
+    ONBOARDED = "onboarded"
+    NOT_ONBOARDED = "not_onboarded"
+    ONBOARDING = 'onboarding'
+    ERROR = 'error'
 
 
 class K8sVersion(str, Enum):
@@ -81,6 +40,57 @@ class K8sVersion(str, Enum):
         this_version = self.value[1:]
         other_version = to_compare.value[1:]
         return float(this_version) < float(other_version)
+
+
+class K8sModel(BaseModel):
+    name: str = Field(title="Name of k8s cluster. It must be unique for each k8s cluster")
+    provided_by: str
+    blueprint_ref: str = Field(default="", title="Reference blueprint, empty if k8s cluster is external")
+    credentials: str = Field(title="Content of k8s crediential file (example admin.conf)")
+    vim_name: str = Field(title="Reference VIM, where k8s cluster is deployed (example OpenStack)")
+    k8s_version: K8sVersion = Field(default=K8sVersion.V1_24)
+    networks: List[str] = Field(title="List of attached networks", min_items=1)
+    areas: List[str] = Field(title="Competence areas", min_items=1)
+    cni: Optional[str]
+    nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED)
+    nfvo_onboard: bool = Field(default=False)
+
+    def __eq__(self, other):
+        """
+        Overrides the default equals implementation. In this way it is possible to directly compare objects
+        of this type on a given criteria (in this case the 'name')
+        """
+        if isinstance(other, K8sModel):
+            return self.name == other.name
+        return False
+
+
+class K8sModelCreateFromBlueprint(BaseModel):
+    name: str
+    nfvo_onboard: bool = False
+    blueprint_ref: str
+
+
+class K8sModelCreateFromExternalCluster(BaseModel):
+    name: str
+    nfvo_onboard: bool = False
+    credentials: str
+    vim_name: str
+    k8s_version: str
+    networks: List[str] = Field(min_items=1)
+    areas: List[int] = Field(min_items=1)
+    cni: Optional[str]
+
+
+class K8sLabel(str, Enum):
+    """
+    Known labels that help to identify what is installed in a k8s cluster
+    """
+    FLANNEL = 'flannel'
+    OPEN_EBS = 'openebs-ndm'
+    METALLB = 'metallb'
+    CALICO = 'calico-node'
+    METRIC_SERVER = 'metrics-server'
 
 
 class K8sPluginName(str, Enum):
@@ -141,8 +151,8 @@ class K8sTemplateFillData(BaseModel):
     CIDR is used by flannel and calico.
     lb_pools is used by metallb to give a range of IPs for load balancers
     """
-    pod_network_cidr: Optional[str]
-    lb_pools: Optional[List[LBPool]]
+    pod_network_cidr: str = Field(default="")
+    lb_pools: List[LBPool] = Field(default=[])
 
 
 class K8sPluginsToInstall(BaseModel):
@@ -153,4 +163,8 @@ class K8sPluginsToInstall(BaseModel):
     template_fill_data: K8sTemplateFillData = Field(default=K8sTemplateFillData())
     skip_plug_checks: bool = Field(default=False)
 
-
+class K8sQuota(BaseModel):
+    request_cpu: str = Field(default=1, alias="requests.cpu")
+    request_memory: str = Field(default="1Gi", alias="requests.memory")
+    limit_cpu: str = Field(default=2, alias="limits.cpu")
+    limit_memory: str = Field(default="2Gi", alias="limits.memory")

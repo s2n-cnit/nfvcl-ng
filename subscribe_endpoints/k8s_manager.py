@@ -13,8 +13,8 @@ import yaml
 from kubernetes.utils import FailToCreateError
 from pydantic import ValidationError
 from redis.client import PubSub
-from models.k8s.blue_k8s_model import LBPool
-from models.k8s.k8s_models import K8sModelManagement, K8sOperationType, K8sModel, K8sPluginName, K8sPluginsToInstall, \
+from models.k8s.blueprint_k8s_model import LBPool
+from models.k8s.topology_k8s_model import K8sModelManagement, K8sOperationType, K8sModel, K8sPluginName, K8sPluginsToInstall, \
     K8sTemplateFillData
 from nfvo import NbiUtil
 from topology.topology import Topology
@@ -88,7 +88,7 @@ class K8sManager:
             The matching k8s cluster or Throw ValueError if NOT found.
         """
         topology = Topology.from_db(self.db, self.nbiutil, self.lock)
-        k8s_clusters: List[K8sModel] = topology.get_k8scluster_model()
+        k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
         match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
         if match:
@@ -263,9 +263,10 @@ class K8sManager:
                 # If no load balancer pool is given
                 # Taking the FIRST network of the k8s cluster and reserving 20 addresses. THERE SHOULD BE AT LEAST 1.
                 network_name = cluster.networks[0]
-                result = topology.reserve_range(net_name=network_name, range_length=20, owner=cluster_id)
-                lb_pool = LBPool(mode='layer2', net_name=network_name, ip_start=result['start'],
-                                 ip_end=result['end'], range_length=20)
+                reserved_range = topology.reserve_range(net_name=network_name, range_length=20,
+                                                        owner=cluster_id)
+                lb_pool = LBPool(mode='layer2', net_name=network_name, ip_start=reserved_range.start,
+                                 ip_end=reserved_range.end, range_length=20)
                 template_data.lb_pools = [lb_pool]
             else:
                 # Checking that every single network is in k8s cluster and reserving the desired range length.
@@ -275,10 +276,10 @@ class K8sManager:
                     if network_name in cluster.networks:
                         if not pool.range_length:
                             pool.range_length = 20
-                        result = topology.reserve_range(net_name=network_name, range_length=pool.range_length,
-                                                        owner=cluster_id)
-                        pool.ip_start = result['start']
-                        pool.ip_end = result['end']
+                        reserved_range = topology.reserve_range(net_name=network_name, range_length=pool.range_length,
+                                                                owner=cluster_id)
+                        pool.ip_start = reserved_range.start
+                        pool.ip_end = reserved_range.end
                     else:
                         raise ValueError("The network {} is not present inside k8s {} cluster.".format(network_name,
                                                                                                        cluster.name))

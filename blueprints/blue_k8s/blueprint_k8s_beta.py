@@ -5,13 +5,13 @@ from blueprints import parse_ansible_output
 from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
 from models.blueprint.common import BlueEnablePrometheus
 from models.blueprint.rest_blue import BlueGetDataModel
-from models.k8s.k8s_models import K8sPluginName, K8sTemplateFillData
-from models.vim.vim_models import VimLink, VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor
+from models.k8s.topology_k8s_model import K8sPluginName, K8sTemplateFillData, K8sModel
+from models.vim.vim_models import VimLink, VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel
 from models.virtual_link_desc import VirtLinkDescr
 from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip, NbiUtil
 from typing import Union, Dict, Optional, List
-from models.k8s.blue_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, VMFlavors, \
+from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, VMFlavors, \
     K8sNsdInterfaceDesc
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 from main import persistency
@@ -91,7 +91,8 @@ class K8sBeta(BlueprintBaseBeta):
             }],
             'monitor': [{
                 'day0': [],
-                'day2': [{'method': 'enable_prometheus'}],
+                'day2': [{'method': 'enable_node_exporter'},
+                         {'method': 'enable_scraping'}],
                 'dayN': []
             }],
             'log': [{
@@ -147,27 +148,24 @@ class K8sBeta(BlueprintBaseBeta):
             # For every area we need to check that VIM of that area exists and network is listed in that VIM
             for area in k8s_create_model.areas:
                 logger.debug("Blue {} - Checking area {}".format(self.get_id(), area.id))
-                # check if the VIM exists
-                vim = self.topology_get_vim_by_area(area.id)
-                if not vim:
-                    raise ValueError('Blue {} - no VIMs at area {}'.format(self.get_id(), area.id))
+                # Check if the VIM exists and retrieve it
+                vim: VimModel = self.topology_get_vim_by_area(area.id)
                 # Checking if the load-balancing network exists at the VIM
-                if lb_pool.net_name not in vim['networks']:
+                if lb_pool.net_name not in vim.networks:
                     raise ValueError('Blue {} - network ->{}<- not available at VIM {}'
-                                     .format(self.get_id(), lb_pool.net_name, vim['name']))
+                                     .format(self.get_id(), lb_pool.net_name, vim.name))
 
-            # If the starting IP of this load balancer pool in not present then we generate automatically a range
+            # If the starting IP of this LOAD BALANCER pool in not present then we generate automatically a range
             if lb_pool.ip_start is None:
                 logger.debug("{} retrieving lb IP range".format(self.get_id()))
                 if not lb_pool.range_length:
                     lb_pool.range_length = 20
 
-                # !!! llb_range is returned as a dictionary
-                llb_range = self.topology_reserve_ip_range(lb_pool)
-                logger.info("Blue {} taking range {}-{} on network {} for lb"
-                            .format(self.get_id(), llb_range['start'], llb_range['end'], lb_pool.net_name))
-                lb_pool.ip_start = IPv4Address(llb_range['start'])
-                lb_pool.ip_end = IPv4Address(llb_range['end'])
+                load_bal_topo_res_range = self.topology_reserve_ip_range(lb_pool)
+                logger.info("Blue {} taking range {}-{} on network {} for LOAD BALANCER".format(self.get_id(),
+                            load_bal_topo_res_range.start, load_bal_topo_res_range.end, lb_pool.net_name))
+                lb_pool.ip_start = IPv4Address(load_bal_topo_res_range.start)
+                lb_pool.ip_end = IPv4Address(load_bal_topo_res_range.end)
             lb_pool_list.append(lb_pool)
 
         self.k8s_model.config.network_endpoints.data_nets = lb_pool_list
@@ -225,7 +223,7 @@ class K8sBeta(BlueprintBaseBeta):
         created_vnfd = [self.set_vnfd(AreaType.CORE, vld=vim_net_mapping)]  # sol006_NSD_builder expect a list
 
         n_obj = sol006_NSD_builder(
-            created_vnfd, self.get_vim_name(self.k8s_model.config.core_area.dict()), param, vim_net_mapping)
+            created_vnfd, self.get_vim_name(self.k8s_model.config.core_area.id), param, vim_net_mapping)
 
         # Append to the NSDs the just created NSD for the controller
         self.base_model.nsd_.append(BlueNSD.parse_obj(n_obj.get_nsd()))
@@ -574,19 +572,8 @@ class K8sBeta(BlueprintBaseBeta):
             if primitive['result']['charm_status'] != 'completed':
                 raise ValueError('in k8s blue -> add_to_topology callback charm_status is not completed')
 
-        k8s_data = {
-            'name': self.get_id(),
-            'provided_by': 'blueprint',
-            'blueprint_ref': self.get_id(),
-            'k8s_version': self.k8s_model.config.version,
-            'credentials': self.k8s_model.config.master_credentials,
-            'vim_account': self.get_vim(self.k8s_model.config.core_area.id),
-            'vim_name': self.get_vim(self.k8s_model.config.core_area.id)['name'],
-            'networks': [item.net_name for item in self.k8s_model.config.network_endpoints.data_nets],
-            'areas': [item.id for item in self.k8s_model.areas],
-            'nfvo_onboarded': False
-        }
-        self.topology_add_k8scluster(k8s_data)
+        vim = self.get_vim(self.k8s_model.config.core_area.id)
+        self.topology_add_k8scluster(self.k8s_model.parse_to_k8s_topo_model(vim_name=vim.name))
 
     def install_plugins(self, msg: dict):
         """
@@ -757,11 +744,11 @@ class K8sBeta(BlueprintBaseBeta):
 
         return {}
 
-    def enable_prometheus(self, args):
+    def enable_node_exporter(self, args):
         res = []
+        node_exporters_ip_list = []  # List to store all node exporters for server configuration
 
-        #For each area we install, through APT install, the package node prometheus-node-exporter on every NSD
-
+        # For each area we install, through APT install, the package node prometheus-node-exporter on every NSD
         for nsd in self.base_model.nsd_:
             nsd_item = nsd.descr.nsd.nsd[0]
             configurator = ConfiguratorK8sBeta(
@@ -778,6 +765,7 @@ class K8sBeta(BlueprintBaseBeta):
             # If it is master
             if nsd.type == 'master':
                 configurator.set_mng_ip(self.k8s_model.config.controller_ip)
+                node_exporters_ip_list.append(self.k8s_model.config.controller_ip+":9100")  # Adding to the node list
             else:
                 # In case of worker we need to identify witch is the correct mgt IP of this worker
                 # We select the correct area
@@ -790,11 +778,19 @@ class K8sBeta(BlueprintBaseBeta):
                     if target_router_nsd_int is not None:
                         # Add the FIRST management IP as management IP
                         configurator.set_mng_ip(target_router_nsd_int.vld[0].ip)
+                        node_exporters_ip_list.append(target_router_nsd_int.vld[0].ip+":9100") # Adding to the node list
                 else:
                     logger.warning("Area not found when trying to enable prometheus")
                     continue  # Skip the current iteration
 
             # We dump the content to be executed on the node for each node
             res += configurator.enable_prometheus()
-            # TODO add node exporter as prometheus target on a prom server of the topology.
+
+        # Saving the node exporter list to be permanent (and used by enable_scraping function)
+        self.base_model.node_exporters = node_exporters_ip_list
+        self.to_db()
         return res
+
+    def enable_scraping(self, prom_info: BlueEnablePrometheus):
+        self.setup_prom_scraping(prom_info=prom_info)
+        return []

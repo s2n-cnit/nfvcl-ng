@@ -2,7 +2,7 @@ from pydantic import ValidationError
 from blueprints.blueprint_beta import BlueprintBaseBeta
 from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
 from models.blueprint.rest_blue import BlueGetDataModel
-from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimLink
+from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimLink, VimModel
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from typing import Union, List, Dict, Optional
@@ -166,9 +166,7 @@ class VyOSBlue(BlueprintBaseBeta):
             for area in self.vyos_model.areas:
                 logger.debug("Blue {} - checking area {}".format(self.get_id(), area.id))
                 # Check if the vim exists
-                vim = self.topology_get_vim_by_area(area.id)
-                if not vim:
-                    raise ValueError('Blue {} - no VIMs at area {}'.format(self.get_id(), area.id))
+                vim: VimModel = self.topology_get_vim_by_area(area.id)  # Throw error in case not found
 
                 config: VyOSConfig
                 device_index = 0
@@ -178,18 +176,18 @@ class VyOSBlue(BlueprintBaseBeta):
                     # Check if the management network exist in the vim. If it does, the network is
                     # added to the list
                     man_network = config.network_endpoints.mgt
-                    if man_network.net_name not in vim['networks']:
+                    if man_network.net_name not in vim.networks:
                         raise ValueError('Blue {} - management network {} not available at VIM {}'
-                                         .format(self.get_id(), man_network.net_name, vim['name']))
+                                         .format(self.get_id(), man_network.net_name, vim.name))
                     self.get_network_cidr(man_network)
 
                     # Check if data networks exist in the area managed by the VIM. If it does, the network is
                     # added to the list
                     data_networks = config.network_endpoints.data_nets
                     for data_network in data_networks:
-                        if data_network.net_name not in vim['networks']:
+                        if data_network.net_name not in vim.networks:
                             raise ValueError('Blue {} - management network {} not available at VIM {}'
-                                             .format(self.get_id(), data_network, vim['name']))
+                                             .format(self.get_id(), data_network, vim.name))
                         # self.get_network_info(data_network)
 
                     device_index = device_index + 1

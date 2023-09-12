@@ -1,6 +1,8 @@
-from models.network import NetworkModel
+from models.k8s.topology_k8s_model import K8sModel
+from models.network import NetworkModel, RouterModel, PduModel
 from models.prometheus.prometheus_model import PrometheusServerModel
 from models.topology import TopologyModel
+from models.vim import UpdateVimModel, VimModel
 from utils.log import create_logger
 from multiprocessing import Queue, RLock
 from topology.topology import Topology
@@ -30,11 +32,11 @@ def topology_worker(db: OSSdb, nbiutil: NbiUtil, queue: Queue, lock: RLock):
                 topology.delete(terraform=msg['terraform'])
             # vim
             elif ops_type == "add_vim":
-                topology.add_vim(msg, terraform=msg['terraform'])
+                topology.add_vim(VimModel.parse_obj(msg), terraform=msg['terraform'])
             elif ops_type == "update_vim":
-                topology.update_vim(msg, terraform=msg['terraform'])
+                topology.update_vim(UpdateVimModel.parse_obj(msg), terraform=msg['terraform'])
             elif ops_type == "del_vim":
-                topology.del_vim(msg, terraform=msg['terraform'])
+                topology.del_vim(msg['vim_name'], terraform=msg['terraform'])
             # net
             elif ops_type == "add_net":
                 topology.add_network(NetworkModel.parse_obj(msg))
@@ -42,23 +44,22 @@ def topology_worker(db: OSSdb, nbiutil: NbiUtil, queue: Queue, lock: RLock):
                 topology.del_network(NetworkModel.parse_obj(msg))
             # router
             elif ops_type == "add_router":
-                topology.add_router(msg)
+                topology.add_router(RouterModel.parse_obj(msg))
             elif ops_type == "del_router":
-                topology.del_router(msg)
+                topology.del_router(msg.pop("router_id"))
             # pdu
             elif ops_type == "add_pdu":
-                topology.add_pdu(msg)
+                topology.add_pdu(PduModel.parse_obj(msg))
             elif ops_type == "del_pdu":
                 topology.del_pdu(msg)
             elif ops_type == "add_k8s":
-                topology.add_k8scluster(msg)
+                topology.add_k8scluster(K8sModel.parse_obj(msg))
             elif ops_type == "del_k8s":
                 # Since K8s instance is taken by database, as stated in K8sModel, the field is called "name"
                 cluster_id = msg.pop("name")
                 topology.del_k8scluster(cluster_id)
             elif ops_type == "update_k8s":
-                cluster_id = msg.pop("cluster_id")
-                topology.update_k8scluster(name=cluster_id, data=msg)
+                topology.update_k8scluster(K8sModel.parse_obj(msg))
             elif ops_type == "add_prom":
                 topology.add_prometheus_server(prom_server=PrometheusServerModel.parse_obj(msg))
             elif ops_type == "del_prom":
@@ -70,8 +71,6 @@ def topology_worker(db: OSSdb, nbiutil: NbiUtil, queue: Queue, lock: RLock):
         except Exception:
             logger.error(traceback.format_exc())
             success = False
-        else:
-            topology.save_topology()
 
         finally:
             if 'callback' in msg and msg['callback']:

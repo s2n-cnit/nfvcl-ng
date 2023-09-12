@@ -114,6 +114,7 @@ class BlueprintBaseModel(BaseModel):
     type: str
     vnfi: List = Field(default=[])
     deployment_units: List = Field(default=[])
+    node_exporters: List = Field(default=[], description="List of node exporters active in the blueprint.")
 
     """
     @validator('timestamp')

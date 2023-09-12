@@ -38,10 +38,10 @@ class OpType(Enum):
 
 
 class Sim(BaseModel):
-    imsi: constr(regex=r'^[0-9]*$', min_length=15, max_length=15)
-    plmn: constr(regex=r'^[0-9]*$', min_length=5, max_length=5)
-    key: constr(regex=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
-    op: constr(regex=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
+    imsi: constr(pattern=r'^[0-9]*$', min_length=15, max_length=15)
+    plmn: constr(pattern=r'^[0-9]*$', min_length=5, max_length=5)
+    key: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
+    op: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
     opType: OpType
     amf: Optional[constr(min_length=4, max_length=4)] = None
     configured_nssai: Optional[List[ConfiguredNssaiItem]] = Field(None, min_items=1)
@@ -85,9 +85,10 @@ class UeranSimConfig(BaseModel):
 class UeranSimBlueprintRequestInstance(BaseModel):
     type: Literal["UeRanSim"]
     config: UeranSimConfig
-    areas: conlist(AreaInfo, min_items=1) = Field(
+    areas: List[AreaInfo] = Field(
         ...,
         description='list of areas to instantiate the Blueprint',
+        min_items=1
     )
 
     class Config:

@@ -1,10 +1,10 @@
 from blueprints import BlueprintBase, parse_ansible_output
-from models.k8s.k8s_models import K8sPluginName, K8sTemplateFillData
+from models.k8s.topology_k8s_model import K8sPluginName, K8sTemplateFillData
 from . import ConfiguratorK8s
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from typing import Union, Dict, Optional
-from models.k8s.blue_k8s_model import K8sBlueprintCreate, K8sBlueprintScale
+from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 import traceback
 from main import *
@@ -92,11 +92,11 @@ class K8s(BlueprintBase):
                     logger.debug("{} retrieving lb IP range".format(self.get_id()))
                     range_length = lb_pool['range_length'] if 'range_length' in lb_pool else 20
 
-                    llb_range = self.topology_reserve_ip_range(lb_pool, range_length)
+                    topo_reserved_range = self.topology_reserve_ip_range(lb_pool, range_length)
                     logger.info("Blue {} taking range {}-{} on network {} for lb"
-                                .format(self.get_id(), llb_range['start'], llb_range['end'], lb_pool['net_name']))
-                    lb_pool['ip_start'] = llb_range['start']
-                    lb_pool['ip_end'] = llb_range['end']
+                                .format(self.get_id(), topo_reserved_range.start, topo_reserved_range.end, lb_pool['net_name']))
+                    lb_pool['ip_start'] = topo_reserved_range.start
+                    lb_pool['ip_end'] = topo_reserved_range.end
                 pool_list.append(lb_pool)
 
             self.conf['config']['network_endpoints']['data_nets'] = pool_list

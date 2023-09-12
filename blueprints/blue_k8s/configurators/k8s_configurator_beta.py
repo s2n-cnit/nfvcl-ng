@@ -1,6 +1,6 @@
 from logging import Logger
 from configurators.flex_configurator import Configurator_Flex
-from models.k8s.blue_k8s_model import K8sBlueprintModel
+from models.k8s.blueprint_k8s_model import K8sBlueprintModel
 from utils import persistency
 from utils.log import create_logger
 

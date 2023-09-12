@@ -14,9 +14,10 @@ class VyOSBlueprintCreate(BaseModel):
         None,
         description='url that will be used to notify when the blueprint processing finishes',
     )
-    areas: conlist(VyOSArea, min_items=1) = Field(
+    areas: List[VyOSArea] = Field(
         ...,
         description='list of areas (with relative configuration) to instantiate the Blueprint. ',
+        min_items=1
     )
 
     class Config:

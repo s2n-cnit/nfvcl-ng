@@ -1,5 +1,6 @@
 from models.config_model import NFVCLConfigModel
 from utils.util import get_nfvcl_config
+from utils.log import create_logger
 from utils import persistency
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from neutronclient.v2_0 import client as neutron_client
@@ -13,7 +14,7 @@ nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 nbiUtil = get_osm_nbi_utils()
 db = persistency.DB()
-logger = logging.getLogger('keystoneauth')
+logger = create_logger('Keystoneauth')
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARN)
 # create formatter
@@ -160,7 +161,7 @@ class OSclient:
 
     def delete_network(self, network_name=None, network_id=None):
         if network_name is None and network_id is None:
-            raise ValueError('net id and name are None')
+            raise ValueError('Net ID and name are None')
         if network_id is None:
             network_id = self.find_network_id_by_name(network_name)
         try:

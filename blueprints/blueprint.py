@@ -1,6 +1,10 @@
 import json
 import datetime
 import requests
+
+from models.k8s.topology_k8s_model import K8sModel
+from models.network import PduModel
+from models.network.network_models import IPv4ReservedRange
 from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
 from .db_blue_model import DbBlue
@@ -316,32 +320,32 @@ class BlueprintBase(abc.ABC):
 
     def topology_add_pdu(self, pdu: dict):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        topology.add_pdu(pdu)
-        topology.save_topology()
+        topology.add_pdu(PduModel.parse_obj(pdu))
         self.pdu.append(pdu['name'])
+        self.to_db()
 
     def topology_del_pdu(self, pdu_name: str):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         topology.del_pdu(pdu_name)
-        topology.save_topology()
         self.pdu = [item for item in self.pdu if item != pdu_name]
+        self.to_db()
 
     def topology_get_pdu(self, pdu_name: str):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        return topology.get_pdu(pdu_name)
+        return topology.get_pdu(pdu_name).dict()
 
-    def topology_get_pdu_by_area(self, area):
+    def topology_get_pdu_by_area(self, area) -> dict:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        pdus = topology.get_pdus()
+        pdus: List[PduModel] = topology.get_pdus()
         if type(area) is dict:
-            return next((item for item in pdus if item['area'] == area['id']), None)
+            return next((pdu.dict() for pdu in pdus if pdu.area == area['id']), None)
         else:
-            return next((item for item in pdus if item['area'] == area), None)
+            return next((pdu.dict() for pdu in pdus if pdu.area == area), None)
 
     def topology_get_pdu_by_area_and_type(self, area_id: str, pdu_type: str) -> dict:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        pdus = topology.get_pdus()
-        return next((item for item in pdus if item['area'] == area_id and item['type'] == pdu_type), None)
+        pdus: List[PduModel] = topology.get_pdus()
+        return next((item.dict() for item in pdus if item.area == area_id and item.type == pdu_type), None)
 
     def topology_get_vim_by_area(self, area):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
@@ -352,32 +356,29 @@ class BlueprintBase(abc.ABC):
 
     def topology_add_k8scluster(self, k8s_cluster_data: dict):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        topology.add_k8scluster(k8s_cluster_data)
-        # save topylogy yet inside add_k8scluster
-        #topology.save_topology()
+        topology.add_k8scluster(K8sModel.parse_obj(k8s_cluster_data))
 
     def topology_del_k8scluster(self):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         topology.del_k8scluster(self.get_id())
-        topology.save_topology()
 
-    def topology_update_k8scluster(self, k8s_cluster_data: dict):
+    def topology_update_k8scluster(self, k8s_cluster: K8sModel):
+        # Retrieving the topology
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        topology.update_k8scluster(self.get_id(), k8s_cluster_data)
-        topology.save_topology()
+        # Update the k8s cluster
+        topology.update_k8scluster(k8s_cluster)
 
     def topology_add_network(self, net: dict, areas: list):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        vims = set()
+        vim_names = set()
         for a in areas:
             if type(a) == int:
-                vims.add(topology.get_vim_name_from_area_id(a))
-                logger.debug("for area {} the following vims have been selected: {}".format(a, vims))
+                vim_names.add(topology.get_vim_name_from_area_id(a))
+                logger.debug("for area {} the following vims have been selected: {}".format(a, vim_names))
             else:
-                vims.add(topology.get_vim_name_from_area_id(a['id']))
-                logger.debug("for area {} the following vims have been selected: {}".format(a['id'], vims))
-        topology.add_network(net, list(vims), terraform=True)
-        topology.save_topology()
+                vim_names.add(topology.get_vim_name_from_area_id(a['id']))
+                logger.debug("for area {} the following vims have been selected: {}".format(a['id'], vim_names))
+        topology.add_network(net, list(vim_names), terraform=True)
 
     def topology_del_network(self, net: dict, areas: Union[List[int], List[dict]]):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
@@ -394,19 +395,19 @@ class BlueprintBase(abc.ABC):
             else:
                 raise ValueError("Type error in areas")
         topology.del_network(net, list(vims), terraform=True)
-        topology.save_topology()
 
     def topology_get_network(self, network_name: str) -> dict:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        return topology.get_network(network_name)
+        return topology.get_network(network_name).dict()
 
-    def topology_reserve_ip_range(self, lb_pool: dict, range_length: int):
+    def topology_reserve_ip_range(self, lb_pool: dict, range_length: int) -> IPv4ReservedRange:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        return topology.reserve_range(lb_pool['net_name'], range_length, self.get_id())
+        reserved_range: IPv4ReservedRange = topology.reserve_range(lb_pool['net_name'], range_length, self.get_id())
+        return reserved_range
 
     def topology_release_ip_range(self):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        return topology.release_ranges(self.get_id())
+        return topology.release_ranges(owner=self.get_id())
 
     def get_vim_name(self, area: Union[int, dict]) -> str:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)

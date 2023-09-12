@@ -1,19 +1,6 @@
 import ruamel.yaml
-import paramiko
-#from utils.util import *
-#from scp import SCPClient
 
-'''
-  'prometheus': {
-    'scrap_file': 'nfvcl.yaml',
-    'host': '192.168.100.10',
-    'port': 27017,
-    'passwd': 'root',
-    'user': 'root'
-  }
-'''
 endpoint = []
-
 with open("config.yaml", 'r') as stream:
     try:
         nfvcl_conf = ruamel.yaml.safe_load(stream)
@@ -33,21 +20,6 @@ with open("config.yaml", 'r') as stream:
     except:
         print('exception in the configuration file parsing')
 
-
-def createSSHClient(server, port, user, password):
-    client = paramiko.SSHClient()
-    client.load_system_host_keys()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(server, port, user, password, allow_agent=False)
-
-    return client
-
-def createSCPClient(server, port, user, password):
-    ssh = createSSHClient(server, port, user, password)
-    #scp = SCPClient(ssh.get_transport())
-    scp = ssh.open_sftp()
-    return scp
-
 def closeSCPClient(scp):
     scp.close()
 
@@ -63,7 +35,7 @@ class PrometheusManager():
         return next((item for item in self.jobs if item['labels'] == labels), None)
 
     def delTarget(self, job, target):
-        job['targets'] =  [item for item in job['targets'] if target != item]
+        job['targets'] = [item for item in job['targets'] if target != item]
 
         #removing jobs without targets
         self.jobs = [item for item in self.jobs if len(item['targets']) > 0]

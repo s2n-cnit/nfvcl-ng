@@ -1,3 +1,5 @@
+from typing import Union
+
 from topology.os_nbi import OSclient
 from utils import persistency
 from utils.log import create_logger
@@ -86,9 +88,9 @@ class VimTerraformer:
 
         return res
 
-    def delNet(self, net_name):
+    def delNet(self, net_name) -> Union[None, bool, Exception]:
         if self.osClient.find_network_by_name(net_name) is None:
-            logger.warning("network {} not existing".format(net_name))
+            logger.warning("Network {} not existing on VIM".format(net_name))
             return
         return self.osClient.delete_network(network_name=net_name)
 

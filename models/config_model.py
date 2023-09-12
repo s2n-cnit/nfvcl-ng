@@ -5,12 +5,12 @@ from pydantic import BaseModel
 
 class NFVCLParameters(BaseModel):
     ip: str
-    port: str
+    port: int
 
 
 class OSMParameters(BaseModel):
     host: str
-    port: str
+    port: int
     username: str
     password: str
     project: str
@@ -19,7 +19,7 @@ class OSMParameters(BaseModel):
 
 class MongoParameters(BaseModel):
     host: str
-    port: str
+    port: int
     db: str
 
 

@@ -5,7 +5,9 @@ from logging import Logger
 from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccount, V1ClusterRoleList, V1ClusterRole, \
     V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, V1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
-    V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1PodSpec, V1Container
+    V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1PodSpec, V1Container, V1ResourceQuota, \
+    V1ResourceQuotaSpec
+from models.k8s.topology_k8s_model import K8sQuota
 from utils.log import create_logger
 from utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
 
@@ -510,10 +512,41 @@ def k8s_delete_namespace(kube_client_config: kubernetes.client.Configuration, na
         return namespace
 
 
+def k8s_add_quota_to_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str,
+                               quota_name: str, quota: K8sQuota) -> V1ResourceQuota:
+    """
+    Add a quota (for resources) to the namespace
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace_name: The namespace on witch the quota is applied
+        quota_name: The name of the quota reservation
+        quota: The quantities to be reserved
+
+    Returns:
+        The created quota.
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+
+        spec = quota.dict(by_alias=True)
+        res_spec = V1ResourceQuotaSpec(hard=spec)
+        metadata = V1ObjectMeta(name=quota_name)
+        res_quota = V1ResourceQuota(metadata=metadata, spec=res_spec)
+
+        try:
+            created_quota = api_instance_core.create_namespaced_resource_quota(namespace=namespace_name, body=res_quota)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>patch_namespaced_pod: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return created_quota
+
 def k8s_add_sidecar_namespaced_pod(kube_client_config: kubernetes.client.Configuration, namespace_name: str,
                                    pod_name: str) -> V1Namespace:
     """
-
+        Still to be implemented
     """
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         api_instance_core = kubernetes.client.CoreV1Api(api_client)
@@ -533,3 +566,5 @@ def k8s_add_sidecar_namespaced_pod(kube_client_config: kubernetes.client.Configu
             api_client.close()
 
         return patched_pod
+
+

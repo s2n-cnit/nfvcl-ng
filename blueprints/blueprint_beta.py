@@ -5,9 +5,13 @@ import traceback
 import importlib
 import abc
 from models.blueprint.blueprint_base_model import BlueprintBaseModel, BlueNSD, BlueprintVersion
+from models.blueprint.common import BlueEnablePrometheus
 from models.blueprint.rest_blue import BlueGetDataModel, ShortBlueModel
-from models.k8s.blue_k8s_model import LBPool
-from models.network import NetworkModel
+from models.k8s.topology_k8s_model import K8sModel
+from models.k8s.blueprint_k8s_model import LBPool
+from models.network import NetworkModel, PduModel
+from models.network.network_models import IPv4ReservedRange
+from models.vim import VimModel
 from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
 from models.blueprint.blue_types import blueprint_types
@@ -302,7 +306,16 @@ class BlueprintBaseBeta(abc.ABC):
     def get_data(self, get_request: BlueGetDataModel):
         pass
 
-    def topology_add_pdu(self, pdu: dict):
+    def get_topology(self) -> Topology:
+        """
+        Util to return the topology in the blueprints
+        Returns:
+            The topology of the NFVCL
+        """
+        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
+        return topology
+
+    def topology_add_pdu(self, pdu: PduModel):
         """
         Add a PDU to the topology
         Args:
@@ -310,8 +323,7 @@ class BlueprintBaseBeta(abc.ABC):
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
         topology.add_pdu(pdu)
-        topology.save_topology()
-        self.base_model.pdu.append(pdu['name'])
+        self.base_model.pdu.append(pdu.name)
 
     def topology_del_pdu(self, pdu_name: str):
         """
@@ -325,7 +337,7 @@ class BlueprintBaseBeta(abc.ABC):
         # Removing from this blueprint
         self.base_model.pdu = [item for item in self.base_model.pdu if item != pdu_name]
 
-    def topology_get_pdu(self, pdu_name: str):
+    def topology_get_pdu(self, pdu_name: str) -> PduModel:
         """
         Retrieve a PDU from the topology
         Args:
@@ -334,7 +346,7 @@ class BlueprintBaseBeta(abc.ABC):
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
         return topology.get_pdu(pdu_name)
 
-    def topology_get_pdu_by_area(self, area_id):
+    def topology_get_pdu_by_area(self, area_id: int) -> PduModel:
         """
         Retrieve the FIRST PDU from the topology by area
         
@@ -342,13 +354,10 @@ class BlueprintBaseBeta(abc.ABC):
             area_id: the area in witch the function is looking for the PDU
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        pdus = topology.get_pdus()
-        if type(area_id) is dict:
-            return next((item for item in pdus if item['area'] == area_id['id']), None)
-        else:
-            return next((item for item in pdus if item['area'] == area_id), None)
+        pdus: List[PduModel] = topology.get_pdus()
+        return next((item for item in pdus if item.area == area_id), None)
 
-    def topology_get_pdu_by_area_and_type(self, area_id: str, pdu_type: str) -> dict:
+    def topology_get_pdu_by_area_and_type(self, area_id: str, pdu_type: str) -> PduModel:
         """
         Retrieve the **FIRST** PDU from the topology by area and by type
 
@@ -358,23 +367,24 @@ class BlueprintBaseBeta(abc.ABC):
             pdu_type: the type of the PDU
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        pdus = topology.get_pdus()
-        return next((item for item in pdus if item['area'] == area_id and item['type'] == pdu_type), None)
+        pdus: List[PduModel] = topology.get_pdus()
+        pdu = next((item for item in pdus if item.area == area_id and item.type == pdu_type), None)
+        return pdu
 
-    def topology_get_vim_by_area(self, area_id):
+    def topology_get_vim_by_area(self, area_id: int) -> VimModel:
         """
         Retrieve the **FIRST** VIM from the topology by area
 
         Args:
             area_id: the area in witch the function is looking for VIM
+
+        Raises:
+            ValueError if VIM is not found for the area
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        if type(area_id) is dict:
-            return topology.get_vim_from_area_id(area_id['id'])
-        else:
-            return topology.get_vim_from_area_id(area_id)
+        return topology.get_vim_from_area_id_model(area_id)
 
-    def topology_add_k8scluster(self, k8s_cluster_data: dict):
+    def topology_add_k8scluster(self, k8s_cluster_data: K8sModel):
         """
         Add a K8S cluster to the topology
 
@@ -389,18 +399,21 @@ class BlueprintBaseBeta(abc.ABC):
         Delete the K8S cluster, with ID that is corresponding to this blueprint ID, from the topology.
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        topology.del_k8scluster(self.get_id())
+        try:
+            topology.del_k8scluster(self.get_id())
+        except ValueError as e:
+            logger.debug("The K8s cluster was not present at the moment of k8s blueprint destruction.")
 
-    def topology_update_k8scluster(self, k8s_cluster_data: dict):
+
+    def topology_update_k8scluster(self, k8s_cluster: K8sModel):
         """
-        Update the K8S cluster, with ID that is corresponding to this blueprint ID, in the topology.
+        Update the K8S cluster in the topology.
 
         Args:
-            k8s_cluster_data: the data to be used to update the K8s cluster
+            k8s_cluster: the data to be used to update the K8s cluster
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        topology.update_k8scluster(self.get_id(), k8s_cluster_data)
-        topology.save_topology()
+        topology.update_k8scluster(k8s_cluster)
 
     def topology_add_network(self, net: NetworkModel, areas: list):
         """
@@ -422,9 +435,8 @@ class BlueprintBaseBeta(abc.ABC):
                 vims.add(topology.get_vim_name_from_area_id(a['id']))
                 logger.debug("for area {} the following vims have been selected: {}".format(a['id'], vims))
         topology.add_network(net, list(vims), terraform=True)
-        topology.save_topology()
 
-    def topology_del_network(self, net: NetworkModel, areas: Union[List[int], List[dict]]):
+    def topology_del_network(self, net: NetworkModel, areas: List[int]):
         """
         Delete network from the topology and then remove it from every VIM of the area (terraform is set to true)
 
@@ -435,20 +447,11 @@ class BlueprintBaseBeta(abc.ABC):
             areas: area ID list used to retrieve the VIM list. The network is removed from every VIM.
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        vims = set()
+        vims = []
         for area in areas:
-            if type(area) == int:
-                vims.add(topology.get_vim_name_from_area_id(area))
-                logger.debug("Blue {} - for area {} the following vims have been selected: {}"
-                             .format(self.get_id(), area, vims))
-            elif type(area) == dict:
-                vims.add(topology.get_vim_name_from_area_id(area['id']))
-                logger.debug("Blue {} - for area {} the following vims have been selected: {}"
-                             .format(self.get_id(), area['id'], vims))
-            else:
-                raise ValueError("Type error in areas")
+            vims.append(topology.get_vim_name_from_area_id(area))
+
         topology.del_network(net, list(vims), terraform=True)
-        topology.save_topology()
 
     def topology_get_network(self, network_name: str) -> NetworkModel:
         """
@@ -461,10 +464,9 @@ class BlueprintBaseBeta(abc.ABC):
             The network
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        net_dict = topology.get_network(network_name)  # TODO avoid parsing object when topology will be updated
-        return NetworkModel.parse_obj(net_dict)
+        return topology.get_network(network_name)
 
-    def topology_reserve_ip_range(self, lb_pool: LBPool):
+    def topology_reserve_ip_range(self, lb_pool: LBPool) -> IPv4ReservedRange:
         """
         Reserve an IP range in the topology with owner that is this blueprint ID.
 
@@ -485,9 +487,9 @@ class BlueprintBaseBeta(abc.ABC):
             The reserved IP range -> {'start': '192.168.0.1', 'end': '192.168.0.100'}
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        return topology.release_ranges(self.get_id())
+        return topology.release_ranges(owner=self.get_id())
 
-    def get_vim_name(self, area: Union[int, dict]) -> str:
+    def get_vim_name(self, area: int) -> str:
         """
         Returns the name of the FIRST matching VIM, given the area of interest.
         Args:
@@ -498,12 +500,9 @@ class BlueprintBaseBeta(abc.ABC):
             The name FIRST matching VIM for that area
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        if type(area) == int:
-            return topology.get_vim_name_from_area_id(area)
-        else:
-            return topology.get_vim_name_from_area_id(area['id'])
+        return topology.get_vim_name_from_area_id(area)
 
-    def get_vim(self, area: Union[int, dict]) -> dict:
+    def get_vim(self, area: int) -> VimModel:
         """
         Returns the FIRST VIM, given the area of interest.
         Args:
@@ -514,10 +513,7 @@ class BlueprintBaseBeta(abc.ABC):
             The FIRST matching VIM for that area
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        if type(area) == int:
-            return topology.get_vim_from_area_id(area)
-        else:
-            return topology.get_vim_from_area_id(area['id'])
+        return topology.get_vim_from_area_id_model(area)
 
     def get_vims(self):
         """
@@ -526,17 +522,19 @@ class BlueprintBaseBeta(abc.ABC):
         Returns:
             A list of VIM, one for each deployment area.
         """
-        deployment_areas = set()
+        deployment_areas = []
+        # Cannot use model, the reason could be: Since every blueprint has its creation message, the message is
+        # Different on blueprint basis. BUT in this case we suppose every blueprint has areas in is message.
         for area in self.base_model.conf['areas']:
-            deployment_areas.add(area) if type(area) is int else deployment_areas.add(area['id'])
+            deployment_areas.append(area) if type(area) is int else deployment_areas.append(area['id'])
 
-        vims_names = set()
+        vims_names = []
         vims = []
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
         for area in deployment_areas:
-            area_vim = topology.get_vim_from_area_id(area)
-            if area_vim['name'] not in vims_names:
-                vims_names.add(area_vim['name'])
+            area_vim = topology.get_vim_from_area_id_model(area)
+            if area_vim.name not in vims_names:
+                vims_names.append(area_vim.name)
                 vims.append(area_vim)
         return vims
 
@@ -548,13 +546,14 @@ class BlueprintBaseBeta(abc.ABC):
         Delete itself from the Database.
         Returns:
         """
-        logger.info("Destroying")
+        logger.info("Destroying the blueprint {}".format(self.get_id()))
         if hasattr(self, "pdu"):
             for p in self.pdu:
                 logger.debug("deleting pdu {}".format(p))
                 self.topology_del_pdu(p)
         self._destroy()
         self.delete_db()
+
 
     @abc.abstractmethod
     def _destroy(self):
@@ -798,3 +797,14 @@ class BlueprintBaseBeta(abc.ABC):
         else:
             logger.info("no callback message is needed")
             return None
+
+    def setup_prom_scraping(self, prom_info: BlueEnablePrometheus):
+        if hasattr(prom_info, 'prom_server_id'):
+            topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
+            prom_server = topology.get_prometheus_server(prom_info.prom_server_id)
+            prom_server.add_jobs(targets=self.base_model.node_exporters, labels={'k8scluster': self.get_id()})
+            topology.update_prometheus_server(prom_server)
+            prom_server.update_remote_sd_file()
+        else:
+            raise ValueError("The prom_server_id is not present in the request")
+

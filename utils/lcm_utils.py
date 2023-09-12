@@ -1,7 +1,10 @@
 import json
 from datetime import datetime
+from typing import List
+
 from blueprints.blueprint_beta import BlueprintBaseBeta
 from models.blueprint.blueprint_base_model import BlueNSD
+from models.vim import VimModel
 from utils import persistency
 from utils.util import remove_files_by_pattern
 from utils.log import create_logger
@@ -376,7 +379,7 @@ def init_dayN(nsi_list, osmNbiUtil: NbiUtil, blue: BlueprintBaseBeta):
         blue.delete_nsd(nsi)
 
 
-def checkVims(vims, osmNbiUtil: NbiUtil):
+def checkVims(vims: List[VimModel], osmNbiUtil: NbiUtil):
     """
     Checks that all VIMs are present on OSM
     Args:
@@ -388,9 +391,9 @@ def checkVims(vims, osmNbiUtil: NbiUtil):
     vim_list = list()
 
     for vim in vims:
-        vim_object = osmNbiUtil.get_vim_by_tenant_and_name(vim['name'], vim['vim_tenant_name'])
+        vim_object = osmNbiUtil.get_vim_by_tenant_and_name(vim.name, vim.vim_tenant_name)
         if vim_object is None:
-            raise AssertionError('VIM {} not onboarded on OSM (the NFVO)'.format(vim['name']))
+            raise AssertionError('VIM {} not onboarded on OSM (the NFVO)'.format(vim.name))
         vim_list.append(vim_object)
 
     return vim_list

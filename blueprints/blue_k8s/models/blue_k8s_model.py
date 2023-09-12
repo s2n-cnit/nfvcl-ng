@@ -79,9 +79,10 @@ class K8sBlueprintCreate(BaseModel):
         description='url that will be used to notify when the blueprint processing finishes',
     )
     config: K8sConfig
-    areas: conlist(K8sAreaInfo, min_items=1) = Field(
+    areas: List[K8sAreaInfo]= Field(
         ...,
         description='list of areas to instantiate the Blueprint',
+        min_items=1
     )
 
     class Config:

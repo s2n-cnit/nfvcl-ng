@@ -13,8 +13,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError
 import utils.util
 from config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
-from models.k8s import K8sModel, K8sLabel, K8sVersion
-from models.k8s.k8s_models import K8sPluginName, K8sPluginType, K8sTemplateFillData
+from models.k8s.topology_k8s_model import K8sPluginName, K8sPluginType, K8sTemplateFillData, K8sModel, K8sLabel, K8sVersion
 from utils.k8s.k8s_client_extension import create_from_yaml_custom
 from utils.log import create_logger
 from utils.util import deprecated
@@ -496,7 +495,7 @@ def read_namespaced_config_map(kube_client_config: kubernetes.client.Configurati
         return config_map
 
 
-def parse_k8s_clusters_from_dict(k8s_list: dict) -> List[K8sModel]:
+def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[K8sModel]:
     """
     From a k8s cluster list in dictionary form returns a list of corresponding k8s models.
 

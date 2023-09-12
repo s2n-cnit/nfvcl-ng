@@ -1,15 +1,17 @@
 from logging import Logger
 from redis.client import Redis
 from models.event import Event
-from models.k8s import K8sModel
+from models.k8s.topology_k8s_model import K8sModel
+from models.network.network_models import RouterPortModel, IPv4ReservedRange
 from models.prometheus.prometheus_model import PrometheusServerModel
+from models.vim import VimModel, UpdateVimModel
 from topology.topology_events import TopologyEventType
-from utils.k8s import parse_k8s_clusters_from_dict
 from utils.log import create_logger
 from utils.ipam import *
+from utils.util import remove_files_by_pattern
 from topology.vim_terraform import VimTerraformer
 from models.topology import TopologyModel
-from models.network import PduModel, NetworkModel
+from models.network import PduModel, NetworkModel, RouterModel
 from utils.persistency import OSSdb
 from nfvo.osm_nbi_util import NbiUtil
 import typing
@@ -27,29 +29,47 @@ logger: Logger = create_logger('Topology')
 redis_cli: Redis = get_redis_instance()
 
 
+def trigger_event(event_name: TopologyEventType, data: dict):
+    """
+    Send an event, together with the data that have been updated, to REDIS.
+
+    Args:
+        event_name: the name of the event
+        data: the updated data (dict)
+    """
+
+    event: Event = Event(operation=event_name.value, data=data)
+    trigger_redis_event(redis_cli, TOPOLOGY_TOPIC, event)
+
+
 class Topology:
-    def __init__(self, topo: Union[dict, None], db: OSSdb, nbiutil: NbiUtil, lock: RLock):
+    _model: TopologyModel
+
+    def __init__(self, topo: Union[dict, None], db: OSSdb, osmnbiutil: NbiUtil, lock: RLock):
         self.db = db
-        self.nbiutil = nbiutil
+        self.osm_nbi_util = osmnbiutil
         self.lock = lock
         self._os_terraformer = {}
         if topo:
             if isinstance(topo, TopologyModel):
                 self._data = topo.dict()
+                self._model = topo
             else:
                 try:
-                    self._data = TopologyModel.parse_obj(topo).dict()
+                    self._model = TopologyModel.parse_obj(topo)
+                    self._data = self._model.dict()
                 except Exception:
                     logger.error(traceback.format_exc())
                     raise ValueError("Topology cannot be initialized")
 
-            # re-creating terraformer objs
-            for vim in self._data['vims']:
-                logger.debug('creating terraformer object for VIM {}'.format(vim['name']))
-                self._os_terraformer[vim['name']] = VimTerraformer(vim)
+            # Re-creating terraformer objs
+            for vim in self._model.vims:
+                logger.debug('creating terraformer object for VIM {}'.format(vim.name))
+                self._os_terraformer[vim.name] = VimTerraformer(vim.dict())
         else:
-            logger.warning("topology information are not existing")
-            self._data = {'vims': [], 'networks': [], 'routers': [], 'kubernetes': [], 'pdus': []}
+            msg_err = "Topology information are not existing"
+            self._model = None
+            logger.warning(msg_err)
 
     @classmethod
     def from_db(cls, db: OSSdb, nbiutil: NbiUtil, lock: RLock):
@@ -69,425 +89,588 @@ class Topology:
             data = None
         return cls(data, db, nbiutil, lock)
 
-    def save_topology(self) -> None:
+    def _save_topology(self) -> None:
+        """
+        Save the content of self._data into the db. Update self._model with current self._data values.
+        """
         content = TopologyModel.parse_obj(self._data)
+        self._model = content
+        plain_dict = json.loads(content.json())
+        self.db.update_DB("topology", plain_dict, {'id': 'topology'})
+
+    def _save_topology_from_model(self) -> None:
+        """
+        Save the content of self._model into the db. Update self._data with current self._model values.
+        """
+        content = self._model
+        self._data = content.dict()
         plain_dict = json.loads(content.json())
         self.db.update_DB("topology", plain_dict, {'id': 'topology'})
 
     # **************************** Topology ***********************
     def get(self) -> dict:
-        return self._data
+        if hasattr(self, '_data'):
+            return self._data
+        else:
+            return {}
+
+    def get_model(self) -> TopologyModel:
+        return self._model
 
     @obj_multiprocess_lock
     def create(self, topo: TopologyModel, terraform: bool = False) -> None:
-        logger.debug("terraform: {}".format(terraform))
-        if len(self._data['vims']) or len(self._data['networks']) or len(self._data['routers']):
-            logger.error('not possible to allocate a new topology, since another one is already declared')
-            raise ValueError('not possible to allocate a new topology, since another one is already declared')
-        self._data = topo.dict() # TODO replace self._data with TopologyModel object
+        logger.debug("Creating topology. Terraform: {}".format(terraform))
+
+        if self._model is not None:
+            msg_err = 'It is not possible to allocate a new topology, since another one is already declared'
+            logger.error(msg_err)
+            raise ValueError(msg_err)
+        self._model = topo
 
         # Moving vim in the request into tmp array, in this way, when performing operation to populate vims, a loop is
         # avoided.
-        tmp_vims = self._data['vims']
-        self._data['vims'] = []
+        request_vims = self._model.vims
+        self._model.vims = []
 
-        for vim in tmp_vims:
-            logger.info('starting terraforming VIM {}'.format(vim['name']))
-            # self.os_terraformer[vim['name']] = VimTerraformer(vim)
+        for vim in request_vims:
+            logger.info('Starting terraforming VIM {}'.format(vim.name))
             self.add_vim(vim, terraform=terraform)
 
-        self.trigger_event(TopologyEventType.TOPO_CREATE, topo.to_dict())
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_CREATE, self._model.to_dict())
 
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
-        logger.debug("[delete] terraform: {}".format(terraform))
-        if not self._data:
-            logger.error('not possible to delete the topology. No topology is currently allocated')
-            raise ValueError('not possible to delete the topology. No topology is currently allocated')
+        logger.debug("Deleting the topology. Terraform: {}".format(terraform))
+        deleted_topology: TopologyModel = self._model.copy()
+        if not self._model:
+            msg_err = 'Not possible to delete the topology. No topology is currently allocated'
+            logger.error(msg_err)
+            raise ValueError(msg_err)
 
         # Check for terraform is done inside del_vim method
-        for vim in self._data['vims']:
-            error: Exception
+        for vim in self._model.vims:
             try:
-                self.del_vim(vim)
-            except Exception as error:
-                logger.error("{}".format(error))
-                raise error
+                self.del_vim(vim, terraform)
+            except Exception as exception:
+                logger.error(exception)
+                raise exception
 
         self._os_terraformer = {}
-        self._data = {'vims': [], 'networks': [], 'routers': [], 'kubernetes': [], 'pdus': []}
-        self.db.delete_DB('topology', {'id': 'topology'})
 
-        self.trigger_event(TopologyEventType.TOPO_DELETE, {})
+        self._model = None
+        self.db.delete_DB('topology', {'id': 'topology'})
+        trigger_event(TopologyEventType.TOPO_DELETE, deleted_topology.to_dict())
 
     # **************************** VIMs ****************************
-    def get_vim(self, vim_name: str) -> Union[dict, None]:
-        vim = next((item for item in self._data['vims'] if item['name'] == vim_name), None)
-        if not vim:
-            raise ValueError('vim {} not found in the topology'.format(vim_name))
-        return vim
+    def get_vim(self, vim_name: str) -> VimModel:
+        """
+        Return a vim, given the name
+        Args:
+            vim_name: the name
+        Returns: the vim
+        """
+        return self._model.get_vim(vim_name)
 
     @obj_multiprocess_lock
-    def add_vim(self, vim, terraform: bool = False):
-        # check if the vim already exists
-        if vim['name'] in self._os_terraformer:
-            raise ValueError('VIM already existing')
-        else:
-            self._os_terraformer[vim['name']] = VimTerraformer(vim)
+    def add_vim(self, vim_model: VimModel, terraform: bool = False):
+        """
+        Add a VIM to the topology. IF required create resources on the real VIM. Onboard the VIM on OSM to be menaged by
+        it.
+        Args:
+            vim_model: The VIM to be added in the topology.
+            terraform: If resources will be created on the VIM
+        """
+        # Check if the vim already exists and add it
+        self._model.add_vim(vim_model)
+        # Create the terraformer for the VIM that will manage resources on the VIM
+        self._os_terraformer[vim_model.name] = VimTerraformer(vim_model.dict())  # Recreate it even if existing
+
         if terraform:
-            for vim_net in vim['networks']:
-                logger.debug('now analyzing network {}'.format(vim_net['name']))
-                self.add_vim_net(vim_net, vim)
+            # For each network, if terraforming, we need to create it in the real VIM
+            for vim_net in vim_model.networks:
+                logger.debug('Network >{}< is being added to VIM >{}<'.format(vim_net, vim_model.name))
+                self._add_vim_net(vim_net, vim_model, terraform=True)
+            for vim_router in vim_model.routers:
+                logger.debug('Router >{}< is being added to VIM >{}<'.format(vim_router, vim_model.name))
+                self.add_vim_router(vim_router, vim_model)
 
-            for vim_router in vim['routers']:
-                self.add_vim_router(vim_router, vim)
+        # Save the topology
+        self._save_topology_from_model()
 
-        self._data['vims'].append(vim)
+        # ???
+        use_floating_ip: bool = False
+        for vim_net in vim_model.networks:
+            use_floating_ip = use_floating_ip or self.check_floating_ips(vim_net)
 
-        use_floating_ip = False
-        for vim_net in vim['networks']:
-            use_floating_ip = use_floating_ip or self.check_fip(vim_net)
-
+        # TODO write it better
         osm_vim = {}
+        vim_dict = vim_model.dict()
         for key in ["schema_version", "name", "vim_type", "vim_tenant_name", "vim_user", "vim_password",
                     "config"]:
-            if key in vim:
-                osm_vim[key] = vim[key]
+            if key in vim_dict:
+                osm_vim[key] = vim_dict[key]
         osm_vim['config']['use_floating_ip'] = use_floating_ip
-        osm_vim['vim_url'] = str(vim['vim_url'])
+        osm_vim['vim_url'] = str(vim_model.vim_url)
 
-        data = self.nbiutil.add_vim(osm_vim)
+        # Adding the VIM on OSM
+        data = self.osm_nbi_util.add_vim(osm_vim)
         if not data:
-            raise ValueError("failed to onboard VIM {} onto OSM".format(vim['name']))
+            raise ValueError("failed to onboard VIM {} onto OSM".format(vim_model.name))
 
-        self.trigger_event(TopologyEventType.TOPO_VIM_CREATE, vim)
+        trigger_event(TopologyEventType.TOPO_VIM_CREATE, vim_model.dict())
 
     @obj_multiprocess_lock
-    def del_vim(self, vim, terraform=False):
+    def del_vim(self, vim_name: str, terraform=False):
+        # VIM is unique by name
+        vim_model = self._model.get_vim(vim_name)
         # FixMe: if there are services on the VIM, OSM will not delete it
         # In every case (of terraform) we need to delete VIM account from OSM.
-        try:
-            osm_vim = self.nbiutil.get_vim_by_tenant_and_name(vim['name'], vim['vim_tenant_name'])
-            logger.debug(osm_vim)
-        except ValueError:
-            logger.error('VIM {} not found at osm, skipping...'.format(vim['name']))
-        else:
-            logger.info('removing VIM {} from osm'.format(vim['name']))
-            data = self.nbiutil.del_vim(osm_vim['_id'])
-            logger.debug(data)
+        # Check that VIM is present on OSM -> Raise error if not
+        osm_vim = self.osm_nbi_util.get_vim_by_tenant_and_name(vim_model.name, vim_model.vim_tenant_name)
+
+        logger.info('Removing VIM {} from osm'.format(vim_model.name))
+        # Remote deletion from OSM
+        self.osm_nbi_util.del_vim(osm_vim['_id'])
 
         # If terraform is enabled then we need to delete also OpenStack resources
         if terraform:
-            # remove all networks, ports and routers
-            for router in self._data['routers']:
-                if router['name'] in vim['routers']:
-                    self._os_terraformer[vim['name']].delRouter(router['name'])
-            for network in self._data['networks']:
-                if network['name'] in [item['name'] for item in vim['networks']]:
-                    self._os_terraformer[vim['name']].delNet(network['name'])
-
-        self._data['vims'] = [item for item in self._data['vims'] if item['name'] != vim['name']]
-
-        self.trigger_event(TopologyEventType.TOPO_VIM_DEL, vim)
+            # remove all networks, ports and routers from topology and from vim
+            for router in self._model.routers:
+                if router.name in vim_model.routers:
+                    self._os_terraformer[vim_model.name].delRouter(router.name)
+            for network in self._model.networks:
+                if network.name in vim_model.networks:
+                    self._os_terraformer[vim_model.name].delNet(network.name)
+        # Local deletion
+        self._model.del_vim(vim_model.name)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_VIM_DEL, vim_model.dict())
 
     @obj_multiprocess_lock
-    def update_vim(self, update_msg: dict, terraform: bool = True):
-        vim = next((item for item in self._data['vims'] if item['name'] == update_msg['name']), None)
-        if not vim:
-            raise ValueError('vim {} not found in the topology'.format(update_msg['name']))
+    def update_vim(self, update_msg: UpdateVimModel, terraform: bool = True):
+        """
+        Update an existing VIM.
+        Args:
+            update_msg: The update message containing information to be edited/added. See the model for further info.
+            terraform: If new elements has to be created/destroyed on the VIM (openstack,...)
+        """
+        vim_model = self._model.get_vim(update_msg.name)
 
-        for vim_net in update_msg['networks_to_add']:
-            logger.debug("adding net {} to vim {}".format(vim_net, vim['name']))
-            if vim_net in vim['networks']:
-                raise ValueError('network {} already in VIM {}'.format(vim_net, vim['name']))
-            self.add_vim_net(vim_net, vim, terraform=terraform)
-        for vim_net in update_msg['networks_to_del']:
-            logger.debug("deleting net {} from vim {}".format(vim_net, vim['name']))
-            if vim_net not in vim['networks']:
-                raise ValueError('network {} not in VIM {}'.format(vim_net, vim['name']))
-            self.del_vim_net(vim_net, vim, terraform=terraform)
-        for vim_router in update_msg['routers_to_add']:
-            logger.debug("adding router {} from vim {}".format(vim_router, vim['name']))
-            self.add_vim_router(vim_router, vim, terraform=terraform)
-        for vim_router in update_msg['routers_to_del']:
-            logger.debug("deleting router {} from vim {}".format(vim_router, vim['name']))
-            self.del_vim_router(vim_router, vim, terraform=terraform)
-        for vim_area in update_msg['areas_to_add']:
-            logger.debug("adding area {} to vim {}".format(vim_area, vim['name']))
-            if vim_area in vim['areas']:
-                raise ValueError('area {} already in VIM {}'.format(vim_area, vim['name']))
-            vim['areas'].append(vim_area)
-        for vim_area in update_msg['areas_to_del']:
-            logger.debug("deleting area {} from vim {}".format(vim_area, vim['name']))
-            try:
-                vim_area_int = int(vim_area)
-            except ValueError:
-                raise ValueError('Area {} to delete from VIM {} is not a valid int number'.format(vim_area, vim['name']))
-            if vim_area_int not in vim['areas']:
-                raise ValueError('area {} not in VIM {}'.format(vim_area, vim['name']))
-            vim['areas'].remove(vim_area_int)
+        # Each network to be added in VIM
+        for vim_net in update_msg.networks_to_add:
+            logger.debug("Adding net >{}< to vim >{}<".format(vim_net, vim_model.name))
+            self._add_vim_net(vim_net, vim_model, terraform=terraform)
+        for vim_net in update_msg.networks_to_del:
+            logger.debug("Deleting net >{}< from vim {}".format(vim_net, vim_model.name))
+            self._del_vim_net(vim_net, vim_model, terraform=terraform)
+        for vim_router in update_msg.routers_to_add:
+            logger.debug("Adding router >{}< from vim {}".format(vim_router, vim_model.name))
+            self.add_vim_router(vim_router, vim_model, terraform=terraform)
+        for vim_router in update_msg.routers_to_del:
+            logger.debug("Deleting router {} from vim {}".format(vim_router, vim_model.name))
+            self.del_vim_router(vim_router, vim_model, terraform=terraform)
+        for vim_area in update_msg.areas_to_add:
+            logger.debug("Adding area {} to vim {}".format(vim_area, vim_model.name))
+            vim_model.add_area(vim_area)
+        for vim_area in update_msg.areas_to_del:
+            vim_model.del_area(vim_area)
 
-        self.trigger_event(TopologyEventType.TOPO_VIM_UPDATE, vim)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_VIM_UPDATE, vim_model.dict())
 
     def get_vim_name_from_area_id(self, area: int) -> Union[str, None]:
         """
         Return the FIRST VIM name, given the area
         Args:
-            area: the area for witch the vim is searched.
-
+            area: the area for witch the VIM is searched.
         Returns:
-            The FIRST matching VIM for that area
+            The name of the FIRST matching VIM for that area
         """
-        vim = next((item for item in self._data['vims'] if area in item['areas']), None)
-        if vim:
-            return vim['name']
-        else:
-            logger.warning("No VIM has been found for area {}".format(area))
-            return None
+        return self.get_vim_from_area_id_model(area).name
 
     def get_vim_from_area_id(self, area: int) -> dict:
         """
         Returns the FIRST VIM given the area id
         Args:
             area: The area id from witch the VIM is obtained.
-
         Returns:
             The FIRST vim belonging to that area.
         """
-        vim = next((item for item in self._data['vims'] if area in item['areas']), None)
-        if vim is None:
-            raise ValueError("No VIM has been found for area {}!".format(area))
-        return vim
+        return self._model.get_vim_by_area(area_id=area).dict()
+
+    def get_vim_from_area_id_model(self, area: int) -> VimModel:
+        """
+        Returns the FIRST VIM given the area id
+        Args:
+            area: The area id from witch the VIM is obtained.
+        Returns:
+            The FIRST vim belonging to that area.
+        """
+        return self._model.get_vim_by_area(area_id=area)
 
     # **************************** Networks *************************
-    def get_network(self, net_name: str, vim_name: typing.Optional[str] = None) -> dict:
-        net = next((item for item in self._data['networks'] if item['name'] == net_name), None)
-        if not net:
-            raise ValueError('network {} not found in the topology'.format(net_name))
+    def get_network(self, net_name: str, vim_name: typing.Optional[str] = None) -> NetworkModel:
+        """
+        Retrieve a network from the topology and optionally checks that belongs to a VIM.
+        Args:
+            net_name: The network to be retrieved
+            vim_name: The OPTIONAL name of the vim
+
+        Returns:
+            The network in dictionary format.
+        """
+        return self.get_network_model(net_name, vim_name)
+
+    def get_network_model(self, net_name: str, vim_name: typing.Optional[str] = None) -> NetworkModel:
+        """
+        Retrieve a network from the topology and optionally checks that belongs to a VIM.
+        Args:
+            net_name: The network to be retrieved
+            vim_name: The OPTIONAL name of the vim
+
+        Returns:
+            The network.
+        """
+        # Raise value error if not found
+        net_model: NetworkModel = self._model.get_network(net_name)
+
+        # Check that the required vim has the network
         if vim_name:
-            vim = self.get_vim(vim_name)
-            vim_net = next((item for item in vim['networks'] if item['name'] == net_name), None)
-            if not vim_net:
-                raise ValueError('network {} not found in the topology vim {}'.format(net_name, vim_name))
-            # merging info from topology and vim router descriptions
-            res = net.copy()
-            res.update(vim_net)
-            return res
+            vim = self._model.get_vim(vim_name)
+            vim.get_net(net_name)  # Raise error if the VIM does not have the network
+
+        return net_model
+
+    # Do NOT put obj_multiprocess_lock since it calls the next function that already have it.
+    def add_network(self, network: Union[NetworkModel, dict], vim_names_list: Union[list, None] = None,
+                    terraform: bool = False):
+        """
+        Same of add_network_model but accept dict+model.
+        """
+        # Converting from dict if necessary
+        if not isinstance(network, NetworkModel):
+            network_model: NetworkModel = NetworkModel.parse_obj(network)
         else:
-            return net
+            network_model = network
+
+        self.add_network_model(network_model, vim_names_list, terraform)
 
     @obj_multiprocess_lock
-    def add_network(self, network: NetworkModel, vim_names_list: Union[list, None] = None, terraform: bool = False):
-        # it adds a network to the topology
-        self._data['networks'].append(network)
+    def add_network_model(self, network_model: NetworkModel, vim_names_list: Union[list, None] = None,
+                          terraform: bool = False) -> NetworkModel:
+        """
+        Add network to the topology. If required networks are added to VIMs and terraformed (created on the VIM).
+        Args:
+            network_model: The network to be added in the topology
+            vim_names_list: The list of VIMs in witch the newtork will be added
+            terraform: If network has to be created on the VIMs
+        Returns:
+            The created network
+        """
+        # It adds a network to the topology
+        added_network = self._model.add_network(network_model)
 
+        # Adding the Network to the desired VIMs. If required, the network is created on the VIM
         if vim_names_list:
             for vim_name in vim_names_list:
-                vim = next((item for item in self._data['vims'] if item['name'] == vim_name), None)
-                if vim is None:
-                    raise ValueError('VIM {} not found'.format(vim_name))
-                # vim['networks'].append(network['name'])
-                if isinstance(network, dict):
-                    networkName = network['name']
-                else:
-                    networkName = network.name
-                self.add_vim_net(networkName, vim, terraform=terraform)
+                vim = self._model.get_vim(vim_name)
+                network_name = network_model.name
+                self._add_vim_net(network_name, vim, terraform=terraform)
 
-        if isinstance(network, dict):
-            self.trigger_event(TopologyEventType.TOPO_CREATE_NETWORK, network)
-        else:
-            self.trigger_event(TopologyEventType.TOPO_CREATE_NETWORK, network.to_dict())
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_CREATE_NETWORK, network_model.to_dict())
+        return added_network
 
     @obj_multiprocess_lock
     def del_network(self, network: NetworkModel, vim_names_list: Union[list, None] = None, terraform: bool = False):
+        """
+        Delete a network from the topology. Delete it from required VIM list, terraform if required.
+        Args:
+            network: The network to be removed from the topology
+            vim_names_list: The VIMs from witch the network is removed (the nfvcl representation).
+            terraform: If the net has to be deleted on the VIM (network is removed from openstack)
+        Returns:
+            The removed network
+        """
         if isinstance(network, dict):
             network = NetworkModel.parse_obj(network)
+
+        # For each required VIM, the network is deleted. Otherwise, the net is removed only from the topology
         if vim_names_list:
             for vim_name in vim_names_list:
-                vim = next((item for item in self._data['vims'] if item['name'] == vim_name), None)
-                if vim is None:
-                    raise ValueError('VIM {} not found'.format(vim_name))
+                vim: VimModel = self._model.get_vim(vim_name)
+                self._del_vim_net(network.name, vim, terraform=terraform)
 
-                if network.name not in vim['networks']:
-                    logger.warning('Network {} not found in VIM {}'.format(network.name, vim['name']))
-                else:
-                    self.del_vim_net(network.name, vim, terraform=terraform)
-        self._data['networks'] = [item for item in self._data['networks'] if item['name'] != network.name]
-
-        self.trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, network.to_dict())
+        self._model.del_network(network.name)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, network.to_dict())
 
     # **************************** Routers **************************
 
     def get_router(self, router_name: str, vim_name: typing.Optional[str] = None):
-        router = next((item for item in self._data['routers'] if item['name'] == router_name), None)
-        if not router:
-            raise ValueError('router {} not found in the topology'.format(router_name))
+        """
+        Returns the required router
+        Args:
+            router_name: The router to be retrieved
+            vim_name: The name of the vim, used to add info from vim to router
+
+        Returns:
+            The desired router info
+        """
+        # Looking for the router in the topology
+        router: RouterModel = self._model.get_router(router_name)
+
+        # If vim_name is present we add info from vim to the router
         if vim_name:
-            vim = self.get_vim(vim_name)
-            vim_router = next((item for item in vim['routers'] if item['name'] == router_name), None)
+            vim_m = self._model.get_vim(vim_name)
+
+            vim_router = vim_m.get_router(router_name)
             # merging info from topology and vim router descriptions
-            res = router.copy()
-            res.update(vim_router)
-            return res
+            # res: RouterModel = router.copy()
+            # res_dict = res.dict()
+            # res_dict.update(vim_router)
+            # TODO necessary?
+            return router.dict()
         else:
-            return router
+            return router.dict()
 
     @obj_multiprocess_lock
-    def add_router(self, router: dict):
-        # check if a router with the same name exists
-        router_check = next((item for item in self._data['routers'] if item['name'] == router['name']), None)
-        if router_check:
-            raise ValueError("router {} already existing in the topology". format(router['name']))
-        self._data['routers'].append(router)
-
-        self.trigger_event(TopologyEventType.TOPO_CREATE_ROUTER, router)
+    def add_router(self, router: RouterModel):
+        """
+        Add a router to the topology
+        Args:
+            router: The router to be added to the topology. Must not be already present
+        Returns:
+            The deleted router
+        Raises:
+            ValueError if already present
+        """
+        # Crash if already present
+        self._model.add_router(router)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_CREATE_ROUTER, router.dict())
 
     @obj_multiprocess_lock
-    def del_router(self, router: dict, vim_names_list: list = None):
-        router_check = next((item for item in self._data['routers'] if item['name'] == router['name']), None)
-        if not router_check:
-            raise ValueError("router {} not existing in the topology".format(router['name']))
+    def del_router(self, router_name: str, vim_names_list: list = None):
+        """
+        Delete a router from the topology and optionally from desired VIMs
+        Args:
+            router_name: The name of the router to be deleted
+            vim_names_list: The list of VIMs from witch the router must be removed.
+
+        Returns:
+            The deleted router
+        """
+        router = self._model.del_router(router_name)
 
         if vim_names_list:
             for vim_name in vim_names_list:
-                vim = next((item for item in self._data['vims'] if item['name'] == vim_name), None)
-                if vim is None:
-                    raise ValueError('VIM {} not found'.format(vim_name))
+                vim = self._model.get_vim(vim_name)
+                # Throw error if router not found in vim
+                vim_router = vim.get_router(router.name)
 
-                if router['name'] not in [item['name'] for item in vim['routers']]:
-                    logger.warning('Router {} not found in VIM {}'.format(router['name'], vim['name']))
-                else:
-                    self.del_vim_router(router['name'], vim)
+                vim.del_router(vim_router)
 
-        self._data['routers'] = [item for item in self._data['routers'] if item['name'] != router['name']]
-
-        self.trigger_event(TopologyEventType.TOPO_DELETE_ROUTER, router)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_DELETE_ROUTER, router.dict())
 
     # **************************** VIM updating **********************
 
-    def add_vim_net(self, vim_net_name: str, vim: dict, terraform: bool = False):
-        if not self.check_vim_resource(vim_net_name, vim, 'networks'):
-            logger.error('network {} already associated to the VIM'.format(vim_net_name))
-            raise ValueError('Topology terraforming failed')
+    def _add_vim_net(self, vim_net_name: str, vim: VimModel, terraform: bool = False):
+        """
+        Add a network to a VIM, if the network already exist on the VIM, it does not need to be terraformed it is just
+        added to the topology representation.
+        Otherwise, the net is created in the VIM.
+        Args:
+            vim_net_name: The name of the network
+            vim: The target VIM
+            terraform: If the network has to be created on the VIM
 
-        vim['networks'].append(vim_net_name)
-        net = next(item for item in self._data['networks'] if item['name'] == vim_net_name)
+        Returns:
+            The created network if terraformed, None otherwise (even if it is added to the topology but not terraformed)
+        """
+        # Adding the net, raise ValueError if already present
+        vim.add_net(vim_net_name)
+
+        # Checking that the network is present in the topology and getting it
+        topo_net = self._model.get_network(network_name=vim_net_name)
+
+        # If terraform we need to create the net on OS
         if terraform:
-            logger.info('network {} will be terraformed to vim {}'.format(vim_net_name, vim['name']))
-            # net_overridden = net.copy()
-            # net_overridden.update(vim_net)
-            ids = self._os_terraformer[vim['name']].createNet(net.copy())
-            ids['vim'] = vim['name']
+            logger.info('Network >{}< will be terraformed to VIM >{}<'.format(vim_net_name, vim.name))
+            # Creating net
+            terraformed_ids = self._os_terraformer[vim.name].createNet(topo_net.dict().copy())
+            terraformed_ids['vim'] = vim.name
 
-            if 'ids' not in net:
-                net['ids'] = []
-            net['ids'].append(ids)
-            return ids
+            topo_net.ids.append(terraformed_ids)
+            self._save_topology_from_model()  # TODO remove and put in higher calls
+            return terraformed_ids
         else:
             return None
 
-    def del_vim_net(self, vim_net_name: str, vim: dict, terraform: bool = False):
-        if self.check_vim_resource(vim_net_name, vim, 'networks'):
-            logger.error('network {} not associated to the VIM'.format(vim_net_name))
-            raise ValueError('Topology terraforming failed')
-        vim['networks'].remove(vim_net_name)
+    def _del_vim_net(self, vim_net_name: str, vim: VimModel, terraform: bool = False) -> str:
+        """
+        Remove a Network from the desired VIM representation. If terraform it will delete also on the VIM.
+        Args:
+            vim_net_name: The net to be removed
+            vim: The VIM representation on witch the net is removed
+            terraform: If the net is deleted on the VIM
+
+        Returns: the name of deleted network on the vim
+        """
+        vim_model: VimModel = self._model.get_vim(vim.name)
+        removed_net = vim_model.del_net(vim_net_name)
+
         if terraform:
-            return self._os_terraformer[vim['name']].delNet(vim_net_name)
+            if not self._os_terraformer[vim.name].delNet(vim_net_name):
+                msg_err = "Cannot remove network >{}< from VIM >{}<".format(vim_net_name, vim.name)
+                logger.error(msg_err)
+                raise ValueError(msg_err)
+
+        self._save_topology_from_model()
+        return removed_net
+
+    def del_vim_router(self, vim_router_name: str, vim: VimModel, terraform: bool = False):
+        """
+        Delete a router in the VIM structure. If required (terraform) it deletes also on the VIM.
+        Args:
+            vim_router_name: The router to be removed
+            vim: The VIM in witch the router has to be removed
+            terraform: If the router has to be deleted on the VIM
+
+        Returns:
+            ???
+        """
+        vim.del_router(vim_router_name)
+
+        if terraform:
+            return self._os_terraformer[vim.name].delRouter(vim_router_name)
         else:
             return True
 
-    def check_vim_resource(self, resource_name: str, vim: dict, resource_type: str) -> bool:
-        res = next((item for item in self._data[resource_type] if item['name'] == resource_name), None)
-        if res is None:
-            logger.error('{} {} not found in the topology'.format(resource_type, resource_name))
-            raise ValueError('Topology terraforming failed')
-        check_vim_resource = next((item for item in vim[resource_type] if item == resource_name), None)
-        return check_vim_resource is None
+    def add_vim_router(self, vim_router_name: str, vim: VimModel, terraform: bool = False):  # TODO test
+        """
+        ???
+        Args:
+            vim_router_name:
+            vim: The VIM, BEING PART OF THE TOPOLOGY, to witch the router is associated. If the VIM is not part of the
+            topology, when topo is saved, the vim does not persist.
+            terraform:
+        Returns: ???
+        """
+        vim.add_router(router=vim_router_name)
+        topology_router = self._model.get_router(vim_router_name)
 
-    def del_vim_router(self, vim_router_name: str, vim: dict, terraform: bool = False):
-        if self.check_vim_resource(vim_router_name, vim, 'routers'):
-            logger.error('router {} not associated to the VIM'.format(vim_router_name))
-            raise ValueError('Topology terraforming failed')
-        # router = next((item for item in self._data['routers'] if item['name'] == vim_router_name), None)
-        vim['routers'].remove(vim_router_name)
-        if terraform:
-            return self._os_terraformer[vim['name']].delRouter(vim_router_name)
-        else:
-            return True
+        # Create a copy to be used within os terraformer
+        router: RouterModel = topology_router.copy()
+        router_dict = router.dict()
 
-    def add_vim_router(self, vim_router_name: str, vim: dict, terraform: bool = False):
-        if not self.check_vim_resource(vim_router_name, vim, 'routers'):
-            logger.error('router {} already associated to the VIM'.format(vim_router_name))
-            raise ValueError('Topology terraforming failed')
-        topology_router = next((item for item in self._data['routers'] if item['name'] == vim_router_name), None)
-
-        # override topology level data with vim-specific data
-        router = topology_router.copy()
-        # router.update(vim_router)
-
-        # check if the router is connected to an external network
-        router['internal_net'] = []
-        for port in router['ports']:
-            ext_net = next((item for item in
-                            self._data['networks'] if item['name'] == port['net'] and item['external']), None)
+        # Check if the router is connected to an external network
+        port: RouterPortModel
+        for port in router.ports:
+            # A topology external net is indicated by network.external param. Then we take only topology networks that
+            # are connected to router port.
+            ext_net = next((network for network in
+                            self._model.networks if network.name == port.net and network.external), None)
             if ext_net:
                 # this is an external router
-                ids = next((item for item in ext_net['ids'] if item['vim'] == vim['name']), None)
-
-                router["external_gateway_info"] = {
+                ids = next((item for item in ext_net.ids if item['vim'] == vim.name), None)
+                # TODO transform in dict and then add this data for os terraformer
+                router_dict["external_gateway_info"] = {
                     "network_id": ids['l2net_id'],
                     "enable_snat": True,
                     "external_fixed_ips": [
                         {
-                            "ip_address": port['ip_addr'] if 'ip_addr' in port else
-                            ext_net['allocation_pool'][0]['start'],
+                            "ip_address": port.ip_addr if 'ip_addr' in port else
+                            ext_net.allocation_pool[0].start,
                             "subnet_id": ids['l3net_id']
                         }
                     ]
                 }
             else:
-                router['internal_net'].append(port['net'])
+                router_dict['internal_net'].append(port.net)
 
-        logger.debug('internal networks:')
-        logger.debug(router['internal_net'])
         if terraform:
-            ids = self._os_terraformer[vim['name']].createRouter(router)
+            ids = self._os_terraformer[vim.name].createRouter(router_dict)
         else:
             ids = []
+        self._save_topology_from_model()
         return ids
 
-    def get_routers_in_net(self, net_name: str):
+    def get_routers_in_net(self, net_name: str) -> List[RouterModel]:
+        """
+        Returns all router being part of a network (at least one port connected to the network)
+        Args:
+            net_name: The network
+        Returns: Routers (dictionary) that have at leas one port connected to the network
+        """
         res = []
-        for router in self._data['routers']:
+        for router in self._model.routers:
             # check if the net is connected to this router
-            net_port = next((item for item in router['ports'] if item['net'] == net_name), None)
+            net_port = next((item for item in router.ports if item.net == net_name), None)
+            if net_port is not None:
+                res.append(router)
+        return res
+
+    def get_routers_in_net_model(self, net_name: str) -> List[RouterModel]:
+        """
+        Returns all router being part of a network (at least one port connected to the network)
+        Args:
+            net_name: The network
+        Returns: Routers that have at leas one port connected to the network
+        """
+        res = []
+        for router in self._model.routers:
+            # check if the net is connected to this router
+            net_port = next((item for item in router.ports if item.net == net_name), None)
             if net_port is not None:
                 res.append(router)
         return res
 
     # **************************** Other funcs **********************
     # endpoints are network where VM (and VNFs) can be attached
-    def get_network_endpoints(self, os_name=None):
-        if os_name:
-            os_nets = next((item['networks'] for item in self._data['vims'] if os_name == item['name']), [])
-            net_names = [item['name'] for item in os_nets]
-            return [item for item in self._data['networks'] if not item['external'] and item['name'] in net_names]
+    def get_network_endpoints(self, vim_name=None) -> List[NetworkModel]:
+        """
+        Retrieve network endpoints, optionally relative to a vim. Endpoints are network where VM (and VNFs) can be
+        attached.
+        Args:
+            vim_name: The VIM from witch networks endpoint are retrieved, if None net endpoints are the topology
+            ones.
+        Returns:
+            A list containing net endpoints
+        """
+        if vim_name:
+            # Getting the vim net list
+            vim_nets: List[NetworkModel] = next((vim.networks for vim in self._model.vims if vim_name == vim.name), [])
+            net_names = [net.name for net in vim_nets]
+            # Retrieving only network endpoint in the topology that are associated with the desired VIM
+            return [net for net in self._model.networks if not net.external and net.name in net_names]
         else:
-            return [item['name'] for item in self._data['networks'] if not item['external']]
+            return [net for net in self._model.networks if not net.external]
 
-    def check_fip(self, net_name: str) -> bool:
-        # network require a floating IP if at least one of the router attached is external
-        net_routers = self.get_routers_in_net(net_name)
+    def check_floating_ips(self, net_name: str) -> bool:
+        """
+        Check that floating IPs are enabled in the net (SNAT is enabled for the net)
+        Args:
+            net_name: The net to be checked
+
+        Returns:
+            True if floating IPs are supported
+        """
+        # Network require a floating IP if at least one of the router attached is external
+        net_routers: List[RouterModel] = self.get_routers_in_net(net_name)
         for router in net_routers:
-            # check if the net is connected to this router
-            if "external_gateway_info" in router and "enable_snat" in router["external_gateway_info"] and \
-                    router["external_gateway_info"]["enable_snat"] is True:
+            # Check if the NET is connected to this router
+            if(router.external_gateway_info and
+               "enable_snat" in router.external_gateway_info and
+               router.external_gateway_info["enable_snat"] is True):
                 return True
         return False
 
     @obj_multiprocess_lock
     def reserve_range(self, net_name: str, range_length: int, owner: str, vim_name: typing.Optional[str] = None) \
-            -> dict:
+            -> IPv4ReservedRange:
         """
         Reserve a range in a network of the topology. The range has an owner. The network can be retrieved from a VIM.
         Args:
@@ -499,18 +682,17 @@ class Topology:
         Returns:
             The IP range -> {'start': '192.168.0.1', 'end': '192.168.0.100'}
         """
-        net = self.get_network(net_name, vim_name)
-        reserved_ips = net['allocation_pool'] if 'reserved_ranges' not in net \
-            else net['allocation_pool'] + net['reserved_ranges']
-        ip_range = get_range_in_cidr(net['cidr'], reserved_ips, range_length)
+        net: NetworkModel = self.get_network(net_name, vim_name)
+
+        # Reserved IPs are the reserved ones + IPs already allocated
+        reserved_ips = net.allocation_pool + net.reserved_ranges
+        ip_range = get_range_in_cidr(net.cidr, reserved_ips, range_length)
 
         reserved_range = self.set_reserved_ip_range(ip_range, net_name, owner)
 
-        self.save_topology()
-        self.trigger_event(TopologyEventType.TOPO_CREATE_RANGE_RES, reserved_range)
-        return ip_range  # TODO should return LBPool object, for more information.
+        return reserved_range
 
-    def set_reserved_ip_range(self, ip_range: dict, net_name: str, owner: str) -> dict:
+    def set_reserved_ip_range(self, ip_range: IPv4Pool, net_name: str, owner: str) -> IPv4ReservedRange:
         """
         Set up a reserved ip range for a network of the topology.
         Args:
@@ -521,143 +703,157 @@ class Topology:
         Returns:
             The reserved IP range
         """
-        topology_net = next((n for n in self._data['networks'] if n['name'] == net_name), None)
-        if not topology_net:
-            raise ValueError('network {} not found in the topology'.format(net_name))
-        if topology_net['external']:
-            raise ValueError('network {} is external. Not possible to reserve any IP ranges.'.format(net_name))
-        if 'reserved_ranges' not in topology_net:
-            topology_net['reserved_ranges'] = []
-        ip_range['owner'] = owner
-        topology_net['reserved_ranges'].append(ip_range)
+        topo_net = self._model.get_network(net_name)  # Throw error in case not found
+        if topo_net.external:
+            raise ValueError('Network {} is external. Not possible to reserve any IP ranges.'.format(net_name))
+
+        ip_range = IPv4ReservedRange(start=ip_range.start, end=ip_range.end, owner=owner)
+        topo_net.add_reserved_range(ip_range)
+
+        self._save_topology_from_model()  # Since we are working on the model
+        trigger_event(TopologyEventType.TOPO_CREATE_RANGE_RES, ip_range.dict())
         return ip_range
 
     @obj_multiprocess_lock
-    def release_ranges(self, owner: str, ip_range: typing.Optional[dict] = None, net_name: typing.Optional[str] = None):
+    def release_ranges(self, owner: str, ip_range: IPv4ReservedRange = None,
+                       net_name: str = None) -> IPv4ReservedRange:
+        """
+        Release a reserved range. It is possible by giving the owner name or the full specification.
+        Args:
+            owner: The owner of the reservation. Mandatory
+            ip_range: Optional IP range, in case there are multiple reservation.
+            net_name: Optional network name in witch the reservation is searched.
+        Returns:
+            The deleted IP range reservation
+        """
+        removed_range: Union[IPv4ReservedRange, None] = None
+
         if net_name is None:
-            for network in self._data['networks']:
-                if 'reserved_ranges' in network:
-                    network['reserved_ranges'] = [p for p in network['reserved_ranges'] if p['owner'] != owner]
+            # Iterating over all the networks because no network was given.
+            for network in self._model.networks:
+                removed_range = self._priv_rel_range(owner=owner, network=network, ip_range=ip_range)
+                if removed_range:
+                    break
         else:
-            network = next((n for n in self._data['networks'] if n['name'] == net_name), None)
-            if network is None:
-                logger.error('network not found in the topology. Aborting IP range release')
+            # Looking for the reservation to be removed in the desired network
+            network = self._model.get_network(net_name)
+            removed_range = self._priv_rel_range(owner=owner, network=network, ip_range=ip_range)
+
+        if removed_range is None:
+            msg_err = "The range has not been found and removed."
+            logger.error(msg_err)
+        else:
+            self._save_topology_from_model()
+            trigger_event(TopologyEventType.TOPO_DELETE_RANGE_RES, removed_range.to_dict())
+            return removed_range
+
+    def _priv_rel_range(self, owner: str, network: NetworkModel, ip_range: IPv4ReservedRange) \
+            -> Union[IPv4ReservedRange, None]:
+
+        # Looking for the reservation to be removed in every reserved range.
+        for reserved_range in network.reserved_ranges:
+            if ip_range is None:
+                # Checking reserved range has the required owner
+                if reserved_range.owner == owner:
+                    network.reserved_ranges.remove(reserved_range)
+                    return reserved_range
             else:
-                if 'reserved_ranges' in network:
-                    if ip_range is None:
-                        # Exclude all reserved range with the target owner
-                        network['reserved_ranges'] = [ip_pool for ip_pool in network['reserved_ranges'] if ip_pool['owner'] != owner]
-                    else:
-                        # Exclude the reserved range with the target owner and the same starting ip.
-                        network['reserved_ranges'] = [p for p in network['reserved_ranges'] if p['owner'] != owner and
-                                                p['start'] != ip_range['start']]
-        self.trigger_event(TopologyEventType.TOPO_DELETE_RANGE_RES, {})
-        #network['reserved_ranges'] TODO IPv4Address is not JSON serializable
-        self.save_topology()
+                # Ensure that the owner inside the reservation is the required one
+                assert owner == ip_range.owner
+                # Checking reserved range is equal to the required one (owner, start ip, end ip)
+                if reserved_range == ip_range:
+                    network.reserved_ranges.remove(reserved_range)
+                    return reserved_range
+
+        return None
 
     @obj_multiprocess_lock
-    def add_pdu(self, pdu_input: Union[PduModel, dict]):
-        status = "error"
-        details = ""
-        if type(pdu_input) is PduModel:
-            pdu = pdu_input.dict()
-        else:
-            pdu = PduModel.parse_obj(pdu_input).dict(by_alias=True)
+    def add_pdu(self, pdu_input: PduModel):
+        """
+        Add PDU to the topology
+        Args:
+            pdu_input: The PDU to be added to the topology
+        """
+        pdu_input.nfvo_onboarded = False
         try:
-            # pdu_list = self.nbiutil.get_pdu_list()
-            pdu_check = next((item for item in self._data['pdus'] if item['name'] == pdu['name']), None)
-            if pdu_check:
-                raise ValueError('PDU {} already existing'.format(pdu['name']))
+            pdu_input.details = ""
+            self._model.add_pdu(pdu_input)
 
-            # status = "not onboarded"
-            pdu.update({'nfvo-onboarded': False, "details": ""})
-            self._data['pdus'].append(pdu)
-            self.save_topology()
-
-            pdu_dict = PduModel.parse_obj(pdu).dict()
-            self.trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_dict)
-            self.save_topology()
-
-        except Exception:
+        except ValueError:
+            # Value error is thrown when the PDU already exist, in this case we will
             logger.error(traceback.format_exc())
             details = "{}".format(traceback.format_exc())
-            pdu.update({'nfvo-onboarded': False, "details": details})
-            pdu_candidate = next((item for item in self._data['pdus'] if item['name'] == pdu['name']), None)
-            if not pdu_candidate:
-                self._data['pdus'].append(pdu)
-            self.save_topology()
-            # TODO add event pubblication?
+
+            # Updating existing pdu, TODO Does it have sense?
+            existing_pdu = self._model.get_pdu(pdu_input.name)
+            existing_pdu.details = details
+
+        # Saving changes to the topology
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.dict())
 
     @obj_multiprocess_lock
     def del_pdu(self, pdu_name: str):
-        try:
-            pdu = next(item for item in self._data['pdus'] if item['name'] == pdu_name)
-            res = False
-            if pdu['nfvo-onboarded']:
-                res = self.nbiutil.delete_pdu(pdu_name)
-                logger.info("Deleting pdu from OSM, result: {}".format(res))
+        """
+        Delete a PDU from the topology. De-onboard it from OSM if previously onboarded.
+        Args:
+            pdu_name: The name of the PDU to be removed from the topology
+        """
+        pdu = self._model.get_pdu(pdu_name)
+
+        if pdu.nfvo_onboarded:
+            res = self.osm_nbi_util.delete_pdu(pdu_name)
+            logger.info("Deleting pdu from OSM, result: {}".format(res))
+
             if res:
-                self._data['pdus'] = [item for item in self._data['pdus'] if item['name'] != pdu_name]
+                deleted_pdu = self._model.del_pdu(pdu_name)
+            else:
+                msg_err = "->{}<- PDU deonboarding failed. PDU not removed".format(pdu.name)
+                logger.error(msg_err)
+                raise ValueError(msg_err)
+        else:
+            deleted_pdu = self._model.del_pdu(pdu_name)
 
-            self.trigger_event(TopologyEventType.TOPO_DELETE_PDU, pdu)
-            self.save_topology()
+        trigger_event(TopologyEventType.TOPO_DELETE_PDU, deleted_pdu.dict())
+        self._save_topology_from_model()
 
-        except ValueError as err:
-            logger.error(err)
-            raise ValueError('error in creating PDU')
-        except Exception:
-            logger.error(traceback.format_exc())
+    def get_pdu(self, pdu_name: str) -> PduModel:
+        """
+        Returns a PDU given the name
+        Args:
+            pdu_name: The name of the PDU
 
-    def get_pdu(self, pdu_name: str):
-        return next((item for item in self._data['pdus'] if item['name'] == pdu_name), None)
+        Returns: The PDU
+        """
+        return self._model.get_pdu(pdu_name)
 
     def get_pdus(self):
-        return self._data['pdus']
+        """
+        Returns a list of PDUs
+        """
+        return self._model.get_pdus()
 
-    def get_k8scluster(self):
-        return self._data['kubernetes']
-
-    def get_k8scluster_model(self) -> List[K8sModel]:
+    def get_k8s_clusters(self) -> List[K8sModel]:
         """
         Get the k8s cluster list from the topology as List[K8sModel]
 
         Returns:
             List[K8sModel]: the k8s cluster list
         """
-        k8s_clusters: List[K8sModel] = parse_k8s_clusters_from_dict(self._data['kubernetes'])
-        return k8s_clusters
-
+        return self._model.kubernetes
 
     @obj_multiprocess_lock
-    def add_k8scluster(self, data: dict):
-        # check if clusters with the same name exists
+    def add_k8scluster(self, data: K8sModel):
+        """
+        Add the k8s cluster to the topology. If specified it onboard the cluster on OSM
+        Args:
+            data: the k8s cluster to be adde
+        """
+        # Delegate add operation to the model. Registering the cluster on OSM if requested
+        self._model.add_k8s_cluster(data, self.osm_nbi_util)
 
-        k8s_cluster = next((item for item in self._data['kubernetes'] if item['name'] == data['name']), None)
-        if k8s_cluster:
-            raise ValueError('Kubernetes cluster with name {} already exists in the topology'.format(data['name']))
-
-        self._data['kubernetes'].append(data)
-        if 'nfvo_onboard' in data and data['nfvo_onboard']:
-            self._data['kubernetes'][-1]['nfvo_status'] = 'onboarding'
-            # Fixme use pydantic model?
-            vims = self.nbiutil.get_vims()
-            # retrieve vim_id using vim_name
-            vim_id = next((item['_id'] for item in vims if item['name'] == data['vim_name'] and '_id' in item), None)
-            if vim_id is None:
-                raise ValueError('VIM (name={}) has not a vim_id'.format(data['vim_name']))
-            if self.nbiutil.add_k8s_cluster(
-                    data['name'],
-                    data['credentials'],
-                    data['k8s_version'],
-                    vim_id,
-                    data['networks']
-            ):
-                self._data['kubernetes'][-1]['nfvo_status'] = 'onboarded'
-            else:
-                self._data['kubernetes'][-1]['nfvo_status'] = 'error'
-
-        self.trigger_event(TopologyEventType.TOPO_CREATE_K8S, data)
-        self.save_topology()
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_CREATE_K8S, data.dict())
 
     @obj_multiprocess_lock
     def del_k8scluster(self, cluster_id: str):
@@ -667,129 +863,88 @@ class Topology:
         Args:
             cluster_id: The id (or name) of the cluster to be removed
         """
-        #Obtaining the name of the cluster to delete
-        if not cluster_id:
-            raise ValueError('Error while trying to delete k8s cluster: parsed name is null')
-        # check if it exists
-        k8s_matching_cluster_list = [item for item in self._data['kubernetes'] if item['name'] == cluster_id]
+        k8s_deleted_cluster = self._model.del_k8s_cluster(cluster_id, self.osm_nbi_util)
 
-        #Checking if there is at least one element, that is the cluster we want to delete
-        if len(k8s_matching_cluster_list)>0:
-            k8s_cluster = k8s_matching_cluster_list[0]
-            if k8s_cluster['nfvo_status'] == 'onboarded':
-                if not self.nbiutil.delete_k8s_cluster(cluster_id):
-                    raise ValueError('Kubernetes {} cannot be de-onboarded... still in use? Aborting...'.format(cluster_id))
-
-            #Setting new k8s cluster list as
-            self._data['kubernetes'] = [item for item in self._data['kubernetes'] if item['name'] != cluster_id]
-
-            self.trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_cluster)
-            self.save_topology()
-        else:
-            logger.error("Deleting k8s cluster: no cluster called {} was found".format(cluster_id))
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_deleted_cluster.dict())
 
     @obj_multiprocess_lock
-    def update_k8scluster(self, name: str, data: dict):
-        cluster = next(item for item in self._data['kubernetes'] if item['name'] == name)
-        if cluster['nfvo_status'] != 'onboarded' and 'nfvo_onboard' in data and data['nfvo_onboard']:
-            cluster.update(data)
-            logger.info("Updated k8s cluster {} data with {}".format(name, data))
-            cluster['nfvo_status'] = 'onboarding'
+    def update_k8scluster(self, cluster: K8sModel):
+        """
+        Update a topology K8s cluster
+        Args:
+            cluster: The k8s cluster to be added in the topology
+        """
+        updated_cluster = self._model.upd_k8s_cluster(cluster, self.osm_nbi_util)
 
-            vims = self.nbiutil.get_vims()
-            # retrieve vim_id using vim_name
-            vim_id = next((item['_id'] for item in vims if item['name'] == cluster['vim_name'] and '_id' in item), None)
-            if vim_id is None:
-                raise ValueError('VIM (name={}) has not a vim_id'.format(cluster['vim_name']))
-            # Fixme use pydantic model?
-            if self.nbiutil.add_k8s_cluster(
-                    cluster['name'],
-                    cluster['credentials'],
-                    cluster['k8s_version'],
-                    vim_id,
-                    cluster['networks']
-            ):
-                cluster['nfvo_status'] = 'onboarded'
-                logger.info("K8s cluster {} onboarded".format(name))
-            else:
-                cluster['nfvo_status'] = 'error'
-                logger.error("K8s cluster {} onboard failed".format(name))
-        else:
-            # Update data also in case 'not onboarding'
-            cluster.update(data)
-            logger.info("Updated k8s cluster {} data with {}".format(name, data))
-
-        self.save_topology()
-        self.trigger_event(TopologyEventType.TOPO_UPDATE_K8S, data)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_UPDATE_K8S, updated_cluster.dict())
 
     @obj_multiprocess_lock
     def add_prometheus_server(self, prom_server: PrometheusServerModel):
+        """
+        Add prometheus server to the topology. After this operation it should be possible to configure this instance to
+        scrape data from target dynamically from the NFVCL.
+        Args:
+            prom_server: The server that will be added to the topology
+        """
         # Check if there is an instance with the same id
-        prom_instance = next((prom_instance for prom_instance in self._data['prometheus_srv']
-                              if prom_instance['id'] == prom_server.id), None)
-        if prom_instance is not None:
-            raise ValueError("There is already a prometheus instance with that ID")
-
-        self._data['prometheus_srv'].append(prom_server.dict())
-        self.save_topology()
-        self.trigger_event(TopologyEventType.TOPO_CREATE_PROM_SRV, prom_server.dict())
+        self._model.add_prometheus_srv(prom_server)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_CREATE_PROM_SRV, prom_server.dict())
 
     @obj_multiprocess_lock
-    def del_prometheus_server(self, prom_server_id: str, force: bool = False):
-        # Getting the position of the prom server to be deleted
-        prom_instance_index = next((index for index, prom_instance in enumerate(self._data['prometheus_srv'])
-                                    if prom_instance['id'] == prom_server_id), None)
+    def del_prometheus_server(self, prom_srv_id: str, force: bool = False) -> PrometheusServerModel:
+        """
+        Delete prometheus server from the topology.
+        Args:
+            prom_srv_id: The ID of the prom server to be removed from the topology
+            force: The force removal even if there are configured jobs.
+        Returns:
+            The deleted instance
+        """
+        deleted_prom_instance = self._model.del_prometheus_srv(prom_srv_id, force)
 
-        if prom_instance_index is None:
-            raise ValueError("The prometheus instance to be deleted has not been found")
+        remove_files_by_pattern("day2_files", 'prometheus_{}'.format(prom_srv_id))
 
-        # Removing the prom instance from the topology, and saving it to trigger the event
-        if len(self._data['prometheus_srv']['jobs']) > 0 and not force:
-            raise ValueError("The prometheus instance to be deleted has configured jobs. You have to remove active"
-                             "jobs or force the deletion in the request.")
-        else:
-            prom_instance = self._data['prometheus_srv'].pop(prom_instance_index)
-            self.save_topology()
-            self.trigger_event(TopologyEventType.TOPO_DELETE_PROM_SRV, prom_instance)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_DELETE_PROM_SRV, deleted_prom_instance.dict())
+        return deleted_prom_instance
 
+    @obj_multiprocess_lock
     def update_prometheus_server(self, prom_server: PrometheusServerModel):
-        prom_instance_index = next((index for index, prom_instance in enumerate(self._data['prometheus_srv'])
-                                    if prom_instance['id'] == prom_server.id), None)
+        """
+        Update a Prometheus server instance of the topology
+        Args:
+            prom_server: The prometheus server to be updated
+        """
+        updated_instance = self._model.upd_prometheus_srv(prom_server)
 
-        if prom_instance_index is None:
-            raise ValueError("The prometheus instance to be updated has not been found")
-
-        prom_instance = self._data['prometheus_srv'][prom_instance_index]
-        prom_instance.update(prom_server.dict())
-
-        self.save_topology()
-        self.trigger_event(TopologyEventType.TOPO_UPDATE_PROM_SRV, prom_instance)
-
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_UPDATE_PROM_SRV, updated_instance.dict())
 
     def get_prometheus_server(self, prom_server_id: str) -> PrometheusServerModel:
-        prom_instance = next((prom_instance for prom_instance in self._data['prometheus_srv']
-                              if prom_instance['id'] == prom_server_id), None)
-        if prom_instance is None:
-            raise ValueError("The prometheus instance to be returned has not been found")
+        """
+        Return a specific instance of a prometheus server given the ID from the topology.
+        Args:
+            prom_server_id: The ID of the instance to be retrieved.
 
-        return PrometheusServerModel.parse_obj(prom_instance)
+        Returns:
+            The prometheus server instace
+        """
+        prom_instance = self._model.find_prom_srv(prom_server_id)
+
+        return prom_instance
 
     def get_prometheus_servers_model(self) -> List[PrometheusServerModel]:
-        list_model = [PrometheusServerModel.parse_obj(item) for item in self._data['prometheus_srv']]
-        return list_model
+        """
+        Returns the prometheus server instance model list
+        """
+        return self._model.prometheus_srv
 
-    def get_prometheus_servers(self) -> List[PrometheusServerModel]:
+    def get_prometheus_servers(self) -> dict:
+        """
+        Returns the prometheus server instance list (dict)
+        """
         list_model = self._data['prometheus_srv']
         return list_model
-
-    def trigger_event(self, event_name: TopologyEventType, data: dict):
-        """
-        Send an event, together with the data that have been updated, to REDIS.
-
-        Args:
-            event_name: the name of the event
-            data: the updated data (dict)
-        """
-
-        event: Event = Event(operation=event_name.value, data=data)
-        trigger_redis_event(redis_cli, TOPOLOGY_TOPIC, event)

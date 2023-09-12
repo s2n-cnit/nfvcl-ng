@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Query, status, HTTPException
-from models.k8s import K8sModel, K8sModelCreateFromBlueprint, K8sModelCreateFromExternalCluster, K8sModelUpdateRequest
+from models.k8s.topology_k8s_model import K8sModel, K8sModelCreateFromBlueprint, K8sModelCreateFromExternalCluster
 from models.prometheus.prometheus_model import PrometheusServerModel
 from models.topology import TopologyModel
 from models.network import NetworkModel, RouterModel, PduModel
@@ -120,27 +120,19 @@ async def update_vim(
         vim_id: str,
         updated_vim: UpdateVimModel,
         terraform: bool = Query(default=False,
-                                description="set to true if you want to terraform the VIM")
-):
+                                description="set to true if you want to terraform the VIM")):
     msg = updated_vim.dict()
     msg.update({'terraform': terraform})
     return produce_msg_worker('vims', vim_id, 'update_vim', msg_body=msg)
 
 
-@topology_router.delete(
-    "/vim/{vim_id}",
-    response_model=RestAnswer202,
-    status_code=status.HTTP_202_ACCEPTED,
-    callbacks=callback_router.routes
-)
-async def delete_vim(
-        vim_id: str,
-        terraform: bool = Query(default=False,
-                                description="set to true if you want to terraform the VIM")
-):
-    msg = get_topology_item('vims', vim_id)
+@topology_router.delete("/vim/{vim_name}",response_model=RestAnswer202,status_code=status.HTTP_202_ACCEPTED,
+    callbacks=callback_router.routes)
+async def delete_vim(vim_name: str, terraform: bool = Query(default=False,
+                     description="set to true if you want to terraform the VIM")):
+    msg = {'vim_name': vim_name}
     msg.update({'terraform': terraform})
-    return produce_msg_worker('vims', vim_id, 'del_vim', msg_body=msg)
+    return produce_msg_worker('vims', vim_name, 'del_vim', msg_body=msg)
 
 
 @topology_router.get("/network/{network_id}", response_model=NetworkModel)
@@ -184,7 +176,11 @@ async def create_router(router: RouterModel):
 @topology_router.delete("/router/{router_id}", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
                         callbacks=callback_router.routes)
 async def delete_router(router_id: str):
-    return produce_msg_worker('routers', router_id, 'del_router')
+    msg = {}
+    msg.update({'ops_type': 'del_router'})
+    msg.update({'router_id': router_id})
+    topology_msg_queue.put(msg)
+    return {'id': router_id, 'operation_type': 'del_router'}
 
 
 @topology_router.get("/pdu/{pdu_id}", response_model=PduModel)
@@ -233,7 +229,7 @@ async def create_k8scluster(cluster: K8sModelCreateFromBlueprint):
         if not blue_item:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                                 detail='Blueprint {} not found'.format(msg['blueprint_ref']))
-        if blue_item['type'] != 'K8s':
+        if blue_item['type'] not in ['K8s', 'K8sBeta']:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail='Blueprint {} is not a Kubernetes cluster'
                                 .format(msg['blueprint_ref']))
@@ -275,12 +271,14 @@ async def add_external_k8scluster(cluster: K8sModelCreateFromExternalCluster):
 @topology_router.put("/kubernetes/{cluster_id}", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
                      callbacks=callback_router.routes, summary=UPD_K8SCLUSTER_SUMMARY,
                      description=UPD_PROM_SRV_DESCRIPTION)
-async def update_k8scluster(cluster_updates: K8sModelUpdateRequest, cluster_id):
+async def update_k8scluster(cluster_updates: K8sModel, cluster_id):
     msg = cluster_updates.dict()
 
     # check if the cluster exists in the topology
     topology = Topology.from_db(db, nbiUtil, topology_lock)
-    candidate_cluster = next((item for item in topology.get_k8scluster() if item['name'] == cluster_id), None)
+
+    candidate_cluster = next((item for item in topology.get_k8s_clusters() if item.name == cluster_id), None)
+
     if not candidate_cluster:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Kubernetes cluster {} cannot be found in the topology'
@@ -301,7 +299,7 @@ async def delete_k8scluster(cluster_id: str):
 @topology_router.get("/kubernetes", response_model=List[K8sModel])
 async def get_k8scluster():
     topology = Topology.from_db(db, nbiUtil, topology_lock)
-    return topology.get_k8scluster()
+    return topology.get_k8s_clusters()
 
 
 @topology_router.post("/prometheus", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
@@ -340,7 +338,8 @@ async def del_prom(prom_srv_id: str):
 
 @topology_router.get("/prometheus", response_model=List[PrometheusServerModel], status_code=status.HTTP_202_ACCEPTED,
                      callbacks=callback_router.routes, summary=GET_PROM_LIST_SRV_SUMMARY,
-                     description=GET_PROM_LIST_SRV_DESCRIPTION)
+                     description=GET_PROM_LIST_SRV_DESCRIPTION,
+                     name="TOPO Get Prometheus servers")
 async def get_prom_list():
     topology = Topology.from_db(db, nbiUtil, topology_lock)
     prom_list = topology.get_prometheus_servers_model()

@@ -2,10 +2,11 @@ import json
 from logging import Logger
 from fastapi import APIRouter, HTTPException, Body, status
 from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
-    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList
-from models.k8s import K8sModel
+    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota
+from models.k8s.blueprint_k8s_model import K8sModel
 from main import *
-from models.k8s.k8s_models import K8sPluginName, K8sOperationType, K8sModelManagement, K8sPluginsToInstall
+from models.k8s.topology_k8s_model import K8sPluginName, K8sOperationType, K8sModelManagement, K8sPluginsToInstall, \
+    K8sQuota
 from models.response_model import OssCompliantResponse, OssStatus
 from rest_endpoints.rest_callback import RestAnswer202
 from topology.topology import Topology
@@ -14,7 +15,7 @@ from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins,
 from utils.redis_utils.redis_manager import get_redis_instance
 from utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
     k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_to_user, \
-    k8s_delete_namespace
+    k8s_delete_namespace, k8s_add_quota_to_namespace
 from utils.log import create_logger
 
 k8s_router = APIRouter(
@@ -40,7 +41,7 @@ def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
         The matching k8s cluster or Throw HTTPException if NOT found.
     """
     topology = Topology.from_db(db, nbiUtil, topology_lock)
-    k8s_clusters: List[K8sModel] = topology.get_k8scluster_model()
+    k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
     match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
     if match:
@@ -602,10 +603,44 @@ async def create_k8s_kubectl_user(cluster_id: str, username: str, expire_seconds
     return auth_response
 
 
+@k8s_router.post("/{cluster_id}/quota/{namespace}/{quota_name}", response_model=OssCompliantResponse)
+async def apply_resource_quota_namespace(cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota):
+    """
+    Add a quota reservation (for resources) to the namespace.
+    Args:
+        cluster_id: The cluster on witch the quota is created
+
+        namespace: The namespace target of the quota reservation
+
+        quota_name: The name of the reservation
+
+        quota: The quantities to be reserved
+
+    Returns:
+        The created quota.
+    """
+
+    # Get k8s cluster and k8s config for client
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+
+    try:
+        quota_resp: V1ResourceQuota = k8s_add_quota_to_namespace(kube_client_config=k8s_config,namespace_name=namespace,
+                                                                 quota_name=quota_name, quota=quota)
+
+    except (ValueError, ApiException) as val_err:
+        logger.error(val_err)
+        resp = OssCompliantResponse(status=OssStatus.failed, detail=val_err.body, result={})
+        return resp
+
+    resp = OssCompliantResponse(status=OssStatus.ready, detail="Quota created", result=quota_resp.to_dict())
+    return resp
+
+
 @k8s_router.post("/{cluster_id}/sidecar/{namespace}/{pod_name}", response_model=dict)
 async def add_k8s_sidecar_to_pod(cluster_id: str, namespace: str, pod_name: str):
     """
-    Add a sidecar to a Pod
+    Add a sidecar to a Pod TESTING
     Args:
         cluster_id:
         namespace:

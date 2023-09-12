@@ -120,19 +120,28 @@ def create_logger(name: str) -> logging.getLogger:
     return logger
 
 
-# Class decorator for locking methods
 def obj_multiprocess_lock(func):
+    """
+    Class decorator for locking methods that edit topology information
+    Semaphore for topology. Locks the topology such that only ONE operation is made at the same time.
+    """
     def wrapper(self, *args, **kwargs):
-        print("acquiring lock")
+        print("Acquiring lock")
         self.lock.acquire()
-        print("acquired lock")
+        print("Acquired lock")
 
-        r = func(self, *args, **kwargs)
-
-        print("releasing lock")
-        self.lock.release()
-        print("released lock")
-        return r
+        # In case of crash we still need to unlock the semaphore -> TRY
+        try:
+            #
+            response = func(self, *args, **kwargs)
+            print("Releasing lock")
+            self.lock.release()
+            print("Released lock")
+            return response
+        except Exception as excep:
+            # In case of crash we still need to unlock the semaphore
+            self.lock.release()
+            raise excep
 
     return wrapper
 

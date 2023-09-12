@@ -8,6 +8,7 @@ import yaml
 from pathlib import Path
 from typing import List
 from urllib3.exceptions import InsecureRequestWarning
+from models.k8s.topology_k8s_model import K8sModel
 from utils.log import create_logger
 from utils.util import get_nfvcl_config
 
@@ -65,7 +66,7 @@ class NbiUtil:
         if osm_ip is None:
             raise ValueError("OSM IP address not available")
         else:
-            self.osm_nbi_url = "https://" + osm_ip + ":" + osm_port + "/osm"
+            self.osm_nbi_url = "https://{}:{}/osm".format(osm_ip, osm_port)
 
         self.vim_account_id = vim_account_id
         self.base_url = self.osm_nbi_url
@@ -466,9 +467,17 @@ class NbiUtil:
             return False
 
     # Kubernetes Clusters ###################################################################################
-    def add_k8s_cluster(self, name: str, conf: dict, k8s_version: str, vim: str, k8s_net_names: List['str']):
+    def add_k8s_cluster_model(self, vim: str, k8s_cluster: K8sModel):
+        return self.add_k8s_cluster(name=k8s_cluster.name,
+                             conf=k8s_cluster.credentials,
+                             k8s_version=k8s_cluster.k8s_version,
+                             vim=vim,
+                             k8s_net_names=k8s_cluster.networks)
+
+
+    def add_k8s_cluster(self, name: str, conf: str, k8s_version: str, vim: str, k8s_net_names: List[str]):
         if len(self.get_k8s_clusters()) > 0:
-            logger.warn('trying to onboard multiple k8s clusters. OSM currently support one cluster. Aborting')
+            logger.warning('trying to onboard multiple k8s clusters. OSM currently support one cluster. Aborting')
             return False
         k8s_nets = {}
         for net_name in k8s_net_names:
@@ -488,6 +497,7 @@ class NbiUtil:
         }
         result = self.post_x(data, '/admin/v1/k8sclusters')
         if self.check_REST_response(result):
+            logger.debug("Successfully onboarded K8s cluster ->{}<-".format(name))
             return result.json()
         else:
             logger.error('error on k8s cluster creation')
@@ -552,8 +562,8 @@ class NbiUtil:
             logger.error("VIM creation error: {}".format(result.reason))
             return False
 
-    def del_vim(self, id):
-        result = self.delete_x('/admin/v1/vim_accounts/' + str(id))
+    def del_vim(self, vim_id):
+        result = self.delete_x('/admin/v1/vim_accounts/' + str(vim_id))
         if self.check_REST_response(result):
             return result.json()
         else:
@@ -572,7 +582,9 @@ class NbiUtil:
         if self.check_REST_response(r):
             vim_list = r.json()
             if vim_list is None or not vim_list:
-                raise ValueError('VIM not found on OSM')
+                msg_err = 'VIM >{}< not found on OSM with tenant name >{}<'.format(name, tenant)
+                logger.error(msg_err)
+                raise ValueError(msg_err)
             else:
                 return vim_list[0]
         else:
@@ -606,7 +618,7 @@ class NbiUtil:
     def delete_k8s_repo(self, name: str):
         repo = next((item for item in self.get_k8s_repos() if item['name'] == name), None)
         if repo is None:
-            logger.warn('Helm repository with name {} not existing'.format(name))
+            logger.warning('Helm repository with name {} not existing'.format(name))
             return False
 
         result = self.delete_x('/admin/v1/k8srepos/{}'.format(repo['_id']))

@@ -1,10 +1,11 @@
-from pydantic import BaseModel, AnyHttpUrl
+from pydantic import BaseModel, AnyHttpUrl, Field
 
 
 class RestAnswer202(BaseModel):
     id: str
-    description: str ='operation submitted'
-    status: str ='submitted'
+    operation_type: str = Field(default="", description="The requested operation")
+    description: str = 'operation submitted'
+    status: str = 'submitted'
 
 
 class CallbackModel(BaseModel):

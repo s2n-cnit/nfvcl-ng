@@ -14,7 +14,7 @@ from threading import Thread
 from blueprints import BlueprintBase
 from models.blueprint.blue_types import blueprint_types
 from topology.topology import Topology
-from models.k8s import K8sModel
+from models.k8s.topology_k8s_model import K8sModel
 from .blue_models import *
 from main import old_workers, db, persistency, id_generator, nbiUtil, topology_lock, workers
 from utils.k8s import get_pods_for_k8s_namespace, get_k8s_config_from_file_content, parse_k8s_clusters_from_dict
@@ -329,9 +329,7 @@ def get_pods(blue_id: str):
 
     topology = Topology.from_db(db, nbiUtil, topology_lock)
 
-    k8s_list = topology.get_k8scluster()
-
-    k8s_clusters: List[K8sModel] = parse_k8s_clusters_from_dict(k8s_list)
+    k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
 
     # TODO test code
     pods_for_cluster: dict = {}

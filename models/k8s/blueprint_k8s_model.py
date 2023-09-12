@@ -1,36 +1,9 @@
-from enum import Enum
 from ipaddress import IPv4Network
 from typing import List, Optional, Literal, Dict
 from pydantic import BaseModel, Field, conlist
+from models.k8s.common_k8s_model import LBPool, Cni
+from models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from models.virtual_link_desc import VirtLinkDescr
-
-
-class Cni(Enum):
-    flannel = 'flannel'
-    calico = 'calico'
-
-
-class LbType(Enum):
-    layer2 = 'layer2'
-    layer3 = 'layer3'
-
-
-class LBPool(BaseModel):
-    mode: LbType = Field(
-        'layer2', description='Operating mode of Metal-LB. Default Layer-2.'
-    )
-    net_name: str = Field(
-        ..., description='name of the network in the topology'
-    )
-    ip_start: Optional[str]
-    ip_end: Optional[str]
-    range_length: Optional[int] = Field(
-        None,
-        description='Number of IPv4 addresses to reserved if no ip start and end are passed. Default 10 addresses.',
-    )
-
-    class Config:
-        use_enum_values = True
 
 
 class K8sNetworkEndpoints(BaseModel):
@@ -63,8 +36,8 @@ class K8sAreaInfo(BaseModel):
 
 
 class K8sConfig(BaseModel):
-    version: Optional[str] = "1.24"
-    cni: Optional[Cni] = "flannel"
+    version: K8sVersion = Field(default=K8sVersion.V1_24)
+    cni: Cni = Field(default=Cni.flannel)
     linkerd: Optional[dict]
     pod_network_cidr: Optional[IPv4Network] \
         = Field('10.254.0.0/16', description='K8s Pod network IPv4 cidr to init the cluster')
@@ -88,9 +61,10 @@ class K8sBlueprintCreate(BaseModel):
         description='url that will be used to notify when the blueprint processing finishes',
     )
     config: K8sConfig
-    areas: conlist(K8sAreaInfo, min_items=1) = Field(
+    areas: List[K8sAreaInfo] = Field(
         ...,
         description='list of areas to instantiate the Blueprint',
+        min_items=1
     )
 
     class Config:
@@ -103,6 +77,27 @@ class K8sBlueprintModel(K8sBlueprintCreate):
     K8sBlueprintCreate
     """
     blueprint_instance_id: str = Field(description="The blueprint ID generated when it has been instantiated")
+
+    def parse_to_k8s_topo_model(self, vim_name: str) -> K8sModel:
+        """
+        Parse the blueprint model to the topology representation
+        Args:
+            vim_name: The vim name
+        Returns:
+            The parsed model.
+        """
+        k8s_data: K8sModel = K8sModel(
+            name=self.blueprint_instance_id,
+            provided_by='blueprint',
+            blueprint_ref=self.blueprint_instance_id,
+            k8s_version=self.config.version,
+            credentials=self.config.master_credentials,
+            vim_name=vim_name,
+            networks=[item.net_name for item in self.config.network_endpoints.data_nets],
+            areas=[item.id for item in self.areas],
+            cni=self.config.cni,
+            nfvo_onboarded=False)
+        return k8s_data
 
 
 class K8sBlueprintScale(BaseModel):

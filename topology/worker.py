@@ -74,5 +74,5 @@ def topology_worker(db: OSSdb, nbiutil: NbiUtil, queue: Queue, lock: RLock):
 
         finally:
             if 'callback' in msg and msg['callback']:
-                logger.warn("add here the code for the callback message {} {}".format(ops_type, success))
+                logger.warning("add here the code for the callback message {} {}".format(ops_type, success))
             # FIXME: pubsub here?

@@ -799,10 +799,23 @@ class BlueprintBaseBeta(abc.ABC):
             return None
 
     def setup_prom_scraping(self, prom_info: BlueEnablePrometheus):
+        """
+        Set a scraping job on the requested prometheus server instance (present in the topology).
+        The scraping job is configured on the node exporters that belong to the blueprint (present in
+        self.base_model.node_exporters)
+        Args:
+            prom_info: info about prometheus instance, containing the prometheus instance ID (coherent with the one
+            in the topology)
+
+        Raises:
+            ValueError if the prom server instance is not found in the topology.
+        """
         if hasattr(prom_info, 'prom_server_id'):
             topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
             prom_server = topology.get_prometheus_server(prom_info.prom_server_id)
-            prom_server.add_jobs(targets=self.base_model.node_exporters, labels={'k8scluster': self.get_id()})
+            # Add new jobs to the existing configuration
+            prom_server.add_jobs(targets=self.base_model.node_exporters, labels={'blueprint': self.get_id()})
+            # Update the sd_file on the prometheus server.
             topology.update_prometheus_server(prom_server)
             prom_server.update_remote_sd_file()
         else:

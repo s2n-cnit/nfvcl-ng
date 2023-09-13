@@ -42,17 +42,43 @@ def nsd_build_package(name, nsd):
     # os.chdir('../..')
 
 
-# Decorator to validate authorization prior API call
-def check_authorization(f):
+def check_authorization(decorated_function):
+    """
+    Decorator! Check if the token is still valid before API call to OSM. If not it requests a new token
+    Args:
+        decorated_function: The function to be decorated
+
+    Returns:
+        The wrapper
+    """
     def wrapper(*args):
+        # args[0] when called from an object function ( example(self, arg1, arg...) ) is the object itself
         response = requests.get(args[0].token_url, headers=args[0].headers, verify=False)
-        # logger.debug("check_authorization")
-        # logger.debug(response)
+
+        # If 401 == unauthorized. Requesting a new token.
         if response.status_code == 401:
             args[0].new_token()
-        return f(*args)
+        return decorated_function(*args)
 
     return wrapper
+
+
+def check_rest_response(response: requests.Response) -> bool:
+    """
+    Checks that the response is positive
+    Args:
+        response: The response to be analyzed
+
+    Returns:
+        True if the response is positive, False otherwise
+
+    """
+    if response.status_code in (requests.codes.ok, requests.codes.accepted, requests.codes.created,
+                                requests.codes.no_content):
+        return True
+    else:
+        logger.error("{} -- {} -- {}".format(response.url, response.status_code, response.reason))
+        return False
 
 
 class NbiUtil:
@@ -79,6 +105,11 @@ class NbiUtil:
         self.new_token()
 
     def new_token(self):
+        """
+        Requires a new token for interacting with OSM and update it in the object headers to be used in API calls.
+
+        Raises: ValueError in case the token could not be retrieved
+        """
         response = requests.post(self.token_url,
                                  json={"username": self.username, "password": self.password},
                                  headers=self.headers,
@@ -88,14 +119,6 @@ class NbiUtil:
             raise ValueError("OSM auth token request not successful")
         token = json.loads(response.text).get("id")
         self.headers.update({"Authorization": "Bearer {0}".format(token)})
-
-    def check_REST_response(self, response: requests.Response) -> bool:
-        if response.status_code in (requests.codes.ok, requests.codes.accepted, requests.codes.created,
-                                    requests.codes.no_content):
-            return True
-        else:
-            logger.error("{} -- {} -- {}".format(response.url, response.status_code, response.reason))
-            return False
 
     # get_x generic method for http GET messages
     @check_authorization
@@ -157,7 +180,7 @@ class NbiUtil:
     # Network Service Instances ###########################################################################
     def get_nsi_list(self) -> dict:
         res = self.get_x("/nslcm/v1/ns_instances")
-        if self.check_REST_response(res):
+        if check_rest_response(res):
             return res.json()
 
     def check_ns_instance(self, ns_id: str) -> dict:
@@ -166,7 +189,7 @@ class NbiUtil:
             logger.error(msg)
             raise ValueError(msg)
         res = self.get_x("/nslcm/v1/ns_instances/{}".format(ns_id))
-        if self.check_REST_response(res):
+        if check_rest_response(res):
             nsr = res.json()
             if "operational-status" not in nsr:
                 raise ValueError(str(nsr["detailed-status"]))
@@ -186,7 +209,7 @@ class NbiUtil:
             "vimAccountId": vim_account_id
         }
         response1 = self.post_x(data, "/nslcm/v1/ns_instances")
-        if not self.check_REST_response(response1):
+        if not check_rest_response(response1):
             logger.error(response1)
             raise ValueError("error in NS instantiation at NBI")
         instantiation_data = json.loads(response1.text)
@@ -194,7 +217,7 @@ class NbiUtil:
 
         response2 = self.post_x(data, "/nslcm/v1/ns_instances/{}/instantiate".format(ns_id))
         r_text = json.loads(response2.text)
-        if not self.check_REST_response(response2):
+        if not check_rest_response(response2):
             self.ns_delete(ns_id)
             raise ValueError(str(r_text['detail']))
 
@@ -214,7 +237,7 @@ class NbiUtil:
         if res.status_code == requests.codes.no_content:
             return {'error': True, 'data': {}}
         return {
-            'error': not self.check_REST_response(res),
+            'error': not check_rest_response(res),
             'data': json.loads(res.text) if res.text is not None else {}
         }
 
@@ -234,14 +257,14 @@ class NbiUtil:
             # run the instance
             r2 = self.post_x(ns, "/nslcm/v1/ns_instances/{}/instantiate".format(ns_id))
             # r2 does not contains the id of the ns instance, but of the bound worker... returning the data in r
-            return {'error': not self.check_REST_response(r2), 'data': json.loads(r.text) if r.text is not None else {}}
+            return {'error': not check_rest_response(r2), 'data': json.loads(r.text) if r.text is not None else {}}
 
-        return {'error': not self.check_REST_response(r), 'data': json.loads(r.text) if r.text is not None else {}}
+        return {'error': not check_rest_response(r), 'data': json.loads(r.text) if r.text is not None else {}}
 
     # Network Service Descriptors ###########################################################################
     def nsd_delete(self, nsd_id):
         r = self.delete_x("/nsd/v1/ns_descriptors/{}".format(nsd_id))
-        return {'error': not self.check_REST_response(r),  # 'data': json.loads(r.text) if r.text is not None else {},
+        return {'error': not check_rest_response(r),  # 'data': json.loads(r.text) if r.text is not None else {},
                 'error_code': r.status_code}
 
     def nsd_onboard(self, pkg_name):
@@ -249,7 +272,7 @@ class NbiUtil:
         r = self.post_package(data, pkg_name + '.tar.gz', "/nsd/v1/ns_descriptors_content/")
 
         return {
-            'error': not self.check_REST_response(r),
+            'error': not check_rest_response(r),
             'data': json.loads(r.text) if r.text is not None else None,
             'error_code': r.status_code
         }
@@ -274,7 +297,7 @@ class NbiUtil:
 
     def get_nsd_by_name(self, name: str):
         r = self.get_x(self.ns_descriptors_url)
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             for nsd in r.json():
                 if nsd["name"] == name:
                     return nsd['_id'], 200
@@ -283,7 +306,7 @@ class NbiUtil:
     # Virtual Network Function Descriptors ###################################################################
     def get_vnfd_list(self) -> dict:
         res = self.get_x("/vnfpkgm/v1/vnf_packages")
-        if self.check_REST_response(res):
+        if check_rest_response(res):
             return res.json()
 
     def vnfd_onboard(self, pkg_name):
@@ -291,14 +314,14 @@ class NbiUtil:
         r = self.post_package(data, pkg_name + '.tar.gz', "/vnfpkgm/v1/vnf_packages_content")
 
         return {
-            'error': not self.check_REST_response(r),
+            'error': not check_rest_response(r),
             'data': json.loads(r.text) if r.text is not None else None,
             'error_code': r.status_code
         }
 
     def get_vnfd_detail(self, vnfd_id: str) -> dict:
         r = self.get_x("/vnfpkgm/v1/vnf_packages/{}".format(vnfd_id))
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             logger.error("INFO - vnfd {} not found".format(vnfd_id))
@@ -306,7 +329,7 @@ class NbiUtil:
 
     def delete_vnfd(self, vnfd_id: str) -> bool:
         r = self.delete_x("/vnfpkgm/v1/vnf_packages/{}".format(vnfd_id))
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return True
         else:
             logger.error("INFO - vnfd {} not found".format(vnfd_id))
@@ -315,7 +338,7 @@ class NbiUtil:
     # Virtual Network Function Instances #####################################################################
     def get_vnfi_list(self, ns_id: str) -> list:
         r = self.get_x("/nslcm/v1/vnf_instances?nsr-id-ref={}".format(ns_id))
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             logger.error("INFO - vnfi list not found")
@@ -323,7 +346,7 @@ class NbiUtil:
 
     def get_all_vnfi(self) -> list:
         r = self.get_x("/nslcm/v1/vnf_instances")
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             logger.error("INFO - vnfi list not found")
@@ -331,7 +354,7 @@ class NbiUtil:
 
     def get_vnfi_detail(self, vnfi_id: str) -> dict:
         r = self.get_x("/nslcm/v1/vnf_instances/{}".format(vnfi_id))
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             logger.error("VNFI {} not found!".format(vnfi_id))
@@ -340,7 +363,7 @@ class NbiUtil:
     # Day2 primitives ###########################################################################################
     def get_subscriptions(self):
         r = self.get_x("/nslcm/v1/subscriptions")
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             logger.error("Get subscription error: ".format(r.reason))
@@ -348,7 +371,7 @@ class NbiUtil:
 
     def delete_subscriptions(self, subscription_id: str) -> bool:
         r = self.delete_x("/nslcm/v1/subscriptions/{}".format(subscription_id))
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return True
         else:
             logger.error("Subscription {} not found!".format(subscription_id))
@@ -382,7 +405,7 @@ class NbiUtil:
         }
         response = self.post_x(data, "/nslcm/v1/subscriptions")
         logger.info(response.text)
-        if self.check_REST_response(response):
+        if check_rest_response(response):
             return True
         return False
 
@@ -393,7 +416,7 @@ class NbiUtil:
 
         response = self.post_x(pdata, "/nslcm/v1/ns_instances/{}/action".format(ns_id))
         logger.debug("execute_primitive response= " + str(response.json()))
-        if self.check_REST_response(response):
+        if check_rest_response(response):
             operation_res = self.wait_for_operation("ns", response.json()['id'], 3600)
             return {
                 "response": response.text,
@@ -414,7 +437,7 @@ class NbiUtil:
         wait = timeout
         while wait >= 0:
             r = self.get_x(url)
-            if not self.check_REST_response(r):
+            if not check_rest_response(r):
                 return {'success': False, 'details': r.reason}
             nslcmop = r.json()
             # logger.debug("wait_for_operation r= " + r.text)
@@ -432,14 +455,14 @@ class NbiUtil:
     # Physical Deployment Units ###############################################################################
     def get_pdu_list(self) -> dict:
         r = self.get_x("/pdu/v1/pdu_descriptors")
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             raise ValueError("PDU list not found!")
 
     def get_pdu_detail(self, id_: str) -> dict:
         r = self.get_x("/pdu/v1/pdu_descriptors/{1}".format(self.osm_nbi_url, id_))
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             logger.error("PDU {} not found!".format(id_))
@@ -448,7 +471,7 @@ class NbiUtil:
     def delete_pdu(self, id_: str):
         result = self.delete_x('/pdu/v1/pdu_descriptors/' + str(id_))
         # logger.debug(result)
-        if self.check_REST_response(result):
+        if check_rest_response(result):
             return True
         else:
             logger.error('PDU deletion error')
@@ -458,12 +481,12 @@ class NbiUtil:
     def add_pdu(self, data: dict):
         result = self.post_x(data, '/pdu/v1/pdu_descriptors')
         # logger.debug(result)
-        if self.check_REST_response(result):
+        if check_rest_response(result):
             return result.json()
         else:
             logger.error('PDU creation error')
             logger.error(result.reason)
-            logger.warn(result.text)
+            logger.warning(result.text)
             return False
 
     # Kubernetes Clusters ###################################################################################
@@ -496,7 +519,7 @@ class NbiUtil:
             "nets": k8s_nets
         }
         result = self.post_x(data, '/admin/v1/k8sclusters')
-        if self.check_REST_response(result):
+        if check_rest_response(result):
             logger.debug("Successfully onboarded K8s cluster ->{}<-".format(name))
             return result.json()
         else:
@@ -519,7 +542,7 @@ class NbiUtil:
             url += "/?name={}".format(cluster_name)
         r = self.get_x(url)
         # logger.debug("{} --- {}".format(r.status_code, r.text))
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             return False
@@ -546,7 +569,7 @@ class NbiUtil:
         repo_id = self.get_k8s_cluster_id(name)
         result = self.delete_x('/admin/v1/k8sclusters/{}'.format(repo_id))
         # logger.debug(result)
-        if self.check_REST_response(result):
+        if check_rest_response(result):
             return result.json()
         else:
             logger.error("k8s repository creation error: {}".format(result.reason))
@@ -556,7 +579,7 @@ class NbiUtil:
     def add_vim(self, data):
         result = self.post_x(data, '/admin/v1/vim_accounts')
         # logger.debug(result)
-        if self.check_REST_response(result):
+        if check_rest_response(result):
             return result.json()
         else:
             logger.error("VIM creation error: {}".format(result.reason))
@@ -564,7 +587,7 @@ class NbiUtil:
 
     def del_vim(self, vim_id):
         result = self.delete_x('/admin/v1/vim_accounts/' + str(vim_id))
-        if self.check_REST_response(result):
+        if check_rest_response(result):
             return result.json()
         else:
             logger.error("VIM deletion error: {}".format(result.reason))
@@ -572,14 +595,14 @@ class NbiUtil:
 
     def get_vims(self):
         r = self.get_x("/admin/v1/vims/")
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             return r.json()
         else:
             raise ValueError("VIM list cannot be retrieved")
 
     def get_vim_by_tenant_and_name(self, name: str, tenant: str):
         r = self.get_x("/admin/v1/vims/?vim_tenant_name={}&name={}".format(tenant, name))
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             vim_list = r.json()
             if vim_list is None or not vim_list:
                 msg_err = 'VIM >{}< not found on OSM with tenant name >{}<'.format(name, tenant)
@@ -601,7 +624,7 @@ class NbiUtil:
         # logger.debug('k8s repo add msg: {}'.format(data))
         result = self.post_x(data, '/admin/v1/k8srepos')
         # logger.debug('k8s repo add res: {}'.format(result))
-        if self.check_REST_response(result):
+        if check_rest_response(result):
             return result.json()
         else:
             logger.error("k8s repository creation error: {}".format(result.reason))
@@ -609,7 +632,7 @@ class NbiUtil:
 
     def get_k8s_repos(self):
         r = self.get_x("/admin/v1/k8srepos")
-        if self.check_REST_response(r):
+        if check_rest_response(r):
             res = r.json()
             return res
         else:
@@ -623,7 +646,7 @@ class NbiUtil:
 
         result = self.delete_x('/admin/v1/k8srepos/{}'.format(repo['_id']))
         # logger.debug('delete_k8s_repo - delete_x result: {}'.format(result))
-        if self.check_REST_response(result):
+        if check_rest_response(result):
             return result.json()
         else:
             logger.error("k8s repository creation error: {}".format(result.reason))

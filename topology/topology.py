@@ -198,27 +198,20 @@ class Topology:
         # Save the topology
         self._save_topology_from_model()
 
-        # ???
+        # If one of the vim_net has floating ip enabled -> enable floating IP
         use_floating_ip: bool = False
         for vim_net in vim_model.networks:
             use_floating_ip = use_floating_ip or self.check_floating_ips(vim_net)
 
-        # TODO write it better
-        osm_vim = {}
-        vim_dict = vim_model.dict()
-        for key in ["schema_version", "name", "vim_type", "vim_tenant_name", "vim_user", "vim_password",
-                    "config"]:
-            if key in vim_dict:
-                osm_vim[key] = vim_dict[key]
-        osm_vim['config']['use_floating_ip'] = use_floating_ip
-        osm_vim['vim_url'] = str(vim_model.vim_url)
+        vim_dict = vim_model.model_dump(exclude={'networks', 'routers', 'areas'})
+        vim_dict['config']['use_floating_ip'] = use_floating_ip
 
         # Adding the VIM on OSM
-        data = self.osm_nbi_util.add_vim(osm_vim)
+        data = self.osm_nbi_util.add_vim(vim_dict)
         if not data:
             raise ValueError("failed to onboard VIM {} onto OSM".format(vim_model.name))
 
-        trigger_event(TopologyEventType.TOPO_VIM_CREATE, vim_model.dict())
+        trigger_event(TopologyEventType.TOPO_VIM_CREATE, vim_model.model_dump())
 
     @obj_multiprocess_lock
     def del_vim(self, vim_name: str, terraform=False):
@@ -226,12 +219,17 @@ class Topology:
         vim_model = self._model.get_vim(vim_name)
         # FixMe: if there are services on the VIM, OSM will not delete it
         # In every case (of terraform) we need to delete VIM account from OSM.
-        # Check that VIM is present on OSM -> Raise error if not
-        osm_vim = self.osm_nbi_util.get_vim_by_tenant_and_name(vim_model.name, vim_model.vim_tenant_name)
+        try:
+            # Check that VIM is present on OSM -> Raise error if not
+            osm_vim = self.osm_nbi_util.get_vim_by_tenant_and_name(vim_model.name, vim_model.vim_tenant_name)
 
-        logger.info('Removing VIM {} from osm'.format(vim_model.name))
-        # Remote deletion from OSM
-        self.osm_nbi_util.del_vim(osm_vim['_id'])
+            logger.info('Removing VIM {} from osm'.format(vim_model.name))
+            # Remote deletion from OSM
+            self.osm_nbi_util.del_vim(osm_vim['_id'])
+        except ValueError:
+            logger.warning('VIM >{}< has not been found on OSM, it will be removed anyway from the topology'.
+                           format(vim_model.name))
+
 
         # If terraform is enabled then we need to delete also OpenStack resources
         if terraform:
@@ -245,7 +243,7 @@ class Topology:
         # Local deletion
         self._model.del_vim(vim_model.name)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_VIM_DEL, vim_model.dict())
+        trigger_event(TopologyEventType.TOPO_VIM_DEL, vim_model.model_dump())
 
     @obj_multiprocess_lock
     def update_vim(self, update_msg: UpdateVimModel, terraform: bool = True):

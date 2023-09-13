@@ -55,7 +55,7 @@ class LCMWorkers:
         Create and return a LIST of DetailedBlueModel (for all blueprints) that are used for showing blueprints data to
         the user.
         Args:
-            blue_filter: the ??? TODO
+            blue_filter: the OPTIONAL ID of the blueprint to be used as filter to retrieve only the desired blueprint
 
         Returns:
             A list that contains a the details for each blueprint.
@@ -75,7 +75,7 @@ class LCMWorkers:
         Create and return a LIST of ShortBlueModel (for all blueprints) that are used to summarize blueprints data to
         the user.
         Args:
-            blue_filter: the ??? TODO
+            blue_filter: the OPTIONAL ID of the blueprint to be used as filter to retrieve only the desired blueprint
 
         Returns:
             A list that contains a summary for each blueprint.

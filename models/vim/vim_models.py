@@ -23,7 +23,7 @@ class VimModel(BaseModel):
     name: str
     vim_type: VimTypeEnum = 'openstack'
     schema_version: str = '1.3'
-    vim_url: HttpUrl
+    vim_url: str
     vim_tenant_name: str = 'admin'
     vim_user: str = 'admin'
     vim_password: str = 'admin'

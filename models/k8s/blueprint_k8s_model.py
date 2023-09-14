@@ -30,7 +30,6 @@ class K8sAreaInfo(BaseModel):
     core: Optional[bool] = False
     workers_replica: int
     worker_flavor_override: Optional[VMFlavors]
-    # TODO: We need to support multiple IPs when we have multiple replica for each area
     worker_mgt_int: Dict[str, K8sNsdInterfaceDesc] = Field(default={})
     worker_data_int: Dict[str, K8sNsdInterfaceDesc] = Field(default={})
 

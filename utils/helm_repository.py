@@ -1,10 +1,15 @@
 import utils.persistency as persistency
+from models.config_model import NFVCLConfigModel
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils.log import create_logger
-from utils.util import nfvcl_ip, nfvcl_port
 from datetime import datetime
 import yaml
 import os.path
 import hashlib
+from utils.util import get_nfvcl_config
+
+nbiUtil = get_osm_nbi_utils()
+nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 logger = create_logger('HelmRepository')
 db = persistency.DB()
@@ -24,7 +29,7 @@ class HelmRepository:
         # FIXME: check versions and update db item
         for key in ['description', 'name', 'version']:
             if key not in item.keys():
-                raise ValueError("Chart Entry is missing of the {} key")
+                raise ValueError("Chart Entry is missing of the >{}< key".format(key))
 
         item['created'] = get_timestring()
         filename = '{}-{}.tgz'.format(item['name'], item['version'])
@@ -37,7 +42,7 @@ class HelmRepository:
 
         item['home'] = 'https://helm.sh/helm'
         item['sources'] = ['https://github.com/helm/helm']
-        item['urls'] = ['http://{}:{}{}charts/{}'.format(nfvcl_ip, nfvcl_port, helm_url_prefix, filename)]
+        item['urls'] = ['http://{}:{}{}charts/{}'.format(nfvcl_config.nfvcl.ip, nfvcl_config.nfvcl.port, helm_url_prefix, filename)]
 
         db.insert_DB('helm_charts', item)
         self.create_index()
@@ -55,7 +60,7 @@ class HelmRepository:
 
             # update the URL with the current IP address
             filename = '{}-{}.tgz'.format(c['name'], c['version'])
-            c['urls'] = ['http://{}:{}{}charts/{}'.format(nfvcl_ip, nfvcl_port, helm_url_prefix, filename)]
+            c['urls'] = ['http://{}:{}{}charts/{}'.format(nfvcl_config.nfvcl.ip, nfvcl_config.nfvcl.port, helm_url_prefix, filename)]
             # aggregate all the version of the same chart into a same array
             registry_index['entries'][c['name']].append(c)
         try:

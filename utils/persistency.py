@@ -1,10 +1,14 @@
 import json
 from pymongo import MongoClient
-from utils.util import *
+
+from models.config_model import NFVCLConfigModel
+from utils.util import get_nfvcl_config
+
+nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 
-persLayer = MongoClient("mongodb://" + mongodb_host + ":" + mongodb_port + "/")
-OSSdb = persLayer[mongodb_db]
+persLayer = MongoClient("mongodb://{}:{}/".format(nfvcl_config.mongodb.host, nfvcl_config.mongodb.port))
+OSSdb = persLayer[nfvcl_config.mongodb.db]
 
 persistent_collections = [
     "blueprints",

@@ -1,12 +1,19 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+
+from models.config_model import NFVCLConfigModel
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 from rest_endpoints.nfvcl_callback import callback_router
 from utils.helm_repository import helm_repo, chart_path, helm_url_prefix
 from rest_endpoints.helm_model import HelmRepo
 from utils.log import create_logger
 import json
 import os
-from main import nbiUtil, nfvcl_ip, nfvcl_port
+from utils.util import get_nfvcl_config
+
+nbiUtil = get_osm_nbi_utils()
+nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
+
 
 helm_router = APIRouter(
     prefix="/helm_repo",
@@ -57,5 +64,5 @@ def create_helm_repo():
         logger.info('deleting previous helm repository')
         nbiUtil.delete_k8s_repo('nfvcl_helm_repo')
 
-    r = nbiUtil.add_k8s_repo('nfvcl_helm_repo', "http://{}:{}{}".format(nfvcl_ip, nfvcl_port, helm_url_prefix))
+    r = nbiUtil.add_k8s_repo('nfvcl_helm_repo', "http://{}:{}{}".format(nfvcl_config.nfvcl.ip, nfvcl_config.nfvcl.port, helm_url_prefix))
     logger.debug('adding helm repo result: {}'.format(r))

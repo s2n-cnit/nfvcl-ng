@@ -15,41 +15,6 @@ from models.config_model import NFVCLConfigModel
 # Using _ before name such that cannot be directly accessed from external files.
 _nfvcl_config: NFVCLConfigModel
 
-# TODO remove this code as soon as all reference to this variables are removed. Use the next function
-if os.path.exists("config_dev.yaml"):
-    config_file = open("config_dev.yaml", 'r')
-else:
-    config_file = open("config.yaml", 'r')
-
-with config_file as stream:
-    try:
-        nfvcl_conf = yaml.safe_load(stream)
-    except yaml.YAMLError as exc:
-        print(exc)
-
-    # Parsing the config file
-    try:
-        nfvcl_ip = nfvcl_conf['nfvcl']['ip']
-        nfvcl_port = str(nfvcl_conf['nfvcl']['port'])
-
-        osm_ip = nfvcl_conf['osm']['host']
-        osm_port = str(nfvcl_conf['osm']['port'])
-        osm_user = nfvcl_conf['osm']['username']
-        osm_passwd = nfvcl_conf['osm']['password']
-        osm_proj = nfvcl_conf['osm']['project']
-        if 'version' in nfvcl_conf['osm']:
-            if nfvcl_conf['osm']['version'] > 8:
-                sol006 = True
-
-        mongodb_host = nfvcl_conf['mongodb']['host']
-        mongodb_port = str(nfvcl_conf['mongodb']['port'])
-        mongodb_db = nfvcl_conf['mongodb']['db']
-        redis_host = nfvcl_conf['redis']['host']
-        redis_port = str(nfvcl_conf['redis']['port'])
-    except Exception as exception:
-        print('exception in the configuration file parsing: {}'.format(str(exception)))
-
-
 def get_nfvcl_config() -> NFVCLConfigModel:
     """
     Returning existing config or generating new one in case it is None

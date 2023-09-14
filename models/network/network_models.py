@@ -1,5 +1,5 @@
 import copy
-from pydantic import BaseModel, Field, conlist, validator
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Union
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
@@ -62,6 +62,17 @@ class IPv4ReservedRange(IPv4Pool):
     """
     owner: str
 
+    def __eq__(self, other):
+        """
+        Overrides the default equals implementation. In this way it is possible to directly compare objects
+        of this type on a given criteria (in this case the 'name')
+        TWO RESERVED RANGE ARE CONSIDERED EQUAL IF SOME OF THE IPs ARE OVERLAPPED.
+        """
+        if isinstance(other, IPv4ReservedRange):
+            if other.start <= self.start <= other.end or other.start <= self.end <= other.end:
+                return True
+        return False
+
 
 class NetworkModel(BaseModel):
     name: str
@@ -71,7 +82,7 @@ class NetworkModel(BaseModel):
     dhcp: bool = True
     ids: List[dict] = Field(default=[])
     cidr: IPv4Network
-    gateway_ip: Optional[IPv4Network] = None  # TODO Should it be IPv4 address?
+    gateway_ip: Optional[IPv4Address] = None
     allocation_pool: List[IPv4Pool] = []
     reserved_ranges: List[IPv4ReservedRange] = []
     dns_nameservers: List[IPv4Address] = []
@@ -115,9 +126,49 @@ class NetworkModel(BaseModel):
         return to_return.dict()
 
     def add_reserved_range(self, reserved_range: IPv4ReservedRange):
-        # TODO check existence of range!!!
+        """
+        Add a reserved range to the network
+        Args:
+            reserved_range: The range to be reserved
+
+        Returns:
+
+        """
+        if reserved_range in self.reserved_ranges:
+            msg_err = ("Reserved range >{}< is already present in the topology. Or have overlapped IPs with an existing"
+                       "range. See IPv4ReservedRange for more info.").format(reserved_range.model_dump())
+            raise ValueError(msg_err)
         self.reserved_ranges.append(reserved_range)
 
+    def release_range(self, owner: str, ip_range: IPv4ReservedRange) \
+            -> Union[IPv4ReservedRange, None]:
+        """
+        Release a reserved range in a network Model. The removed reservation is the FIRST that match the owner.
+        If a range is given, then the removed IP range will be the desired one.
+        !!! Ranges are considered equal if the IPs are overlapping.
+        Args:
+            owner: The owner of the reservation
+            ip_range: The [OPTIONAL] IP range to be removed
+
+        Returns:
+            The released range.
+        """
+        # Looking for the reservation to be removed in every reserved range.
+        for reserved_range in self.reserved_ranges:
+            if ip_range is None:
+                # Checking reserved range has the required owner
+                if reserved_range.owner == owner:
+                    self.reserved_ranges.remove(reserved_range)
+                    return reserved_range
+            else:
+                # Ensure that the owner inside the reservation is the required one
+                assert owner == ip_range.owner
+                # Checking reserved range is equal to the required one (owner, start ip, end ip)
+                if reserved_range == ip_range:
+                    self.reserved_ranges.remove(reserved_range)
+                    return reserved_range
+
+        return None
 
 class RouterPortModel(BaseModel):
     net: str

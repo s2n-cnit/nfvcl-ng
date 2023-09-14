@@ -406,12 +406,11 @@ class Topology:
 
     # **************************** Routers **************************
 
-    def get_router(self, router_name: str, vim_name: typing.Optional[str] = None):
+    def get_router(self, router_name: str):
         """
         Returns the required router
         Args:
             router_name: The router to be retrieved
-            vim_name: The name of the vim, used to add info from vim to router
 
         Returns:
             The desired router info
@@ -419,19 +418,7 @@ class Topology:
         # Looking for the router in the topology
         router: RouterModel = self._model.get_router(router_name)
 
-        # If vim_name is present we add info from vim to the router
-        if vim_name:
-            vim_m = self._model.get_vim(vim_name)
-
-            vim_router = vim_m.get_router(router_name)
-            # merging info from topology and vim router descriptions
-            # res: RouterModel = router.copy()
-            # res_dict = res.dict()
-            # res_dict.update(vim_router)
-            # TODO necessary?
-            return router.dict()
-        else:
-            return router.dict()
+        return router.dict()
 
     @obj_multiprocess_lock
     def add_router(self, router: RouterModel):
@@ -502,7 +489,6 @@ class Topology:
             terraformed_ids['vim'] = vim.name
 
             topo_net.ids.append(terraformed_ids)
-            self._save_topology_from_model()  # TODO remove and put in higher calls
             return terraformed_ids
         else:
             return None
@@ -729,41 +715,21 @@ class Topology:
         if net_name is None:
             # Iterating over all the networks because no network was given.
             for network in self._model.networks:
-                removed_range = self._priv_rel_range(owner=owner, network=network, ip_range=ip_range)
+                removed_range = network.release_range(owner=owner, ip_range=ip_range)
                 if removed_range:
                     break
         else:
             # Looking for the reservation to be removed in the desired network
             network = self._model.get_network(net_name)
-            removed_range = self._priv_rel_range(owner=owner, network=network, ip_range=ip_range)
+            removed_range = network.release_range(owner=owner, ip_range=ip_range)
 
         if removed_range is None:
-            msg_err = "The range has not been found and removed."
+            msg_err = "The range has NOT been found and removed."
             logger.error(msg_err)
         else:
             self._save_topology_from_model()
             trigger_event(TopologyEventType.TOPO_DELETE_RANGE_RES, removed_range.to_dict())
             return removed_range
-
-    def _priv_rel_range(self, owner: str, network: NetworkModel, ip_range: IPv4ReservedRange) \
-            -> Union[IPv4ReservedRange, None]:
-
-        # Looking for the reservation to be removed in every reserved range.
-        for reserved_range in network.reserved_ranges:
-            if ip_range is None:
-                # Checking reserved range has the required owner
-                if reserved_range.owner == owner:
-                    network.reserved_ranges.remove(reserved_range)
-                    return reserved_range
-            else:
-                # Ensure that the owner inside the reservation is the required one
-                assert owner == ip_range.owner
-                # Checking reserved range is equal to the required one (owner, start ip, end ip)
-                if reserved_range == ip_range:
-                    network.reserved_ranges.remove(reserved_range)
-                    return reserved_range
-
-        return None
 
     @obj_multiprocess_lock
     def add_pdu(self, pdu_input: PduModel):
@@ -776,15 +742,22 @@ class Topology:
         try:
             pdu_input.details = ""
             self._model.add_pdu(pdu_input)
+            # Saving changes to the topology
+            self._save_topology_from_model()
+            trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.dict())
 
         except ValueError:
-            # Value error is thrown when the PDU already exist, in this case we will
+            # Value error is thrown when the PDU already exist
             logger.error(traceback.format_exc())
-            details = "{}".format(traceback.format_exc())
 
-            # Updating existing pdu, TODO Does it have sense?
-            existing_pdu = self._model.get_pdu(pdu_input.name)
-            existing_pdu.details = details
+    @obj_multiprocess_lock
+    def upd_pdu(self, pdu_input: PduModel):
+        """
+        Add PDU to the topology
+        Args:
+            pdu_input: The PDU to be added to the topology
+        """
+        self._model.upd_pdu(pdu_input)
 
         # Saving changes to the topology
         self._save_topology_from_model()

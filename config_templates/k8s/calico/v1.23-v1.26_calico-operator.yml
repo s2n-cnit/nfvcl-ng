@@ -2551,7 +2551,6 @@ spec:
                   array.
                 items:
                   type: integer
-                  # TODO: This nullable is manually added in. We should update controller-gen
                   # to handle []*int properly itself.
                   nullable: true
                 type: array

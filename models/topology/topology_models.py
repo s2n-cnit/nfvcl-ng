@@ -176,7 +176,20 @@ class TopologyModel(BaseModel):
         return self.pdus.pop(pdu_index)
 
     def upd_pdu(self, pdu: PduModel) -> PduModel:
-        print("TODO")  # TODO
+        """
+        Update an existing pdu
+        Args:
+            pdu: the pdu to be updated (identified by pdu.name) with updated data.
+
+        Returns:
+            The updated pdu
+        """
+        pdu_index = self.find_pdu_index(pdu.name)
+
+        # Update in the topology information
+        self.pdus[pdu_index] = pdu
+
+        return pdu
 
     def get_pdu(self, pdu_name: str) -> PduModel:
         """
@@ -190,7 +203,7 @@ class TopologyModel(BaseModel):
         return self.pdus[pdu_index]
 
     def get_pdus(self) -> List[PduModel]:
-        print("TODO")  # TODO
+        return self.pdus
 
     # -------------------------------------------------------------------------
     def add_vim(self, vim: VimModel) -> VimModel:
@@ -274,7 +287,22 @@ class TopologyModel(BaseModel):
     # ----------------------------------------------------------------------------
 
     def add_network(self, network: NetworkModel) -> NetworkModel:
-        print("TODO")  # TODO
+        """
+        Add network to the topology.
+        Args:
+            network: The network to be added in the topology
+        Returns:
+            The added network
+        Raises:
+            ValueError if the network is already present.
+        """
+        if network in self.networks:
+            msg_err = "The network >{}< is already present in the topology.".format(network.name)
+            logger.error(msg_err)
+            raise ValueError(msg_err)
+        else:
+            self.networks.append(network)
+            return network
 
     def del_network(self, network_name: str) -> NetworkModel:
         """
@@ -288,7 +316,16 @@ class TopologyModel(BaseModel):
         return self.networks.pop(net_idx)
 
     def upd_network(self, network: NetworkModel) -> NetworkModel:
-        print("TODO")  # TODO
+        """
+        Update a network in the topology
+        Args:
+            network: The network to update (new data with name that identify the instance to be updated)
+
+        Returns: The updated network
+        """
+        net_index = self.find_net_index(network.name)
+        self.networks[net_index] = network
+        return network
 
     def get_network(self, network_name) -> NetworkModel:
         """
@@ -303,7 +340,7 @@ class TopologyModel(BaseModel):
         return self.networks[net_index]
 
     def get_networks(self) -> List[NetworkModel]:
-        print("TODO")  # TODO
+        return self.networks
 
     # --------------------------------------------
 

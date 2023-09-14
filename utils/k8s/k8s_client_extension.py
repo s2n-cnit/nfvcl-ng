@@ -1,7 +1,6 @@
 import logging
 import os
 from json import JSONDecodeError
-
 import kubernetes
 import yaml
 from kubernetes.client import ApiException, ApiClient

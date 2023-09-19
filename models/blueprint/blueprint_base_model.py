@@ -117,7 +117,7 @@ class BlueprintBaseModel(BaseModel):
     node_exporters: List = Field(default=[], description="List of node exporters active in the blueprint.")
 
     """
-    @validator('timestamp')
+    @field_validator('timestamp')
     def standardize_cid(cls, timestamp: dict):
        
         if timestamp is not None:

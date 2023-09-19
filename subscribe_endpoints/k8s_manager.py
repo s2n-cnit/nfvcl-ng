@@ -136,7 +136,7 @@ class K8sManager:
         elif message['type'] == 'message':
             # --- Parsing the message in the model for k8s management ---
             try:
-                management_model: K8sModelManagement = K8sModelManagement.parse_obj(json.loads(data))
+                management_model: K8sModelManagement = K8sModelManagement.model_validate(json.loads(data))
             except ValidationError as val_err:
                 msg_err = "Received model is impossible to validate."
                 self.logger.error(msg_err)
@@ -145,7 +145,7 @@ class K8sManager:
             self.logger.info("Received operation {}. Starting processing the request...".format(management_model.k8s_ops))
             if management_model.k8s_ops == K8sOperationType.INSTALL_PLUGIN:
                 self.install_plugins(management_model.cluster_id,
-                                     K8sPluginsToInstall.parse_obj(json.loads(management_model.data)))
+                                     K8sPluginsToInstall.model_validate(json.loads(management_model.data)))
             elif management_model.k8s_ops == K8sOperationType.APPLY_YAML:
                 self.apply_to_k8s(management_model.cluster_id, management_model.data)
             else:

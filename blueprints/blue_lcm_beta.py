@@ -66,7 +66,7 @@ class LCMWorkersBeta:
         blues_mongo_cursor = get_blue_by_filter(blue_filter, db)
         blue_detailed_list: List[DetailedBlueModel] = []
         for blueprint in blues_mongo_cursor:
-            detailed_blueprint = DetailedBlueModel.parse_obj(blueprint)
+            detailed_blueprint = DetailedBlueModel.model_validate(blueprint)
             detailed_blueprint.areas = blueprint['conf']['areas']
             blue_detailed_list.append(detailed_blueprint)
         return blue_detailed_list
@@ -89,7 +89,7 @@ class LCMWorkersBeta:
         blue_undetailed_list: List[ShortBlueModel] = []
         # For each blueprint in the DB we create a summary
         for blueprint in blues_mongo_cursor:
-            blueprint_short: ShortBlueModel = ShortBlueModel.parse_obj(blueprint)
+            blueprint_short: ShortBlueModel = ShortBlueModel.model_validate(blueprint)
             # We add summary data that need to be calculated
             blueprint_short.no_areas = len(blueprint['conf']['areas'])
             blueprint_short.no_nsd = len(blueprint['nsd_'])
@@ -225,7 +225,7 @@ class BlueLCMworkerBeta:
                         if not day0_operation(handler, checked_vims, msg, self.osmNbiUtil, self.blue):
                             raise (AssertionError('error in Day0 operations'))
                         self.blue.to_db()
-                    self.trigger_event(BlueEventType.BLUE_END_DAY0, self.blue.print_short_summary().dict())
+                    self.trigger_event(BlueEventType.BLUE_END_DAY0, self.blue.print_short_summary().model_dump())
 
                 if "day2" in stage:
                     self.blue.base_model.detailed_status = 'Day2'
@@ -234,7 +234,7 @@ class BlueLCMworkerBeta:
                     for handler in stage['day2']:
                         day2_operation(handler, msg, osmNbiUtil=self.osmNbiUtil, blue=self.blue, db=self.db)
                         self.blue.to_db()
-                    self.trigger_event(BlueEventType.BLUE_END_DAY2, self.blue.print_short_summary().dict())
+                    self.trigger_event(BlueEventType.BLUE_END_DAY2, self.blue.print_short_summary().model_dump())
 
                 if "dayN" in stage:
                     self.blue.base_model.detailed_status = 'DayN'
@@ -243,7 +243,7 @@ class BlueLCMworkerBeta:
                     for handler in stage['dayN']:
                         dayN_operation(handler, msg, self.osmNbiUtil, self.blue)
                         self.blue.to_db()
-                    self.trigger_event(BlueEventType.BLUE_END_DAYN, self.blue.print_short_summary().dict())
+                    self.trigger_event(BlueEventType.BLUE_END_DAYN, self.blue.print_short_summary().model_dump())
 
             self.blue.base_model.status = 'idle'
             self.blue.base_model.current_operation = ""

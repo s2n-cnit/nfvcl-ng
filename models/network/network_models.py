@@ -1,5 +1,5 @@
 import copy
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Union
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
@@ -16,7 +16,7 @@ class IPv4Pool(BaseModel):
     start: IPv4Address
     end: IPv4Address
 
-    @validator('start')
+    @field_validator('start')
     def start_val(cls, val):
         """
         Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')
@@ -29,7 +29,7 @@ class IPv4Pool(BaseModel):
         else:
             raise ValueError("IPv4Pool validator: The type of >start< field is not recognized ->> {}". format(val))
 
-    @validator('end')
+    @field_validator('end')
     def end_val(cls, val):
         """
         Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')
@@ -53,7 +53,7 @@ class IPv4Pool(BaseModel):
         to_return = copy.deepcopy(self)
         to_return.start = self.start.exploded
         to_return.end = self.end.exploded
-        return to_return.dict()
+        return to_return.model_dump()
 
 
 class IPv4ReservedRange(IPv4Pool):
@@ -107,23 +107,26 @@ class NetworkModel(BaseModel):
         to_return = copy.deepcopy(self)
         to_return.cidr = self.cidr.with_prefixlen
         if to_return.gateway_ip is not None:
-            to_return.gateway_ip = self.gateway_ip.with_prefixlen
+            to_return.gateway_ip = self.gateway_ip.exploded
 
         for i in range(0, len(to_return.dns_nameservers)):
+            # Replacing Ipv4Address with its string representation, ignore alert on type!
             to_return.dns_nameservers[i] = to_return.dns_nameservers[i].exploded
 
         for i in range(0, len(to_return.reserved_ranges)):
             res_range_dict: dict = {"owner": to_return.reserved_ranges[i].owner,
                                     "end": to_return.reserved_ranges[i].end.exploded,
                                     "start": to_return.reserved_ranges[i].start.exploded}
+            # Replacing Ipv4Address with its string representation, ignore alert on type!
             to_return.reserved_ranges[i] = res_range_dict
 
         for i in range(0, len(to_return.allocation_pool)):
             range_dict: dict = {"end": to_return.allocation_pool[i].end.exploded,
                                 "start": to_return.allocation_pool[i].start.exploded}
+            # Replacing Ipv4Address with its string representation, ignore alert on type!
             to_return.allocation_pool[i] = range_dict
 
-        return to_return.dict()
+        return to_return.model_dump()
 
     def add_reserved_range(self, reserved_range: IPv4ReservedRange):
         """

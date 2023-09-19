@@ -27,45 +27,45 @@ def topology_worker(db: OSSdb, nbiutil: NbiUtil, queue: Queue, lock: RLock):
         try:
             # topology
             if ops_type == "add_topology":
-                topology.create(TopologyModel.parse_obj(msg), terraform=msg['terraform'])
+                topology.create(TopologyModel.model_validate(msg), terraform=msg['terraform'])
             elif ops_type == "del_topology":
                 topology.delete(terraform=msg['terraform'])
             # vim
             elif ops_type == "add_vim":
-                topology.add_vim(VimModel.parse_obj(msg), terraform=msg['terraform'])
+                topology.add_vim(VimModel.model_validate(msg), terraform=msg['terraform'])
             elif ops_type == "update_vim":
-                topology.update_vim(UpdateVimModel.parse_obj(msg), terraform=msg['terraform'])
+                topology.update_vim(UpdateVimModel.model_validate(msg), terraform=msg['terraform'])
             elif ops_type == "del_vim":
                 topology.del_vim(msg['vim_name'], terraform=msg['terraform'])
             # net
             elif ops_type == "add_net":
-                topology.add_network(NetworkModel.parse_obj(msg))
+                topology.add_network(NetworkModel.model_validate(msg))
             elif ops_type == "del_net":
-                topology.del_network(NetworkModel.parse_obj(msg))
+                topology.del_network(NetworkModel.model_validate(msg))
             # router
             elif ops_type == "add_router":
-                topology.add_router(RouterModel.parse_obj(msg))
+                topology.add_router(RouterModel.model_validate(msg))
             elif ops_type == "del_router":
                 topology.del_router(msg.pop("router_id"))
             # pdu
             elif ops_type == "add_pdu":
-                topology.add_pdu(PduModel.parse_obj(msg))
+                topology.add_pdu(PduModel.model_validate(msg))
             elif ops_type == "del_pdu":
                 topology.del_pdu(msg)
             elif ops_type == "add_k8s":
-                topology.add_k8scluster(K8sModel.parse_obj(msg))
+                topology.add_k8scluster(K8sModel.model_validate(msg))
             elif ops_type == "del_k8s":
                 # Since K8s instance is taken by database, as stated in K8sModel, the field is called "name"
                 cluster_id = msg.pop("name")
                 topology.del_k8scluster(cluster_id)
             elif ops_type == "update_k8s":
-                topology.update_k8scluster(K8sModel.parse_obj(msg))
+                topology.update_k8scluster(K8sModel.model_validate(msg))
             elif ops_type == "add_prom":
-                topology.add_prometheus_server(prom_server=PrometheusServerModel.parse_obj(msg))
+                topology.add_prometheus_server(prom_server=PrometheusServerModel.model_validate(msg))
             elif ops_type == "del_prom":
                 topology.del_prometheus_server(msg['id'])
             elif ops_type == "upd_prom":
-                topology.update_prometheus_server(prom_server=PrometheusServerModel.parse_obj(msg))
+                topology.update_prometheus_server(prom_server=PrometheusServerModel.model_validate(msg))
             else:
                 logger.error('message not supported: {}'.format(msg))
         except Exception:

@@ -17,7 +17,7 @@ from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_conte
 from main import persistency
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils.log import create_logger
-from .models.blue_k8s_model import LBPool, K8sAreaInfo
+from models.k8s.blueprint_k8s_model import LBPool, K8sAreaInfo
 from ..blueprint_beta import BlueprintBaseBeta
 
 db = persistency.DB()
@@ -102,7 +102,7 @@ class K8sBeta(BlueprintBaseBeta):
             }],
         }
         # DO NOT remove -> model initialization.
-        self.k8s_model = K8sBlueprintModel.parse_obj(self.base_model.conf)
+        self.k8s_model = K8sBlueprintModel.model_validate(self.base_model.conf)
         # Avoid to put self.db
 
     def bootstrap_day0(self, msg: dict) -> list:
@@ -120,7 +120,7 @@ class K8sBeta(BlueprintBaseBeta):
         else:
             raise ValueError('Core area not found in the input')
 
-        msg_model = K8sBlueprintCreate.parse_obj(msg)
+        msg_model = K8sBlueprintCreate.model_validate(msg)
         self.topology_terraform(msg_model)
 
         # The returned nsd list [] is used to spawn network services, if self.nsd() is empty then no VM, containers are
@@ -142,7 +142,7 @@ class K8sBeta(BlueprintBaseBeta):
 
         for data_net in k8s_create_model.config.network_endpoints.data_nets:
             # lb_pool is the one load balancer pool
-            lb_pool: LBPool = data_net.copy()
+            lb_pool: LBPool = data_net.model_copy()
             logger.debug("Blue {} - checking pool {}".format(self.get_id(), lb_pool.net_name))
 
             # For every area we need to check that VIM of that area exists and network is listed in that VIM
@@ -164,8 +164,9 @@ class K8sBeta(BlueprintBaseBeta):
                 load_bal_topo_res_range = self.topology_reserve_ip_range(lb_pool)
                 logger.info("Blue {} taking range {}-{} on network {} for LOAD BALANCER".format(self.get_id(),
                             load_bal_topo_res_range.start, load_bal_topo_res_range.end, lb_pool.net_name))
-                lb_pool.ip_start = IPv4Address(load_bal_topo_res_range.start)
-                lb_pool.ip_end = IPv4Address(load_bal_topo_res_range.end)
+                # Building IPv4Addresses to validate. Then saving string because obj cannot be serialized.
+                lb_pool.ip_start = IPv4Address(load_bal_topo_res_range.start).exploded
+                lb_pool.ip_end = IPv4Address(load_bal_topo_res_range.end).exploded
             lb_pool_list.append(lb_pool)
 
         self.k8s_model.config.network_endpoints.data_nets = lb_pool_list
@@ -226,7 +227,7 @@ class K8sBeta(BlueprintBaseBeta):
             created_vnfd, self.get_vim_name(self.k8s_model.config.core_area.id), param, vim_net_mapping)
 
         # Append to the NSDs the just created NSD for the controller
-        self.base_model.nsd_.append(BlueNSD.parse_obj(n_obj.get_nsd()))
+        self.base_model.nsd_.append(BlueNSD.model_validate(n_obj.get_nsd()))
         return param['name']
 
     def worker_nsd(self, area: K8sAreaInfo, replica_id: int) -> str:
@@ -245,7 +246,7 @@ class K8sBeta(BlueprintBaseBeta):
                 )
 
         # The default values are already filled in self.config_model.config.worker_flavors
-        vm_flavor = self.k8s_model.config.worker_flavors.copy()
+        vm_flavor = self.k8s_model.config.worker_flavors.model_copy()
         # If flavor is given in the k8s creation request then use these values
         if area.worker_flavor_override:
             vm_flavor = area.worker_flavor_override
@@ -266,7 +267,7 @@ class K8sBeta(BlueprintBaseBeta):
         n_ = n_obj.get_nsd()
         n_['area_id'] = area.id
         n_['replica_id'] = replica_id
-        self.base_model.nsd_.append(BlueNSD.parse_obj(n_))
+        self.base_model.nsd_.append(BlueNSD.model_validate(n_))
         return param['name']
 
     def set_vnfd(self, area_type: AreaType, area_id: Optional[int] = None, vld: Optional[list] = None,
@@ -326,12 +327,12 @@ class K8sBeta(BlueprintBaseBeta):
         interfaces = []
         intf_index = 3  # starting from ens3
         for l_ in vld:
-            interfaces.append(VimLink.parse_obj({"vld": l_["vld"], "name": "ens{}".format(intf_index),
+            interfaces.append(VimLink.model_validate({"vld": l_["vld"], "name": "ens{}".format(intf_index),
                                                  "mgt": l_["mgt"], "port-security-enabled": False}))
             intf_index += 1
         vdu.interface = interfaces
 
-        vnfd = VirtualNetworkFunctionDescriptor.parse_obj({
+        vnfd = VirtualNetworkFunctionDescriptor.model_validate({
             'password': 'root',
             'id': '{}_AC'.format(self.get_id()),
             'name': '{}_AC'.format(self.get_id()),
@@ -340,8 +341,8 @@ class K8sBeta(BlueprintBaseBeta):
         complete_vnfd = sol006_VNFbuilder(nbiUtil, self.db, vnfd.dict(by_alias=True),
                                           charm_name='helmflexvnfm', cloud_init=True)
         id_vnfd = {'id': 'vnfd', 'name': complete_vnfd.get_id(),
-                   'vl': [i.dict() for i in interfaces]}
-        self.base_model.vnfd.core.append(BlueVNFD.parse_obj(id_vnfd))
+                   'vl': [i.model_dump() for i in interfaces]}
+        self.base_model.vnfd.core.append(BlueVNFD.model_validate(id_vnfd))
         self.to_db()
 
         return id_vnfd
@@ -357,12 +358,12 @@ class K8sBeta(BlueprintBaseBeta):
         interfaces = []
         intf_index = 3  # starting from ens3
         for l_ in vld:
-            interfaces.append(VimLink.parse_obj({"vld": l_["vld"], "name": "ens{}".format(intf_index),
+            interfaces.append(VimLink.model_validate({"vld": l_["vld"], "name": "ens{}".format(intf_index),
                                                  "mgt": l_["mgt"], "port-security-enabled": False}))
             intf_index += 1
 
         vdu.interface = interfaces
-        vnfd = VirtualNetworkFunctionDescriptor.parse_obj({
+        vnfd = VirtualNetworkFunctionDescriptor.model_validate({
             'password': 'root',
             'id': '{}_A{}_R{}'.format(self.get_id(), area_id, replica),
             'name': '{}_A{}_R{}'.format(self.get_id(), area_id, replica),
@@ -373,8 +374,8 @@ class K8sBeta(BlueprintBaseBeta):
                                           cloud_init=True)
 
         area_vnfd = {'area_id': area_id, 'id': 'vnfd', 'name': complete_vnfd.get_id(),
-                     'vl': [i.dict() for i in interfaces]}
-        self.base_model.vnfd.area.append(BlueVNFD.parse_obj(area_vnfd))
+                     'vl': [i.model_dump() for i in interfaces]}
+        self.base_model.vnfd.area.append(BlueVNFD.model_validate(area_vnfd))
         self.to_db()
 
         return area_vnfd
@@ -669,11 +670,11 @@ class K8sBeta(BlueprintBaseBeta):
         if val:
             # We update self.conf that is SAVED into the DB, differently from self.config_model.
             # In this way the model will be saved into the DB
-            self.base_model.conf = self.k8s_model.dict()
+            self.base_model.conf = self.k8s_model.model_dump()
         else:
             # If the blueprint instance is loaded for the first time, then the model is empty, and we can parse the
             # dictionary into the model
-            self.k8s_model = K8sBlueprintModel.parse_obj(self.base_model.conf)
+            self.k8s_model = K8sBlueprintModel.model_validate(self.base_model.conf)
         # To save the data (in particular the self.conf variable) we call the super method
         super(K8sBeta, self).to_db()
 
@@ -729,13 +730,13 @@ class K8sBeta(BlueprintBaseBeta):
                 target_area.worker_mgt_int[nsd.replica_id] = K8sNsdInterfaceDesc(
                     nsd_id=nsd.nsi_id,
                     nsd_name=nsd.descr.nsd.nsd[0].name,
-                    vld=[VirtLinkDescr.parse_obj(vlds["mgt"][0])])
+                    vld=[VirtLinkDescr.model_validate(vlds["mgt"][0])])
 
                 nsd_data_int_key = next(item for item in vlds if item != 'mgt')
                 target_area.worker_data_int[nsd.replica_id] = K8sNsdInterfaceDesc(
                     nsd_id=nsd.nsi_id,
                     nsd_name=nsd.descr.nsd.nsd[0].name,
-                    vld=[VirtLinkDescr.parse_obj(item) for item in vlds[nsd_data_int_key]])
+                    vld=[VirtLinkDescr.model_validate(item) for item in vlds[nsd_data_int_key]])
             self.to_db()
 
     def get_data(self, get_request: BlueGetDataModel) -> dict:

@@ -8,7 +8,7 @@ import kubernetes.client
 import kubernetes.utils
 from kubernetes import config
 from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, VersionInfo, V1ConfigMap, \
-    V1Namespace, V1ObjectMeta
+    V1Namespace, V1ObjectMeta, V1alpha1ClusterCIDRList
 from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError
 import utils.util
@@ -143,7 +143,7 @@ def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configurati
 
 def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespace: str = None) -> V1DaemonSetList:
     """
-    Search for all DeamonSets of a namespace. If a namespace is not specified, it will work on
+    Search for all DaemonSets of a namespace. If a namespace is not specified, it will work on
     all namespaces.
 
     @param kube_client_config the configuration of K8s on which the client is built.
@@ -260,7 +260,7 @@ def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configurati
         skip_plug_checks: skip plugin checks (already installed...)
 
     Returns:
-        A dict[List[List[K8sTypes]: for each plugin a new key for the dictionary is created witch contains a list of resource types
+        A dict[List[List[K8sTypes]]]: for each plugin a new key for the dictionary is created witch contains a list of resource types
         (V1Pod, V1DaemonSet, ...) and for each resource type there is a list of elements.
 
     Raises:
@@ -282,7 +282,7 @@ def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configurati
         yaml_file_configs_templates = get_yaml_files_for_plugin(version, plugin)
 
         rendered_files_list = utils.util.render_files_from_template(paths=yaml_file_configs_templates,
-                                                                    render_dict=template_fill_data.dict(),
+                                                                    render_dict=template_fill_data.model_dump(),
                                                                     files_name_prefix=cluster_id)
 
         result_list = []
@@ -418,7 +418,7 @@ def get_k8s_version(kube_client_config: kubernetes.client.Configuration) -> K8sV
 
 
 @check_k8s_version(min_version=K8sVersion.V1_26)
-def get_k8s_cidr_info2s(kube_client_config: kubernetes.client.Configuration):
+def get_k8s_cidr_info2s(kube_client_config: kubernetes.client.Configuration) -> V1alpha1ClusterCIDRList:
     """
         Return the pod CIDR of a k8s cluster
 
@@ -434,7 +434,7 @@ def get_k8s_cidr_info2s(kube_client_config: kubernetes.client.Configuration):
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         networking_v1_alpha = kubernetes.client.NetworkingV1alpha1Api(api_client)
         try:
-            cluster_cidr_list = networking_v1_alpha.list_cluster_cidr()
+            cluster_cidr_list: V1alpha1ClusterCIDRList = networking_v1_alpha.list_cluster_cidr()
         except ApiException as error:
             logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
             raise error
@@ -508,7 +508,7 @@ def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[K8sModel]:
     """
     k8s_obj_list: List[K8sModel] = []
     for k8s in k8s_list:
-        k8s_object = K8sModel.parse_obj(k8s)
+        k8s_object = K8sModel.model_validate(k8s)
         k8s_obj_list.append(k8s_object)
     return k8s_obj_list
 

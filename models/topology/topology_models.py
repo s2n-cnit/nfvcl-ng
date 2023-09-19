@@ -36,7 +36,7 @@ class TopologyModel(BaseModel):
         for i in range(0, len(to_return.networks)):
             # Replace object with its dict representation
             to_return.networks[i] = to_return.networks[i].to_dict()
-        return to_return.dict()
+        return to_return.model_dump()
 
     def add_prometheus_srv(self, prom_srv: PrometheusServerModel):
         """

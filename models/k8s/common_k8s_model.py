@@ -20,12 +20,10 @@ class LBPool(BaseModel):
     net_name: str = Field(
         ..., description='name of the network in the topology'
     )
-    ip_start: Optional[str]
-    ip_end: Optional[str]
-    range_length: Optional[int] = Field(
-        None,
-        description='Number of IPv4 addresses to reserved if no ip start and end are passed. Default 10 addresses.',
-    )
+    ip_start: Optional[str] = Field(default=None)
+    ip_end: Optional[str] = Field(default=None)
+    range_length: Optional[int] = Field(None,description='Number of IPv4 addresses to reserved if no ip start'
+                                                         ' and end are passed. Default 10 addresses.')
 
     class Config:
         use_enum_values = True

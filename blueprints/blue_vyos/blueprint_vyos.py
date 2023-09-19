@@ -88,7 +88,7 @@ class VyOSBlue(BlueprintBaseBeta):
             }]
         }
         # DO NOT remove -> model initialization.
-        self.vyos_model = VyOSBlueprint.parse_obj(self.base_model.conf)
+        self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
 
 
     def bootstrap_day0(self, msg: dict) -> list:
@@ -160,7 +160,7 @@ class VyOSBlue(BlueprintBaseBeta):
             # network_endpoints = []
             areas: dict
 
-            self.vyos_model = VyOSBlueprint.parse_obj(msg)
+            self.vyos_model = VyOSBlueprint.model_validate(msg)
 
             # For each area in which we would like to develop a VyOS router we check if it is feasible.
             for area in self.vyos_model.areas:
@@ -209,12 +209,12 @@ class VyOSBlue(BlueprintBaseBeta):
 
         if vld is None:
             # Management interface
-            interfaces = [VimLink.parse_obj({'vld': 'mgt', 'name': 'ens3', "mgt": True})]
+            interfaces = [VimLink.model_validate({'vld': 'mgt', 'name': 'ens3', "mgt": True})]
         else:
             interfaces = []
             intf_index = 3  # starting from ens3
             for l_ in vld:
-                interfaces.append(VimLink.parse_obj({"vld": l_["vld"], "name": "ens{}".format(intf_index),
+                interfaces.append(VimLink.model_validate({"vld": l_["vld"], "name": "ens{}".format(intf_index),
                                                      "mgt": l_["mgt"], "port-security-enabled": False}))
                 intf_index += 1
 
@@ -224,7 +224,7 @@ class VyOSBlue(BlueprintBaseBeta):
         vdu.interface = interfaces
 
         vnfd_id = '{}_vyos_A{}_{}'.format(self.get_id(), str(area_id), device_number)
-        vnfd = VirtualNetworkFunctionDescriptor.parse_obj({
+        vnfd = VirtualNetworkFunctionDescriptor.model_validate({
             'username': 'vyos',
             'password': 'vyos',
             'id': vnfd_id,
@@ -232,12 +232,12 @@ class VyOSBlue(BlueprintBaseBeta):
         })
         vnfd.vdu = [vdu]
 
-        complete_vnfd = sol006_VNFbuilder(self.osm_nbiutil, self.db, vnfd.dict(by_alias=True),
+        complete_vnfd = sol006_VNFbuilder(self.osm_nbiutil, self.db, vnfd.model_dump(by_alias=True),
                                           charm_name='helmflexvnfm')
 
         area_vnfd = {'area_id': area_id, 'id': 'vnfd', 'name': complete_vnfd.get_id(),
-                     'vl': [i.dict() for i in interfaces]}
-        self.base_model.vnfd.area.append(BlueVNFD.parse_obj(area_vnfd))
+                     'vl': [i.model_dump() for i in interfaces]}
+        self.base_model.vnfd.area.append(BlueVNFD.model_validate(area_vnfd))
         self.to_db()
 
         return area_vnfd
@@ -287,7 +287,7 @@ class VyOSBlue(BlueprintBaseBeta):
         if not target_config.vyos_router_flavors:
             vm_flavor = None
         else:
-            vm_flavor = target_config.vyos_router_flavors.copy()
+            vm_flavor = target_config.vyos_router_flavors.model_copy()
 
         created_vnfd = [
             self.setVnfd(area_id, vld=vim_net_mapping, vm_flavor_request=vm_flavor, device_number=device_number,
@@ -297,7 +297,7 @@ class VyOSBlue(BlueprintBaseBeta):
 
         n_ = n_obj.get_nsd()
         n_['area_id'] = area_id
-        self.base_model.nsd_.append(BlueNSD.parse_obj(n_))
+        self.base_model.nsd_.append(BlueNSD.model_validate(n_))
         return param['name']
 
     def nsd(self) -> List[str]:
@@ -398,9 +398,9 @@ class VyOSBlue(BlueprintBaseBeta):
             -Return primitive to be executed
         """
         if not self.vyos_model:
-            self.vyos_model = VyOSBlueprint.parse_obj(self.base_model.conf)
+            self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
         if not request:
-            request = VyOSBlueprintSNATCreate.parse_obj(msg)
+            request = VyOSBlueprintSNATCreate.model_validate(msg)
 
         target_router: VyOSConfig
         target_area, target_router = search_for_target_router_in_area(area_list=self.vyos_model.areas,
@@ -442,9 +442,9 @@ class VyOSBlue(BlueprintBaseBeta):
             -Return primitive to be executed
         """
         if not self.vyos_model:
-            self.vyos_model = VyOSBlueprint.parse_obj(self.base_model.conf)
+            self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
         if not request:
-            request = VyOSBlueprintDNATCreate.parse_obj(msg)
+            request = VyOSBlueprintDNATCreate.model_validate(msg)
 
         target_router: VyOSConfig
         target_area, target_router = search_for_target_router_in_area(area_list=self.vyos_model.areas,
@@ -483,14 +483,14 @@ class VyOSBlue(BlueprintBaseBeta):
         The rule is composed by a DNAT rule and a SNAT rule with a particular form.
         """
         if not self.vyos_model:
-            self.vyos_model = VyOSBlueprint.parse_obj(self.base_model.conf)
-        snat_msg = msg.copy()
+            self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
+        snat_msg = msg.model_copy()
         snat_msg.operation = 'snat'
-        dnat_msg = msg.copy()
+        dnat_msg = msg.model_copy()
         dnat_msg.operation = 'dnat'
 
-        snat_request = VyOSBlueprintSNATCreate.parse_obj(snat_msg)
-        dnat_request = VyOSBlueprintDNATCreate.parse_obj(dnat_msg)
+        snat_request = VyOSBlueprintSNATCreate.model_validate(snat_msg)
+        dnat_request = VyOSBlueprintDNATCreate.model_validate(dnat_msg)
 
         primitives_to_exec = []
         primitives_to_exec.extend(self.set_snat_rules(msg={}, request=snat_request))
@@ -568,8 +568,8 @@ class VyOSBlue(BlueprintBaseBeta):
         - return the primitive
         """
         if not self.vyos_model:
-            self.vyos_model = VyOSBlueprint.parse_obj(self.base_model.conf)
-        request: VyOSBlueprintNATdelete = VyOSBlueprintNATdelete.parse_obj(msg)
+            self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
+        request: VyOSBlueprintNATdelete = VyOSBlueprintNATdelete.model_validate(msg)
 
         target_router: VyOSConfig
         target_area, target_router = search_for_target_router_in_area(area_list=self.vyos_model.areas,
@@ -637,12 +637,12 @@ class VyOSBlue(BlueprintBaseBeta):
             only the area is specified.
         """
         try:
-            request = VyOSBlueprintGetRouters.parse_obj(msg.arguments)
+            request = VyOSBlueprintGetRouters.model_validate(msg.arguments)
         except ValidationError:
             # In case of validation error, retrieve the correct schema so the user can correct the request.
             msg = {"message": "The request is not correct. The presented field <arguments> schema is wrong or "
                               "missing some data",
-                   "schema": VyOSBlueprintGetRouters.schema()}
+                   "schema": VyOSBlueprintGetRouters.model_json_schema()}
             return msg
 
         target_router: VyOSConfig
@@ -651,12 +651,12 @@ class VyOSBlue(BlueprintBaseBeta):
             target_area, target_router = search_for_target_router_in_area(area_list=self.vyos_model.areas,
                                                                           target_area_id=request.area,
                                                                           target_router_name=request.router_name)
-            return {"router_list": [target_router.dict()]}  # A list with only one element
+            return {"router_list": [target_router.model_dump()]}  # A list with only one element
 
         # Second case we have only the area, a list of routers in that area will be retrieved
         else:
             router_list = search_for_routers_in_area(area_list=self.vyos_model.areas, target_area_id=request.area)
-            return {"router_list": [router_config.dict() for router_config in router_list]}
+            return {"router_list": [router_config.model_dump() for router_config in router_list]}
 
     def to_db(self):
         """
@@ -669,11 +669,11 @@ class VyOSBlue(BlueprintBaseBeta):
         if val:
             # If the model is loaded from the db, then we assign to self.conf and call the super method. In this way
             # the model will be saved in the db
-            self.base_model.conf = self.vyos_model.dict()
+            self.base_model.conf = self.vyos_model.model_dump()
         else:
             # If the blueprint instance is loaded for the first time, then the model is empty, and we can parse the
             # dictionary into the model
-            self.vyos_model = VyOSBlueprint.parse_obj(self.base_model.conf)
+            self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
         # To save the data (in particular the self.conf variable) we call the super method
         super(VyOSBlue, self).to_db()
 

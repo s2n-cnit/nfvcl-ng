@@ -59,7 +59,7 @@ def _load_nfvcl_config() -> NFVCLConfigModel:
 
         # Parsing the config file
         try:
-            config = NFVCLConfigModel.parse_obj(nfvcl_conf)
+            config = NFVCLConfigModel.model_validate(nfvcl_conf)
         except Exception as exce:
             print('exception in the configuration file parsing: {}'.format(exce))
         return config

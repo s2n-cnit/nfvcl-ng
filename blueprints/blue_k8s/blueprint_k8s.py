@@ -2,7 +2,6 @@ from blueprints import BlueprintBase, parse_ansible_output
 from models.k8s.topology_k8s_model import K8sPluginName, K8sTemplateFillData
 from . import ConfiguratorK8s
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
-from nfvo.osm_nbi_util import get_osm_nbi_utils
 from typing import Union, Dict, Optional
 from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
@@ -264,7 +263,7 @@ class K8s(BlueprintBase):
     def add_worker_area_label(self, msg: dict):
         logger.debug("Blue {} - Triggering Day2 Add area label to workers ".format(self.get_id()))
         if type(msg) is not dict:
-            msg = msg.dict()
+            msg = msg.model_dump()
 
         if "areas" in msg: 
             areas_to_label = [item['id'] for item in msg['areas']]
@@ -298,7 +297,7 @@ class K8s(BlueprintBase):
         logger.info("Deleting worker from K8S blueprint " + str(self.get_id()))
         nsi_to_delete = []
         if type(msg) is not dict:
-            msg = msg.dict()
+            msg = msg.model_dump()
         areas = []
         if "del_areas" in msg:
             areas = msg["del_areas"]
@@ -340,7 +339,7 @@ class K8s(BlueprintBase):
     def add_worker(self, msg: dict) -> List[str]:
         logger.info("Adding worker to K8S blueprint " + str(self.get_id()))
         if type(msg) is not dict:
-            msg = msg.dict()
+            msg = msg.model_dump()
         nsd_names = []
         for area in msg['add_areas']:
             logger.info("Blue {} - activating new area {}".format(self.get_id(), area['id']))
@@ -372,7 +371,7 @@ class K8s(BlueprintBase):
 
     def add_worker_day2(self, msg: dict):  # FIXME!!!!!
         if type(msg) is not dict:
-            msg = msg.dict()
+            msg = msg.model_dump()
         res = []
 
         areas = []
@@ -502,7 +501,7 @@ class K8s(BlueprintBase):
             Empty primitive list such that caller does not crash
         """
         if type(msg) is not dict:
-            msg = msg.dict()
+            msg = msg.model_dump()
         client_config = get_k8s_config_from_file_content(self.conf['config']['master_credentials'])
         # Build plugin list
         plug_list: List[K8sPluginName] = []

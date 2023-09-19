@@ -29,7 +29,7 @@ class ConfiguratorK8sBeta(Configurator_Flex):
 
         if self.role == 'master':
             ansible_vars = [
-                {'pod_network_cidr': config_model.config.pod_network_cidr.with_prefixlen},
+                {'pod_network_cidr': config_model.config.pod_network_cidr},
                 {'k8s_master_ip': config_model.config.controller_ip}
                 # ^-- They are used as ansible vars in playbook_kubernetes_master.yml
             ]

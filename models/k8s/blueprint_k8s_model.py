@@ -29,7 +29,7 @@ class K8sAreaInfo(BaseModel):
     id: int
     core: Optional[bool] = False
     workers_replica: int
-    worker_flavor_override: Optional[VMFlavors]
+    worker_flavor_override: Optional[VMFlavors] = Field(default=None)
     worker_mgt_int: Dict[str, K8sNsdInterfaceDesc] = Field(default={})
     worker_data_int: Dict[str, K8sNsdInterfaceDesc] = Field(default={})
 
@@ -37,14 +37,13 @@ class K8sAreaInfo(BaseModel):
 class K8sConfig(BaseModel):
     version: K8sVersion = Field(default=K8sVersion.V1_24)
     cni: Cni = Field(default=Cni.flannel)
-    linkerd: Optional[dict]
-    pod_network_cidr: Optional[IPv4Network] \
-        = Field('10.254.0.0/16', description='K8s Pod network IPv4 cidr to init the cluster')
+    linkerd: dict = Field(default={})
+    pod_network_cidr: str = Field(default="10.254.0.0/16", description='K8s Pod network IPv4 cidr to init the cluster')
     network_endpoints: K8sNetworkEndpoints
     worker_flavors: VMFlavors = VMFlavors()
     master_flavors: VMFlavors = VMFlavors()
     nfvo_onboarded: bool = False
-    core_area: K8sAreaInfo = Field(default=None, description="The core are of the cluster")
+    core_area: Optional[K8sAreaInfo] = Field(default=None, description="The core are of the cluster")
     controller_ip: str = Field(default="", description="The IP of the k8s controller or master")
     master_key_add_worker: str = Field(default="", description="The master key to be used by a worker to join the k8s cluster")
     master_credentials: str = Field(default="", description="The certificate of the admin, to allow k8s administration")

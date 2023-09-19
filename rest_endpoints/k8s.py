@@ -92,8 +92,8 @@ async def install_k8s_plugin(cluster_id: str, message: K8sPluginsToInstall):
     """
 
     request = K8sModelManagement(k8s_ops=K8sOperationType.INSTALL_PLUGIN, cluster_id=cluster_id,
-                                 data=json.dumps(message.dict()))
-    redis_cli.publish("K8S_MAN", request.json())
+                                 data=json.dumps(message.model_dump()))
+    redis_cli.publish("K8S_MAN", request.model_dump_json())
 
     return RestAnswer202(id='K8s management')
 

@@ -115,7 +115,7 @@ class BlueprintBase(abc.ABC):
         db_data = _db.findone_DB("blueprint-instances", {'id': blue_id})
         if not db_data:
             raise ValueError('blueprint {} not found in DB or malformed'.format(blue_id))
-        data = DbBlue.parse_obj(db_data).dict()
+        data = DbBlue.model_validate(db_data).model_dump()
         if data['type'] not in blueprint_types:
             raise ValueError('type {} for blueprint {} not found'.format(data['type'], blue_id))
         blue_class = blueprint_types[data['type']]
@@ -141,7 +141,7 @@ class BlueprintBase(abc.ABC):
                 'current_operation': self.current_operation, 'modified': self.modified,
                 'supported_operations': self.supported_operations, 'type': self.blue_type, 'pdu': self.pdu,
                 'vnfd': self.vnfd, 'deployment_units': self.deployment_units}
-        data_serialized = json.loads(DbBlue.parse_obj(data).json())
+        data_serialized = json.loads(DbBlue.model_validate(data).json())
         if self.db.exists_DB("blueprint-instances", {'id': self.conf["blueprint_instance_id"]}):
 
             self.db.update_DB("blueprint-instances", data_serialized,
@@ -320,7 +320,7 @@ class BlueprintBase(abc.ABC):
 
     def topology_add_pdu(self, pdu: dict):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        topology.add_pdu(PduModel.parse_obj(pdu))
+        topology.add_pdu(PduModel.model_validate(pdu))
         self.pdu.append(pdu['name'])
         self.to_db()
 
@@ -332,20 +332,20 @@ class BlueprintBase(abc.ABC):
 
     def topology_get_pdu(self, pdu_name: str):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        return topology.get_pdu(pdu_name).dict()
+        return topology.get_pdu(pdu_name).model_dump()
 
     def topology_get_pdu_by_area(self, area) -> dict:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         pdus: List[PduModel] = topology.get_pdus()
         if type(area) is dict:
-            return next((pdu.dict() for pdu in pdus if pdu.area == area['id']), None)
+            return next((pdu.model_dump() for pdu in pdus if pdu.area == area['id']), None)
         else:
-            return next((pdu.dict() for pdu in pdus if pdu.area == area), None)
+            return next((pdu.model_dump() for pdu in pdus if pdu.area == area), None)
 
     def topology_get_pdu_by_area_and_type(self, area_id: str, pdu_type: str) -> dict:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
         pdus: List[PduModel] = topology.get_pdus()
-        return next((item.dict() for item in pdus if item.area == area_id and item.type == pdu_type), None)
+        return next((item.model_dump() for item in pdus if item.area == area_id and item.type == pdu_type), None)
 
     def topology_get_vim_by_area(self, area):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
@@ -356,7 +356,7 @@ class BlueprintBase(abc.ABC):
 
     def topology_add_k8scluster(self, k8s_cluster_data: dict):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        topology.add_k8scluster(K8sModel.parse_obj(k8s_cluster_data))
+        topology.add_k8scluster(K8sModel.model_validate(k8s_cluster_data))
 
     def topology_del_k8scluster(self):
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
@@ -398,7 +398,7 @@ class BlueprintBase(abc.ABC):
 
     def topology_get_network(self, network_name: str) -> dict:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)
-        return topology.get_network(network_name).dict()
+        return topology.get_network(network_name).model_dump()
 
     def topology_reserve_ip_range(self, lb_pool: dict, range_length: int) -> IPv4ReservedRange:
         topology = Topology.from_db(self.db, self.nbiutil, self.topology_lock)

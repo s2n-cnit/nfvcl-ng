@@ -109,7 +109,7 @@ class PrometheusServerModel(BaseModel):
         """
         relative_path: str = 'day2_files/prometheus_{}_scraps.yaml'.format(self.id)
         with open(relative_path, 'w') as file:
-            file.write(ruamel.yaml.dump(self.dict()['jobs'], Dumper=ruamel.yaml.RoundTripDumper, allow_unicode=True))
+            file.write(ruamel.yaml.dump(self.model_dump()['jobs'], Dumper=ruamel.yaml.RoundTripDumper, allow_unicode=True))
         global_path = f"{os.getcwd()}/{relative_path}"
         return global_path
 

@@ -151,10 +151,10 @@ async def get_blueprints(
         blue_filter['type'] = type
     if detailed:
         res = old_workers.get_blue_detailed_summary(blue_filter)
-        to_ret = [item.dict() for item in res]
+        to_ret = [item.model_dump() for item in res]
     else:
         res = old_workers.get_blue_short_summary(blue_filter)
-        to_ret = [item.dict() for item in res]
+        to_ret = [item.model_dump() for item in res]
 
     return to_ret
 
@@ -190,7 +190,7 @@ def create_blueprint(msg: blue_create_models):
 
     logger.info("Candidate Blueprint {} selected".format(blueprint_types[msg.type]['class_name']))
     # start async operations
-    thread = Thread(target=instantiate_blueprint, args=(msg.dict(), blue_id,))
+    thread = Thread(target=instantiate_blueprint, args=(msg.model_dump(), blue_id,))
     # thread.daemon = True
     thread.start()
     # reply with submitted code

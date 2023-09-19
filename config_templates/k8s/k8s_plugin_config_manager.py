@@ -30,7 +30,7 @@ def get_enabled_plugins(plugin_names_filter: List[K8sPluginName] = None) -> List
     json_data: List[dict] = json.loads(data)
 
     for dict_plugin in json_data:
-        plugin: K8sPlugin = K8sPlugin.parse_obj(dict_plugin)
+        plugin: K8sPlugin = K8sPlugin.model_validate(dict_plugin)
         # If no filter
         if plugin_names_filter is None:
             enabled_plugins.append(plugin)

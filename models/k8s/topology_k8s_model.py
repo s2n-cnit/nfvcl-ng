@@ -50,7 +50,7 @@ class K8sModel(BaseModel):
     vim_name: str = Field(title="Reference VIM, where k8s cluster is deployed (example OpenStack)")
     k8s_version: K8sVersion = Field(default=K8sVersion.V1_24)
     networks: List[str] = Field(title="List of attached networks", min_items=1)
-    areas: List[str] = Field(title="Competence areas", min_items=1)
+    areas: List[int] = Field(title="Competence areas", min_items=1)
     cni: Optional[str]
     nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED)
     nfvo_onboard: bool = Field(default=False)

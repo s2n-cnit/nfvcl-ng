@@ -52,12 +52,12 @@ class Topology:
         self._os_terraformer = {}
         if topo:
             if isinstance(topo, TopologyModel):
-                self._data = topo.dict()
+                self._data = topo.model_dump()
                 self._model = topo
             else:
                 try:
-                    self._model = TopologyModel.parse_obj(topo)
-                    self._data = self._model.dict()
+                    self._model = TopologyModel.model_validate(topo)
+                    self._data = self._model.model_dump()
                 except Exception:
                     logger.error(traceback.format_exc())
                     raise ValueError("Topology cannot be initialized")
@@ -65,7 +65,7 @@ class Topology:
             # Re-creating terraformer objs
             for vim in self._model.vims:
                 logger.debug('creating terraformer object for VIM {}'.format(vim.name))
-                self._os_terraformer[vim.name] = VimTerraformer(vim.dict())
+                self._os_terraformer[vim.name] = VimTerraformer(vim.model_dump())
         else:
             msg_err = "Topology information are not existing"
             self._model = None
@@ -84,7 +84,7 @@ class Topology:
         """
         topo = db.findone_DB("topology", {})
         if topo:
-            data = TopologyModel.parse_obj(topo).dict()
+            data = TopologyModel.model_validate(topo).model_dump()
         else:
             data = None
         return cls(data, db, nbiutil, lock)
@@ -93,9 +93,9 @@ class Topology:
         """
         Save the content of self._data into the db. Update self._model with current self._data values.
         """
-        content = TopologyModel.parse_obj(self._data)
+        content = TopologyModel.model_validate(self._data)
         self._model = content
-        plain_dict = json.loads(content.json())
+        plain_dict = json.loads(content.model_dump_json())
         self.db.update_DB("topology", plain_dict, {'id': 'topology'})
 
     def _save_topology_from_model(self) -> None:
@@ -103,8 +103,8 @@ class Topology:
         Save the content of self._model into the db. Update self._data with current self._model values.
         """
         content = self._model
-        self._data = content.dict()
-        plain_dict = json.loads(content.json())
+        self._data = content.model_dump()
+        plain_dict = json.loads(content.model_dump_json())
         self.db.update_DB("topology", plain_dict, {'id': 'topology'})
 
     # **************************** Topology ***********************
@@ -142,7 +142,7 @@ class Topology:
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
         logger.debug("Deleting the topology. Terraform: {}".format(terraform))
-        deleted_topology: TopologyModel = self._model.copy()
+        deleted_topology: TopologyModel = self._model.model_copy()
         if not self._model:
             msg_err = 'Not possible to delete the topology. No topology is currently allocated'
             logger.error(msg_err)
@@ -151,7 +151,7 @@ class Topology:
         # Check for terraform is done inside del_vim method
         for vim in self._model.vims:
             try:
-                self.del_vim(vim, terraform)
+                self.del_vim(vim.name, terraform)
             except Exception as exception:
                 logger.error(exception)
                 raise exception
@@ -184,7 +184,7 @@ class Topology:
         # Check if the vim already exists and add it
         self._model.add_vim(vim_model)
         # Create the terraformer for the VIM that will manage resources on the VIM
-        self._os_terraformer[vim_model.name] = VimTerraformer(vim_model.dict())  # Recreate it even if existing
+        self._os_terraformer[vim_model.name] = VimTerraformer(vim_model.model_dump())  # Recreate it even if existing
 
         if terraform:
             # For each network, if terraforming, we need to create it in the real VIM
@@ -275,7 +275,7 @@ class Topology:
             vim_model.del_area(vim_area)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_VIM_UPDATE, vim_model.dict())
+        trigger_event(TopologyEventType.TOPO_VIM_UPDATE, vim_model.model_dump())
 
     def get_vim_name_from_area_id(self, area: int) -> Union[str, None]:
         """
@@ -295,7 +295,7 @@ class Topology:
         Returns:
             The FIRST vim belonging to that area.
         """
-        return self._model.get_vim_by_area(area_id=area).dict()
+        return self._model.get_vim_by_area(area_id=area).model_dump()
 
     def get_vim_from_area_id_model(self, area: int) -> VimModel:
         """
@@ -348,7 +348,7 @@ class Topology:
         """
         # Converting from dict if necessary
         if not isinstance(network, NetworkModel):
-            network_model: NetworkModel = NetworkModel.parse_obj(network)
+            network_model: NetworkModel = NetworkModel.model_validate(network)
         else:
             network_model = network
 
@@ -392,7 +392,7 @@ class Topology:
             The removed network
         """
         if isinstance(network, dict):
-            network = NetworkModel.parse_obj(network)
+            network = NetworkModel.model_validate(network)
 
         # For each required VIM, the network is deleted. Otherwise, the net is removed only from the topology
         if vim_names_list:
@@ -418,7 +418,7 @@ class Topology:
         # Looking for the router in the topology
         router: RouterModel = self._model.get_router(router_name)
 
-        return router.dict()
+        return router.model_dump()
 
     @obj_multiprocess_lock
     def add_router(self, router: RouterModel):
@@ -434,7 +434,7 @@ class Topology:
         # Crash if already present
         self._model.add_router(router)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_ROUTER, router.dict())
+        trigger_event(TopologyEventType.TOPO_CREATE_ROUTER, router.model_dump())
 
     @obj_multiprocess_lock
     def del_router(self, router_name: str, vim_names_list: list = None):
@@ -458,7 +458,7 @@ class Topology:
                 vim.del_router(vim_router)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_ROUTER, router.dict())
+        trigger_event(TopologyEventType.TOPO_DELETE_ROUTER, router.model_dump())
 
     # **************************** VIM updating **********************
 
@@ -485,7 +485,7 @@ class Topology:
         if terraform:
             logger.info('Network >{}< will be terraformed to VIM >{}<'.format(vim_net_name, vim.name))
             # Creating net
-            terraformed_ids = self._os_terraformer[vim.name].createNet(topo_net.dict().copy())
+            terraformed_ids = self._os_terraformer[vim.name].createNet(topo_net.model_dump().copy())
             terraformed_ids['vim'] = vim.name
 
             topo_net.ids.append(terraformed_ids)
@@ -547,8 +547,8 @@ class Topology:
         topology_router = self._model.get_router(vim_router_name)
 
         # Create a copy to be used within os terraformer
-        router: RouterModel = topology_router.copy()
-        router_dict = router.dict()
+        router: RouterModel = topology_router.model_copy()
+        router_dict = router.model_dump()
 
         # Check if the router is connected to an external network
         port: RouterPortModel
@@ -695,7 +695,7 @@ class Topology:
         topo_net.add_reserved_range(ip_range)
 
         self._save_topology_from_model()  # Since we are working on the model
-        trigger_event(TopologyEventType.TOPO_CREATE_RANGE_RES, ip_range.dict())
+        trigger_event(TopologyEventType.TOPO_CREATE_RANGE_RES, ip_range.to_dict())
         return ip_range
 
     @obj_multiprocess_lock
@@ -744,7 +744,7 @@ class Topology:
             self._model.add_pdu(pdu_input)
             # Saving changes to the topology
             self._save_topology_from_model()
-            trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.dict())
+            trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.model_dump())
 
         except ValueError:
             # Value error is thrown when the PDU already exist
@@ -761,7 +761,7 @@ class Topology:
 
         # Saving changes to the topology
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.dict())
+        trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.model_dump())
 
     @obj_multiprocess_lock
     def del_pdu(self, pdu_name: str):
@@ -785,7 +785,7 @@ class Topology:
         else:
             deleted_pdu = self._model.del_pdu(pdu_name)
 
-        trigger_event(TopologyEventType.TOPO_DELETE_PDU, deleted_pdu.dict())
+        trigger_event(TopologyEventType.TOPO_DELETE_PDU, deleted_pdu.model_dump())
         self._save_topology_from_model()
 
     def get_pdu(self, pdu_name: str) -> PduModel:
@@ -824,7 +824,7 @@ class Topology:
         self._model.add_k8s_cluster(data, self.osm_nbi_util)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_K8S, data.dict())
+        trigger_event(TopologyEventType.TOPO_CREATE_K8S, data.model_dump())
 
     @obj_multiprocess_lock
     def del_k8scluster(self, cluster_id: str):
@@ -837,7 +837,7 @@ class Topology:
         k8s_deleted_cluster = self._model.del_k8s_cluster(cluster_id, self.osm_nbi_util)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_deleted_cluster.dict())
+        trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_deleted_cluster.model_dump())
 
     @obj_multiprocess_lock
     def update_k8scluster(self, cluster: K8sModel):
@@ -849,7 +849,7 @@ class Topology:
         updated_cluster = self._model.upd_k8s_cluster(cluster, self.osm_nbi_util)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_UPDATE_K8S, updated_cluster.dict())
+        trigger_event(TopologyEventType.TOPO_UPDATE_K8S, updated_cluster.model_dump())
 
     @obj_multiprocess_lock
     def add_prometheus_server(self, prom_server: PrometheusServerModel):
@@ -862,7 +862,7 @@ class Topology:
         # Check if there is an instance with the same id
         self._model.add_prometheus_srv(prom_server)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_PROM_SRV, prom_server.dict())
+        trigger_event(TopologyEventType.TOPO_CREATE_PROM_SRV, prom_server.model_dump())
 
     @obj_multiprocess_lock
     def del_prometheus_server(self, prom_srv_id: str, force: bool = False) -> PrometheusServerModel:
@@ -879,7 +879,7 @@ class Topology:
         remove_files_by_pattern("day2_files", 'prometheus_{}'.format(prom_srv_id))
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_PROM_SRV, deleted_prom_instance.dict())
+        trigger_event(TopologyEventType.TOPO_DELETE_PROM_SRV, deleted_prom_instance.model_dump())
         return deleted_prom_instance
 
     @obj_multiprocess_lock
@@ -892,7 +892,7 @@ class Topology:
         updated_instance = self._model.upd_prometheus_srv(prom_server)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_UPDATE_PROM_SRV, updated_instance.dict())
+        trigger_event(TopologyEventType.TOPO_UPDATE_PROM_SRV, updated_instance.model_dump())
 
     def get_prometheus_server(self, prom_server_id: str) -> PrometheusServerModel:
         """

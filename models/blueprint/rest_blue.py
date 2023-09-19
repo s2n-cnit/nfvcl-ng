@@ -29,7 +29,7 @@ class ShortBlueModel(BaseModel):
     detailed_status: str = Field(default="", description="Detailed description of the blueprint status")
     current_operation: str = Field(default="")
     created: datetime.datetime = Field(default=datetime.datetime.now())
-    modified: Optional[datetime.datetime]
+    modified: Optional[datetime.datetime] = Field(default=None)
     no_areas: int = Field(default=-1, description="Number of areas. -1 when not initialized")
     no_nsd: int = Field(default=-1, description="Number of nsd. -1 when not initialized")
     no_primitives: int = Field(default=-1, description="Number of primitives. -1 when not initialized")

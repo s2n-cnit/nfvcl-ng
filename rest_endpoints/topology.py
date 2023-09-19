@@ -73,7 +73,7 @@ async def create_topology(
         terraform: bool = Query(default=False,
                                 description="set to true if you want to terraform VIMs upon topology creation"),
 ):
-    msg = topo.dict()
+    msg = topo.model_dump()
     msg.update({'ops_type': 'add_topology', 'terraform': terraform})
     topology_msg_queue.put(msg)
     return {'id': 'topology'}
@@ -89,7 +89,7 @@ async def delete_topology(
     topology = Topology.from_db(db, nbiUtil, topology_lock)
     if not topology:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="topology not declared")
-    msg = msg_body.dict()
+    msg = msg_body.model_dump()
     msg.update({'ops_type': 'del_topology', 'terraform': terraform})
     print(msg)
     topology_msg_queue.put(msg)
@@ -108,7 +108,7 @@ async def create_vim(
         terraform: bool = Query(default=False,
                                 description="set to true if you want to terraform VIMs upon topology creation")
 ):
-    msg = vim.dict()
+    msg = vim.model_dump()
     msg.update({'ops_type': 'add_vim', 'terraform': terraform})
     topology_msg_queue.put(msg)
     return {'id': 'topology'}
@@ -121,7 +121,7 @@ async def update_vim(
         updated_vim: UpdateVimModel,
         terraform: bool = Query(default=False,
                                 description="set to true if you want to terraform the VIM")):
-    msg = updated_vim.dict()
+    msg = updated_vim.model_dump()
     msg.update({'terraform': terraform})
     return produce_msg_worker('vims', vim_id, 'update_vim', msg_body=msg)
 
@@ -143,7 +143,7 @@ async def get_network(network_id: str):
 @topology_router.post("/network", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
                       callbacks=callback_router.routes)
 async def create_network(network: NetworkModel):
-    msg = network.dict()
+    msg = network.model_dump()
     msg.update({'ops_type': 'add_net'})
     topology_msg_queue.put(msg)
     return {'id': 'topology'}
@@ -167,7 +167,7 @@ async def get_router(router_id: str):
 @topology_router.post("/router", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
                       callbacks=callback_router.routes)
 async def create_router(router: RouterModel):
-    msg = router.dict()
+    msg = router.model_dump()
     msg.update({'ops_type': 'add_router'})
     topology_msg_queue.put(msg)
     return {'id': 'topology'}
@@ -197,7 +197,7 @@ async def get_pdus():
 @topology_router.post("/pdu", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
                       callbacks=callback_router.routes)
 async def create_pdu(router: PduModel):
-    msg = router.dict()
+    msg = router.model_dump()
     msg.update({'ops_type': 'add_pdu'})
     topology_msg_queue.put(msg)
     return {'id': 'topology'}
@@ -215,7 +215,7 @@ async def delete_pdu(pdu_id: str):
                       callbacks=callback_router.routes, summary=ADD_K8SCLUSTER_SUMMARY,
                       description=ADD_K8SCLUSTER_DESCRIPTION)
 async def create_k8scluster(cluster: K8sModelCreateFromBlueprint):
-    msg = cluster.dict()
+    msg = cluster.model_dump()
     msg.update({'ops_type': 'add_k8s'})
     if 'blueprint_ref' not in msg or not msg['blueprint_ref']:
         # See in following methods
@@ -259,7 +259,7 @@ async def create_k8scluster(cluster: K8sModelCreateFromBlueprint):
                       callbacks=callback_router.routes, summary=ADD_EXTERNAL_K8SCLUSTER_SUMMARY,
                       description=ADD_EXTERNAL_K8SCLUSTER)
 async def add_external_k8scluster(cluster: K8sModelCreateFromExternalCluster):
-    msg = cluster.dict()
+    msg = cluster.model_dump()
     msg.update({'ops_type': 'add_k8s'})
 
     msg.update({'provided_by': 'external'})
@@ -272,7 +272,7 @@ async def add_external_k8scluster(cluster: K8sModelCreateFromExternalCluster):
                      callbacks=callback_router.routes, summary=UPD_K8SCLUSTER_SUMMARY,
                      description=UPD_PROM_SRV_DESCRIPTION)
 async def update_k8scluster(cluster_updates: K8sModel, cluster_id):
-    msg = cluster_updates.dict()
+    msg = cluster_updates.model_dump()
 
     # check if the cluster exists in the topology
     topology = Topology.from_db(db, nbiUtil, topology_lock)
@@ -306,7 +306,7 @@ async def get_k8scluster():
                       callbacks=callback_router.routes, summary=ADD_PROM_SRV_SUMMARY,
                       description=ADD_K8SCLUSTER_DESCRIPTION)
 async def add_prom(prom_srv: PrometheusServerModel):
-    msg = prom_srv.dict()
+    msg = prom_srv.model_dump()
     msg.update({'ops_type': 'add_prom'})
     topology_msg_queue.put(msg)
 
@@ -317,7 +317,7 @@ async def add_prom(prom_srv: PrometheusServerModel):
                      callbacks=callback_router.routes, summary=UPD_PROM_SRV_SUMMARY,
                      description=UPD_PROM_SRV_DESCRIPTION)
 async def upd_prom(prom_srv: PrometheusServerModel):
-    msg = prom_srv.dict()
+    msg = prom_srv.model_dump()
     msg.update({'ops_type': 'upd_prom'})
     topology_msg_queue.put(msg)
 

@@ -60,7 +60,7 @@ class BlueprintBaseBeta(abc.ABC):
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None, db: DB = None,
                  nbiutil: NbiUtil = None):
         if data:
-            self.base_model = BlueprintBaseModel.parse_obj(data)
+            self.base_model = BlueprintBaseModel.model_validate(data)
         else:
             data = {}
             conf["blueprint_instance_id"] = id_
@@ -69,7 +69,7 @@ class BlueprintBaseBeta(abc.ABC):
             data['conf'] = conf
             data['id'] = id_
             data['input_conf'] = conf
-            self.base_model = BlueprintBaseModel.parse_obj(data)
+            self.base_model = BlueprintBaseModel.model_validate(data)
 
         self.base_model.version = BlueprintVersion.ver2_00
         self.topology_lock = None
@@ -108,8 +108,8 @@ class BlueprintBaseBeta(abc.ABC):
 
     def to_db(self):
         self.base_model.modified = datetime.datetime.now()
-        # self.base_model.dict() is NOT working, some fields remain object
-        data_serialized = json.loads(self.base_model.json(by_alias=True))
+        # self.base_model.model_dump() is NOT working, some fields remain object
+        data_serialized = json.loads(self.base_model.model_dump_json(by_alias=True))
         if self.db.exists_DB("blueprint-instances", {'id': self.base_model.id}):
             self.db.update_DB("blueprint-instances", data_serialized, {'id': self.base_model.id})
         else:
@@ -217,10 +217,10 @@ class BlueprintBaseBeta(abc.ABC):
         #    p.update({'time': p['time'].strftime("%m/%d/%Y, %H:%M:%S")})
         #    logger.debug(p)
         #    res['primitives'].append(p)
-        return self.base_model.dict()
+        return self.base_model.model_dump()
 
     def print_short_summary(self) -> ShortBlueModel:
-        return ShortBlueModel.parse_obj(self.base_model.dict())
+        return ShortBlueModel.model_validate(self.base_model.model_dump())
 
     def get_nsd(self) -> List[BlueNSD]:
         """

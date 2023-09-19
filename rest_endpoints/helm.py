@@ -48,7 +48,7 @@ def helm_index_get(file):
 @helm_router.post("/", status_code=204, callbacks=callback_router.routes)
 def helm_onboard_post(helm_repo_item: HelmRepo):
     logger.debug("GET POST for helm repository index")
-    helm_repo_dict = helm_repo_item.dict()
+    helm_repo_dict = helm_repo_item.model_dump()
     try:
         helm_repo.set_entry(helm_repo_dict)
     except Exception as e:

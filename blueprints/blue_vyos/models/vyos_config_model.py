@@ -7,15 +7,15 @@ from .vyos_nat_rules_model import VyOSDestNATRule, VyOSSourceNATRule
 
 class VyOSConfig(BaseModel):
     version: Optional[str] = "1.00"
-    name: Optional[str]
-    nsd_name: Optional[str]
-    nsd_id: Optional[str]
+    name: Optional[str] = Field(default=None)
+    nsd_name: Optional[str] = Field(default=None)
+    nsd_id: Optional[str] = Field(default=None)
     network_endpoints: VyOSRouterNetworkEndpoints
     admin_username: str = Field(default='vyos')
     admin_password: str = Field(default='vyos')
-    vyos_router_flavors: Optional[VMFlavors]
-    snat_rules: Optional[List[VyOSSourceNATRule]]
-    dnat_rules: Optional[List[VyOSDestNATRule]]
+    vyos_router_flavors: Optional[VMFlavors] = Field(default=None)
+    snat_rules: Optional[List[VyOSSourceNATRule]] = Field(default=None)
+    dnat_rules: Optional[List[VyOSDestNATRule]] = Field(default=None)
 
     def extend_snat_rules(self, list_to_append: List[VyOSSourceNATRule]):
         """

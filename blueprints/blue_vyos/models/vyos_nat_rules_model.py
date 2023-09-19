@@ -10,7 +10,7 @@ class VyOSSourceNATRule(BaseModel):
     into the desired ip
     """
     outbound_network: str = Field(title="The network to which the source IP translation is applied. Example 10.0.0.0/16")
-    outbound_interface: Optional[str]
+    outbound_interface: Optional[str] = Field(default=None)
     source_address: str = Field(title="The source IP or ip range to witch the rule is applied. Example 10.170.2.0/24")
     virtual_ip: str = Field(default="masquerade",title="The desired new IP of packets exiting the interface. This value"
                                                         "can be set to 'masquerade' or to a valid IP/32 (10.170.2.66)")
@@ -24,7 +24,7 @@ class VyOSDestNATRule(BaseModel):
     interface (can be retrived by the network) to a new IP address.
     """
     inbound_network: str = Field(title="The network from which to listen. Example 10.0.0.0/16")
-    inbound_interface: Optional[str]
+    inbound_interface: Optional[str] = Field(default=None)
     virtual_ip: str = Field(title="The virtual IP represent the target IP or the IP range to convert into the "
                                   "real_destination_ip. Example 7.7.7.7")
     real_destination_ip: str = Field(title="The real destination. Example 192.168.0.45")

@@ -142,7 +142,7 @@ class VyOSBlue(BlueprintBaseBeta):
         """
         topology_net = get_topology_item('networks', network.net_name)
         if topology_net is not None:
-            network.network = topology_net['cidr']
+            network.network = topology_net['cidr'].exploded
 
     def topology_terraform(self, msg: dict) -> None:
         """

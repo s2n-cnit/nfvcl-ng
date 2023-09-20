@@ -50,5 +50,15 @@
     "daemon_sets": [
       "metric-server"
     ]
+  },
+  {
+    "name": "multus-cni",
+    "type": "network",
+    "installation_modules": [
+      "multus"
+    ],
+    "daemon_sets": [
+      "multus"
+    ]
   }
 ]

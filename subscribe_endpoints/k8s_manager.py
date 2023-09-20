@@ -136,7 +136,7 @@ class K8sManager:
         elif message['type'] == 'message':
             # --- Parsing the message in the model for k8s management ---
             try:
-                management_model: K8sModelManagement = K8sModelManagement.model_validate(json.loads(data))
+                management_model: K8sModelManagement = K8sModelManagement.model_validate(json.loads(data)['data'])
             except ValidationError as val_err:
                 msg_err = "Received model is impossible to validate."
                 self.logger.error(msg_err)

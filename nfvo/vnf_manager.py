@@ -3,6 +3,7 @@ import shutil
 import tarfile
 import typing
 import yaml
+from pydantic import Field
 
 import utils.persistency
 from . import NbiUtil, PNFmanager
@@ -28,7 +29,7 @@ class sol006_VNFbuilder:
                  nbi_util: NbiUtil,
                  db: utils.persistency.DB,
                  vnf_data: dict,
-                 charm_name: typing.Optional[str] = None,
+                 charm_name: typing.Optional[str] = Field(default=None),
                  cloud_init: bool = False,
                  adapt_interfaces=False) -> None:
         self.nbi_util = nbi_util

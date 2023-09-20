@@ -76,11 +76,11 @@ class NetworkModel(BaseModel):
     name: str
     external: bool = Field(default=False)
     type: NetworkTypeEnum
-    vid: Optional[int]
+    vid: Optional[int] = Field(default=None)
     dhcp: bool = True
     ids: List[dict] = Field(default=[])
     cidr: IPv4Network
-    gateway_ip: Optional[IPv4Address] = None
+    gateway_ip: Optional[IPv4Address] = Field(default=None)
     allocation_pool: List[IPv4Pool] = []
     reserved_ranges: List[IPv4ReservedRange] = []
     dns_nameservers: List[IPv4Address] = []

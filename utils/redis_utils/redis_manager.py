@@ -30,4 +30,4 @@ def trigger_redis_event(redis_cli: Redis, topic: str, event: Event):
         topic: the topic where the event is published
         event: the event to be triggered
     """
-    redis_cli.publish(topic, event.json())
+    redis_cli.publish(topic, event.model_dump_json())

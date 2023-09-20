@@ -55,7 +55,7 @@ def get_plugin_config_files(k8s_version: K8sVersion, plugin_folder_path: str) ->
     Args:
         k8s_version: [K8sVersion] the version of the k8s cluster
 
-        plugin_folder_path: [K8sDaemon] the folder of plugin to be installed.
+        plugin_folder_path: [str] the folder of plugin to be installed.
 
     Returns:
         List[tuple[str,str]]: a list of tuple (module_path, module_name) that represent compatible modules that can be applied

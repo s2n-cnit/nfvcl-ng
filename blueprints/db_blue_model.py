@@ -24,20 +24,20 @@ class DbBlue(BaseModel):
     #id: Optional[PyObjectId] = Field(alias='_id')
     id: str
     conf: dict
-    input_conf: Optional[dict]
-    nsd_: Optional[List[Dict]] = []
-    pdu: Optional[List[str]]
+    input_conf: Optional[dict] = Field(default=None)
+    nsd_: Optional[List[Dict]] = Field(default=[])
+    pdu: Optional[List[str]] = Field(default=None)
     vnfd: Optional[Dict[str, Any]]
     # self.vnf_configurator = []
-    primitives: Optional[List[dict]] = []
-    action_to_check: Optional[List[dict]] = []
-    timestamp: Dict[str, datetime.datetime] = {}
-    config_len: dict = {}
+    primitives: Optional[List[dict]] = Field(default=[])
+    action_to_check: Optional[List[dict]] = Field(default=[])
+    timestamp: Dict[str, datetime.datetime] = Field(default={})
+    config_len: dict = Field(default={})
     created: datetime.datetime
     status: str = "bootstraping"
-    detailed_status: Union[str, None] = ""
-    current_operation: Union[str, None] = ""
-    modified: Optional[datetime.datetime]
+    detailed_status: Union[str, None] = Field(default="")
+    current_operation: Union[str, None] = Field(default="")
+    modified: Optional[datetime.datetime] = Field(default=None)
     supported_operations: Dict[str, List]
     type: str
 

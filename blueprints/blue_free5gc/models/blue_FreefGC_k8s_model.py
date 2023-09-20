@@ -1,3 +1,5 @@
+from pydantic import Field
+
 from blueprints.blue_5g_base.models import Create5gModel, AddTacModel
 from typing import Literal, Optional
 
@@ -12,13 +14,13 @@ class Free5gck8sBlueUpdateModel(Free5gck8sBlueCreateModel):
 
 class Free5gck8sTacModel(AddTacModel):
     type: Literal["Free5GC_K8s"]
-    operation: Optional[Literal["add_tac", "del_tac"]]
+    operation: Optional[Literal["add_tac", "del_tac"]] = Field(default=None)
 
 class Free5gck8sSliceModel(AddTacModel):
     type: Literal["Free5GC_K8s"]
-    operation: Optional[Literal["add_slice", "del_slice"]]
+    operation: Optional[Literal["add_slice", "del_slice"]] = Field(default=None)
 
 class Free5gck8sSubscriberModel(AddTacModel):
     type: Literal["Free5GC_K8s"]
-    operation: Optional[Literal["add_ues", "del_ues"]]
+    operation: Optional[Literal["add_ues", "del_ues"]] = Field(default=None)
 # =========================================== End of main section =====================================================

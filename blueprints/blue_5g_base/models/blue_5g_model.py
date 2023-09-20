@@ -14,14 +14,14 @@ class SubDataNets(BaseModel):
     dnn: str = Field(..., description="set dnn, exp: 'internet'")
     dns: str
     pools: List[Pool]
-    uplinkAmbr: Optional[str]
-    downlinkAmbr: Optional[str]
-    default5qi: Optional[str]
+    uplinkAmbr: Optional[str] = Field(default=None)
+    downlinkAmbr: Optional[str] = Field(default=None)
+    default5qi: Optional[str] = Field(default=None)
 
 
 class NetworkEndPoints(BaseModel):
-    mgt: Optional[str] = None
-    wan: Optional[str] = None
+    mgt: Optional[str] = Field(default=None)
+    wan: Optional[str] = Field(default=None)
     data_nets: List[SubDataNets]
 
 
@@ -29,12 +29,12 @@ class SubFlows(BaseModel):
     flowId: str = Field(..., description="set flow Id, exp: f0")
     ipAddrFilter: Optional[str] = Field(None, description="set IP address filter")
     qi: constr(pattern=r"[0-9]")
-    gfbr: Optional[str] = Field(..., description="set gfbr, exp: 100Mbps")
+    gfbr: Optional[str] = Field(default= None, description="set gfbr, exp: 100Mbps")
 
 
 class SubpduSessions(BaseModel):
     pduSessionId: str = Field(..., description="set pduSession Id, exp: p0")
-    pduSessionAmbr: Optional[str] = Field(..., description="set pduSessionAmbr, exp: 10Mbps")
+    pduSessionAmbr: Optional[str] = Field(default=None, description="set pduSessionAmbr, exp: 10Mbps")
     flows: List[SubFlows] = Field(default=[])
 
 
@@ -42,7 +42,7 @@ class SubProfileParams(BaseModel):
     isolationLevel: Literal["ISOLATION", "NO_ISOLATION"]
     sliceAmbr: Optional[str] = Field('1000Mbps', description="Set sliceAmbr, exp: 1000Mbps")
     ueAmbr: Optional[str] = Field('50Mbps', description="Set ueAmbr, exp: 50Mbps")
-    maximumNumberUE: Optional[int]
+    maximumNumberUE: Optional[int] = Field(default=None)
     pduSessions: List[SubpduSessions]
 
 
@@ -69,7 +69,7 @@ class SubSnssai(BaseModel):
     sliceId: str
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
     pduSessionIds: List[str] = Field(..., description="Set Default slices parameters, exp: ['p0', 'p1']")
-    default_slice: Optional[bool]
+    default_slice: Optional[bool] = Field(default=None)
 
 
 class SubSubscribers(BaseModel):
@@ -77,8 +77,8 @@ class SubSubscribers(BaseModel):
     k: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
     opc: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
     snssai: List[SubSnssai]
-    authenticationMethod: Optional[str] = Field("5G_AKA")
-    authenticationManagementField: Optional[str] = Field("8000")
+    authenticationMethod: Optional[str] = Field(default="5G_AKA")
+    authenticationManagementField: Optional[str] = Field(default="8000")
 
 
 class SubConfig(BaseModel):
@@ -87,7 +87,7 @@ class SubConfig(BaseModel):
         ...,
         description='PLMN identifier of the mobile network'
     )
-    sliceProfiles: Optional[List[SubSliceProfiles]] = Field(..., description="Set Default slices parameters")
+    sliceProfiles: Optional[List[SubSliceProfiles]] = Field(default=None, description="Set Default slices parameters")
     subscribers: List[SubSubscribers]
 
 
@@ -121,5 +121,5 @@ class Create5gModel(BaseModel):
 # =========================================== End of main section =====================================================
 
 class AddTacModel(Create5gModel):
-    callbackURL: Optional[HttpUrl] = Field(description="URL that will be used to notify when the topology terraform ends")
-    config: Optional[SubConfig]
+    callbackURL: Optional[HttpUrl] = Field(default=None, description="URL that will be used to notify when the topology terraform ends")
+    config: Optional[SubConfig] = Field(default=None)

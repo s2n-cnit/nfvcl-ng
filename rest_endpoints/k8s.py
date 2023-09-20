@@ -3,8 +3,11 @@ from logging import Logger
 from fastapi import APIRouter, HTTPException, Body, status
 from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
     V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota
+
+from models.event import Event
 from models.k8s.blueprint_k8s_model import K8sModel
 from main import *
+from models.k8s.k8s_events import K8sEventType
 from models.k8s.topology_k8s_model import K8sPluginName, K8sOperationType, K8sModelManagement, K8sPluginsToInstall, \
     K8sQuota
 from models.response_model import OssCompliantResponse, OssStatus
@@ -12,11 +15,12 @@ from rest_endpoints.rest_callback import RestAnswer202
 from topology.topology import Topology
 from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins, \
     get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
-from utils.redis_utils.redis_manager import get_redis_instance
+from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
     k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_to_user, \
     k8s_delete_namespace, k8s_add_quota_to_namespace
 from utils.log import create_logger
+from utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 
 k8s_router = APIRouter(
     prefix="/k8s",
@@ -93,7 +97,9 @@ async def install_k8s_plugin(cluster_id: str, message: K8sPluginsToInstall):
 
     request = K8sModelManagement(k8s_ops=K8sOperationType.INSTALL_PLUGIN, cluster_id=cluster_id,
                                  data=json.dumps(message.model_dump()))
-    redis_cli.publish("K8S_MAN", request.model_dump_json())
+
+    event: Event = Event(operation=K8sEventType.PLUGIN_INSTALLED, data=request.model_dump())
+    trigger_redis_event(redis_cli=redis_cli, topic=K8S_MANAGEMENT_TOPIC, event=event)
 
     return RestAnswer202(id='K8s management')
 
@@ -113,7 +119,9 @@ async def apply_to_k8s(cluster_id: str, body=Body(...)):
     """
     request = K8sModelManagement(k8s_ops=K8sOperationType.APPLY_YAML, cluster_id=cluster_id,
                                  data=body.decode('utf-8'))
-    redis_cli.publish("K8S_MAN", request.json())
+
+    event: Event = Event(operation=K8sEventType.DEFINITION_APPLIED, data=request.model_dump())
+    trigger_redis_event(redis_cli=redis_cli, topic=K8S_MANAGEMENT_TOPIC, event=event)
 
     return RestAnswer202(id='K8s management')
 

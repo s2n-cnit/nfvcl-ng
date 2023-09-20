@@ -382,8 +382,8 @@ def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins
         # If type is generic -> No need to check for conflict
         if plugin_type in types and plugin_type is not K8sPluginType.GENERIC:
             msg_err = "There is a conflict between installed plugins + ones to be installed. 2 or more plugins of " \
-                      "the same type have been found (Example calico and flannel)"
-            raise ValueError(msg_err)
+                      "the same type {} have been found (Example calico and flannel)".format(plugin_type)
+            logger.warning(msg_err)
         types.append(plugin_type)
 
 

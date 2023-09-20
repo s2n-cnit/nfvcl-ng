@@ -13,8 +13,8 @@ logger: Logger = create_logger('Topology model')
 
 
 class TopologyModel(BaseModel):
-    id: Optional[str] = "topology"
-    callback: Optional[HttpUrl] = None
+    id: Optional[str] = Field(default='topology')
+    callback: Optional[HttpUrl] = Field(default=None)
     vims: List[VimModel] = []
     kubernetes: List[K8sModel] = []
     networks: List[NetworkModel] = []

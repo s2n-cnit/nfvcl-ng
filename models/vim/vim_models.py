@@ -190,9 +190,9 @@ class VimLink(BaseModel):
 
 
 class VMFlavors(BaseModel):
-    memory_mb: str = Field(16384, alias='memory-mb')
-    storage_gb: str = Field(32, alias='storage-gb')
-    vcpu_count: str = Field(4, alias='vcpu-count')
+    memory_mb: str = Field(default="8192", alias='memory-mb')
+    storage_gb: str = Field(default="32", alias='storage-gb')
+    vcpu_count: str = Field(default="4", alias='vcpu-count')
 
 
 class VirtualDeploymentUnit(BaseModel):

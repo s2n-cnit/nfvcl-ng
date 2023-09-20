@@ -13,7 +13,7 @@ class Sol006PDUInterface(BaseModel):
 class Sol006PDUrequest(BaseModel):
     name: str
     type: str
-    description: Optional[str]
+    description: Optional[str] = Field(default=None)
     shared: bool
     vims: List[dict] = []
     vim_accounts: List[dict] = []

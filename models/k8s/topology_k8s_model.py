@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field, conlist
+from pydantic import BaseModel, Field
 from models.k8s.common_k8s_model import LBPool
 
 
@@ -51,7 +51,7 @@ class K8sModel(BaseModel):
     k8s_version: K8sVersion = Field(default=K8sVersion.V1_24)
     networks: List[str] = Field(title="List of attached networks", min_items=1)
     areas: List[int] = Field(title="Competence areas", min_items=1)
-    cni: Optional[str]
+    cni: Optional[str] = Field(default=None)
     nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED)
     nfvo_onboard: bool = Field(default=False)
 
@@ -79,7 +79,7 @@ class K8sModelCreateFromExternalCluster(BaseModel):
     k8s_version: str
     networks: List[str] = Field(min_items=1)
     areas: List[int] = Field(min_items=1)
-    cni: Optional[str]
+    cni: Optional[str] = Field(default=None)
 
 
 class K8sLabel(str, Enum):
@@ -102,6 +102,7 @@ class K8sPluginName(str, Enum):
     METALLB = 'metallb'
     CALICO = 'calico'
     METRIC_SERVER = 'metric-server'
+    MULTUS = 'multus-cni'
 
 
 class K8sPluginType(str, Enum):

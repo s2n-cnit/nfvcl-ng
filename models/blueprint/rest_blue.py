@@ -9,17 +9,17 @@ class NetworkServiceSummaryModel(BaseModel):
     vim: str
     nsi_id: str
     nsd_id: str
-    area: Optional[int]
+    area: Optional[int] = Field(default=None)
     descr: dict
     deploy_config: dict
 
 
 class VnfDescriptorReference(BaseModel):
-    id: Optional[str]
-    name: Optional[str]
-    v1: Optional[dict]
-    area_id: Optional[int]
-    type: Optional[str]
+    id: Optional[str] = Field(default=None)
+    name: Optional[str] = Field(default=None)
+    v1: Optional[dict] = Field(default=None)
+    area_id: Optional[int] = Field(default=None)
+    type: Optional[str] = Field(default=None)
 
 
 class ShortBlueModel(BaseModel):

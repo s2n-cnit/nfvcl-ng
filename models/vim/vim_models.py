@@ -1,8 +1,7 @@
 from enum import Enum
 from logging import Logger
 from typing import List
-from pydantic import BaseModel, HttpUrl, Field
-from models.k8s.blueprint_k8s_model import VMFlavors
+from pydantic import BaseModel, Field
 from utils.log import create_logger
 
 logger: Logger = create_logger('Vim model')
@@ -190,6 +189,12 @@ class VimLink(BaseModel):
     port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
 
 
+class VMFlavors(BaseModel):
+    memory_mb: str = Field(16384, alias='memory-mb')
+    storage_gb: str = Field(32, alias='storage-gb')
+    vcpu_count: str = Field(4, alias='vcpu-count')
+
+
 class VirtualDeploymentUnit(BaseModel):
     count: int = Field(default=1)
     id: str
@@ -205,3 +210,5 @@ class VirtualNetworkFunctionDescriptor(BaseModel):
     id: str
     name: str
     vdu: List[VirtualDeploymentUnit] = Field(default=[])
+
+

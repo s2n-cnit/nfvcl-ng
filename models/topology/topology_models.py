@@ -24,19 +24,6 @@ class TopologyModel(BaseModel):
     # " installed deployed services. When needed the NFVCL will add a new job to the server in order to pull data."
     prometheus_srv: List[PrometheusServerModel] = Field(default=[])
 
-    def to_dict(self) -> dict:
-        """
-        Return a dictionary. This avoids error when trying to convert this object into json because some data type does
-        not support conversion.
-
-        Returns:
-            a dictionary representation
-        """
-        to_return = copy.deepcopy(self)
-        for i in range(0, len(to_return.networks)):
-            # Replace object with its dict representation
-            to_return.networks[i] = to_return.networks[i].to_dict()
-        return to_return.model_dump()
 
     def add_prometheus_srv(self, prom_srv: PrometheusServerModel):
         """

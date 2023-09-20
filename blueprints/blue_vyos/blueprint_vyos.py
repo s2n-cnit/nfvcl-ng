@@ -1,3 +1,4 @@
+from ipaddress import IPv4Address
 from pydantic import ValidationError
 from blueprints.blueprint_beta import BlueprintBaseBeta
 from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
@@ -125,12 +126,12 @@ class VyOSBlue(BlueprintBaseBeta):
                 for virtual_link_descriptor in vlds[virtual_link_descriptor_name]:
                     target_data_net = next(data_net for data_net in target_router.network_endpoints.data_nets if
                                            data_net.net_name == virtual_link_descriptor['ns_vld_id'])
-                    target_data_net.ip_addr = virtual_link_descriptor['ip']
+                    target_data_net.ip_addr = IPv4Address(virtual_link_descriptor['ip'])
                     target_data_net.osm_interface_name = virtual_link_descriptor['intf_name']
                     self.get_network_cidr(target_data_net)
 
             # We insert the management ip in the model
-            target_router.network_endpoints.mgt.ip_addr = management_vld["mgt"][0]['ip']
+            target_router.network_endpoints.mgt.ip_addr = IPv4Address(management_vld["mgt"][0]['ip'])
             self.get_network_cidr(target_router.network_endpoints.mgt)
         self.to_db()
 
@@ -142,7 +143,7 @@ class VyOSBlue(BlueprintBaseBeta):
         """
         topology_net = get_topology_item('networks', network.net_name)
         if topology_net is not None:
-            network.network = topology_net['cidr'].exploded
+            network.network = topology_net['cidr']
 
     def topology_terraform(self, msg: dict) -> None:
         """
@@ -547,7 +548,7 @@ class VyOSBlue(BlueprintBaseBeta):
                         items = match.groups()
                         interface_number: int = int(items[1])
                         ip_no_mask = element['ipv4'][0]['address'].split("/", 1)[0]
-                        if ip_no_mask != router_config.network_endpoints.data_nets[interface_number - 1].ip_addr:
+                        if ip_no_mask != router_config.network_endpoints.data_nets[interface_number - 1].ip_addr.exploded:
                             raise ValueError(
                                 "The IP assigned to the vyos port does not correspond to correct IP address")
                         else:

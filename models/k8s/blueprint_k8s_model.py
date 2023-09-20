@@ -1,9 +1,9 @@
-from ipaddress import IPv4Network
 from typing import List, Optional, Literal, Dict
-from pydantic import BaseModel, Field, conlist
+from pydantic import BaseModel, Field
 from models.k8s.common_k8s_model import LBPool, Cni
 from models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from models.virtual_link_desc import VirtLinkDescr
+from models.vim.vim_models import VMFlavors
 
 
 class K8sNetworkEndpoints(BaseModel):
@@ -11,12 +11,6 @@ class K8sNetworkEndpoints(BaseModel):
         ..., description='name of the topology network to be used for management'
     )
     data_nets: List[LBPool] = Field(description='topology networks to be used by the load balancer', min_items=1)
-
-
-class VMFlavors(BaseModel):
-    memory_mb: str = Field(8192, alias='memory-mb')
-    storage_gb: str = Field(12, alias='storage-gb')
-    vcpu_count: str = Field(4, alias='vcpu-count')
 
 
 class K8sNsdInterfaceDesc(BaseModel):
@@ -42,7 +36,7 @@ class K8sConfig(BaseModel):
     network_endpoints: K8sNetworkEndpoints
     worker_flavors: VMFlavors = VMFlavors()
     master_flavors: VMFlavors = VMFlavors()
-    nfvo_onboarded: bool = False
+    nfvo_onboard: bool = False
     core_area: Optional[K8sAreaInfo] = Field(default=None, description="The core are of the cluster")
     controller_ip: str = Field(default="", description="The IP of the k8s controller or master")
     master_key_add_worker: str = Field(default="", description="The master key to be used by a worker to join the k8s cluster")
@@ -94,7 +88,7 @@ class K8sBlueprintModel(K8sBlueprintCreate):
             networks=[item.net_name for item in self.config.network_endpoints.data_nets],
             areas=[item.id for item in self.areas],
             cni=self.config.cni,
-            nfvo_onboarded=False)
+            nfvo_onboard=self.config.nfvo_onboard)
         return k8s_data
 
 

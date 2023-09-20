@@ -1,7 +1,7 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from .vyos_router_network_endpoint_model import VyOSRouterNetworkEndpoints
-from .vyos_vm_flavors_model import VMFlavors
+from models.vim.vim_models import VMFlavors
 from .vyos_nat_rules_model import VyOSDestNATRule, VyOSSourceNATRule
 
 

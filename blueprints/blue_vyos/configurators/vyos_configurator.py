@@ -65,9 +65,9 @@ class Configurator_VyOS(Configurator_Flex):
         # This code works because vyos create sequential interfaces starting from eth0, eth1, eth2, ..., ethN
         for network in self.network_endpoints.data_nets:
             # Getting prefix length
-            prefix_length = IPv4Network(network.network).prefixlen
+            prefix_length = network.network.prefixlen
 
-            interface_address = network.ip_addr
+            interface_address = network.ip_addr.exploded
             # NOTE: the ip address is got by get IP address, but OSM is not reporting netmask! setting /24 as default
             if interface_address is None:
                 lines.append("set interfaces ethernet eth{} address dhcp".format(interface_index))

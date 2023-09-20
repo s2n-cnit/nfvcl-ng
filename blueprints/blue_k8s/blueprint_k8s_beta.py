@@ -6,12 +6,12 @@ from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
 from models.blueprint.common import BlueEnablePrometheus
 from models.blueprint.rest_blue import BlueGetDataModel
 from models.k8s.topology_k8s_model import K8sPluginName, K8sTemplateFillData, K8sModel
-from models.vim.vim_models import VimLink, VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel
+from models.vim.vim_models import VimLink, VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel, VMFlavors
 from models.virtual_link_desc import VirtLinkDescr
 from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip, NbiUtil
 from typing import Union, Dict, Optional, List
-from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, VMFlavors, \
+from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, \
     K8sNsdInterfaceDesc
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 from main import persistency
@@ -287,14 +287,15 @@ class K8sBeta(BlueprintBaseBeta):
         """
         logger.debug("Setting VNFd for {}".format(area_type))
 
-        # VM default flavors for k8s, if not overwritten
-        vm_flavor = VMFlavors()
-        vm_flavor.vcpu_count = 4
-        vm_flavor.memory_mb = 6144
-        vm_flavor.storage_gb = 8
         # They can be overwritten on demand
         if vm_flavor_request is not None:
             vm_flavor = vm_flavor_request
+        else:
+            # VM default flavors for k8s, if not overwritten
+            vm_flavor = VMFlavors()
+            vm_flavor.vcpu_count = 4
+            vm_flavor.memory_mb = 6144
+            vm_flavor.storage_gb = 8
 
         # VDU is common but the interfaces are changing soo we will update in the specific case
         if area_id:
@@ -684,7 +685,7 @@ class K8sBeta(BlueprintBaseBeta):
         """
         # If onboarded, the k8s cluster is removed from OSM.
         logger.info("Destroying")
-        if self.k8s_model.config.nfvo_onboarded:
+        if self.k8s_model.config.nfvo_onboard:
             nbiUtil.delete_k8s_cluster(self.get_id())
 
         # The k8s repo is removed from OSM

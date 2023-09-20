@@ -1,5 +1,4 @@
-import copy
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, field_serializer
 from typing import List, Optional, Union
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
@@ -42,18 +41,17 @@ class IPv4Pool(BaseModel):
         else:
             raise ValueError("IPv4Pool validator: The type of >end< field is not recognized ->> {}". format(val))
 
+    @field_serializer('start')
+    def serialize_start(self, start: IPv4Address, _info):
+        if start is not None:
+            return start.exploded
+        return None
 
-    def to_dict(self) -> dict:
-        """
-        IPv4pool, IPv4reservedRange, IPv4Network ... are NOT json serializable.
-        Trying to solve the problem with this function
-        Returns:
-            a dictionary representation of the NetworkModel object.
-        """
-        to_return = copy.deepcopy(self)
-        to_return.start = self.start.exploded
-        to_return.end = self.end.exploded
-        return to_return.model_dump()
+    @field_serializer('end')
+    def serialize_end(self, end: IPv4Address, _info):
+        if end is not None:
+            return end.exploded
+        return None
 
 
 class IPv4ReservedRange(IPv4Pool):
@@ -96,37 +94,35 @@ class NetworkModel(BaseModel):
             return self.name == other.name
         return False
 
-    def to_dict(self) -> dict:
+    @field_validator('gateway_ip')
+    @classmethod
+    def end_validator(cls, val):
         """
-        IPv4pool, IPv4reservedRange, IPv4Network ... are NOT json serializable.
-        Trying to solve the problem with this function
-
-        Returns:
-            a dictionary representation of the NetworkModel object.
+        Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')
         """
-        to_return = copy.deepcopy(self)
-        to_return.cidr = self.cidr.with_prefixlen
-        if to_return.gateway_ip is not None:
-            to_return.gateway_ip = self.gateway_ip.exploded
+        if isinstance(val, str):
+            return IPv4Address(val)
+        elif isinstance(val, IPv4Address):
+            return val
 
-        for i in range(0, len(to_return.dns_nameservers)):
-            # Replacing Ipv4Address with its string representation, ignore alert on type!
-            to_return.dns_nameservers[i] = to_return.dns_nameservers[i].exploded
+    @field_serializer('cidr')
+    def serialize_cidr(self, cidr: IPv4Network, _info):
+        if cidr is not None:
+            return cidr.exploded
+        return None
 
-        for i in range(0, len(to_return.reserved_ranges)):
-            res_range_dict: dict = {"owner": to_return.reserved_ranges[i].owner,
-                                    "end": to_return.reserved_ranges[i].end.exploded,
-                                    "start": to_return.reserved_ranges[i].start.exploded}
-            # Replacing Ipv4Address with its string representation, ignore alert on type!
-            to_return.reserved_ranges[i] = res_range_dict
+    @field_serializer('gateway_ip')
+    def serialize_start(self, gateway_ip: IPv4Address, _info):
+        if gateway_ip is not None:
+            return gateway_ip.exploded
+        return None
 
-        for i in range(0, len(to_return.allocation_pool)):
-            range_dict: dict = {"end": to_return.allocation_pool[i].end.exploded,
-                                "start": to_return.allocation_pool[i].start.exploded}
-            # Replacing Ipv4Address with its string representation, ignore alert on type!
-            to_return.allocation_pool[i] = range_dict
-
-        return to_return.model_dump()
+    @field_serializer('dns_nameservers')
+    def serialize_dns(self, dns_nameservers: List[IPv4Address], _info):
+        to_ret: List[str] = []
+        for i in range(0, len(dns_nameservers)):
+            to_ret.append(dns_nameservers[i].exploded)
+        return to_ret
 
     def add_reserved_range(self, reserved_range: IPv4ReservedRange):
         """

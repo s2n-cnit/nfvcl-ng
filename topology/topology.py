@@ -137,7 +137,7 @@ class Topology:
             self.add_vim(vim, terraform=terraform)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE, self._model.to_dict())
+        trigger_event(TopologyEventType.TOPO_CREATE, self._model.model_dump())
 
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
@@ -160,7 +160,7 @@ class Topology:
 
         self._model = None
         self.db.delete_DB('topology', {'id': 'topology'})
-        trigger_event(TopologyEventType.TOPO_DELETE, deleted_topology.to_dict())
+        trigger_event(TopologyEventType.TOPO_DELETE, deleted_topology.model_dump())
 
     # **************************** VIMs ****************************
     def get_vim(self, vim_name: str) -> VimModel:
@@ -377,7 +377,7 @@ class Topology:
                 self._add_vim_net(network_name, vim, terraform=terraform)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_NETWORK, network_model.to_dict())
+        trigger_event(TopologyEventType.TOPO_CREATE_NETWORK, network_model.model_dump())
         return added_network
 
     @obj_multiprocess_lock
@@ -402,7 +402,7 @@ class Topology:
 
         self._model.del_network(network.name)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, network.to_dict())
+        trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, network.model_dump())
 
     # **************************** Routers **************************
 
@@ -695,7 +695,7 @@ class Topology:
         topo_net.add_reserved_range(ip_range)
 
         self._save_topology_from_model()  # Since we are working on the model
-        trigger_event(TopologyEventType.TOPO_CREATE_RANGE_RES, ip_range.to_dict())
+        trigger_event(TopologyEventType.TOPO_CREATE_RANGE_RES, ip_range.model_dump())
         return ip_range
 
     @obj_multiprocess_lock
@@ -728,7 +728,7 @@ class Topology:
             logger.error(msg_err)
         else:
             self._save_topology_from_model()
-            trigger_event(TopologyEventType.TOPO_DELETE_RANGE_RES, removed_range.to_dict())
+            trigger_event(TopologyEventType.TOPO_DELETE_RANGE_RES, removed_range.model_dump())
             return removed_range
 
     @obj_multiprocess_lock

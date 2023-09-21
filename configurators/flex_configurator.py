@@ -3,29 +3,17 @@ import textwrap
 import uuid
 from jinja2 import Environment, FileSystemLoader
 from ruamel.yaml import YAML
-from ruamel.yaml import YAMLError
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 from configurators.configurator import Configurator_Base
+from utils.util import get_nfvcl_config
 
 # NOTE: here ruamel is needed just because the ansible shell module needs a multiline scalar literal block in yaml (
 # i.e., shell:|)
-with open("config.yaml", 'r') as stream:
-    try:
-        yaml = YAML()
-        nfvcl_conf = yaml.load(stream)
-    except YAMLError as exc:
-        print(exc)
+nfvcl_config = get_nfvcl_config()
 
-# Parsing the config file
-try:
-    nfvcl_ip = nfvcl_conf['nfvcl']['ip']
-    nfvcl_port = nfvcl_conf['nfvcl']['port']
-except Exception as e:
-    raise ValueError('problem in parsing the configuration file')
-
-nfvclURL = 'http://' + nfvcl_ip + ':' + str(nfvcl_port) + '/nfvcl_day2/day2/'
-nfvclURL_postActions = 'http://' + nfvcl_ip + ':' + str(nfvcl_port) + '/nfvcl_day2/actions'
+nfvclURL = f'http://{nfvcl_config.nfvcl.ip}:{str(nfvcl_config.nfvcl.port)}/nfvcl_day2/day2/'
+nfvclURL_postActions = f'http://{nfvcl_config.nfvcl.ip}:{str(nfvcl_config.nfvcl.port)}/nfvcl_day2/actions'
 
 yaml = YAML()
 yaml.preserve_quotes = True

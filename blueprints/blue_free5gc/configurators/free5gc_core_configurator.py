@@ -1,7 +1,8 @@
 import copy
-from typing import Union, List, Dict
+from typing import Union, Dict
 from pydantic import BaseModel, parse_obj_as
 from main import *
+from utils.log import create_logger
 
 # create logger
 logger = create_logger('Configurator_Free5GC_Core')

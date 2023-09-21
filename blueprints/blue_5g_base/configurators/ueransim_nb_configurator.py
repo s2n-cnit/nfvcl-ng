@@ -1,6 +1,6 @@
 from configurators.flex_configurator import Configurator_Flex
 from utils import persistency
-from utils.util import *
+from utils.log import create_logger
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 
 nbiUtil = get_osm_nbi_utils()

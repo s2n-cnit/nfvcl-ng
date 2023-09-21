@@ -1,7 +1,7 @@
 # this file should copy in configurators
 from configurators.flex_configurator import Configurator_Flex
 from utils import persistency
-from utils.util import *
+from utils.log import create_logger
 
 logger = create_logger('Configurator_trex_A')
 

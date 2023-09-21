@@ -1,11 +1,12 @@
 from blueprints import BlueprintBase
 from .models import VoBlueprintRequestInstance
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services
-from nfvo.osm_nbi_util import get_osm_nbi_utils
-from main import *
 from typing import Union, Dict
+from utils.log import create_logger
+from utils.persistency import DB
+from nfvo.osm_nbi_util import get_osm_nbi_utils
 
-db = persistency.DB()
+db = DB()
 logger = create_logger('VOBlue')
 nbiUtil = get_osm_nbi_utils()
 

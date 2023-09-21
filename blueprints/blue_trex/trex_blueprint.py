@@ -2,12 +2,13 @@ from blueprints import BlueprintBase, parse_ansible_output
 from . import Configurator_trex
 from .models import TrexRequestBlueprintInstance
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
-from main import *
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from typing import Union, Dict
+from utils.log import create_logger
+from utils.persistency import DB
 
 # Insert functions to work with db(mango db)
-db = persistency.DB()
+db = DB()
 logger = create_logger('trexBlueprint')
 
 # log into osm with user and pass

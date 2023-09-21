@@ -1,8 +1,8 @@
 from blueprints import BlueprintBase
 from utils import persistency
-from nfvo import sol006_VNFbuilder, sol006_NSD_builder, NbiUtil
+from nfvo import sol006_VNFbuilder, sol006_NSD_builder
 from nfvo.osm_nbi_util import get_osm_nbi_utils
-from utils.util import *
+from utils.log import create_logger
 from .models import MqttRequestBlueprintInstance
 from typing import Union, Dict
 

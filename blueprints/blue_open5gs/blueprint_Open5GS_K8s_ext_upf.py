@@ -1,15 +1,14 @@
 import typing
 from abc import ABC
-
 from blueprints.blue_5g_base.blueprint_5g_base import Blue5GBase
 from blueprints.blueprint import BlueprintBase
 from utils import persistency
 from nfvo.vnf_manager import sol006_VNFbuilder
 from nfvo.nsd_manager import sol006_NSD_builder, get_kdu_services, get_ns_vld_ip
-from utils.util import create_logger
 from configurators.open5gs_upf_configurator import Configurator_Open5GS_UPF
 import blueprints.blue_open5gs.open5GS_default_config as open5GS_default_config
 import copy
+from utils.log import create_logger
 
 db = persistency.DB()
 

@@ -299,9 +299,6 @@ class Configurator_Flex(Configurator_Base):
             if 'plmn' in self.conf:
                 labels['plmn'] = str(self.conf['plmn'])
 
-        # TODO enable adding job to prometheus in automatic way
-        # PrometheusMan.addJob(targets, labels)
-
         return self.dump()
 
     def disable_prometheus(self):

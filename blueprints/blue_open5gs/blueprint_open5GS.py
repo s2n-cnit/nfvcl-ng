@@ -1,7 +1,7 @@
 from blueprints.blue_amari5G import Amari5G
 from nfvo import sol006_VNFbuilder
-from nfvo.osm_nbi_util import get_osm_nbi_utils
 from main import *
+from utils.log import create_logger
 
 db = persistency.DB()
 nbiUtil = get_osm_nbi_utils()

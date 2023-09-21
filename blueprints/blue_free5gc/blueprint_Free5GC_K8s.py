@@ -1,16 +1,16 @@
 import ipaddress
-from typing import Union, Dict
+from typing import Union, Dict, List
 from blueprints import BlueprintBase
 from blueprints.blue_5g_base import Blue5GBase
-from .models import *
 from . import free5GC_default_config
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_kdu_services, get_ns_vld_ip
 from .configurators import Configurator_Free5GC, Configurator_Free5GC_User, Configurator_Free5GC_Core
 import copy
-from main import *
 from nfvo.osm_nbi_util import get_osm_nbi_utils
-
-db = persistency.DB()
+from utils.log import create_logger
+from utils.persistency import DB
+from .models import *
+db = DB()
 nbiUtil = get_osm_nbi_utils()
 
 # create logger
@@ -18,6 +18,7 @@ logger = create_logger('Free5GC_K8s')
 
 # Free5GC modules exported as external VMs
 edge_vnfd_type = ['upf']
+
 
 class Free5GC_K8s(Blue5GBase):
     chartName = "nfvcl_helm_repo/free5gc:3.2.0"
@@ -29,44 +30,44 @@ class Free5GC_K8s(Blue5GBase):
 
     @classmethod
     def rest_add_tac(cls, msg: Free5gck8sTacModel, blue_id: str):
-        msg_dict = msg.dict()
+        msg_dict = msg.model_dump()
         msg_dict["operation"] = "add_tac"
-        msg = Free5gck8sTacModel.parse_obj(msg_dict)
+        msg = Free5gck8sTacModel.model_validate(msg_dict)
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
     def rest_del_tac(cls, msg: Free5gck8sTacModel, blue_id: str):
-        msg_dict = msg.dict()
+        msg_dict = msg.model_dump()
         msg_dict["operation"] = "del_tac"
-        msg = Free5gck8sTacModel.parse_obj(msg_dict)
+        msg = Free5gck8sTacModel.model_validate(msg_dict)
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
     def rest_add_slice(cls, msg: Free5gck8sSliceModel, blue_id: str):
-        msg_dict = msg.dict()
+        msg_dict = msg.model_dump()
         msg_dict["operation"] = "add_slice"
-        msg = Free5gck8sSliceModel.parse_obj(msg_dict)
+        msg = Free5gck8sSliceModel.model_validate(msg_dict)
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
     def rest_del_slice(cls, msg: Free5gck8sSliceModel, blue_id: str):
-        msg_dict = msg.dict()
+        msg_dict = msg.model_dum
         msg_dict["operation"] = "del_slice"
-        msg = Free5gck8sSliceModel.parse_obj(msg_dict)
+        msg = Free5gck8sSliceModel.model_validate(msg_dict)
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
     def rest_add_subscriber(cls, msg: Free5gck8sSubscriberModel, blue_id: str):
-        msg_dict = msg.dict()
+        msg_dict = msg.model_dump()
         msg_dict["operation"] = "add_ues"
-        msg = Free5gck8sSubscriberModel.parse_obj(msg_dict)
+        msg = Free5gck8sSubscriberModel.model_validate(msg_dict)
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
     def rest_del_subscriber(cls, msg: Free5gck8sSubscriberModel, blue_id: str):
-        msg_dict = msg.dict()
+        msg_dict = msg.model_dump()
         msg_dict["operation"] = "del_ues"
-        msg = Free5gck8sSubscriberModel.parse_obj(msg_dict)
+        msg = Free5gck8sSubscriberModel.model_validate(msg_dict)
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
@@ -595,7 +596,7 @@ class Free5GC_K8s(Blue5GBase):
 
     def add_tac_nsd(self, model_msg) -> list:
         nsd_names = []
-        msg = model_msg.dict()
+        msg = model_msg.model_dum
 
         # save msg because "add_tac_nsd" modifies it and "add_tac_conf" uses the changed version.
         self.msg["add_tac"] = msg
@@ -753,7 +754,7 @@ class Free5GC_K8s(Blue5GBase):
         return res
 
     def del_tac_nsd(self, model_msg) -> list:
-        msg = model_msg.dict()
+        msg = model_msg.model_dum
         nsi_to_delete = super().del_area(msg)
         if "areas" in msg:
             for area in msg['areas']:
@@ -822,7 +823,7 @@ class Free5GC_K8s(Blue5GBase):
         res = []
         tail_res = []
         # here use the msg modified by "add_tac_nsd"
-        #msg = model_msg.dict()
+        #msg = model_msg.model_dum
         msg = self.msg["add_tac"]
 
         # execute this function two times (first time)
@@ -885,7 +886,7 @@ class Free5GC_K8s(Blue5GBase):
         return res
 
     def del_tac_conf(self, model_msg) -> list:
-        msg = model_msg.dict()
+        msg = model_msg.model_dum
         res = []
         tail_res = []
         # add callback IP in self.conf
@@ -905,7 +906,7 @@ class Free5GC_K8s(Blue5GBase):
         res = []
         tail_res = []
 
-        msg = msg_model.dict()
+        msg = msg_model.model_dum
         self.sumConfig(self.conf, msg)
 
         # Add edge slices (msg) to the core (self.conf)
@@ -997,7 +998,7 @@ class Free5GC_K8s(Blue5GBase):
         if isinstance(msg_model, dict):
             msg = msg_model
         else:
-            msg = msg_model.dict()
+            msg = msg_model.model_dum
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
@@ -1011,7 +1012,7 @@ class Free5GC_K8s(Blue5GBase):
         if isinstance(msg_model, dict):
             msg = msg_model
         else:
-            msg = msg_model.dict()
+            msg = msg_model.model_dum
 
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":
@@ -1027,7 +1028,7 @@ class Free5GC_K8s(Blue5GBase):
 
     def del_slice(self, msg_model) -> list:
         logger.info("del_ues method starts ... type(msg_model) = {}".format(type(msg_model)))
-        msg = msg_model.dict()
+        msg = msg_model.model_dum
 
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":

@@ -151,11 +151,11 @@ class BlueprintBaseBeta(abc.ABC):
                              .format(self.get_id(), name, nsd.status))
                 raise ValueError('NSD {} not in Day0 state'.format(name))
 
-            nsd_build_package(name, nsd.descr.dict(by_alias=True))
+            nsd_build_package(name, nsd.descr.model_dump(by_alias=True))
             res.append(name)
         return res
 
-    def get_osm_ns_byname(self, name) -> BlueNSD:
+    def get_osm_ns_byname(self, name) -> Union[BlueNSD, None]:
         """
         Return OSM network service given the service name.
         Args:
@@ -268,7 +268,7 @@ class BlueprintBaseBeta(abc.ABC):
         if getattr(ns, 'deploy_config', None) is None:
             return None
         else:
-            return ns.deploy_config.dict(by_alias=True)  # For compatibility with OSM nbi utils
+            return ns.deploy_config.model_dump(by_alias=True)  # For compatibility with OSM nbi utils
 
     def get_vnf_data(self):
         """
@@ -574,7 +574,7 @@ class BlueprintBaseBeta(abc.ABC):
         self.base_model.nsd_ = res
         self.to_db()
 
-    def set_timestamp(self, label: str, tstamp: datetime.datetime = None) -> None:
+    def set_timestamp(self, label: str, tstamp: datetime.datetime = None) -> datetime:
         """
         Set the timestamp value relative to the given label.
         Args:
@@ -614,15 +614,6 @@ class BlueprintBaseBeta(abc.ABC):
         """
         self.base_model.config_len[label] = len(json.dumps(config))
         return self.base_model.config_len[label]
-
-        #def findNsdTemplate(self, category_, type_, flavors_):
-        #templates = db.find_DB(
-        #    "nsd_templates", {'category': category_, 'type': type_})
-        #n_ = next((item for item in templates if (set(flavors_['include']) <= set(
-        #    item['flavors'])) and not bool(set(flavors_['exclude']) & set(item['flavors']))), None)
-        #if n_ is None:
-        #    raise ValueError('NSD template not found in the catalogue')
-        #return n_['descriptor']
 
     @staticmethod
     def updateVnfdNames(vnfd_names, nsd_):

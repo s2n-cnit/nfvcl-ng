@@ -1,7 +1,6 @@
 from configurators.flex_configurator import Configurator_Flex
 from utils import persistency
-from utils.util import *
-# from ruamel.yaml import YAML
+from utils.log import create_logger
 
 logger = create_logger('Configurator_Amari5GC')
 

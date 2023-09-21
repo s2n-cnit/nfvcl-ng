@@ -1,11 +1,11 @@
 from utils import persistency
-from utils.util import create_logger, get_nfvcl_config, NFVCLConfigModel
+from utils.util import get_nfvcl_config, NFVCLConfigModel
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 import typing
+from utils.log import create_logger
 
 logger = create_logger('PNF-Manager')
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
-
 nbiUtil = get_osm_nbi_utils()
 db = persistency.DB()
 

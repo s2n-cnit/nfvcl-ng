@@ -746,7 +746,17 @@ class K8sBeta(BlueprintBaseBeta):
 
         return {}
 
-    def enable_node_exporter(self, args):
+    def enable_node_exporter(self, prom_info: BlueEnablePrometheus):
+        """
+        Install in every area and every NSD the prometheus-node-exporter.
+        - For each nsd it creates a configurator and dump the configuration to be executed.
+        - Every configuration is executed and node-exporter is installed on every K8s worker and the controller.
+        - Save the list of node exporters in the base_model that will be used in the parent class to set up the
+          prometheus job.
+
+        Returns:
+            configuration dumps to be executed on the target nodes.
+        """
         res = []
         node_exporters_ip_list = []  # List to store all node exporters for server configuration
 
@@ -763,21 +773,20 @@ class K8sBeta(BlueprintBaseBeta):
             )
             configurator.resetPlaybook()
 
-            # We need to set mgt IP to addd prometheus node exporter, of each NSD, as prometheus target on the server.
+            # We need to set mgt IP to add prometheus node exporter, of each NSD, as prometheus target on the server.
             # If it is master
             if nsd.type == 'master':
                 configurator.set_mng_ip(self.k8s_model.config.controller_ip)
                 node_exporters_ip_list.append(self.k8s_model.config.controller_ip+":9100")  # Adding to the node list
             else:
                 # In case of worker we need to identify witch is the correct mgt IP of this worker
-                # We select the correct area
+                # We select the correct area (corresponding to the actual NSD)
                 area = next((area for area in self.k8s_model.areas if area.id == nsd.area_id), None)
                 if area is not None:
-                    router_nsd_int: K8sNsdInterfaceDesc
                     # In the area we get the router that have the same nsd_name
                     target_router_nsd_int = next((router_nsd_int for router_nsd_int in area.worker_mgt_int.values()
                                                   if router_nsd_int.nsd_name == nsd_item.name), None)
-                    if target_router_nsd_int is not None:
+                    if target_router_nsd_int is not None: # If found
                         # Add the FIRST management IP as management IP
                         configurator.set_mng_ip(target_router_nsd_int.vld[0].ip)
                         node_exporters_ip_list.append(target_router_nsd_int.vld[0].ip+":9100") # Adding to the node list
@@ -794,5 +803,11 @@ class K8sBeta(BlueprintBaseBeta):
         return res
 
     def enable_scraping(self, prom_info: BlueEnablePrometheus):
+        """
+        Set a scraping job on the requested prometheus server instance. See setup_prom_scraping method for further info.
+        Args:
+            prom_info: The info on the prometheus server instance, coming from the request.
+
+        """
         self.setup_prom_scraping(prom_info=prom_info)
-        return []
+        return [] # Return empty since VNFM does not have to execute tasks.

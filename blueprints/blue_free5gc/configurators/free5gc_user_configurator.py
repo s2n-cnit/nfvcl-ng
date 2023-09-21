@@ -3,6 +3,7 @@ from bson import ObjectId
 from enum import Enum
 from blueprints.blue_free5gc.configurators.free5gc_core_configurator import SstConvertion
 from main import *
+from utils.log import create_logger
 
 # create logger
 logger = create_logger('Configurator_Free5GC_User')

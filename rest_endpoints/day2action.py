@@ -1,7 +1,10 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Union
-from main import *
+from utils.log import create_logger
+from utils.persistency import DB
+
+db = DB()
 
 
 class AnsiblePlaybookResult(BaseModel):

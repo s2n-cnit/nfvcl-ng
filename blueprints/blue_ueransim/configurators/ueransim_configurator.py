@@ -1,7 +1,8 @@
 from configurators.flex_configurator import Configurator_Flex
-from utils.util import *
+from utils.log import create_logger
 
 logger = create_logger('ConfiguratorUeRanSim')
+
 
 class ConfiguratorUeUeRanSim(Configurator_Flex):
     def __init__(self, nsd_id, m_id, blue_id, args):

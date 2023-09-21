@@ -1,7 +1,8 @@
 from configurators.flex_configurator import Configurator_Flex
-from utils.util import *
+from utils.log import create_logger
 
 logger = create_logger('Configurator_Free5GC')
+
 
 class Configurator_Free5GC(Configurator_Flex):
     def __init__(self, nsd_id: str, m_id: int, blue_id: str, args: dict) -> None:

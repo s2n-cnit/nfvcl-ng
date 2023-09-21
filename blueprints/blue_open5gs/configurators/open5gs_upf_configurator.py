@@ -1,6 +1,6 @@
 from configurators.flex_configurator import Configurator_Flex
 from utils import persistency
-from utils.util import *
+from utils.log import create_logger
 
 db = persistency.DB()
 logger = create_logger('Configurator_Open5GS_UPF')

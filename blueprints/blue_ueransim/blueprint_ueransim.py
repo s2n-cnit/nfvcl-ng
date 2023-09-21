@@ -2,7 +2,7 @@ from blueprints import BlueprintBase
 from nfvo import sol006_VNFbuilder,  sol006_NSD_builder, get_ns_vld_ip
 from .configurators.ueransim_configurator import ConfiguratorUeUeRanSim
 from utils import persistency
-from utils.util import *
+from utils.log import create_logger
 from typing import Union, Dict
 from .models import UeranSimBlueprintRequestInstance
 from nfvo.osm_nbi_util import get_osm_nbi_utils
@@ -321,4 +321,10 @@ class UeRanSim(BlueprintBase):
             "dns_nameservers": [],
             "host_routes": []
         }
-        self.topology_del_network(net, area_ids)
+        try:
+            self.topology_del_network(net, area_ids)
+        except ValueError as e:
+            logger.error(e)
+            logger.warning("The UERANSIM network to be deleted was not found. Please check if it is still present in"
+                           "Openstack.")
+

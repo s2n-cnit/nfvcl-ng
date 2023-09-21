@@ -381,7 +381,7 @@ class Topology:
         return added_network
 
     @obj_multiprocess_lock
-    def del_network(self, network: NetworkModel, vim_names_list: Union[list, None] = None, terraform: bool = False):
+    def del_network(self, network: Union[NetworkModel, dict], vim_names_list: Union[list, None] = None, terraform: bool = False):
         """
         Delete a network from the topology. Delete it from required VIM list, terraform if required.
         Args:

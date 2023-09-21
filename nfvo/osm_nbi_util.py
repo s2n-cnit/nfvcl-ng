@@ -663,10 +663,16 @@ class NbiUtil:
         raise ValueError('kdur {} not found'.format(kdu_name))
 
 
+nbi_util_instance: NbiUtil = None
+
+
 def get_osm_nbi_utils() -> NbiUtil:
+    global nbi_util_instance
     """
     Utils created to avoid importing all the parameters into subclasses.
     """
-    nfvcl_config = get_nfvcl_config()
-    return NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,
+    if not nbi_util_instance:
+        nfvcl_config = get_nfvcl_config()
+        nbi_util_instance = NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,
                    project=nfvcl_config.osm.project, osm_ip=nfvcl_config.osm.host, osm_port=nfvcl_config.osm.port)
+    return nbi_util_instance

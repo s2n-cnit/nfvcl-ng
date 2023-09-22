@@ -29,7 +29,7 @@ class sol006_VNFbuilder:
                  nbi_util: NbiUtil,
                  db: utils.persistency.DB,
                  vnf_data: dict,
-                 charm_name: typing.Optional[str] = Field(default=None),
+                 charm_name: typing.Optional[str] = None,
                  cloud_init: bool = False,
                  adapt_interfaces=False) -> None:
         self.nbi_util = nbi_util

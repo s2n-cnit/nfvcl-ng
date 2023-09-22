@@ -69,8 +69,9 @@ class K8sBlueprintModel(K8sBlueprintCreate):
     K8sBlueprintCreate
     """
     blueprint_instance_id: str = Field(description="The blueprint ID generated when it has been instantiated")
+    vim_name: Optional[str] = Field(default=None)
 
-    def parse_to_k8s_topo_model(self, vim_name: str) -> K8sModel:
+    def parse_to_k8s_topo_model(self, vim_name: str = None) -> K8sModel:
         """
         Parse the blueprint model to the topology representation
         Args:
@@ -84,7 +85,7 @@ class K8sBlueprintModel(K8sBlueprintCreate):
             blueprint_ref=self.blueprint_instance_id,
             k8s_version=self.config.version,
             credentials=self.config.master_credentials,
-            vim_name=vim_name,
+            vim_name=self.vim_name,
             networks=[item.net_name for item in self.config.network_endpoints.data_nets],
             areas=[item.id for item in self.areas],
             cni=self.config.cni,

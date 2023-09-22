@@ -317,6 +317,8 @@ class Topology:
 
         Returns:
             The network in dictionary format.
+        Raises:
+            ValueError if not found
         """
         return self.get_network_model(net_name, vim_name)
 
@@ -329,6 +331,9 @@ class Topology:
 
         Returns:
             The network.
+
+        Raises:
+            ValueError if not found
         """
         # Raise value error if not found
         net_model: NetworkModel = self._model.get_network(net_name)
@@ -403,6 +408,28 @@ class Topology:
         self._model.del_network(network.name)
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, network.model_dump())
+
+
+    @obj_multiprocess_lock
+    def del_network_by_name(self, network_name: str, terraform: bool = False):
+        """
+        Delete a network from the topology. Delete it from required VIM list, terraform if required.
+        Args:
+            network: The network to be removed from the topology
+            vim_names_list: The VIMs from witch the network is removed (the nfvcl representation).
+            terraform: If the net has to be deleted on the VIM (network is removed from openstack)
+        Returns:
+            The removed network
+        """
+        # If terraform, deleting the net on every VIM in witch is present
+        if terraform:
+            for vim in self._model.vims:
+                if network_name in vim.networks:
+                    self._del_vim_net(network_name, vim, terraform=terraform)
+
+        delete_net = self._model.del_network(network_name)
+        self._save_topology_from_model()
+        trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, delete_net.model_dump())
 
     # **************************** Routers **************************
 
@@ -812,6 +839,18 @@ class Topology:
             List[K8sModel]: the k8s cluster list
         """
         return self._model.kubernetes
+
+    def get_k8s_cluster(self, cluster_name: str) -> K8sModel:
+        """
+        Get the k8s cluster from the topology
+
+        Returns:
+            K8sModel: the desired k8s cluster
+
+        Raises:
+            ValueError if not found.
+        """
+        return self._model.find_k8s_cluster(cluster_name)
 
     @obj_multiprocess_lock
     def add_k8scluster(self, data: K8sModel):

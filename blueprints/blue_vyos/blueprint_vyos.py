@@ -1,4 +1,5 @@
 from ipaddress import IPv4Address
+from multiprocessing import RLock
 from pydantic import ValidationError
 from blueprints.blueprint_beta import BlueprintBaseBeta
 from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
@@ -7,11 +8,11 @@ from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionD
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from typing import Union, List, Dict, Optional
+from topology.topology import Topology
 from .models import *
 from .models.blue_vyos_rest_model import VyOSBlueprintGetRouters
 from .utils import search_for_target_router_in_area, check_network_exists_in_router, check_rule_exists_in_router
 from .configurators import Configurator_VyOS
-from rest_endpoints.topology import get_topology_item
 from main import persistency
 from utils.log import create_logger
 import traceback
@@ -141,9 +142,12 @@ class VyOSBlue(BlueprintBaseBeta):
 
         @param network: The port model, connected to a network. The retrieved network's cidr is written inside this object.
         """
-        topology_net = get_topology_item('networks', network.net_name)
-        if topology_net is not None:
-            network.network = topology_net['cidr']
+        topology = Topology.from_db(db, nbiUtil, RLock())
+        try:
+            net_model = topology.get_network(network.net_name)
+            network.network = net_model.cidr
+        except ValueError:
+            logger.warning(f"It was impossible to retrieve cidr of network >{network.net_name}< from the topology")
 
     def topology_terraform(self, msg: dict) -> None:
         """
@@ -512,8 +516,8 @@ class VyOSBlue(BlueprintBaseBeta):
             if primitive['result']['charm_status'] != 'completed':
                 raise ValueError('in k8s blue -> get_master_key callback charm_status is not completed')
 
-            target_router: VyOSConfig = None
-            router_config: VyOSConfig = None
+            target_router: Union[VyOSConfig, None] = None
+            router_config: Union[VyOSConfig, None] = None
             # Looking for the corresponding router
             for area in self.vyos_model.areas:
                 for router_config in area.config_list:

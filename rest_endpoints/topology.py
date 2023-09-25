@@ -127,8 +127,6 @@ async def update_vim(updated_vim: UpdateVimModel, terraform: bool = False):
     """
     Update a VIM in the topology
     Args:
-        vim_id: The ID of the VIM to be updated.
-
         updated_vim: The VIM to be updated
 
         terraform: set to true if you want to terraform the VIM

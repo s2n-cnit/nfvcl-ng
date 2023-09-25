@@ -598,7 +598,6 @@ class K8sBeta(BlueprintBaseBeta):
             plug_list.append(K8sPluginName.CALICO)
         plug_list.append(K8sPluginName.METALLB)
         plug_list.append(K8sPluginName.OPEN_EBS)
-        plug_list.append(K8sPluginName.METRIC_SERVER)
 
         # Get the pool list for metal load balancer
         pool_list = self.k8s_model.config.network_endpoints.data_nets

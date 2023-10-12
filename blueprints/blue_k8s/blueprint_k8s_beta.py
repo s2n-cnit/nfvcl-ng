@@ -1,23 +1,25 @@
 from enum import Enum
 from ipaddress import IPv4Address
 from logging import Logger
+from typing import Union, Dict, Optional, List
 from blueprints import parse_ansible_output
-from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
+from main import persistency
+from models.blueprint.blueprint_base_model import BlueVNFD
 from models.blueprint.common import BlueEnablePrometheus
 from models.blueprint.rest_blue import BlueGetDataModel
-from models.k8s.topology_k8s_model import K8sPluginName, K8sTemplateFillData, K8sModel
-from models.vim.vim_models import VimLink, VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel, VMFlavors
-from models.virtual_link_desc import VirtLinkDescr
-from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
-from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip, NbiUtil
-from typing import Union, Dict, Optional, List
 from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, \
     K8sNsdInterfaceDesc
-from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
-from main import persistency
-from nfvo.osm_nbi_util import get_osm_nbi_utils
-from utils.log import create_logger
 from models.k8s.blueprint_k8s_model import LBPool, K8sAreaInfo
+from models.k8s.topology_k8s_model import K8sPluginName, K8sTemplateFillData
+from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel, VMFlavors
+from models.virtual_link_desc import VirtLinkDescr
+from nfvo import get_ns_vld_ip, NbiUtil
+from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta
+from nfvo.osm_nbi_util import get_osm_nbi_utils
+from nfvo.vnf_manager_beta import Sol006VnfdBuilderBeta
+from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
+from utils.log import create_logger
+from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
 from ..blueprint_beta import BlueprintBaseBeta
 
 db = persistency.DB()
@@ -28,6 +30,13 @@ nbiUtil: NbiUtil = get_osm_nbi_utils()
 class AreaType(Enum):
     CORE = 1
     AREA = 2
+
+
+WORKERS_FLAVOR: VMFlavors = VMFlavors(vcpu_count='4', memory_mb='8192', storage_gb='32')
+CONTROLLER_FLAVOR: VMFlavors = VMFlavors(vcpu_count='2', memory_mb='4096', storage_gb='12')
+VDU_IMAGE = 'ubuntu2204-March-23'
+DEFAULT_USR = 'root'
+DEFAULT_PASSWD = 'root'
 
 
 class K8sBeta(BlueprintBaseBeta):
@@ -163,7 +172,9 @@ class K8sBeta(BlueprintBaseBeta):
 
                 load_bal_topo_res_range = self.topology_reserve_ip_range(lb_pool)
                 logger.info("Blue {} taking range {}-{} on network {} for LOAD BALANCER".format(self.get_id(),
-                            load_bal_topo_res_range.start, load_bal_topo_res_range.end, lb_pool.net_name))
+                                                                                                load_bal_topo_res_range.start,
+                                                                                                load_bal_topo_res_range.end,
+                                                                                                lb_pool.net_name))
                 # Building IPv4Addresses to validate. Then saving string because obj cannot be serialized.
                 lb_pool.ip_start = IPv4Address(load_bal_topo_res_range.start).exploded
                 lb_pool.ip_end = IPv4Address(load_bal_topo_res_range.end).exploded
@@ -179,207 +190,113 @@ class K8sBeta(BlueprintBaseBeta):
         Returns:
             A list of NSD to be deployed
         """
-        logger.info("Creating K8s Network Service Descriptors")
-        nsd_names = [self.controller_nsd()]
+
+        nsd_names = []  # For the controller
 
         area: K8sAreaInfo
         # For each area we can have multiple workers (depending on workers replicas)
         for area in self.k8s_model.areas:
-            logger.info(
-                "Blue {} - Creating K8s Worker Service Descriptors on area {}".format(self.get_id(), area.id))
+            if area.core:
+                logger.info("{} - Creating K8s Controller NSD on area {}".format(self.get_id(), area.id))
+                nsd_names.append(self.set_nsd(is_controller=True, area=area))
+            logger.info("{} - Creating K8s Worker NSD on area {}".format(self.get_id(), area.id))
             for replica_id in range(area.workers_replica):
-                nsd_names.append(self.worker_nsd(area, replica_id))
+                nsd_names.append(self.set_nsd(False, area, replica_id))
 
         logger.info("NSDs created")
         return nsd_names
 
-    def controller_nsd(self) -> str:
+    def set_nsd(self, is_controller: bool, area: K8sAreaInfo = None, replica_id: int = None) -> str:
         """
-        Build the k8s controller Network Service Descriptor
+        Build the Network Service descriptor for a NS of the K8s Blueprint.
+        For this blueprint
+        Args:
+            is_controller: indicates if the NS is going to be built for the controller.
+            area: The area in with the NS is located
+            replica_id: The replica number, in case there are multiple worker in an area.
 
         Returns:
-            the name of the NSD
+            The NSD name to be used by upper levels
         """
-        logger.info("Building controller NSD")
+        logger.info("Creating K8s Network Service Descriptors")
+        # The NS id change if controller or worker, on area basis and on the replica number
+        ns_id = f'{self.get_id()}_K8S_C' if is_controller else f'{self.get_id()}_K8S_C_A{area.id}_W{replica_id}'
+        nsd_type = 'master' if is_controller else 'worker'
 
-        param = {
-            'name': '{}_K8S_C'.format(self.get_id()),
-            'id': '{}_K8S_C'.format(self.get_id()),
-            'type': 'master'
-        }
-        # Maps the 'mgt' to the vim_net
-        vim_net_mapping = [
-            {'vld': 'mgt', 'vim_net': self.k8s_model.config.network_endpoints.mgt, "mgt": True}
-        ]
-
-        # For each data network that should be connected to the worker it creates a map between vld net name and the vim
-        # net name.
+        # List of data network to be given when building vnfd
+        data_net_list = []
         for pool in self.k8s_model.config.network_endpoints.data_nets:
-            if pool.net_name != vim_net_mapping[0]['vim_net']:
-                vim_net_mapping.append(
-                    {'vld': 'data_{}'.format(pool.net_name), 'vim_net': pool.net_name, "mgt": False}
-                )
+            data_net_list.append(pool.net_name)
 
-        # Create the VNFD for the core area (the K8s controller)
-        created_vnfd = [self.set_vnfd(AreaType.CORE, vld=vim_net_mapping)]  # sol006_NSD_builder expect a list
+        # Building the list of all networks (mgt+data) that is used when building NSD
+        net_list = [self.k8s_model.config.network_endpoints.mgt]
+        net_list.extend(data_net_list)
+        assert net_list[0] == self.k8s_model.config.network_endpoints.mgt  # MGT must be the first
 
-        n_obj = sol006_NSD_builder(
-            created_vnfd, self.get_vim_name(self.k8s_model.config.core_area.id), param, vim_net_mapping)
+        # Create the VNFD
+        area_type = AreaType.CORE if area.core else AreaType.AREA
+        created_vnfd = [self.set_vnfd(is_controller, area_type, area_id=area.id, data_interfaces=data_net_list)]
 
-        # Append to the NSDs the just created NSD for the controller
-        self.base_model.nsd_.append(BlueNSD.model_validate(n_obj.get_nsd()))
-        return param['name']
+        nsd_builder = Sol006NSDBuilderBeta(created_vnfd, self.get_vim_name(self.k8s_model.config.core_area.id),
+                                           nsd_id=ns_id, nsd_type=nsd_type, vl_map=net_list)
 
-    def worker_nsd(self, area: K8sAreaInfo, replica_id: int) -> str:
-        logger.info("Blue {} - building worker NSD for replica {} at area {}"
-                    .format(self.get_id(), replica_id, area.id))
-        vim_net_mapping = [
-            {'vld': 'mgt', 'vim_net': self.k8s_model.config.network_endpoints.mgt, "mgt": True}
-        ]
+        nsd = nsd_builder.get_nsd()
 
-        # For each data network that should be connected to the worker it creates a map between vld net name and the vim
-        # net name.
-        for pool in self.k8s_model.config.network_endpoints.data_nets:
-            if pool.net_name != vim_net_mapping[0]['vim_net']:
-                vim_net_mapping.append(
-                    {'vld': 'data_{}'.format(pool.net_name), 'vim_net': pool.net_name, "mgt": False}
-                )
+        if not is_controller:
+            nsd.area_id = area.id
+            nsd.replica_id = replica_id
 
-        # The default values are already filled in self.config_model.config.worker_flavors
-        vm_flavor = self.k8s_model.config.worker_flavors.model_copy()
-        # If flavor is given in the k8s creation request then use these values
-        if area.worker_flavor_override:
-            vm_flavor = area.worker_flavor_override
+        # Append to the NSD list the created NSD.
+        self.base_model.nsd_.append(nsd)
+        self.to_db() # Save the model
 
-        # Setting the vnf descriptor
-        created_vnfd = [self.set_vnfd(AreaType.AREA, area.id, vld=vim_net_mapping, vm_flavor_request=vm_flavor,
-                                      replica=replica_id)]
+        return ns_id
 
-        param = {
-            'name': '{}_K8S_A{}_W{}'.format(self.get_id(), area.id, replica_id),
-            'id': '{}_K8S_A{}_W{}'.format(self.get_id(), area.id, replica_id),
-            'type': 'worker'
-        }
-
-        n_obj = sol006_NSD_builder(
-            created_vnfd, self.get_vim_name(area.id), param, vim_net_mapping)
-
-        n_ = n_obj.get_nsd()
-        n_['area_id'] = area.id
-        n_['replica_id'] = replica_id
-        self.base_model.nsd_.append(BlueNSD.model_validate(n_))
-        return param['name']
-
-    def set_vnfd(self, area_type: AreaType, area_id: Optional[int] = None, vld: Optional[list] = None,
-                 vm_flavor_request: Optional[VMFlavors] = None, replica: int = 0) -> None:
+    def set_vnfd(self, is_controller: bool, area_type: AreaType, area_id: Optional[int] = None, data_interfaces: Optional[list] = None,
+                 vm_flavor_request: Optional[VMFlavors] = None, replica: int = 0) -> BlueVNFD:
         """
         Set the Virtual network function descriptor for an area (both core area and normal area).
 
         Args:
             area_type: the area type
             area_id: the optional area id (for not core areas)
-            vld: optional virtual link descriptors (for not core areas)
+            data_interfaces: optional virtual link descriptors for data interfaces
             vm_flavor_request: optional VM flavors to override default ones.
             replica: the replica number of the worker
 
         Returns:
             the created VNFD
         """
-        logger.debug("Setting VNFd for {}".format(area_type))
+        logger.debug(f"Setting VNFd located in area >{area_id}<")
 
-        # They can be overwritten on demand
-        if vm_flavor_request is not None:
-            vm_flavor = vm_flavor_request
+        # ID format change if area_type == core or area_type == area
+        vnfd_id = f'{self.get_id()}_AC' if is_controller else f'{self.get_id()}_A{area_id}_R{replica}'
+        vdu_id = 'AC' if is_controller else f"A{area_id}_R{replica}"
+
+        if is_controller:
+            created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, CONTROLLER_FLAVOR)
         else:
-            # VM default flavors for k8s, if not overwritten
-            vm_flavor = VMFlavors()
-            vm_flavor.vcpu_count = 4
-            vm_flavor.memory_mb = 6144
-            vm_flavor.storage_gb = 8
+            if vm_flavor_request is not None:
+                created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, vm_flavor_request)
+            else:
+                created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, WORKERS_FLAVOR)
 
-        # VDU is common but the interfaces are changing soo we will update in the specific case
-        if area_id:
-            vdu_id = "A{}_R{}".format(area_id, replica)  # A1 = area 1, A32 = area 32
-        else:
-            vdu_id = "AC"
-        vdu = VirtualDeploymentUnit(id=vdu_id, image='ubuntu2204-March-23')
-        vdu.vm_flavor = vm_flavor
+        created_vnfd = VirtualNetworkFunctionDescriptor.build_vnfd(vnfd_id, DEFAULT_PASSWD, True, DEFAULT_USR,
+                                                                   vdu_list=[created_vdu])
 
-        created_vnfd = None
-        if area_type == AreaType.AREA:
-            created_vnfd = self.set_vnfd_area(vdu, area_id, vld, replica=replica)
+        # Build the VNF package and upload the package on OSM
+        built_vnfd_package = Sol006VnfdBuilderBeta(created_vnfd, hemlflexcharm=True, cloud_init=True)
+
+        vnfd_summary = built_vnfd_package.get_vnf_blue_descr_only_vdu()
+
         if area_type == AreaType.CORE:
-            created_vnfd = self.set_vnfd_core(vdu, vld)
+            self.base_model.vnfd.core.append(vnfd_summary)
+        else:
+            self.base_model.vnfd.area.append(vnfd_summary)
 
-        return created_vnfd
-
-    def set_vnfd_core(self, vdu: VirtualDeploymentUnit, vld: List) -> dict:
-        """
-        Set the Virtual network function descriptor for the core area
-        Args:
-            vdu: the virtual deployment unit on witch the VM for the core is based on
-            vld: The list of virtual link descriptors to be attached at the controller
-
-        Returns:
-            the created VNFD
-        """
-        # Core has only mgt interface
-        # Worker has multiple interfaces differently from the controller (just mgt)
-        interfaces = []
-        intf_index = 3  # starting from ens3
-        for l_ in vld:
-            interfaces.append(VimLink.model_validate({"vld": l_["vld"], "name": "ens{}".format(intf_index),
-                                                 "mgt": l_["mgt"], "port-security-enabled": False}))
-            intf_index += 1
-        vdu.interface = interfaces
-
-        vnfd = VirtualNetworkFunctionDescriptor.model_validate({
-            'password': 'root',
-            'id': '{}_AC'.format(self.get_id()),
-            'name': '{}_AC'.format(self.get_id()),
-        })
-        vnfd.vdu = [vdu]
-        complete_vnfd = sol006_VNFbuilder(nbiUtil, self.db, vnfd.dict(by_alias=True),
-                                          charm_name='helmflexvnfm', cloud_init=True)
-        id_vnfd = {'id': 'vnfd', 'name': complete_vnfd.get_id(),
-                   'vl': [i.model_dump() for i in interfaces]}
-        self.base_model.vnfd.core.append(BlueVNFD.model_validate(id_vnfd))
         self.to_db()
 
-        return id_vnfd
-
-    def set_vnfd_area(self, vdu: VirtualDeploymentUnit, area_id: Optional[int] = None, vld: Optional[list] = None,
-                      replica: int = 0) -> dict:
-        if area_id is None:
-            raise ValueError("Area is None in set Vnfd")
-        if vld is None:
-            raise ValueError("VLDs for worker vnf are None in setVnfd function")
-
-        # Worker has multiple interfaces differently from the controller (just mgt)
-        interfaces = []
-        intf_index = 3  # starting from ens3
-        for l_ in vld:
-            interfaces.append(VimLink.model_validate({"vld": l_["vld"], "name": "ens{}".format(intf_index),
-                                                 "mgt": l_["mgt"], "port-security-enabled": False}))
-            intf_index += 1
-
-        vdu.interface = interfaces
-        vnfd = VirtualNetworkFunctionDescriptor.model_validate({
-            'password': 'root',
-            'id': '{}_A{}_R{}'.format(self.get_id(), area_id, replica),
-            'name': '{}_A{}_R{}'.format(self.get_id(), area_id, replica),
-        })
-        vnfd.vdu = [vdu]
-
-        complete_vnfd = sol006_VNFbuilder(nbiUtil, self.db, vnfd.dict(by_alias=True), charm_name='helmflexvnfm',
-                                          cloud_init=True)
-
-        area_vnfd = {'area_id': area_id, 'id': 'vnfd', 'name': complete_vnfd.get_id(),
-                     'vl': [i.model_dump() for i in interfaces]}
-        self.base_model.vnfd.area.append(BlueVNFD.model_validate(area_vnfd))
-        self.to_db()
-
-        return area_vnfd
+        return vnfd_summary
 
     def init_controller_day2_conf(self, msg):
         """
@@ -453,7 +370,7 @@ class K8sBeta(BlueprintBaseBeta):
                 raise ValueError("Blue {} - area {} already exists!".format(self.get_id(), area.id))
             for index in range(1, area.workers_replica + 1):
                 logger.info("Blue {} - adding worker {} on area {}".format(self.get_id(), index, area.id))
-                nsd_names.append(self.worker_nsd(area, index))
+                nsd_names.append(self.set_nsd(is_controller=False, area=area, replica_id=index))
             self.k8s_model.areas.append(area)
 
         for area in msg.modify_areas:
@@ -464,7 +381,7 @@ class K8sBeta(BlueprintBaseBeta):
                 if checked_area.workers_replica < area.workers_replica:
                     for index in range(checked_area.workers_replica + 1, area.workers_replica):
                         logger.info("Blue {} - adding worker {} on area {}".format(self.get_id(), index, area.id))
-                        nsd_names.append(self.worker_nsd(area, index))
+                        nsd_names.append(self.set_nsd(is_controller=False, area=area, replica_id=index))
                 elif checked_area.workers_replica == area.workers_replica:
                     logger.warning("Blue {} - no workers to be added on area {}".format(self.get_id(), area.id))
                 else:
@@ -575,6 +492,7 @@ class K8sBeta(BlueprintBaseBeta):
                 raise ValueError('in k8s blue -> add_to_topology callback charm_status is not completed')
 
         vim = self.get_vim(self.k8s_model.config.core_area.id)
+        self.k8s_model.vim_name = vim.name
         self.topology_add_k8scluster(self.k8s_model.parse_to_k8s_topo_model(vim_name=vim.name))
 
     def install_plugins(self, msg: dict):
@@ -599,12 +517,18 @@ class K8sBeta(BlueprintBaseBeta):
         plug_list.append(K8sPluginName.METALLB)
         plug_list.append(K8sPluginName.OPEN_EBS)
 
+        workers_mgt_int = []
+        for area in self.k8s_model.areas:
+            for worker_interface in area.worker_mgt_int.values():
+                workers_mgt_int.append(worker_interface.vld[0].ip)  # string
+
         # Get the pool list for metal load balancer
         pool_list = self.k8s_model.config.network_endpoints.data_nets
         # Get the k8s pod network cidr
         pod_network_cidr = get_k8s_cidr_info(client_config)
         # create additional data for plugins (lbpool and cidr)
-        add_data = K8sTemplateFillData(pod_network_cidr=pod_network_cidr, lb_pools=pool_list)
+        add_data = K8sTemplateFillData(pod_network_cidr=pod_network_cidr, lb_ipaddresses=workers_mgt_int,
+                                       lb_pools=pool_list)
 
         install_plugins_to_cluster(kube_client_config=client_config, plugins_to_install=plug_list,
                                    template_fill_data=add_data, cluster_id=self.base_model.id)
@@ -727,7 +651,7 @@ class K8sBeta(BlueprintBaseBeta):
                 vlds = get_ns_vld_ip(nsd.nsi_id, vld_names)
 
                 # Need to add interfaces names such that we can assign the correct ip later on!
-                target_area.worker_mgt_int[nsd.replica_id] = K8sNsdInterfaceDesc(
+                target_area.worker_mgt_int[str(nsd.replica_id)] = K8sNsdInterfaceDesc(
                     nsd_id=nsd.nsi_id,
                     nsd_name=nsd.descr.nsd.nsd[0].name,
                     vld=[VirtLinkDescr.model_validate(vlds["mgt"][0])])
@@ -741,7 +665,7 @@ class K8sBeta(BlueprintBaseBeta):
 
     def get_data(self, get_request: BlueGetDataModel) -> dict:
         # TODO IMPLEMENT IF NECESSARY
-        logger.info(get_request.json())
+        logger.info(get_request.model_dump_json())
 
         return {}
 
@@ -776,7 +700,7 @@ class K8sBeta(BlueprintBaseBeta):
             # If it is master
             if nsd.type == 'master':
                 configurator.set_mng_ip(self.k8s_model.config.controller_ip)
-                node_exporters_ip_list.append(self.k8s_model.config.controller_ip+":9100")  # Adding to the node list
+                node_exporters_ip_list.append(self.k8s_model.config.controller_ip + ":9100")  # Adding to the node list
             else:
                 # In case of worker we need to identify witch is the correct mgt IP of this worker
                 # We select the correct area (corresponding to the actual NSD)
@@ -785,10 +709,11 @@ class K8sBeta(BlueprintBaseBeta):
                     # In the area we get the router that have the same nsd_name
                     target_router_nsd_int = next((router_nsd_int for router_nsd_int in area.worker_mgt_int.values()
                                                   if router_nsd_int.nsd_name == nsd_item.name), None)
-                    if target_router_nsd_int is not None: # If found
+                    if target_router_nsd_int is not None:  # If found
                         # Add the FIRST management IP as management IP
                         configurator.set_mng_ip(target_router_nsd_int.vld[0].ip)
-                        node_exporters_ip_list.append(target_router_nsd_int.vld[0].ip+":9100") # Adding to the node list
+                        node_exporters_ip_list.append(
+                            target_router_nsd_int.vld[0].ip + ":9100")  # Adding to the node list
                 else:
                     logger.warning("Area not found when trying to enable prometheus")
                     continue  # Skip the current iteration
@@ -809,4 +734,4 @@ class K8sBeta(BlueprintBaseBeta):
 
         """
         self.setup_prom_scraping(prom_info=prom_info)
-        return [] # Return empty since VNFM does not have to execute tasks.
+        return []  # Return empty since VNFM does not have to execute tasks.

@@ -1,13 +1,15 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
+
+from models.vim.vim_models import VimLink
 
 
 class BlueVNFD(BaseModel):
     id: str
     name: str
-    v1: str = Field(default="")
+    vl: Optional[List[VimLink]] = Field(default=None)
     area_id: int = Field(default=-1)
     type: str = Field(default="")
 

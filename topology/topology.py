@@ -822,6 +822,8 @@ class Topology:
             pdu_name: The name of the PDU
 
         Returns: The PDU
+
+        Raises: ValueError if the PDU is not found
         """
         return self._model.get_pdu(pdu_name)
 

@@ -193,9 +193,10 @@ class RouterModel(BaseModel):
 class PduInterface(BaseModel):
     vld: str
     name: str
-    ip_address: Union[str,IPv4Address] = Field(alias='ip-address')
+    mgt: bool = Field(alias='mgmt')
+    intf_type: Optional[str] = Field(default=None)
+    ip_address: Union[str, IPv4Address] = Field(alias='ip-address')
     network_name: str = Field(alias='vim-network-name')
-    mgt: bool
 
     class Config:
         populate_by_name = True

@@ -1,6 +1,20 @@
+{% if confvar.lb_ipaddresses %}
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: workers-mgt-int
+  namespace: metallb-system
+spec:
+  addresses:
+{% for ipa in confvar.lb_ipaddresses %}
+  - {{ ipa }}/32
+{% endfor %}
+  autoAssign: false
+{% endif %}
 {% if confvar.lb_pools %}
 {% for pool in confvar.lb_pools %}
 ---
+# !!!! FREE5GC BLUEPRINT REQUIRES A LOT OF IPs to be autoassigned from METALLB, otherwise it does not deploy.
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -9,6 +23,7 @@ metadata:
 spec:
   addresses:
   - {{ pool.ip_start }}-{{ pool.ip_end }}
+  autoAssign: true
 {% endfor %}
 {% endif %}
 ---

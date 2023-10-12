@@ -185,6 +185,9 @@ class TopologyModel(BaseModel):
             pdu_name: The name of the PDU
 
         Returns: The PDU
+
+        Raises:
+            ValueError if the PDU is not found in the model
         """
         pdu_index = self.find_pdu_index(pdu_name)
         return self.pdus[pdu_index]
@@ -509,6 +512,9 @@ class TopologyModel(BaseModel):
 
         Returns:
             The position of the pdu instance in the list
+
+        Raises:
+            ValueError if the PDU is not found in the model
         """
         pdu_index = next((index for index, item in enumerate(self.pdus) if item.name == pdu_name), -1)
         if pdu_index < 0:

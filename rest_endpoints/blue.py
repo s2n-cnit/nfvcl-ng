@@ -5,6 +5,7 @@ from models.blueprint.blue_events import BlueEventType
 from models.blueprint.blueprint_base_model import BlueprintVersion
 from models.blueprint.rest_blue import BlueGetDataModel
 from models.event import Event
+from models.response_model import OssCompliantResponse, OssStatus
 from rest_endpoints.rest_callback import RestAnswer202
 from rest_endpoints.nfvcl_callback import callback_router
 import datetime
@@ -22,6 +23,7 @@ from utils.log import create_logger
 from .rest_description import *
 from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from utils.redis_utils.topic_list import BLUEPRINT
+from pymongo.cursor import Cursor
 
 blue_router = APIRouter(
     prefix="/nfvcl/v1/api/blue",
@@ -58,6 +60,19 @@ def get_blueprint_by_id(id_: str):
         logger.warning('Blue {} not found in the persistency layer'.format(id_))
         blue = None
     return blue
+
+
+def get_all_blueprint() -> Cursor:
+    """
+    Return a list of all the blueprints
+    Returns:
+        a mongo cursor that can be iterated.
+    """
+    try:
+        blues = db.find_DB("blueprint-instances", None)
+    except Exception:
+        logger.error(traceback.format_exc())
+    return blues
 
 
 def get_blueprint_model_by_id(blueprint_id: str):
@@ -258,6 +273,24 @@ def delete(blue_id: str):
     thread.start()
     return RestAnswer202(id=blue_id, resource="blueprint", operation="delete", status="submitted",
                          session_id=session_id, description="operation submitted")
+
+
+@blue_router.delete('/all/blue', response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED,
+                    callbacks=callback_router.routes)
+def delete_all_blueprints():
+    try:
+        blues = get_all_blueprint()
+        if not blues:
+            raise ValueError('blueprints not found in the persistency layer')
+    except Exception:
+        return OssCompliantResponse(status=OssStatus.failed, detail="")
+
+    for blue in blues:
+        thread = Thread(target=delete_blueprint, args=(blue['id'],))
+        # thread.daemon = True
+        thread.start()
+
+    return OssCompliantResponse(detail="Operation submitted")
 
 
 @blue_router.get('/{blue_id}/get_data', response_model=dict)

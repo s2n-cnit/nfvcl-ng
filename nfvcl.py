@@ -21,6 +21,7 @@ from rest_endpoints.day2action import day2_router
 from rest_endpoints.k8s import k8s_router
 from rest_endpoints.helm import helm_router
 from fastapi.staticfiles import StaticFiles
+from rest_endpoints.osm_rest import osm_router
 
 
 
@@ -43,6 +44,7 @@ app.include_router(blue_router)
 app.include_router(day2_router)
 app.include_router(k8s_router)
 app.include_router(helm_router)
+app.include_router(osm_router)
 
 day2_files = "day2_files"
 

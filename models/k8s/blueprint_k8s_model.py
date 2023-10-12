@@ -85,7 +85,7 @@ class K8sBlueprintModel(K8sBlueprintCreate):
             blueprint_ref=self.blueprint_instance_id,
             k8s_version=self.config.version,
             credentials=self.config.master_credentials,
-            vim_name=self.vim_name,
+            vim_name=vim_name if vim_name else self.vim_name,
             networks=[item.net_name for item in self.config.network_endpoints.data_nets],
             areas=[item.id for item in self.areas],
             cni=self.config.cni,

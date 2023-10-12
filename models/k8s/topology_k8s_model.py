@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, IPvAnyAddress, field_validator
 from models.k8s.common_k8s_model import LBPool
 
 
@@ -139,11 +139,24 @@ class K8sTemplateFillData(BaseModel):
     """
     Model that represent data to be used for filling the plugin template files.
     CIDR is used by flannel and calico.
-    lb_pools is used by metallb to give a range of IPs for load balancers
+    lb_ipaddresses is used by metal-lb to give of IPs for load balancers (used automatically)
+    lb_ipaddresses is used by metal-lb to give a pool of IPs for load balancers (must be enabled with metal lb call)
     """
     pod_network_cidr: str = Field(default="")
+    lb_ipaddresses: List[str] = Field(default=[])
     lb_pools: List[LBPool] = Field(default=[])
 
+    @field_validator('lb_pools')
+    @classmethod
+    def validate_lb_pools(cls, pool_list: List[LBPool]) -> List[LBPool]:
+        """
+        K8s does not allow '_' in resource names and lower case.
+        """
+        to_ret: List[LBPool]
+        if isinstance(pool_list, list):
+            for pool in pool_list:
+                pool.net_name = pool.net_name.replace("_", "-").lower()
+            return pool_list
 
 class K8sPluginsToInstall(BaseModel):
     """

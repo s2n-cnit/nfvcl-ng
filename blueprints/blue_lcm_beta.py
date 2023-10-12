@@ -254,7 +254,7 @@ class BlueLCMworkerBeta:
             self.blue.rest_callback(requested_operation, session_id, "ready")
 
         except AssertionError as error:
-            self.redis_cli.publish('blueprint', json.dumps(self.blue.print_short_summary()))
+            self.redis_cli.publish('blueprint', self.blue.print_short_summary().model_dump_json())
             self.blue.rest_callback(requested_operation, session_id, "failed")
 
     def trigger_event(self, event_type: BlueEventType, data: dict):

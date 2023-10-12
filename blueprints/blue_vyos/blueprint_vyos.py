@@ -237,7 +237,7 @@ class VyOSBlue(BlueprintBaseBeta):
         })
         vnfd.vdu = [vdu]
 
-        complete_vnfd = sol006_VNFbuilder(self.osm_nbiutil, self.db, vnfd.model_dump(by_alias=True),
+        complete_vnfd = sol006_VNFbuilder(self.osm_nbiutil, self.db, vnfd.model_dump(by_alias=True, exclude_unset=True),
                                           charm_name='helmflexvnfm')
 
         area_vnfd = {'area_id': area_id, 'id': 'vnfd', 'name': complete_vnfd.get_id(),

@@ -82,7 +82,7 @@ class sol006_VNFbuilder:
             'ext-cpd': []
         })
 
-        if 'vdu' in vnf:
+        if 'vdu' in vnf and vnf['vdu'] is not None:
             self.vnfd.update({'sw-image-desc': [], 'virtual-compute-desc': [], 'virtual-storage-desc': []})
             self.type = 'vnfd'
 
@@ -114,7 +114,7 @@ class sol006_VNFbuilder:
                 # adding deployment flavor
                 self.add_vdu_df('default-df', 'default-instantiation-level', u['id'])
 
-        if 'pdu' in vnf:
+        if 'pdu' in vnf and vnf['pdu'] is not None:
             self.type = 'pnfd'
             for u in vnf['pdu']:
                 pdu = self.manage_pdu(self.nbi_util, self.db, u)
@@ -131,7 +131,7 @@ class sol006_VNFbuilder:
                 # adding deployment flavor
                 self.add_vdu_df('default-df', 'default-instantiation-level', u['id'])
 
-        if 'kdu' in vnf:
+        if 'kdu' in vnf and vnf['kdu'] is not None:
             logger.debug(vnf['kdu'])
             self.type = 'knfd'
             self.vnfd['kdu'] = []

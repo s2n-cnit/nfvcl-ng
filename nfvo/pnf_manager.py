@@ -30,9 +30,9 @@ class PNFmanager:
                         #checking if IN_USE
                         break
             if pdu is not None:
-                logger.error('pdu already existing. aborting')
+                logger.error('Pdu already existing. aborting')
             else:
-                #create mongo item
+                # Post the PDU on OSM
                 res = nbiUtil.add_pdu(msg)
                 logger.info(res)
 

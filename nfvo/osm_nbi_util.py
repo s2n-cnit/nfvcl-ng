@@ -78,6 +78,7 @@ def check_rest_response(response: requests.Response) -> bool:
         return True
     else:
         logger.error("{} -- {} -- {}".format(response.url, response.status_code, response.reason))
+        logger.error(response.text)
         return False
 
 
@@ -302,6 +303,16 @@ class NbiUtil:
                 if nsd["name"] == name:
                     return nsd['_id'], 200
         return [], 404
+
+    def get_nsd_list(self) -> dict:
+        """
+        Return a list of NSD present on OSM
+        Returns:
+            a list of NSD present on OSM
+        """
+        res = self.get_x("/nsd/v1/ns_descriptors")
+        if check_rest_response(res):
+            return res.json()
 
     # Virtual Network Function Descriptors ###################################################################
     def get_vnfd_list(self) -> dict:

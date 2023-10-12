@@ -10,7 +10,7 @@ class NFVCLParameters(BaseModel):
 
 class OSMParameters(BaseModel):
     host: str
-    port: int
+    port: str
     username: str
     password: str
     project: str

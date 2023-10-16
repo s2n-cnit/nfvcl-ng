@@ -34,6 +34,10 @@ class BlueprintBaseBeta(abc.ABC):
     api_day0_function: Callable
     api_day2_function: Callable
 
+    #@abc.abstractmethod
+    #def require_k8s(cls) -> bool:
+    #    pass
+
     @classmethod
     @abc.abstractmethod
     def rest_create(cls, msg):

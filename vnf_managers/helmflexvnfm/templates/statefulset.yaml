@@ -32,12 +32,14 @@ spec:
               containerPort: 50051
               protocol: TCP          
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}          
+            {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
           - name: osm-ee
-            mountPath: /app/storage  
+            mountPath: /app/storage
           - name: osm-ee-source
             mountPath: /app/EE/osm_ee/vnf
+          securityContext:
+            allowPrivilegeEscalation: true
       volumes:      
       - name: osm-ee-source
         configMap: 

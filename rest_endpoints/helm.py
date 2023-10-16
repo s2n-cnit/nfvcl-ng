@@ -13,6 +13,8 @@ from utils.util import get_nfvcl_config
 
 nbiUtil = get_osm_nbi_utils()
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
+# The repo name must NOT contain underscores _, upper case
+HELM_REPO_NAME = "nfvcl"
 
 
 helm_router = APIRouter(
@@ -57,12 +59,17 @@ def helm_onboard_post(helm_repo_item: HelmRepo):
 
 @helm_router.on_event("startup")
 def create_helm_repo():
-    # adding Helm repository to OSM
-    r = next((item for item in nbiUtil.get_k8s_repos() if item['name'] == 'nfvcl_helm_repo'), None)
+    """
+    On startup, it adds to OSM the internal chart repo of the NFVCL. In this way OSM can use custom charts to deploy
+    KDUs
+    """
+    # Adding Helm repository to OSM
+    r = next((item for item in nbiUtil.get_k8s_repos() if item['name'] == HELM_REPO_NAME), None)
     logger.info('checking existing helm repo: {}'.format(r))
     if r is not None:
-        logger.info('deleting previous helm repository')
-        nbiUtil.delete_k8s_repo('nfvcl_helm_repo')
+        logger.info('Deleting previous helm repository')
+        nbiUtil.delete_k8s_repo(HELM_REPO_NAME)
 
-    r = nbiUtil.add_k8s_repo('nfvcl_helm_repo', "http://{}:{}{}".format(nfvcl_config.nfvcl.ip, nfvcl_config.nfvcl.port, helm_url_prefix))
-    logger.debug('adding helm repo result: {}'.format(r))
+    # The repo name must not contain underscores _
+    r = nbiUtil.add_k8s_repo(HELM_REPO_NAME, "http://{}:{}{}".format(nfvcl_config.nfvcl.ip, nfvcl_config.nfvcl.port, helm_url_prefix))
+    logger.debug('Adding helm repo result: {}'.format(r))

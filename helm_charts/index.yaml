@@ -1,26 +1,6 @@
 apiVersion: v1
 entries:
   free5gc:
-  - created: '2022-11-15T14:49:04Z'
-    description: free5gc 3.2.0
-    digest: fee339828d2e97bed0ccb0a9087efbd9c301ea22a09c494c4235caee54d37bb6
-    home: https://helm.sh/helm
-    name: free5gc
-    sources:
-    - https://github.com/helm/helm
-    urls:
-    - http://130.251.17.86:5002/helm_repo/charts/free5gc-3.2.0.tgz
-    version: 3.2.0
-  - created: '2022-11-25T13:06:40Z'
-    description: free5gc 3.2.0
-    digest: f96486b59b8d1122989c3c97c5a8b18d49d41c9dd7a987e32cc7d51b202caf24
-    home: https://helm.sh/helm
-    name: free5gc
-    sources:
-    - https://github.com/helm/helm
-    urls:
-    - http://130.251.17.86:5002/helm_repo/charts/free5gc-3.2.0.tgz
-    version: 3.2.0
   - created: '2023-03-15T09:33:57Z'
     description: free5gc 3.2.0
     digest: fee339828d2e97bed0ccb0a9087efbd9c301ea22a09c494c4235caee54d37bb6

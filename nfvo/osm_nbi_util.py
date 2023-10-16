@@ -11,6 +11,7 @@ from urllib3.exceptions import InsecureRequestWarning
 from models.k8s.topology_k8s_model import K8sModel
 from utils.log import create_logger
 from utils.util import get_nfvcl_config
+from re import match
 
 # Disable the InsecureRequestWarning for the requests to OSM
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -551,7 +552,7 @@ class NbiUtil:
         url = "/admin/v1/k8sclusters"
         if cluster_name != "":
             url += "/?name={}".format(cluster_name)
-        r = self.get_x(url)
+        r: requests.Response = self.get_x(url)
         # logger.debug("{} --- {}".format(r.status_code, r.text))
         if check_rest_response(r):
             return r.json()
@@ -568,6 +569,19 @@ class NbiUtil:
         """
         res_json = self.get_k8s_clusters(cluster_name=name)
         return next((item['_id'] for item in res_json if item['name'] == name), None)
+
+    def check_k8s_cluster_onboarded(self) -> bool:
+        """
+        Check if there is at least one k8s cluster onboarded on OSM.
+        Returns:
+            True if present, false otherwise.
+        """
+        res_json = self.get_k8s_clusters()
+        if res_json==False:
+            return False
+        else:
+            return True
+
 
     def delete_k8s_cluster(self, name: str):
         """
@@ -626,15 +640,27 @@ class NbiUtil:
 
     # Repositories ######################################################################################
     def add_k8s_repo(self, name: str, url: str):
+        """
+        Add a K8s helm repo to OSM. It is then possible to use custom helm chart, present in the repo, on OSM.
+        Args:
+            name: The name to be given at the chart repo, will be used to indicate helm chart in the repo
+                  (example name=nfvcl-repo, chart=free5gc -> nfvcl-repo/free5gc).
+                  Must be composed only by lower case letters, numbers and minus (-)
+            url: The url of the helm repo
+        """
+        # Checking that the name of the repo added to OSM is composed only by lower case letters, numbers and -.
+        # Otherwise, the charts are not found by OSM
+        if not bool(match("[a-z0-9\-]*$", name)):
+            msg_err = "The name of the K8s helm repo is not formatted correctly. oOnly lower case letters, numbers and -"
+            logger.error(msg_err)
+            raise ValueError
         data = {
             "name": name,
             "description": "{} chart repository".format(name),
             "type": "helm-chart",
             "url": url
         }
-        # logger.debug('k8s repo add msg: {}'.format(data))
         result = self.post_x(data, '/admin/v1/k8srepos')
-        # logger.debug('k8s repo add res: {}'.format(result))
         if check_rest_response(result):
             return result.json()
         else:

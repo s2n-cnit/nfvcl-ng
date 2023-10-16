@@ -9,7 +9,7 @@ global:
 replicaCount: 1
 
 image:
-  repository: vnfm_ee
+  repository: localhost:5000/vnfm-ee
   tag: latest
   pullPolicy: IfNotPresent
 

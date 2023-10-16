@@ -21,7 +21,7 @@ edge_vnfd_type = ['upf']
 
 
 class Free5GC_K8s(Blue5GBase):
-    chartName = "nfvcl_helm_repo/free5gc:3.2.0"
+    chartName = "nfvcl/free5gc"
     imageName = "free5gc_v3.2.0"
 
     @classmethod

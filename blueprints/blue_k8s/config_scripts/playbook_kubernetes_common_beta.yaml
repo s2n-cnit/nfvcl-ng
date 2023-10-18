@@ -3,6 +3,8 @@
   become: yes
   gather_facts: no
   tasks:
+   - name: Solve problem with missing hostname in OS
+     shell: sed -i "2 i 127.0.0.1 $(hostname)" /etc/hosts
    - name: Make the Swap inactive
      command: swapoff -a
    - name: Remove Swap entry from /etc/fstab.
@@ -47,16 +49,14 @@
          - software-properties-common
        state: present
        update_cache: yes
-   - name: Add Docker’s official GPG key
-     apt_key:
-       url: https://download.docker.com/linux/ubuntu/gpg
-       state: present
-   - name: Add Docker Repository
-     apt_repository:
-       repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
-       state: present
-       filename: docker
-       update_cache: yes
+   - name: Preconfiguration for docker GPG keys
+     command: install -m 0755 -d /etc/apt/keyrings
+   - name: Adding docker GPG keys
+     shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+   - name: Setting permission for docker GPG keys
+     command: chmod a+r /etc/apt/keyrings/docker.gpg
+   - name: Add the repository to Apt sources
+     shell: echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
    - name: Install containerd.
      apt: 
        name:
@@ -64,6 +64,7 @@
          - docker-ce=5:24.0.1-1~ubuntu.22.04~jammy
          - docker-ce-cli
        state: present
+       update_cache: yes
    - name: Hold containerd
      ansible.builtin.dpkg_selections:
        name: containerd.io
@@ -101,15 +102,9 @@
        enabled: yes
        daemon-reload: yes
    - name: Add Google official GPG key
-     apt_key:
-       url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-       state: present
+     shell: curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmour -o /etc/apt/trusted.gpg.d/kubernetes-xenial.gpg
    - name: Add Kubernetes Repository
-     apt_repository:
-       repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
-       state: present
-       filename: kubernetes
-       mode: 0600
+     shell: apt-add-repository -y "deb http://apt.kubernetes.io/ kubernetes-xenial main"
    - name: Installing Kubernetes Cluster Packages.
      apt: 
        name:

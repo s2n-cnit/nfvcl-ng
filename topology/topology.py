@@ -1,6 +1,7 @@
 from logging import Logger
 from redis.client import Redis
 from models.event import Event
+from models.k8s.common_k8s_model import LBPool
 from models.k8s.topology_k8s_model import K8sModel
 from models.network.network_models import RouterPortModel, IPv4ReservedRange
 from models.prometheus.prometheus_model import PrometheusServerModel
@@ -345,6 +346,23 @@ class Topology:
 
         return net_model
 
+
+    def add_network_by_area(self, network: NetworkModel, areas: List[int] = None, terraform: bool = False):
+        """
+        Add network to the topology and to the VIMs that belong to the area list.
+
+        Args:
+            network: the network to be added in the topology
+
+            areas: area ID list used to retrieve the VIMs. The network is then added to every VIM in the list and,
+            if terraform is set to true the net is created on these VIMs.
+        """
+        vims = []
+        for a in areas:
+            vims.append(self.get_vim_name_from_area_id(a))
+            logger.debug("For area {} the following vims have been selected: {}".format(a, vims))
+        self.add_network(network, vims, terraform=terraform)
+
     # Do NOT put obj_multiprocess_lock since it calls the next function that already have it.
     def add_network(self, network: Union[NetworkModel, dict], vim_names_list: Union[list, None] = None,
                     terraform: bool = False):
@@ -366,7 +384,7 @@ class Topology:
         Add network to the topology. If required networks are added to VIMs and terraformed (created on the VIM).
         Args:
             network_model: The network to be added in the topology
-            vim_names_list: The list of VIMs in witch the newtork will be added
+            vim_names_list: The list of VIMs in witch the network will be added
             terraform: If network has to be created on the VIMs
         Returns:
             The created network
@@ -678,6 +696,19 @@ class Topology:
                router.external_gateway_info["enable_snat"] is True):
                 return True
         return False
+
+
+    def reserve_range_lb_pool(self, lb_pool: LBPool, owner: str) -> IPv4ReservedRange:
+        """
+        Reserve a range in a network of the topology (defined by LBPool). The range has an owner.
+        Args:
+            lb_pool: the pool to be reserved
+            owner: The name of the owner
+        Returns:
+            The reserved IP range -> {'start': '192.168.0.1', 'end': '192.168.0.100'}
+        """
+        return self.reserve_range(lb_pool.net_name, lb_pool.range_length, owner)
+
 
     @obj_multiprocess_lock
     def reserve_range(self, net_name: str, range_length: int, owner: str, vim_name: typing.Optional[str] = None) \

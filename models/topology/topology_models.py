@@ -407,7 +407,7 @@ class TopologyModel(BaseModel):
             prom_svr_index = self.prometheus_srv.index(prom_svr_to_search)
         except ValueError:
             msg_err = "The prometheus server ->{}<- has not been found".format(prom_srv_id)
-            logger.error(msg_err)
+            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return prom_svr_index
@@ -448,7 +448,7 @@ class TopologyModel(BaseModel):
         k8s_cluster_index = next((index for index, item in enumerate(self.kubernetes) if item.name == cluster_name), -1)
         if k8s_cluster_index < 0:
             msg_err = "The K8s cluster ->{}<- was not found in the topology.".format(cluster_name)
-            logger.error(msg_err)
+            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return k8s_cluster_index
@@ -465,7 +465,7 @@ class TopologyModel(BaseModel):
         net_index = next((index for index, item in enumerate(self.networks) if item.name == net_name), -1)
         if net_index < 0:
             msg_err = "The network ->{}<- was not found in the topology.".format(net_name)
-            logger.error(msg_err)
+            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return net_index
@@ -482,7 +482,7 @@ class TopologyModel(BaseModel):
         vim_index = next((index for index, item in enumerate(self.vims) if item.name == vim_name), -1)
         if vim_index < 0:
             msg_err = "The VIM ->{}<- was not found in the topology.".format(vim_name)
-            logger.error(msg_err)
+            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return vim_index
@@ -499,7 +499,7 @@ class TopologyModel(BaseModel):
         router_index = next((index for index, item in enumerate(self.vims) if item.name == router_name), -1)
         if router_index < 0:
             msg_err = "The router ->{}<- was not found in the topology.".format(router_name)
-            logger.error(msg_err)
+            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return router_index
@@ -519,7 +519,7 @@ class TopologyModel(BaseModel):
         pdu_index = next((index for index, item in enumerate(self.pdus) if item.name == pdu_name), -1)
         if pdu_index < 0:
             msg_err = "The PDU ->{}<- was not found in the topology.".format(pdu_index)
-            logger.error(msg_err)
+            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return pdu_index

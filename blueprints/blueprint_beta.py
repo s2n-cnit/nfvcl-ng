@@ -34,9 +34,17 @@ class BlueprintBaseBeta(abc.ABC):
     api_day0_function: Callable
     api_day2_function: Callable
 
-    #@abc.abstractmethod
-    #def require_k8s(cls) -> bool:
-    #    pass
+    @abc.abstractmethod
+    def pre_initialization_checks(self) -> bool:
+        """
+        Checks if conditions are not respected for the blueprint life cycle (like having a k8s cluster).
+        This method is called when processing a request, if a condition is not met, the request is dropped.
+        Returns:
+            true if conditions are satisfied.
+        Raises:
+            ValueError if some conditions are not met.
+        """
+        pass
 
     @classmethod
     @abc.abstractmethod
@@ -341,15 +349,6 @@ class BlueprintBaseBeta(abc.ABC):
         # Removing from this blueprint
         self.base_model.pdu = [item for item in self.base_model.pdu if item != pdu_name]
 
-    def topology_get_pdu(self, pdu_name: str) -> PduModel:
-        """
-        Retrieve a PDU from the topology
-        Args:
-            pdu_name: The name of the PDU to be retrieved
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        return topology.get_pdu(pdu_name)
-
     def topology_get_pdu_by_area(self, area_id: int) -> PduModel:
         """
         Retrieve the FIRST PDU from the topology by area
@@ -375,71 +374,6 @@ class BlueprintBaseBeta(abc.ABC):
         pdu = next((item for item in pdus if item.area == area_id and item.type == pdu_type), None)
         return pdu
 
-    def topology_get_vim_by_area(self, area_id: int) -> VimModel:
-        """
-        Retrieve the **FIRST** VIM from the topology by area
-
-        Args:
-            area_id: the area in witch the function is looking for VIM
-
-        Raises:
-            ValueError if VIM is not found for the area
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        return topology.get_vim_from_area_id_model(area_id)
-
-    def topology_add_k8scluster(self, k8s_cluster_data: K8sModel):
-        """
-        Add a K8S cluster to the topology
-
-        Args:
-            k8s_cluster_data: the K8S cluster in dictionary form to be added to the topology
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        topology.add_k8scluster(k8s_cluster_data)
-
-    def topology_del_k8scluster(self):
-        """
-        Delete the K8S cluster, with ID that is corresponding to this blueprint ID, from the topology.
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        try:
-            topology.del_k8scluster(self.get_id())
-        except ValueError as e:
-            logger.debug("The K8s cluster was not present at the moment of k8s blueprint destruction.")
-
-
-    def topology_update_k8scluster(self, k8s_cluster: K8sModel):
-        """
-        Update the K8S cluster in the topology.
-
-        Args:
-            k8s_cluster: the data to be used to update the K8s cluster
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        topology.update_k8scluster(k8s_cluster)
-
-    def topology_add_network(self, net: NetworkModel, areas: list):
-        """
-        Add network to the topology and
-
-        Args:
-            net: the network to be added in the topology
-
-            areas: area ID used to retrieve the VIMs. The network is then added to every VIM in the list (terraform
-            is set to true)
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        vims = set()
-        for a in areas:
-            if type(a) == int:
-                vims.add(topology.get_vim_name_from_area_id(a))
-                logger.debug("for area {} the following vims have been selected: {}".format(a, vims))
-            else:
-                vims.add(topology.get_vim_name_from_area_id(a['id']))
-                logger.debug("for area {} the following vims have been selected: {}".format(a['id'], vims))
-        topology.add_network(net, list(vims), terraform=True)
-
     def topology_del_network(self, net: NetworkModel, areas: List[int]):
         """
         Delete network from the topology and then remove it from every VIM of the area (terraform is set to true)
@@ -455,69 +389,7 @@ class BlueprintBaseBeta(abc.ABC):
         for area in areas:
             vims.append(topology.get_vim_name_from_area_id(area))
 
-        topology.del_network(net, list(vims), terraform=True)
-
-    def topology_get_network(self, network_name: str) -> NetworkModel:
-        """
-        Return a network from the topology.
-
-        Args:
-            network_name: The name of the network to be returned
-
-        Returns:
-            The network
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        return topology.get_network(network_name)
-
-    def topology_reserve_ip_range(self, lb_pool: LBPool) -> IPv4ReservedRange:
-        """
-        Reserve an IP range in the topology with owner that is this blueprint ID.
-
-        Args:
-            lb_pool: the pool to be reserved
-
-        Returns:
-            The reserved IP range -> {'start': '192.168.0.1', 'end': '192.168.0.100'}
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        return topology.reserve_range(lb_pool.net_name, lb_pool.range_length, self.get_id())
-
-    def topology_release_ip_range(self):
-        """
-        Delete the reserved IP range in the topology that has this blueprint ID as owner
-
-        Returns:
-            The reserved IP range -> {'start': '192.168.0.1', 'end': '192.168.0.100'}
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        return topology.release_ranges(owner=self.get_id())
-
-    def get_vim_name(self, area: int) -> str:
-        """
-        Returns the name of the FIRST matching VIM, given the area of interest.
-        Args:
-            area: the area in witch the vim is searched. Can be both 'int' ID or dictionary with 'id' key containing the
-            area ID.
-
-        Returns:
-            The name FIRST matching VIM for that area
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        return topology.get_vim_name_from_area_id(area)
-
-    def get_vim(self, area: int) -> VimModel:
-        """
-        Returns the FIRST VIM, given the area of interest.
-        Args:
-            area: the area in witch the vim is searched. Can be both 'int' ID or dictionary with 'id' key containing the
-            area ID.
-
-        Returns:
-            The FIRST matching VIM for that area
-        """
-        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
-        return topology.get_vim_from_area_id_model(area)
+        topology.del_network(net, vims, terraform=True)
 
     def get_vims(self):
         """

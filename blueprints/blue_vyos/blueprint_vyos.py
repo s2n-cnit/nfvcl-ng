@@ -28,6 +28,9 @@ nbiUtil = get_osm_nbi_utils()
 class VyOSBlue(BlueprintBaseBeta):
     vyos_model: VyOSBlueprint
 
+    def pre_initialization_checks(self) -> bool:
+        return True
+
     @classmethod
     def rest_create(cls, msg: VyOSBlueprintCreate):
         return cls.api_day0_function(msg)
@@ -171,7 +174,7 @@ class VyOSBlue(BlueprintBaseBeta):
             for area in self.vyos_model.areas:
                 logger.debug("Blue {} - checking area {}".format(self.get_id(), area.id))
                 # Check if the vim exists
-                vim: VimModel = self.topology_get_vim_by_area(area.id)  # Throw error in case not found
+                vim: VimModel = self.get_topology().get_vim_from_area_id_model(area.id)  # Throw error in case not found
 
                 config: VyOSConfig
                 device_index = 0
@@ -298,7 +301,7 @@ class VyOSBlue(BlueprintBaseBeta):
             self.setVnfd(area_id, vld=vim_net_mapping, vm_flavor_request=vm_flavor, device_number=device_number,
                          target_config=target_config)]
 
-        n_obj = sol006_NSD_builder(created_vnfd, self.get_vim_name(area_id), param, vim_net_mapping)
+        n_obj = sol006_NSD_builder(created_vnfd, self.get_topology().get_vim_name_from_area_id(area_id), param, vim_net_mapping)
 
         n_ = n_obj.get_nsd()
         n_['area_id'] = area_id

@@ -17,6 +17,7 @@ from nfvo import get_ns_vld_ip, NbiUtil
 from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from nfvo.vnf_manager_beta import Sol006VnfdBuilderBeta
+from topology.topology import Topology
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 from utils.log import create_logger
 from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
@@ -41,6 +42,9 @@ DEFAULT_PASSWD = 'root'
 
 class K8sBeta(BlueprintBaseBeta):
     k8s_model: K8sBlueprintModel
+
+    def pre_initialization_checks(self) -> bool:
+        return True
 
     @classmethod
     def rest_create(cls, msg: K8sBlueprintCreate):
@@ -158,7 +162,7 @@ class K8sBeta(BlueprintBaseBeta):
             for area in k8s_create_model.areas:
                 logger.debug("Blue {} - Checking area {}".format(self.get_id(), area.id))
                 # Check if the VIM exists and retrieve it
-                vim: VimModel = self.topology_get_vim_by_area(area.id)
+                vim: VimModel = self.get_topology().get_vim_from_area_id_model(area.id)
                 # Checking if the load-balancing network exists at the VIM
                 if lb_pool.net_name not in vim.networks:
                     raise ValueError('Blue {} - network ->{}<- not available at VIM {}'
@@ -170,7 +174,7 @@ class K8sBeta(BlueprintBaseBeta):
                 if not lb_pool.range_length:
                     lb_pool.range_length = 20
 
-                load_bal_topo_res_range = self.topology_reserve_ip_range(lb_pool)
+                load_bal_topo_res_range = self.get_topology().reserve_range_lb_pool(lb_pool, self.get_id())
                 logger.info("Blue {} taking range {}-{} on network {} for LOAD BALANCER".format(self.get_id(),
                                                                                                 load_bal_topo_res_range.start,
                                                                                                 load_bal_topo_res_range.end,
@@ -237,7 +241,7 @@ class K8sBeta(BlueprintBaseBeta):
         area_type = AreaType.CORE if area.core else AreaType.AREA
         created_vnfd = [self.set_vnfd(is_controller, area_type, area_id=area.id, data_interfaces=data_net_list)]
 
-        nsd_builder = Sol006NSDBuilderBeta(created_vnfd, self.get_vim_name(self.k8s_model.config.core_area.id),
+        nsd_builder = Sol006NSDBuilderBeta(created_vnfd, self.get_topology().get_vim_name_from_area_id(self.k8s_model.config.core_area.id),
                                            nsd_id=ns_id, nsd_type=nsd_type, vl_map=net_list)
 
         nsd = nsd_builder.get_nsd()
@@ -491,9 +495,10 @@ class K8sBeta(BlueprintBaseBeta):
             if primitive['result']['charm_status'] != 'completed':
                 raise ValueError('in k8s blue -> add_to_topology callback charm_status is not completed')
 
-        vim = self.get_vim(self.k8s_model.config.core_area.id)
+        vim = self.get_topology().get_vim_from_area_id_model(self.k8s_model.config.core_area.id)
         self.k8s_model.vim_name = vim.name
-        self.topology_add_k8scluster(self.k8s_model.parse_to_k8s_topo_model(vim_name=vim.name))
+        self.to_db() # Saving the vim name
+        self.get_topology().add_k8scluster(self.k8s_model.parse_to_k8s_topo_model(vim_name=vim.name))
 
     def install_plugins(self, msg: dict):
         """
@@ -608,17 +613,18 @@ class K8sBeta(BlueprintBaseBeta):
         """
         # If onboarded, the k8s cluster is removed from OSM.
         logger.info("Destroying")
-        if self.k8s_model.config.nfvo_onboard:
-            nbiUtil.delete_k8s_cluster(self.get_id())
 
-        # The k8s repo is removed from OSM
-        nbiUtil.delete_k8s_repo(self.get_id())
-
-        # K8s cluster is removed from the topology
-        self.topology_del_k8scluster()
+        # K8s cluster is removed from the topology and from OSM
+        topo: Topology = self.get_topology()
+        try:
+            topo.get_k8s_cluster(self.get_id())
+            topo.del_k8scluster(self.get_id())
+        except ValueError as e:
+            logger.warning(e)
+            logger.warning("The Cluster was not present in the topology, it will not be removed from it.")
 
         # Release the reserved IP addresses for the Load Balancer (see
-        self.topology_release_ip_range()
+        self.get_topology().release_ranges(self.get_id())
 
     def get_ip(self) -> None:
         """

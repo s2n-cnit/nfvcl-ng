@@ -64,7 +64,7 @@ def get_blueprint_by_id(id_: str):
 
 def get_all_blueprint() -> Cursor:
     """
-    Return a list of all the blueprints
+    Return a list of all the blueprints.
     Returns:
         a mongo cursor that can be iterated.
     """
@@ -107,11 +107,17 @@ def get_blueprint_model_by_id(blueprint_id: str):
 
 
 def delete_blueprint(blue_id):
+    """
+    Remove a blueprint from the NVFCL
+    Args:
+        blue_id: The ID of the blueprint to be deleted, together with its NSs.
+    """
     _db = persistency.DB()
     db_data = _db.findone_DB("blueprint-instances", {'id': blue_id})
     if not db_data:
         raise ValueError('blueprint {} not found in DB or malformed'.format(blue_id))
 
+    # IF blueprint V1 or V2 we need to take it from different queues
     if 'version' in db_data:
         if db_data['version'] == BlueprintVersion.ver2_00.value:
             workers.destroy_worker(blue_id)
@@ -278,16 +284,19 @@ def delete(blue_id: str):
 @blue_router.delete('/all/blue', response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED,
                     callbacks=callback_router.routes)
 def delete_all_blueprints():
+    """
+    Remove all blueprints. For every blueprint, network services are deleted from VIMs and K8s clusters (by OSM)
+    """
     try:
         blues = get_all_blueprint()
         if not blues:
-            raise ValueError('blueprints not found in the persistency layer')
+            raise ValueError('Blueprints not found in the persistency layer')
     except Exception:
         return OssCompliantResponse(status=OssStatus.failed, detail="")
 
+    # For each blueprint we start to remove it.
     for blue in blues:
         thread = Thread(target=delete_blueprint, args=(blue['id'],))
-        # thread.daemon = True
         thread.start()
 
     return OssCompliantResponse(detail="Operation submitted")

@@ -115,15 +115,13 @@ class LCMWorkersBeta:
             worker_names = [t.name for t in threading.enumerate()]
             if blue_id not in worker_names:
                 logger.warning("Worker {} is not running, trying to reinitialize".format(blue_id))
-                # recover the blue from the persistency
-                # blue = unpickle_one_blue_by_id(blue_id)
+                # Recover the blue from the persistency
                 blue = BlueprintBaseBeta.from_db(blue_id)
                 self.start_worker(blue)
             return self.worker_queue.get(blue_id)
 
         else:
             logger.warning("Worker queue {} is not available, trying to reinitialize".format(blue_id))
-            # blue = unpickle_one_blue_by_id(blue_id)
             blue = BlueprintBaseBeta.from_db(blue_id)
             return self.set_worker(blue)
 
@@ -167,10 +165,10 @@ class BlueLCMworkerBeta:
         self.blue.to_db()  # TODO is it necessary? Isn't that just loaded from the DB?
 
         while True:
-            logger.info('worker {} awaiting for new job'.format(self.blue.get_id()))
+            logger.info('Worker {} awaiting for new job'.format(self.blue.get_id()))
             s_input = self.queue.get()
 
-            logger.info('worker {} received new job {}'.format(self.blue.get_id(), s_input['requested_operation']))
+            logger.info('Worker {} received new job {}'.format(self.blue.get_id(), s_input['requested_operation']))
             if s_input['requested_operation'] == 'stop':
                 destroy_blueprint(self.osmNbiUtil, self.blue, self.db)
                 logger.info('removing the worker thread of Blue {}'.format(self.blue.get_id()))
@@ -197,13 +195,16 @@ class BlueLCMworkerBeta:
         pass
 
     def process_session(self, session_id: str, msg: dict, requested_operation: str):
-        logger.debug('updating blueprint {} with method {} session id {}'
+        logger.debug('Updating blueprint {} with method {} session id {}'
                      .format(self.blue.get_id(), requested_operation, session_id))
 
         # Checking if requested operation is supported by the blueprint
         if requested_operation not in self.blue.get_supported_operations():
             self.abort_session('method {} not supported by the blueprint'
                                .format(requested_operation), requested_operation, session_id)
+
+        # Checking that things are fine to initialize a blueprint (example the presence of a K8S cluster).
+        self.blue.pre_initialization_checks()
 
         # Check that all VIMs are onboarded on OSM
         checked_vims = checkVims(self.blue.get_vims(), self.osmNbiUtil)

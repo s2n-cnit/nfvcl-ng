@@ -200,9 +200,9 @@ class VimNetMap(BaseModel):
 
 
 class VMFlavors(BaseModel):
-    memory_mb: str = Field(default="8192", alias='memory-mb', description="Should be a multiple of 1024")
-    storage_gb: str = Field(default="32", alias='storage-gb')
-    vcpu_count: str = Field(default="4", alias='vcpu-count')
+    memory_mb: str = Field(default="8192", serialization_alias='memory-mb', description="Should be a multiple of 1024")
+    storage_gb: str = Field(default="32", serialization_alias='storage-gb')
+    vcpu_count: str = Field(default="4", serialization_alias='vcpu-count')
 
     @field_validator('memory_mb', 'storage_gb', 'vcpu_count', mode='before')
     @classmethod
@@ -220,47 +220,44 @@ class VirtualDeploymentUnit(BaseModel):
     count: int = Field(default=1)
     id: str
     image: str
-    vm_flavor: VMFlavors = Field(default=VMFlavors(), alias="vm-flavor")
+    vm_flavor: VMFlavors = Field(default=VMFlavors(), serialization_alias="vm-flavor")
     interface: List[VimLink] = Field(default=[])
-    vim_monitoring: bool = Field(default=True, alias="vim-monitoring")
+    vim_monitoring: bool = Field(default=True, serialization_alias="vim-monitoring")
 
     @classmethod
-    def build_vdu(cls, vdu_id, vdu_image, vdu_data_int_list: List[str], vdu_flavor):
+    def build_vdu(cls, vdu_id, vdu_image, vdu_data_int_list: List[str], vdu_flavor: VMFlavors = VMFlavors()):
         """
 
         Args:
             vdu_id: The ID of the vdu
             vdu_image: The name of the image used in openstack (origin)
-            vdu_mgt_int: The name of the management interface
             vdu_data_int_list: A list of data network NAMES
             vdu_flavor: Flavor to be assigned to this vdu.
 
         Returns:
 
         """
-        if vdu_flavor is not None:
-            vm_flavor = vdu_flavor
-        else:
-            vm_flavor: VMFlavors = VMFlavors()
-            vm_flavor.vcpu_count = '4'
-            vm_flavor.memory_mb = '6144'
-            vm_flavor.storage_gb = '8'
+        interfaces: List[VimLink] = []
 
-        interfaces = []
         # Starting from ens3. Management interface is ens3
-        interfaces.append(VimLink.model_validate({"vld": "mgt", "name": "ens3",
-                                                  "mgt": True, "port-security-enabled": False}))
+        interfaces.append(VimLink.model_validate({
+            "vld": "mgt",
+            "name": "ens3",
+            "mgt": True,
+            "port-security-enabled": False
+        }))
+
         intf_index = 4  # starting from ens4
         for net_name in vdu_data_int_list:
-            interfaces.append(VimLink.model_validate({"vld": f'data_{net_name}', "name": f"ens{intf_index}",
-                                                      "mgt": False, "port-security-enabled": False}))
+            interfaces.append(VimLink.model_validate({
+                "vld": f'data_{net_name}',
+                "name": f"ens{intf_index}",
+                "mgt": False,
+                "port-security-enabled": False
+            }))
             intf_index += 1
 
-        vdu = VirtualDeploymentUnit(id=vdu_id, image=vdu_image)
-        vdu.vm_flavor = vm_flavor
-        vdu.interface = interfaces
-
-        return vdu
+        return VirtualDeploymentUnit(id=vdu_id, image=vdu_image, vm_flavor=vdu_flavor, interface=interfaces)
 
 
 class PDUDeploymentUnit(BaseModel):
@@ -329,10 +326,3 @@ class VirtualNetworkFunctionDescriptor(BaseModel):
                 return None
         else:
             return None
-
-
-
-
-
-
-

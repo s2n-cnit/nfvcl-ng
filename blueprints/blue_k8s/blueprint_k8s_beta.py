@@ -34,7 +34,7 @@ class AreaType(Enum):
 
 
 WORKERS_FLAVOR: VMFlavors = VMFlavors(vcpu_count='4', memory_mb='8192', storage_gb='32')
-CONTROLLER_FLAVOR: VMFlavors = VMFlavors(vcpu_count='2', memory_mb='4096', storage_gb='12')
+CONTROLLER_FLAVOR: VMFlavors = VMFlavors(vcpu_count='4', memory_mb='4096', storage_gb='16')
 VDU_IMAGE = 'ubuntu2204-March-23'
 DEFAULT_USR = 'root'
 DEFAULT_PASSWD = 'root'
@@ -239,7 +239,8 @@ class K8sBeta(BlueprintBaseBeta):
 
         # Create the VNFD
         area_type = AreaType.CORE if area.core else AreaType.AREA
-        created_vnfd = [self.set_vnfd(is_controller, area_type, area_id=area.id, data_interfaces=data_net_list)]
+        created_vnfd = [self.set_vnfd(is_controller, area_type, area_id=area.id, data_interfaces=data_net_list,
+                                      vm_flavor_request=area.worker_flavor_override)]
 
         nsd_builder = Sol006NSDBuilderBeta(created_vnfd, self.get_topology().get_vim_name_from_area_id(self.k8s_model.config.core_area.id),
                                            nsd_id=ns_id, nsd_type=nsd_type, vl_map=net_list)
@@ -252,7 +253,7 @@ class K8sBeta(BlueprintBaseBeta):
 
         # Append to the NSD list the created NSD.
         self.base_model.nsd_.append(nsd)
-        self.to_db() # Save the model
+        self.to_db()  # Save the model
 
         return ns_id
 
@@ -280,10 +281,7 @@ class K8sBeta(BlueprintBaseBeta):
         if is_controller:
             created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, CONTROLLER_FLAVOR)
         else:
-            if vm_flavor_request is not None:
-                created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, vm_flavor_request)
-            else:
-                created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, WORKERS_FLAVOR)
+            created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, vm_flavor_request if vm_flavor_request else WORKERS_FLAVOR)
 
         created_vnfd = VirtualNetworkFunctionDescriptor.build_vnfd(vnfd_id, DEFAULT_PASSWD, True, DEFAULT_USR,
                                                                    vdu_list=[created_vdu])
@@ -497,7 +495,7 @@ class K8sBeta(BlueprintBaseBeta):
 
         vim = self.get_topology().get_vim_from_area_id_model(self.k8s_model.config.core_area.id)
         self.k8s_model.vim_name = vim.name
-        self.to_db() # Saving the vim name
+        self.to_db()  # Saving the vim name
         self.get_topology().add_k8scluster(self.k8s_model.parse_to_k8s_topo_model(vim_name=vim.name))
 
     def install_plugins(self, msg: dict):

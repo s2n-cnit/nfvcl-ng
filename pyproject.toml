@@ -21,6 +21,8 @@ pymongo = "^4.5.0"
 paramiko = "^3.3.1"
 requests = "^2.31.0"
 python-neutronclient = "^11.0.0"
+coloredlogs = "^15.0.1"
+colorama = "^0.4.6"
 
 
 [build-system]

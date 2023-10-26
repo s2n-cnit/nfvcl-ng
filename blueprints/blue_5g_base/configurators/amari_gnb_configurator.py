@@ -1,8 +1,10 @@
+from logging import Logger
+
 from configurators.flex_configurator import Configurator_Flex
-from main import *
 
 # create logger
-logger = logging.getLogger('Configurator_Amari_gNb')
+from utils.log import create_logger
+logger: Logger = create_logger('Configurator_Amari_gNb')
 
 
 class Configurator_AmariGNB(Configurator_Flex):
@@ -51,7 +53,7 @@ class Configurator_AmariGNB(Configurator_Flex):
 
         self.conf['plmn_list'] = [plmn_obj]
 
-        '''       
+        '''
         configvar.tdd_config = 2 %}
         configvar.n_antenna_ul = 4 %}
         configvar.n_antenna_ul = 2 %}

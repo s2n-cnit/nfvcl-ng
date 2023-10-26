@@ -1,9 +1,11 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from utils.redis_utils.redis_manager import get_redis_instance
 from redis import Redis
+import coloredlogs
+import verboselogs
 
-_redis_cli: Redis = get_redis_instance()
+from utils.util import is_config_loaded
+
 _log_level = logging.DEBUG
 
 
@@ -15,6 +17,39 @@ def set_log_level(level):
     """
     global _log_level
     _log_level = level
+
+
+coloredlog_format_string = "%(asctime)s [%(name)-20.20s][%(threadName)-10.10s] [%(levelname)8s] %(message)s"
+
+level_styles = {
+    'spam': {'color': 'green', 'faint': True},
+    'debug': {'color': 241},
+    'verbose': {'color': 'blue'},
+    'info': {},
+    'notice': {'color': 'magenta'},
+    'warning': {'color': 'yellow'},
+    'success': {'color': 'green', 'bold': True},
+    'error': {'color': 'red'},
+    'critical': {'color': 'red', 'bold': True}
+}
+
+field_styles = {
+    'asctime': {'color': 247},
+    'hostname': {'color': 'magenta'},
+    'levelname': {'color': 'cyan', 'bold': True},
+    'name': {'color': 33},
+    'programname': {'color': 'cyan'},
+    'username': {'color': 'yellow'},
+    'devicename': {'color': 34}
+}
+coloredlog_formatter = coloredlogs.ColoredFormatter(
+    fmt=coloredlog_format_string,
+    field_styles=field_styles,
+    level_styles=level_styles
+)
+
+ROOT_LOGGER_NAME = "RootLogger"
+formatter = logging.Formatter(coloredlog_format_string)
 
 
 def create_logger(name: str) -> logging.Logger:
@@ -31,23 +66,8 @@ def create_logger(name: str) -> logging.Logger:
 
         The created logger
     """
-    global _log_level
-    # create logger
-    logger = logging.getLogger(name)
-    logger.handlers = []
-    logger.propagate = False
-    logger.setLevel(logging.DEBUG)
-
-    # create formatter
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    # create console handler and set level to debug
-    ch = logging.StreamHandler()
-    ch.setLevel(_log_level)
-    # add formatter to console handler
-    ch.setFormatter(formatter)
-    # add console handler to logger
-    logger.addHandler(ch)
+    logger = verboselogs.VerboseLogger(name)
+    logger.parent = logging.getLogger(ROOT_LOGGER_NAME)
 
     # Adding file handler to post log into file
     # w = every restart log is cleaned
@@ -56,36 +76,47 @@ def create_logger(name: str) -> logging.Logger:
     log_file_handler.setFormatter(formatter)
     logger.addHandler(log_file_handler)
 
-    # Adding Redis handler to output the log to redis through publish
-    redis_handler = RedisLoggingHandler(_redis_cli)
-    redis_handler.setLevel(_log_level)
-    redis_handler.setFormatter(formatter)
-    logger.addHandler(redis_handler)
+    # If the config is not yet loaded we cannot get the Redis instance
+    # Workaround for logging before loading config
+    if is_config_loaded():
+        # Adding Redis handler to output the log to redis through publish
+        from utils.redis_utils.redis_manager import get_redis_instance
+        _redis_cli: Redis = get_redis_instance()
+        redis_handler = RedisLoggingHandler(_redis_cli)
+        redis_handler.setLevel(_log_level)
+        redis_handler.setFormatter(formatter)
+        logger.addHandler(redis_handler)
+
+    coloredlogs.install(
+        level=_log_level,
+        logger=logger,
+        fmt=coloredlog_format_string,
+        field_styles=field_styles,
+        level_styles=level_styles
+    )
+
     return logger
 
 
-def mod_logger(logger: logging.Logger) -> logging.Logger:
+def mod_logger(logger: logging.Logger):
     """
     This method takes an existing logger and mod it.
-    Delete existing handlers and add custom ones.
-
-    Args:
-        logger: the logger to be erased and replaced.
-
-    Returns:
-        the new logger
     """
-    # Deleting previous handlers
-    logger.handlers.clear()
+    coloredlogs.install(
+        level=_log_level,
+        logger=logger,
+        fmt=coloredlog_format_string,
+        field_styles=field_styles,
+        level_styles=level_styles
+    )
 
-    # The method create logger will take the same logger and add custom handlers to it
-    return create_logger(logger.name)
 
 class RedisLoggingHandler(logging.Handler):
     """
     This custom handler allow to output logs on redis. In this way an external entity to the NFVCL is able to
     observe what is going on, without need to connect at the NFVCL machine.
     """
+
     def __init__(self, redis_instance: Redis, *args, **kwargs):
         """
         Args:

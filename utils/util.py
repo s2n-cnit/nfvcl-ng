@@ -1,19 +1,32 @@
 import base64
-import logging
 import os
 import string
 import random
 import glob
+from logging import Logger
+from pathlib import Path
 from typing import List
 import OpenSSL
 import yaml
 import shutil
+from models.config_model import NFVCLConfigModel
 from OpenSSL.crypto import PKey
 from jinja2 import Environment, FileSystemLoader
-from models.config_model import NFVCLConfigModel
 
 # Using _ before name such that cannot be directly accessed from external files.
-_nfvcl_config: NFVCLConfigModel
+_nfvcl_config: NFVCLConfigModel | None = None
+
+
+def is_config_loaded() -> bool:
+    global _nfvcl_config
+    return _nfvcl_config is not None
+
+
+from utils.log import create_logger
+
+pre_config_logger = create_logger("PreConfig")
+logger: Logger | None = None
+
 
 def get_nfvcl_config() -> NFVCLConfigModel:
     """
@@ -22,18 +35,13 @@ def get_nfvcl_config() -> NFVCLConfigModel:
     Returns:
         The NFVCL config
     """
-    global _nfvcl_config
+    global _nfvcl_config, logger
 
     # Using _nfvcl_config is present
-    if '_nfvcl_config' in globals():
-        # If none, generate new one. Else return existing one
-        if _nfvcl_config is None:
-            _nfvcl_config = _load_nfvcl_config()
-            return _nfvcl_config
-        else:
-            return _nfvcl_config
-    # In case there is a problem reading and returning the config
-    return _load_nfvcl_config()
+    if not _nfvcl_config:
+        _nfvcl_config = _load_nfvcl_config()
+        logger = create_logger("Util")
+    return _nfvcl_config
 
 
 def _load_nfvcl_config() -> NFVCLConfigModel:
@@ -44,24 +52,25 @@ def _load_nfvcl_config() -> NFVCLConfigModel:
     Returns:
         The NFVCL configuration
     """
-    # Loading develop nfvcl file if present (Not uploaded on Git)
-    if os.path.exists("config_dev.yaml"):
-        config_file = open("config_dev.yaml", 'r')
-    else:
-        config_file = open("config.yaml", 'r')
 
-    with config_file as stream_file:
+    dev_config_file_path = Path("config_dev.yaml")
+    default_config_file_path = Path("config.yaml")
+    # Loading develop nfvcl file if present (Not uploaded on Git)
+    config_file_path = dev_config_file_path if dev_config_file_path.is_file() else default_config_file_path
+
+    with open(config_file_path, 'r') as stream_file:
+        pre_config_logger.info(f"Loading config from {config_file_path.name}")
         config: NFVCLConfigModel
         try:
             nfvcl_conf = yaml.safe_load(stream_file)
         except yaml.YAMLError as exc:
-            print(exc)
+            pre_config_logger.exception("Error loading config", exc)
 
         # Parsing the config file
         try:
             config = NFVCLConfigModel.model_validate(nfvcl_conf)
         except Exception as exce:
-            print('exception in the configuration file parsing: {}'.format(exce))
+            pre_config_logger.exception("Exception in the configuration file parsing", exce)
         return config
 
 
@@ -75,17 +84,17 @@ def obj_multiprocess_lock(func):
     Semaphore for topology. Locks the topology such that only ONE operation is made at the same time.
     """
     def wrapper(self, *args, **kwargs):
-        print("Acquiring lock")
+        logger.debug("Acquiring lock")
         self.lock.acquire()
-        print("Acquired lock")
+        logger.debug("Acquired lock")
 
         # In case of crash we still need to unlock the semaphore -> TRY
         try:
             #
             response = func(self, *args, **kwargs)
-            print("Releasing lock")
+            logger.debug("Releasing lock")
             self.lock.release()
-            print("Released lock")
+            logger.debug("Released lock")
             return response
         except Exception as excep:
             # In case of crash we still need to unlock the semaphore
@@ -102,7 +111,7 @@ def deprecated(func):
     """
 
     def wrapper(*args, **kwargs):
-        print('Function', func.__name__, 'is deprecated.')
+        logger.warning(f"Function {func.__name__} is deprecated.")
         return func(*args, **kwargs)
 
     return wrapper

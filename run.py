@@ -8,10 +8,10 @@ from models.config_model import NFVCLConfigModel
 from utils.util import get_nfvcl_config
 from utils.log import create_logger
 
-
 logger: Logger
 PY_MIN_MAJOR = 3
 PY_MIN_MINOR = 11
+
 
 def check_folders():
     """
@@ -20,6 +20,7 @@ def check_folders():
     Path("helm_charts/charts/").mkdir(parents=True, exist_ok=True)
     Path("day2_files").mkdir(parents=True, exist_ok=True)
     Path("logs").mkdir(parents=True, exist_ok=True)
+
 
 def check_ip() -> NFVCLConfigModel:
     """
@@ -54,5 +55,4 @@ if __name__ == "__main__":
     if nfvcl_conf is not None:
         # Load the app only if pre-configuration is OK.
         from nfvcl import app
-        # Starting the NFVCL app
         uvicorn.run(app, host=nfvcl_conf.nfvcl.ip, port=5002)

@@ -23,8 +23,6 @@ from rest_endpoints.helm import helm_router
 from fastapi.staticfiles import StaticFiles
 from rest_endpoints.osm_rest import osm_router
 
-
-
 app = FastAPI(
     title="NFVCL",
     # description=description,
@@ -68,7 +66,10 @@ async def close_nfvcl():
 
 @app.on_event("startup")
 async def startup_event():
-    logger1 = logging.getLogger('uvicorn.access')
-    logger2 = logging.getLogger('uvicorn.error')
-    mod_logger(logger1)
-    mod_logger(logger2)
+    """
+    Mod the unicorn loggers to add colors and custom style
+    """
+    mod_logger(logging.getLogger('uvicorn'))
+    mod_logger(logging.getLogger('uvicorn.access'))
+    mod_logger(logging.getLogger('uvicorn.error'))
+    mod_logger(logging.getLogger('fastapi'))

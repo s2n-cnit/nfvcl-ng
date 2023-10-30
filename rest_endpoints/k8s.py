@@ -8,8 +8,8 @@ from models.event import Event
 from models.k8s.blueprint_k8s_model import K8sModel
 from main import *
 from models.k8s.k8s_events import K8sEventType
-from models.k8s.topology_k8s_model import K8sPluginName, K8sOperationType, K8sModelManagement, K8sPluginsToInstall, \
-    K8sQuota
+from models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sOperationType, K8sPluginName
+from models.k8s.topology_k8s_model import K8sModelManagement, K8sQuota
 from models.response_model import OssCompliantResponse, OssStatus
 from rest_endpoints.rest_callback import RestAnswer202
 from topology.topology import Topology

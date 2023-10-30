@@ -13,7 +13,8 @@ from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError
 import utils.util
 from config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
-from models.k8s.topology_k8s_model import K8sPluginName, K8sPluginType, K8sTemplateFillData, K8sModel, K8sVersion
+from models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName, K8sPluginType
+from models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from utils.k8s.k8s_client_extension import create_from_yaml_custom
 from utils.log import create_logger
 from utils.util import deprecated

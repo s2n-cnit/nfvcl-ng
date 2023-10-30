@@ -10,7 +10,7 @@ from models.blueprint.rest_blue import BlueGetDataModel
 from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, \
     K8sNsdInterfaceDesc
 from models.k8s.blueprint_k8s_model import LBPool, K8sAreaInfo
-from models.k8s.topology_k8s_model import K8sPluginName, K8sTemplateFillData
+from models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName
 from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel, VMFlavors
 from models.virtual_link_desc import VirtLinkDescr
 from nfvo import get_ns_vld_ip, NbiUtil

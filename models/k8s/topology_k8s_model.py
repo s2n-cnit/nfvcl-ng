@@ -71,17 +71,6 @@ class K8sModelCreateFromBlueprint(BaseModel):
     blueprint_ref: str
 
 
-class K8sLabel(str, Enum):
-    """
-    Known labels that help to identify what is installed in a k8s cluster
-    """
-    FLANNEL = 'flannel'
-    OPEN_EBS = 'openebs-ndm'
-    METALLB = 'metallb'
-    CALICO = 'calico-node'
-    METRIC_SERVER = 'metrics-server'
-
-
 class K8sPluginName(str, Enum):
     """
     Supported plugin names by the k8s manager
@@ -92,6 +81,7 @@ class K8sPluginName(str, Enum):
     CALICO = 'calico'
     METRIC_SERVER = 'metric-server'
     MULTUS = 'multus-cni'
+    ISTIO = 'istio'
 
 
 class K8sPluginType(str, Enum):
@@ -105,6 +95,17 @@ class K8sPluginType(str, Enum):
     GENERIC = 'generic'
 
 
+class K8sPluginLabel(BaseModel):
+    """
+    Describe a K8s object used to recognized installed plugins on cluster.
+    Tha label and values are used to identify a resource in a namespace with a certain name.
+    """
+    namespace: str
+    name: str
+    label: str
+    value: str
+
+
 class K8sPlugin(BaseModel):
     """
     Plugin representation
@@ -113,8 +114,10 @@ class K8sPlugin(BaseModel):
     type: K8sPluginType = Field(description="Type of plugin, must me a valid value in enum K8sPluginType")
     installation_modules: List[str] = Field(default=[], description="List of modules to be installed when adding plugin"
                                                                     " to cluster")
-    daemon_sets: List = Field(default=[], description="List of daemon sets present when the plugin is correctly "
+    daemon_sets: List[K8sPluginLabel] = Field(default=[], description="List of daemon sets present when the plugin is correctly "
                                                       "installed")
+    deployments: List[K8sPluginLabel] = Field(default=[], description="List of deployments present when the plugin"
+                                                                           "is correctly installed on the cluster.")
 
 
 class K8sOperationType(str, Enum):

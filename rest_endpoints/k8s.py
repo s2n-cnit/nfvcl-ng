@@ -13,7 +13,7 @@ from models.k8s.topology_k8s_model import K8sPluginName, K8sOperationType, K8sMo
 from models.response_model import OssCompliantResponse, OssStatus
 from rest_endpoints.rest_callback import RestAnswer202
 from topology.topology import Topology
-from utils.k8s import get_k8s_config_from_file_content, check_installed_plugins, \
+from utils.k8s import get_k8s_config_from_file_content, get_installed_plugins, \
     get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
 from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
@@ -72,7 +72,7 @@ async def get_k8s_installed_plugins(cluster_id: str):
     cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
-    installed_plugins = check_installed_plugins(kube_client_config=k8s_config)
+    installed_plugins = get_installed_plugins(kube_client_config=k8s_config)
 
     return installed_plugins
 

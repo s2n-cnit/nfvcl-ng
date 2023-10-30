@@ -5,8 +5,12 @@
     "installation_modules": [
       "flannel"
     ],
-    "daemon_sets": [
-      "flannel"
+    "daemon_sets": [{
+      "namespace": "kube-flannel",
+      "name": "kube-flannel-ds",
+      "label": "app",
+      "value": "flannel"
+    }
     ]
   },
   {
@@ -15,8 +19,12 @@
     "installation_modules": [
       "openebs"
     ],
-    "daemon_sets": [
-      "openebs-ndm"
+    "daemon_sets": [{
+      "namespace": "openebs",
+      "name": "openebs-ndm",
+      "label": "openebs.io/component-name",
+      "value": "ndm"
+    }
     ]
   },
   {
@@ -26,8 +34,12 @@
       "metallb",
       "metallb-config"
     ],
-    "daemon_sets": [
-      "metallb"
+    "daemon_sets": [{
+      "namespace": "metallb-system",
+      "name": "speaker",
+      "label": "app",
+      "value": "metallb"
+    }
     ]
   },
   {
@@ -37,8 +49,12 @@
       "calico-operator",
       "calico-custom"
     ],
-    "daemon_sets": [
-      "calico"
+    "daemon_sets": [{
+      "namespace": "???",
+      "name": "???",
+      "label": "k8s-app",
+      "value": "calico-node"
+    }
     ]
   },
   {
@@ -48,7 +64,14 @@
       "metric-server"
     ],
     "daemon_sets": [
-      "metric-server"
+    ],
+    "deployments": [
+      {
+        "namespace": "istio-system",
+        "name": "istiod",
+        "label": "app",
+        "value": "istiod"
+      }
     ]
   },
   {
@@ -57,8 +80,27 @@
     "installation_modules": [
       "multus"
     ],
-    "daemon_sets": [
-      "multus"
+    "daemon_sets": [{
+      "namespace": "kube-system",
+      "name" : "kube-multus-ds",
+      "label": "app",
+      "value": "multus"
+    }
+    ]
+  },
+  {
+    "name": "istio",
+    "type": "network",
+    "installation_modules": [
+      "istio"
+    ],
+    "daemon_sets": [],
+    "deployments": [{
+      "namespace": "istio-system",
+      "name" : "istiod",
+      "label": "app",
+      "value": "istiod"
+    }
     ]
   }
 ]

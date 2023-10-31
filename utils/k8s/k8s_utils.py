@@ -13,7 +13,8 @@ from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError
 import utils.util
 from config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
-from models.k8s.topology_k8s_model import K8sPluginName, K8sPluginType, K8sTemplateFillData, K8sModel, K8sLabel, K8sVersion
+from models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName, K8sPluginType
+from models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from utils.k8s.k8s_client_extension import create_from_yaml_custom
 from utils.log import create_logger
 from utils.util import deprecated
@@ -141,15 +142,19 @@ def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configurati
         return pod_list
 
 
-def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespace: str = None) -> V1DaemonSetList:
+def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
+                    label_selector: str = None) -> V1DaemonSetList:
     """
     Search for all DaemonSets of a namespace. If a namespace is not specified, it will work on
     all namespaces.
 
-    @param kube_client_config the configuration of K8s on which the client is built.
-    @param namespace, the optional namespace. If None the search is done on all namespaces.
+    Args:
+        namespace: the optional namespace. If None the search is done on all namespaces.
+        kube_client_config: the configuration of K8s on which the client is built.
+        label_selector: The selector with witch is possible to filter the list of daemon set
+        (example 'k8s-app=metrics-server')
 
-    @return an object V1DaemonSetList containing a list of DaemonSets
+    Returns: an object V1DaemonSetList containing a list of DaemonSets
     """
     # Enter a context with an instance of the API kubernetes.client
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
@@ -158,6 +163,7 @@ def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespa
         try:
             if namespace:
                 daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_namespaced_daemon_set(namespace=namespace,
+                                                                                                  label_selector=label_selector,
                                                                                                   timeout_seconds=TIMEOUT_SECONDS)
             else:
                 daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_daemon_set_for_all_namespaces(
@@ -171,7 +177,40 @@ def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespa
         return daemon_set_list
 
 
-def check_installed_plugins(kube_client_config: kubernetes.client.Configuration) -> List[K8sPluginName]:
+def get_deployments(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
+                    label_selector: str = None) -> V1DaemonSetList:
+    """
+    Search for all Deployments of a namespace. If a namespace is not specified, it will work on
+    all namespaces.
+
+    Args:
+        namespace: the optional namespace. If None the search is done on all namespaces.
+        kube_client_config: the configuration of K8s on which the client is built.
+        label_selector: The selector with witch is possible to filter the list of daemon set
+        (example 'k8s-app=metrics-server')
+
+    Returns: an object V1DaemonSetList containing a list of DaemonSets
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the apps API
+        api_instance_appsV1 = kubernetes.client.AppsV1Api
+        try:
+            if namespace:
+                deploy_list = api_instance_appsV1.list_namespaced_deployment(namespace=namespace, label_selector=label_selector)
+            else:
+                deploy_list: V1DaemonSetList = api_instance_appsV1.list_deployment_for_all_namespaces(
+                    timeout_seconds=TIMEOUT_SECONDS, label_selector=label_selector)
+        except ApiException as error:
+            logger.error("Exception when calling appsV1->list_deployments: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return deploy_list
+
+
+def get_installed_plugins(kube_client_config: kubernetes.client.Configuration) -> List[K8sPluginName]:
     """
     Check which plugin is installed on a k8s cluster. To this goal, daemon sets and pods in 'kube system' are iterated.
     The function check if there are labels that highlight the presence of a plugin.
@@ -182,30 +221,25 @@ def check_installed_plugins(kube_client_config: kubernetes.client.Configuration)
     Returns
         the list of detected plugins in a k8s cluster
     """
-    daemon_sets = get_daemon_sets(kube_client_config)
+    enabled_plugins = get_enabled_plugins()
     to_return = []
 
-    # For each daemon set, it looks if it there is some modules installed
-    daemon: V1DaemonSet
-    for daemon in daemon_sets.items:
-        if 'app' in daemon.spec.selector.match_labels:
-            if daemon.spec.selector.match_labels['app'] == K8sLabel.FLANNEL.value:
-                to_return.append(K8sPluginName.FLANNEL)
-            if daemon.spec.selector.match_labels['app'] == K8sLabel.METALLB.value:
-                to_return.append(K8sPluginName.METALLB)
-        if 'name' in daemon.spec.selector.match_labels:
-            if daemon.spec.selector.match_labels['name'] == K8sLabel.OPEN_EBS.value:
-                to_return.append(K8sPluginName.OPEN_EBS)
-        if 'k8s-app' in daemon.spec.selector.match_labels:
-            if daemon.spec.selector.match_labels['k8s-app'] == K8sLabel.CALICO.value:
-                to_return.append(K8sPluginName.CALICO)
+    # Not the efficient way but this function should be called rarely
+    for plugin in enabled_plugins:
+        # For each plugin that is detected by the presence of a daemon set
+        for daemon_set in plugin.daemon_sets:
+            label = f"{daemon_set.label}={daemon_set.value}"
+            retrieved_daemons = get_daemon_sets(kube_client_config, namespace=daemon_set.namespace, label_selector=label)
+            if len(retrieved_daemons.items) > 0:
+                to_return.append(K8sPluginName(plugin.name))
 
-    pods_in_ksystem = get_pods_for_k8s_namespace(kube_client_config=kube_client_config, namespace='kube-system',
-                                                 label_selector='k8s-app=metrics-server')
-    for pod in pods_in_ksystem.items:
-        if 'k8s-app' in pod.metadata.labels:
-            if pod.metadata.labels['k8s-app'] == K8sLabel.METRIC_SERVER.value:
-                to_return.append(K8sPluginName.METRIC_SERVER)
+        # For each plugin that is detected by the presence of a deployment
+        for deploy in plugin.deployments:
+            label = f"{deploy.label}={deploy.value}"
+            retrieved_daemons = get_daemon_sets(kube_client_config, namespace=deploy.namespace, label_selector=label)
+            if len(retrieved_daemons.items) > 0:
+                to_return.append(K8sPluginName(plugin.name))
+
     return to_return
 
 
@@ -268,7 +302,7 @@ def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configurati
     """
     version: K8sVersion = get_k8s_version(kube_client_config)
 
-    installed_plugins: List[K8sPluginName] = check_installed_plugins(kube_client_config)
+    installed_plugins: List[K8sPluginName] = get_installed_plugins(kube_client_config)
 
     result: dict = {}
 
@@ -381,9 +415,9 @@ def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins
         # If type is already present -> Conflict
         # If type is generic -> No need to check for conflict
         if plugin_type in types and plugin_type is not K8sPluginType.GENERIC:
-            msg_err = "There is a conflict between installed plugins + ones to be installed. 2 or more plugins of " \
+            msg_warning = "There is a conflict between installed plugins + ones to be installed. 2 or more plugins of " \
                       "the same type {} have been found (Example calico and flannel)".format(plugin_type)
-            logger.warning(msg_err)
+            logger.warning(msg_warning)
         types.append(plugin_type)
 
 

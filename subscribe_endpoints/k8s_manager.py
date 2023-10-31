@@ -14,8 +14,8 @@ from kubernetes.utils import FailToCreateError
 from pydantic import ValidationError
 from redis.client import PubSub
 from models.k8s.blueprint_k8s_model import LBPool
-from models.k8s.topology_k8s_model import K8sModelManagement, K8sOperationType, K8sModel, K8sPluginName, K8sPluginsToInstall, \
-    K8sTemplateFillData
+from models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sTemplateFillData, K8sOperationType, K8sPluginName
+from models.k8s.topology_k8s_model import K8sModelManagement, K8sModel
 from nfvo import NbiUtil
 from topology.topology import Topology
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, \

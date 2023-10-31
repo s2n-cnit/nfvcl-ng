@@ -1,15 +1,17 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
+
 from pydantic import BaseModel, Field
 
-from models.vim.vim_models import VimLink
+from models.base_model import NFVCLBaseModel
+from models.vim.vim_models import VimLink, VimNetMap
 
 
 class BlueVNFD(BaseModel):
     id: str
     name: str
-    vl: Optional[List[VimLink]] = Field(default=None)
+    vl: Optional[List[VimLink]] | Optional[List[VimNetMap]] = Field(default=None)
     area_id: int = Field(default=-1)
     type: str = Field(default="")
 
@@ -19,13 +21,25 @@ class BlueVNFDs(BaseModel):
     area: List[BlueVNFD] = Field(default=[])
 
 
-class BlueVLD(BaseModel):
+class BlueVLD(NFVCLBaseModel):
     name: str
-    vim_network_name: str = Field(alias="vim-network-name")  # = Field(alias="vim-network-name")
+    vim_network_name: str = Field(alias="vim-network-name")
 
 
-class BLueDeployConfig(BaseModel):
+class BlueKDUConf(NFVCLBaseModel):
+    kdu_name: str = Field(default="")
+    k8s_namespace: Optional[str] = Field(default=None, alias="k8s-namespace")
+    additionalParams: Dict[str, Any] = Field(default={})
+
+
+class BlueVNFAdditionalParams(NFVCLBaseModel):
+    member_vnf_index: str = Field(default="", alias="member-vnf-index")
+    additionalParamsForKdu: Optional[List[BlueKDUConf]] = Field(default=None)
+
+
+class BlueDeployConfig(BaseModel):
     vld: List[BlueVLD] = Field(default=[])
+    additionalParamsForVnf: List[BlueVNFAdditionalParams] = Field(default=[])
     nsdId: str = Field(default="")
     nsName: str = Field(default="")
     nsDescription: str = Field(default="")
@@ -81,7 +95,7 @@ class BlueNSD(BaseModel):
     vim: str
     type: str
     descr: BlueDescr
-    deploy_config: BLueDeployConfig
+    deploy_config: BlueDeployConfig
     nsd_id: str = Field(default="")
     nsi_id: str = Field(default="")
     area_id: int = Field(default=-1)  # Needed in VyOS, is it really necessary?
@@ -121,7 +135,7 @@ class BlueprintBaseModel(BaseModel):
     """
     @field_validator('timestamp')
     def standardize_cid(cls, timestamp: dict):
-       
+
         if timestamp is not None:
             for key in timestamp.keys():
                 if not isinstance(timestamp[key], datetime):
@@ -131,4 +145,3 @@ class BlueprintBaseModel(BaseModel):
                         timestamp[key] = datetime.now()
         return timestamp
     """
-

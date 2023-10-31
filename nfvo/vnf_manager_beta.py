@@ -32,9 +32,11 @@ JUJU_CHARM_TYPES = [FLEX_CHARM, FLEX_CHARM2, FLEX_CHARM_VYOS]
 VNF_BASE_PATH = '/tmp/vnf_packages'
 VNF_BASE_PATH_PACKAGE = '/tmp/vnf_packages/{}_vnfd'
 
+
 class Sol006VnfdBuilderBeta:
     vnfd_model: VNFSol006Descriptor
     received_vdu_links: List[VimLink]
+    received_kdu_links: List[VimNetMap]
     type: str
 
     def __init__(self, vnf_model_data: VirtualNetworkFunctionDescriptor, hemlflexcharm: bool = False,
@@ -42,14 +44,14 @@ class Sol006VnfdBuilderBeta:
         self.cloud_init = cloud_init
         self.adapt_interfaces = adapt_interfaces
 
-        # Saving VDU links for usage in the descriptor. All vdu should have the same links soo we save the first one.
-        self.received_vdu_links = vnf_model_data.vdu[0].interface
-
         if len(vnf_model_data.vdu) > 0:
+            # Saving VDU links for usage in the descriptor. All vdu should have the same links soo we save the first one.
+            self.received_vdu_links = vnf_model_data.vdu[0].interface
             vim_net_map = next(item for item in vnf_model_data.vdu[0].interface if item.mgt)
             vnf_model_data.mgmt_cp = vim_net_map.vld
 
         elif len(vnf_model_data.kdu) > 0:
+            self.received_kdu_links = vnf_model_data.kdu[0].interface
             vim_net_map = next(item for item in vnf_model_data.kdu[0].interface if item.mgt)
             vnf_model_data.mgmt_cp = vim_net_map.vld
 
@@ -71,6 +73,11 @@ class Sol006VnfdBuilderBeta:
     def get_vnf_blue_descr_only_vdu(self) -> BlueVNFD:
         blue_vnfd = BlueVNFD.model_validate({'id': 'vnfd', 'name': self.get_id()})
         blue_vnfd.vl = self.received_vdu_links
+        return blue_vnfd
+
+    def get_vnf_blue_descr_only_kdu(self) -> BlueVNFD:
+        blue_vnfd = BlueVNFD.model_validate({'id': 'vnfd', 'name': self.get_id()})
+        blue_vnfd.vl = self.received_kdu_links
         return blue_vnfd
 
     def create_sol006_descriptor_model(self, vnf: VirtualNetworkFunctionDescriptor):
@@ -101,7 +108,7 @@ class Sol006VnfdBuilderBeta:
                     (item for item in self.vnfd_model.sw_image_desc if item['name'] == received_vdu.image), None)
                 if image_ref is None:
                     self.vnfd_model.sw_image_desc.append({'id': received_vdu.image, 'image': received_vdu.image,
-                                                         'name': received_vdu.image})
+                                                          'name': received_vdu.image})
 
                 self.vnfd_model.virtual_compute_desc.append(VirtualComputeDescr006.model_validate({
                     'id': received_vdu.id + '_compute_desc',
@@ -155,7 +162,6 @@ class Sol006VnfdBuilderBeta:
                     if kdu_interface.mgt:
                         self.vnfd_model.mgmt_cp = kdu_interface.vld
 
-
     def add_vim_monitoring(self) -> list:
         return [
             {'id': 'vdu_cpu_util', 'name': 'vdu_cpu_util', 'performance-metric': 'cpu_utilization'},
@@ -170,7 +176,8 @@ class Sol006VnfdBuilderBeta:
             {'id': 'vdu_tx_drop_pkts', 'name': 'vdu_tx_drop_pkts', 'performance-metric': 'packets_out_dropped'},
         ]
 
-    def add_vdu_cp_model(self, pdu_interface: Union[VimLink, PduInterface], vdu_id: str, define_type: bool = True) -> IntCPD:
+    def add_vdu_cp_model(self, pdu_interface: Union[VimLink, PduInterface], vdu_id: str,
+                         define_type: bool = True) -> IntCPD:
         # Mapping ex-cp to int-cp and saving it in the model
         self.vnfd_model.ext_cpd.append(ExtCPD.model_validate({
             'id': pdu_interface.vld,
@@ -234,8 +241,8 @@ class Sol006VnfdBuilderBeta:
             'name': 'config',
             'execution-environment-ref': ex_environ,
             'parameter': [{'name': 'ssh-hostname', 'value': '<rw_mgmt_ip>'},
-                       {'name': 'ssh-username', 'value': vnf_data.username},
-                       {'name': 'ssh-password', 'value': vnf_data.password}],
+                          {'name': 'ssh-username', 'value': vnf_data.username},
+                          {'name': 'ssh-password', 'value': vnf_data.password}],
             'seq': '1'
         })
         # HELM

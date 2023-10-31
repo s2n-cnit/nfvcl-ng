@@ -442,7 +442,7 @@ class BlueprintBase(abc.ABC):
             if area_vim['name'] not in vims_names:
                 vims_names.add(area_vim['name'])
                 vims.append(area_vim)
-        print('*************************************\n{}*************************************\n'.format(vims))
+        logger.debug('*************************************\n{}*************************************\n'.format(vims))
         return vims
 
     def destroy(self):

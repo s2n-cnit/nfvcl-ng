@@ -152,8 +152,7 @@ class BlueLCMworker:
             try:
                 self.process_session(s_input['session_id'], s_input['msg'], s_input['requested_operation'])
             except Exception as e:
-                logger.error(traceback.format_tb(e.__traceback__))
-                logger.error(str(e))
+                logger.exception("Exception")
                 self.blue.status = 'error'
                 self.update_db()
             # if callback then send failure
@@ -471,7 +470,7 @@ class BlueLCMworker:
             logger.debug(osm_ns)
 
             nsi_id = osm_ns['nsi_id'] if 'nsi_id' not in p else p['nsi_id']
-            
+
             r = self.osmNbiUtil.execute_primitive(nsi_id, p['primitive_data'])
 
             results.append({"result": r, "primitive": p, "time": datetime.datetime.now()})

@@ -283,8 +283,13 @@ class K8sBeta(BlueprintBaseBeta):
         else:
             created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, vm_flavor_request if vm_flavor_request else WORKERS_FLAVOR)
 
-        created_vnfd = VirtualNetworkFunctionDescriptor.build_vnfd(vnfd_id, DEFAULT_PASSWD, True, DEFAULT_USR,
-                                                                   vdu_list=[created_vdu])
+        created_vnfd = VirtualNetworkFunctionDescriptor.build_vnfd(
+            vnfd_id,
+            DEFAULT_USR,
+            DEFAULT_PASSWD,
+            True,
+            vdu_list=[created_vdu]
+        )
 
         # Build the VNF package and upload the package on OSM
         built_vnfd_package = Sol006VnfdBuilderBeta(created_vnfd, hemlflexcharm=True, cloud_init=True)

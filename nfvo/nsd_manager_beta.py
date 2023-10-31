@@ -1,7 +1,8 @@
 import copy
 from typing import List
 
-from models.blueprint.blueprint_base_model import BlueNSD, BlueDescrNsdItem, BlueVNFD, BlueVNFProfile, BlueDescrVLD
+from models.blueprint.blueprint_base_model import BlueNSD, BlueDescrNsdItem, BlueVNFD, BlueVNFProfile, BlueDescrVLD, \
+    BlueKDUConf, BlueVNFAdditionalParams, BlueDeployConfig, BlueVLD
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils import persistency
 from utils.util import get_nfvcl_config, NFVCLConfigModel
@@ -74,8 +75,7 @@ def get_vnf_ip(vnfi_list: list, ns_vld_id: str) -> list:
 class Sol006NSDBuilderBeta():
     nsd: BlueDescrNsdItem
 
-    def __init__(self, vnfds: List[BlueVNFD], vim_name: str, nsd_id: str, nsd_type: str,
-                 vl_map: List[str], knf_configs=None) -> None:
+    def __init__(self, vnfds: List[BlueVNFD], vim_name: str, nsd_id: str, nsd_type: str, vl_map: List[str], knf_configs: List[BlueKDUConf] | None = None) -> None:
         self.nsd = BlueDescrNsdItem.model_validate({
             'name': nsd_id,
             'id': nsd_id,
@@ -114,28 +114,25 @@ class Sol006NSDBuilderBeta():
                 })
             )
 
-        self.deploy_config = {'vld': []}
+        self.deploy_config = BlueDeployConfig()
         # The first one is the management one
         vl_map_copy = copy.deepcopy(vl_map)
         mgt_name = vl_map_copy.pop(0)
-        self.nsd.virtual_link_descriptor.append(
-            BlueDescrVLD.model_validate({'id': 'mgt', 'mgmt-network': True}))
-        self.deploy_config['vld'].append({'name': 'mgt', 'vim-network-name': mgt_name})
+        self.nsd.virtual_link_descriptor.append(BlueDescrVLD.model_validate({'id': 'mgt', 'mgmt-network': True}))
+        self.deploy_config.vld.append(BlueVLD(name='mgt', vim_network_name=mgt_name))
         for data_net_name in vl_map_copy:
             self.nsd.virtual_link_descriptor.append(
                 BlueDescrVLD.model_validate({'id': f'data_{data_net_name}', 'mgmt-network': False}))
-            self.deploy_config['vld'].append({'name': f'data_{data_net_name}', 'vim-network-name': data_net_name})
+            self.deploy_config.vld.append(BlueVLD(name=f'data_{data_net_name}', vim_network_name=data_net_name))
 
         self.vim = vim_name
         self.type = nsd_type
-        if knf_configs is not None and type(knf_configs) is list:
-            self.deploy_config["additionalParamsForVnf"] = []
-            for knf in knf_configs:
-                self.deploy_config["additionalParamsForVnf"].append({
-                    "member-vnf-index": "1",
-                    "additionalParamsForKdu": knf['kdu_confs']
-                })
-            logger.debug("deployment config for kdu: {}".format(self.deploy_config))
+        if knf_configs:
+            self.deploy_config.additionalParamsForVnf = []
+            for knf_config in knf_configs:
+                # TODO allow multiple vnf per ns
+                self.deploy_config.additionalParamsForVnf.append(BlueVNFAdditionalParams(member_vnf_index="1", additionalParamsForKdu=[knf_config]))
+            logger.debug("Deployment config for kdu: {}".format(self.deploy_config))
 
     def get_nsd(self) -> BlueNSD:
         res = {'status': 'day0', 'vim': self.vim, 'type': self.type, 'descr': {'nsd': {

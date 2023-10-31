@@ -1,4 +1,6 @@
 from typing import List
+
+from blueprints.blue_5g_base.blueprint_5g_base_beta import Blue5GBaseBeta
 from fastapi import APIRouter, Query, HTTPException, status
 from blueprints.blueprint_beta import BlueprintBaseBeta
 from models.blueprint.blue_events import BlueEventType
@@ -96,8 +98,6 @@ def get_blueprint_model_by_id(blueprint_id: str):
             return BlueClass(db_data['conf'], id_=str(blueprint_id))
         else:
             raise ValueError('Blueprint {} type not found in DB'.format(blueprint_id))
-
-
     except Exception:
         logger.error(traceback.format_exc())
         err_msg = 'Blue {} not found in the persistency layer'.format(blueprint_id)
@@ -139,7 +139,7 @@ def instantiate_blueprint(msg, blue_id):
                             Event(operation=BlueEventType.BLUE_CREATE.value, data={"blue_id": blue_id}))
 
         # Checking if the instance is coming from OLD or NEW blueprint base
-        if BlueClass.__bases__[0] == BlueprintBaseBeta:
+        if issubclass(BlueClass, BlueprintBaseBeta):
             # worker_queue is composed by NEW type of worker
             worker_queue = workers.set_worker(blue)
             worker_queue.put({'session_id': 0, 'msg': msg, 'requested_operation': 'init'})
@@ -164,8 +164,8 @@ def update_blueprint(msg, blue_id, requested_operation, session_id, version: Blu
 
 @blue_router.get("/", response_model=List[dict])
 async def get_blueprints(
-        type: Union[str, None] = Query(default=None, description="Filter blueprints by type"),
-        detailed: bool = Query(default=False, description="Detailed or summarized view list")
+    type: Union[str, None] = Query(default=None, description="Filter blueprints by type"),
+    detailed: bool = Query(default=False, description="Detailed or summarized view list")
 ) -> List[dict]:
     blue_filter = {}
     if type:
@@ -182,8 +182,8 @@ async def get_blueprints(
 
 @blue_router.get("/{blue_id}", response_model=dict)
 async def get_blueprint(
-        blue_id: str,
-        detailed: bool = Query(default=False, description="Detailed or summarized view list")
+    blue_id: str,
+    detailed: bool = Query(default=False, description="Detailed or summarized view list")
 ) -> dict:
     if detailed:
         res = old_workers.get_blue_detailed_summary({'id': blue_id})

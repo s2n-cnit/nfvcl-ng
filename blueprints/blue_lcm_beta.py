@@ -176,8 +176,7 @@ class BlueLCMworkerBeta:
             try:
                 self.process_session(s_input['session_id'], s_input['msg'], s_input['requested_operation'])
             except Exception as e:
-                logger.error(traceback.format_tb(e.__traceback__))
-                logger.error(str(e))
+                logger.exception("Exception")
                 self.blue.base_model.status = 'error'
                 self.blue.to_db()
             # if callback then send failure

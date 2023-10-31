@@ -16,7 +16,6 @@ nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 # The repo name must NOT contain underscores _, upper case
 HELM_REPO_NAME = "nfvcl"
 
-
 helm_router = APIRouter(
     prefix="/helm_repo",
     tags=["Helm repository"],
@@ -65,7 +64,7 @@ def create_helm_repo():
     """
     # Adding Helm repository to OSM
     r = next((item for item in nbiUtil.get_k8s_repos() if item['name'] == HELM_REPO_NAME), None)
-    logger.info('checking existing helm repo: {}'.format(r))
+    logger.info('Checking existing helm repo: {}'.format(r))
     if r is not None:
         logger.info('Deleting previous helm repository')
         nbiUtil.delete_k8s_repo(HELM_REPO_NAME)

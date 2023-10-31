@@ -196,7 +196,11 @@ class VimNetMap(BaseModel):
     name: str
     vim_net: str
     mgt: bool
-    k8s_cluster_net: str = Field(alias='k8s-cluster-net', default='data_net')
+    k8s_cluster_net: str = Field(serialization_alias='k8s-cluster-net', default='data_net')
+
+    @classmethod
+    def build_vnm(cls, vld, name, vim_net, mgt, k8s_cluster_net='data_net'):
+        return VimNetMap(vld=vld, name=name, vim_net=vim_net, mgt=mgt, k8s_cluster_net=k8s_cluster_net)
 
 
 class VMFlavors(BaseModel):
@@ -268,15 +272,29 @@ class PDUDeploymentUnit(BaseModel):
 
 class KubeDeploymentUnit(BaseModel):
     name: str
-    helm_chart: str = Field(alias='helm-chart')
-    interface: Optional[VimNetMap] = Field(default=None)
+    helm_chart: str = Field(serialization_alias='helm-chart')
+    interface: Optional[List[VimNetMap]] = Field(default=None)
+
+    @classmethod
+    def build_kdu(cls, name, helm_chart, interface: Optional[List[VimNetMap]] = None):
+        """
+
+        Args:
+            name: KDU name
+            helm_chart: Helm chart, must be on a repository added on OSM
+            interface: TODO ?
+
+        Returns:
+
+        """
+        return KubeDeploymentUnit(name=name, helm_chart=helm_chart, interface=interface)
 
 
 class VirtualNetworkFunctionDescriptor(BaseModel):
     id: str
     name: str
     username: str = Field(default="root")
-    password: str
+    password: str = Field(default="root")
     vdu: Optional[List[VirtualDeploymentUnit]] = Field(default=[])
     pdu: Optional[List[PDUDeploymentUnit]] = Field(default=[])
     kdu: Optional[List[KubeDeploymentUnit]] = Field(default=[])
@@ -284,7 +302,11 @@ class VirtualNetworkFunctionDescriptor(BaseModel):
     cloud_init: Optional[bool] = Field(default=None)
 
     @classmethod
-    def build_vnfd(cls, vnf_id: str, vnf_passwd: str, cloud_init: bool, vnf_username: str = None,
+    def build_vnfd(cls,
+                   vnf_id: str,
+                   vnf_username: str = "root",
+                   vnf_passwd: str = "root",
+                   cloud_init: bool = False,
                    vdu_list: List[VirtualDeploymentUnit] = None,
                    pdu_list: List[PDUDeploymentUnit] = None,
                    kdu_list: List[KubeDeploymentUnit] = None):
@@ -292,7 +314,7 @@ class VirtualNetworkFunctionDescriptor(BaseModel):
             'id': vnf_id,
             'name': vnf_id,
             'password': vnf_passwd,
-            'username': vnf_username if vnf_username is not None else "root",
+            'username': vnf_username,
         })
         vnfd.vdu = vdu_list if vdu_list is not None else []
         vnfd.pdu = pdu_list if pdu_list is not None else []

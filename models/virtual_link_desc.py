@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from models.base_model import NFVCLBaseModel
 
 
-class VirtLinkDescr(BaseModel):
+class VirtLinkDescr(NFVCLBaseModel):
     nsd_id: str = Field(default="")
     ns_vld_id: str
     vnfi_id: str

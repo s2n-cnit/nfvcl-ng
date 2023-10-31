@@ -1,6 +1,9 @@
 from enum import Enum
 from typing import List
-from pydantic import Field, BaseModel, field_validator
+
+from pydantic import Field, field_validator
+
+from models.base_model import NFVCLBaseModel
 from models.k8s.common_k8s_model import LBPool
 
 
@@ -28,7 +31,7 @@ class K8sPluginType(str, Enum):
     GENERIC = 'generic'
 
 
-class K8sPluginLabel(BaseModel):
+class K8sPluginLabel(NFVCLBaseModel):
     """
     Describe a K8s object used to recognized installed plugins on cluster.
     Tha label and values are used to identify a resource in a namespace with a certain name.
@@ -39,7 +42,7 @@ class K8sPluginLabel(BaseModel):
     value: str
 
 
-class K8sPlugin(BaseModel):
+class K8sPlugin(NFVCLBaseModel):
     """
     Plugin representation
     """
@@ -54,7 +57,7 @@ class K8sPlugin(BaseModel):
                                                                       "is correctly installed on the cluster.")
 
 
-class K8sTemplateFillData(BaseModel):
+class K8sTemplateFillData(NFVCLBaseModel):
     """
     Model that represent data to be used for filling the plugin template files.
     CIDR is used by flannel and calico.
@@ -78,7 +81,7 @@ class K8sTemplateFillData(BaseModel):
             return pool_list
 
 
-class K8sPluginsToInstall(BaseModel):
+class K8sPluginsToInstall(NFVCLBaseModel):
     """
     Model used to represent a list of plugins to be installed with specific parameters needed by the plugins.
     """

@@ -1,25 +1,26 @@
 from typing import List, Optional, Literal, Dict
-from pydantic import BaseModel, Field
+from pydantic import Field
+from models.base_model import NFVCLBaseModel
 from models.k8s.common_k8s_model import LBPool, Cni
 from models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from models.virtual_link_desc import VirtLinkDescr
 from models.vim.vim_models import VMFlavors
 
 
-class K8sNetworkEndpoints(BaseModel):
+class K8sNetworkEndpoints(NFVCLBaseModel):
     mgt: str = Field(
         ..., description='name of the topology network to be used for management'
     )
     data_nets: List[LBPool] = Field(description='topology networks to be used by the load balancer', min_items=1)
 
 
-class K8sNsdInterfaceDesc(BaseModel):
+class K8sNsdInterfaceDesc(NFVCLBaseModel):
     nsd_id: str
     nsd_name: str
     vld: List[VirtLinkDescr]
 
 
-class K8sAreaInfo(BaseModel):
+class K8sAreaInfo(NFVCLBaseModel):
     id: int
     core: Optional[bool] = False
     workers_replica: int
@@ -28,7 +29,7 @@ class K8sAreaInfo(BaseModel):
     worker_data_int: Dict[str, K8sNsdInterfaceDesc] = Field(default={})
 
 
-class K8sConfig(BaseModel):
+class K8sConfig(NFVCLBaseModel):
     version: K8sVersion = Field(default=K8sVersion.V1_24)
     cni: Cni = Field(default=Cni.flannel)
     linkerd: dict = Field(default={})
@@ -46,7 +47,7 @@ class K8sConfig(BaseModel):
         use_enum_values = True
 
 
-class K8sBlueprintCreate(BaseModel):
+class K8sBlueprintCreate(NFVCLBaseModel):
     type: Literal['K8s', 'K8sBeta']
     callbackURL: Optional[str] = Field(
         None,
@@ -93,7 +94,7 @@ class K8sBlueprintModel(K8sBlueprintCreate):
         return k8s_data
 
 
-class K8sBlueprintScale(BaseModel):
+class K8sBlueprintScale(NFVCLBaseModel):
     callbackURL: Optional[str] = Field(
         None,
         description='URL that will be used to notify when the blueprint processing finishes',

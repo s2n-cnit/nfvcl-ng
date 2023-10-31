@@ -1,6 +1,9 @@
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+
+from pydantic import Field
+
+from models.base_model import NFVCLBaseModel
 
 
 class Cni(Enum):
@@ -13,7 +16,7 @@ class LbType(Enum):
     layer3 = 'layer3'
 
 
-class LBPool(BaseModel):
+class LBPool(NFVCLBaseModel):
     mode: LbType = Field(
         'layer2', description='Operating mode of Metal-LB. Default Layer-2.'
     )

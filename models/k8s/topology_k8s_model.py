@@ -1,6 +1,9 @@
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field
+
+from pydantic import Field
+
+from models.base_model import NFVCLBaseModel
 from models.k8s.plugin_k8s_model import K8sOperationType
 
 
@@ -42,7 +45,7 @@ class K8sVersion(str, Enum):
         return float(this_version) < float(other_version)
 
 
-class K8sModel(BaseModel):
+class K8sModel(NFVCLBaseModel):
     name: str = Field(title="Name of k8s cluster. It must be unique for each k8s cluster")
     provided_by: str
     blueprint_ref: str = Field(default="", title="Reference blueprint, empty if k8s cluster is external")
@@ -65,7 +68,7 @@ class K8sModel(BaseModel):
         return False
 
 
-class K8sModelCreateFromBlueprint(BaseModel):
+class K8sModelCreateFromBlueprint(NFVCLBaseModel):
     """
     Model used to insert an existing k8s cluster, created with the NFVCL blueprint, into the topology.
     """
@@ -74,7 +77,7 @@ class K8sModelCreateFromBlueprint(BaseModel):
     blueprint_ref: str = Field(description="The ID of the k8s blueprint")
 
 
-class K8sModelManagement(BaseModel):
+class K8sModelManagement(NFVCLBaseModel):
     """
     Model to support message exchange from NFVCL core and K8S management (through Redis sub/pub)
     """
@@ -84,7 +87,7 @@ class K8sModelManagement(BaseModel):
     options: dict = Field(default={}, description="Hold optional parameters for k8s management")
 
 
-class K8sQuota(BaseModel):
+class K8sQuota(NFVCLBaseModel):
     """
     Model used to add a quota reservation (for resources) to a namespace.
     """

@@ -8,7 +8,7 @@ from models.base_model import NFVCLBaseModel
 from models.vim.vim_models import VimLink, VimNetMap
 
 
-class BlueVNFD(BaseModel):
+class BlueVNFD(NFVCLBaseModel):
     id: str
     name: str
     vl: Optional[List[VimLink]] | Optional[List[VimNetMap]] = Field(default=None)
@@ -16,7 +16,7 @@ class BlueVNFD(BaseModel):
     type: str = Field(default="")
 
 
-class BlueVNFDs(BaseModel):
+class BlueVNFDs(NFVCLBaseModel):
     core: List[BlueVNFD] = Field(default=[])
     area: List[BlueVNFD] = Field(default=[])
 
@@ -37,7 +37,7 @@ class BlueVNFAdditionalParams(NFVCLBaseModel):
     additionalParamsForKdu: Optional[List[BlueKDUConf]] = Field(default=None)
 
 
-class BlueDeployConfig(BaseModel):
+class BlueDeployConfig(NFVCLBaseModel):
     vld: List[BlueVLD] = Field(default=[])
     additionalParamsForVnf: List[BlueVNFAdditionalParams] = Field(default=[])
     nsdId: str = Field(default="")
@@ -46,33 +46,33 @@ class BlueDeployConfig(BaseModel):
     vimAccountId: str = Field(default="")
 
 
-class BlueDescrVLD(BaseModel):
+class BlueDescrVLD(NFVCLBaseModel):
     id: str
     mgmt_network: bool = Field(alias="mgmt-network")
 
 
-class ConstituentCpdId(BaseModel):
+class ConstituentCpdId(NFVCLBaseModel):
     constituent_cpd_id: str = Field(alias="constituent-cpd-id")
     constituent_base_element_id: str = Field(alias="constituent-base-element-id")
 
 
-class VirtualLinkConnect(BaseModel):
+class VirtualLinkConnect(NFVCLBaseModel):
     constituent_cpd_id: List[ConstituentCpdId] = Field(alias="constituent-cpd-id")
     virtual_link_profile_id: str = Field(alias="virtual-link-profile-id")
 
 
-class BlueVNFProfile(BaseModel):
+class BlueVNFProfile(NFVCLBaseModel):
     id: str
     vnfd_id: str = Field(alias="vnfd-id")
     virtual_link_connectivity: List[VirtualLinkConnect] = Field(alias="virtual-link-connectivity")
 
 
-class BlueDF(BaseModel):
+class BlueDF(NFVCLBaseModel):
     id: str
     vnf_profile: List[BlueVNFProfile] = Field(alias="vnf-profile")
 
 
-class BlueDescrNsdItem(BaseModel):
+class BlueDescrNsdItem(NFVCLBaseModel):
     name: str
     id: str
     description: str
@@ -82,15 +82,15 @@ class BlueDescrNsdItem(BaseModel):
     vnfd_id: List[str] = Field(alias="vnfd-id")
 
 
-class BlueDescrNsd(BaseModel):
+class BlueDescrNsd(NFVCLBaseModel):
     nsd: List[BlueDescrNsdItem]
 
 
-class BlueDescr(BaseModel):
+class BlueDescr(NFVCLBaseModel):
     nsd: BlueDescrNsd
 
 
-class BlueNSD(BaseModel):
+class BlueNSD(NFVCLBaseModel):
     status: str
     vim: str
     type: str
@@ -107,7 +107,7 @@ class BlueprintVersion(str, Enum):
     ver2_00: str = '2.00'
 
 
-class BlueprintBaseModel(BaseModel):
+class BlueprintBaseModel(NFVCLBaseModel):
     id: str
     version: BlueprintVersion = Field(default=BlueprintVersion.ver1_00.value)
     conf: dict

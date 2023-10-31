@@ -1,68 +1,71 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field, field_serializer
+
+from pydantic import Field, field_serializer
+
+from models.base_model import NFVCLBaseModel
 from models.charm_models import LCMOperationConfig
 from models.network import PduInterface
 
 
-class VirtualComputeDescr006(BaseModel):
+class VirtualComputeDescr006(NFVCLBaseModel):
     id: str
     virtual_cpu: dict = Field(alias='virtual-cpu')
     virtual_memory: dict = Field(alias='virtual-memory')
 
 
-class VirtualStorageDescr006(BaseModel):
+class VirtualStorageDescr006(NFVCLBaseModel):
     id: str
     size_of_storage: int = Field(alias="size-of-storage")
 
 
-class VDULevel(BaseModel):
+class VDULevel(NFVCLBaseModel):
     vdu_id: str = Field(alias='vdu-id')
     number_of_instances: int = Field(alias='number-of-instances')
 
 
-class VDUProfile(BaseModel):
+class VDUProfile(NFVCLBaseModel):
     id: str
     min_number_of_instances: int = Field(alias='min-number-of-instances')
 
 
-class InstantiationLevel(BaseModel):
+class InstantiationLevel(NFVCLBaseModel):
     id: str = Field(default='default-instantiation-level')
     vdu_level: List[VDULevel] = Field(alias='vdu-level', default=[])
 
 
-class DF(BaseModel):
+class DF(NFVCLBaseModel):
     id: str = Field(default="default-df")
     instantiation_level: List[InstantiationLevel] = Field(alias='instantiation-level', default=[InstantiationLevel()])
     vdu_profile: List[VDUProfile] = Field(alias='vdu-profile', default=[])
     lcm_operations_configuration: Optional[LCMOperationConfig] = Field(alias='lcm-operations-configuration', default=None)
 
 
-class KDU(BaseModel):
+class KDU(NFVCLBaseModel):
     name: str
     helm_chart: str = Field(alias='helm-chart')
 
 
-class KDUnet(BaseModel):
+class KDUnet(NFVCLBaseModel):
     id: str
 
 
-class KDUcluster(BaseModel):
+class KDUcluster(NFVCLBaseModel):
     nets: List[dict] = Field(default=[])
 
 
-class ExtCPD(BaseModel):
+class ExtCPD(NFVCLBaseModel):
     id: str
     int_cpd: Optional[dict] = Field(default=None, alias='int-cpd')
     k8s_cluster_net: Optional[str] = Field(default=None, alias='k8s-cluster-net')
 
 
-class IntCPD(BaseModel):
+class IntCPD(NFVCLBaseModel):
     id: str
     virtual_network_interface_requirement: List[dict] = Field(alias='virtual-network-interface-requirement')
     port_security_enabled: Optional[bool] = Field(default=False, alias='port-security-enabled')
 
 
-class VDUSol006Descriptor(BaseModel):
+class VDUSol006Descriptor(NFVCLBaseModel):
     id: str
     name: str
     int_cpd: List[IntCPD] = Field(alias='int-cpd')
@@ -74,7 +77,7 @@ class VDUSol006Descriptor(BaseModel):
     cloud_init_file: Optional[str] = Field(default=None, alias='cloud-init-file')
 
 
-class VNFSol006Descriptor(BaseModel):
+class VNFSol006Descriptor(NFVCLBaseModel):
     """
     VNFD SOL006 compliant descriptor
     """
@@ -121,7 +124,7 @@ class VNFSol006Descriptor(BaseModel):
 
 
 
-class PDUSol006Model(BaseModel):
+class PDUSol006Model(NFVCLBaseModel):
     name: str
     type: str
     shared: bool = Field(default=True)

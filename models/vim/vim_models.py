@@ -1,7 +1,9 @@
 from enum import Enum
 from logging import Logger
 from typing import List, Optional
-from pydantic import BaseModel, Field, field_validator, field_serializer
+from pydantic import Field, field_validator, field_serializer
+
+from models.base_model import NFVCLBaseModel
 from utils.log import create_logger
 
 logger: Logger = create_logger('Vim model')
@@ -11,9 +13,9 @@ class VimTypeEnum(str, Enum):
     openstack: str = 'openstack'
 
 
-class VimModel(BaseModel):
-    class VimConfigModel(BaseModel):
-        # class VimAdditionalProperties(BaseModel):
+class VimModel(NFVCLBaseModel):
+    class VimConfigModel(NFVCLBaseModel):
+        # class VimAdditionalProperties(NFVCLBaseModel):
         insecure: bool = True
         APIversion: str = 'v3.3'
         use_floating_ip: bool = False
@@ -154,7 +156,7 @@ class VimModel(BaseModel):
             return router_name
 
 
-class UpdateVimModel(BaseModel):
+class UpdateVimModel(NFVCLBaseModel):
     name: str
     networks_to_add: List[str] = Field(
         [],
@@ -182,7 +184,7 @@ class UpdateVimModel(BaseModel):
     )
 
 
-class VimLink(BaseModel):
+class VimLink(NFVCLBaseModel):
     # TODO aggregate with PduInterface??? They are very similar models
     vld: str
     name: str
@@ -191,22 +193,22 @@ class VimLink(BaseModel):
     port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
 
 
-class VimNetMap(BaseModel):
+class VimNetMap(NFVCLBaseModel):
     vld: str
     name: str
     vim_net: str
     mgt: bool
-    k8s_cluster_net: str = Field(serialization_alias='k8s-cluster-net', default='data_net')
+    k8s_cluster_net: str = Field(alias='k8s-cluster-net', default='data_net')
 
     @classmethod
     def build_vnm(cls, vld, name, vim_net, mgt, k8s_cluster_net='data_net'):
         return VimNetMap(vld=vld, name=name, vim_net=vim_net, mgt=mgt, k8s_cluster_net=k8s_cluster_net)
 
 
-class VMFlavors(BaseModel):
-    memory_mb: str = Field(default="8192", serialization_alias='memory-mb', description="Should be a multiple of 1024")
-    storage_gb: str = Field(default="32", serialization_alias='storage-gb')
-    vcpu_count: str = Field(default="4", serialization_alias='vcpu-count')
+class VMFlavors(NFVCLBaseModel):
+    memory_mb: str = Field(default="8192", alias='memory-mb', description="Should be a multiple of 1024")
+    storage_gb: str = Field(default="32", alias='storage-gb')
+    vcpu_count: str = Field(default="4", alias='vcpu-count')
 
     @field_validator('memory_mb', 'storage_gb', 'vcpu_count', mode='before')
     @classmethod
@@ -220,13 +222,13 @@ class VMFlavors(BaseModel):
             raise ValueError("VMFlavors -> input value is not a string neither an int.")
 
 
-class VirtualDeploymentUnit(BaseModel):
+class VirtualDeploymentUnit(NFVCLBaseModel):
     count: int = Field(default=1)
     id: str
     image: str
-    vm_flavor: VMFlavors = Field(default=VMFlavors(), serialization_alias="vm-flavor")
+    vm_flavor: VMFlavors = Field(default=VMFlavors(), alias="vm-flavor")
     interface: List[VimLink] = Field(default=[])
-    vim_monitoring: bool = Field(default=True, serialization_alias="vim-monitoring")
+    vim_monitoring: bool = Field(default=True, alias="vim-monitoring")
 
     @classmethod
     def build_vdu(cls, vdu_id, vdu_image, vdu_data_int_list: List[str], vdu_flavor: VMFlavors = VMFlavors()):
@@ -264,15 +266,15 @@ class VirtualDeploymentUnit(BaseModel):
         return VirtualDeploymentUnit(id=vdu_id, image=vdu_image, vm_flavor=vdu_flavor, interface=interfaces)
 
 
-class PDUDeploymentUnit(BaseModel):
+class PDUDeploymentUnit(NFVCLBaseModel):
     count: int = Field(default=1)
     id: str
     interface: dict  # Should correspond to PduInterface in net models
 
 
-class KubeDeploymentUnit(BaseModel):
+class KubeDeploymentUnit(NFVCLBaseModel):
     name: str
-    helm_chart: str = Field(serialization_alias='helm-chart')
+    helm_chart: str = Field(alias='helm-chart')
     interface: Optional[List[VimNetMap]] = Field(default=None)
 
     @classmethod
@@ -290,7 +292,7 @@ class KubeDeploymentUnit(BaseModel):
         return KubeDeploymentUnit(name=name, helm_chart=helm_chart, interface=interface)
 
 
-class VirtualNetworkFunctionDescriptor(BaseModel):
+class VirtualNetworkFunctionDescriptor(NFVCLBaseModel):
     id: str
     name: str
     username: str = Field(default="root")

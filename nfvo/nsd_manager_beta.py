@@ -1,12 +1,15 @@
 import copy
 from typing import List
 
+from pydantic import TypeAdapter
+
 from models.blueprint.blueprint_base_model import BlueNSD, BlueDescrNsdItem, BlueVNFD, BlueVNFProfile, BlueDescrVLD, \
     BlueKDUConf, BlueVNFAdditionalParams, BlueDeployConfig, BlueVLD
+from models.k8s.k8s_objects import K8sService
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils import persistency
-from utils.util import get_nfvcl_config, NFVCLConfigModel
 from utils.log import create_logger
+from utils.util import get_nfvcl_config, NFVCLConfigModel
 
 sol006 = True
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
@@ -41,8 +44,8 @@ def get_ns_vld_ip(ns_id: str, ns_vlds: list) -> dict:
     return res
 
 
-def get_kdu_services(ns_id: str, kdu_name: str) -> list:
-    return nbiUtil.get_kdu_ips(ns_id, kdu_name)
+def get_kdu_services(ns_id: str, kdu_name: str) -> List[K8sService]:
+    return TypeAdapter(List[K8sService]).validate_python(nbiUtil.get_kdu_services(ns_id, kdu_name))
 
 
 def get_vnf_ip(vnfi_list: list, ns_vld_id: str) -> list:

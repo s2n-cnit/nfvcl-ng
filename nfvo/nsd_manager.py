@@ -36,7 +36,7 @@ def get_ns_vld_ip(ns_id: str, ns_vlds: list) -> dict:
     return res
 
 def get_kdu_services(ns_id: str, kdu_name: str) -> list:
-    return nbiUtil.get_kdu_ips(ns_id, kdu_name)
+    return nbiUtil.get_kdu_services(ns_id, kdu_name)
 
 def get_vnf_ip(vnfi_list: list, ns_vld_id: str) -> list:
     addr_list = []

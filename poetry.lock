@@ -2095,6 +2095,17 @@ h11 = ">=0.8"
 standard = ["colorama (>=0.4)", "httptools (>=0.5.0)", "python-dotenv (>=0.13)", "pyyaml (>=5.1)", "uvloop (>=0.14.0,!=0.15.0,!=0.15.1)", "watchfiles (>=0.13)", "websockets (>=10.4)"]
 
 [[package]]
+name = "verboselogs"
+version = "1.7"
+description = "Verbose logging level for Python's logging module"
+optional = false
+python-versions = "*"
+files = [
+    {file = "verboselogs-1.7-py2.py3-none-any.whl", hash = "sha256:d63f23bf568295b95d3530c6864a0b580cec70e7ff974177dead1e4ffbc6ff49"},
+    {file = "verboselogs-1.7.tar.gz", hash = "sha256:e33ddedcdfdafcb3a174701150430b11b46ceb64c2a9a26198c76a156568e427"},
+]
+
+[[package]]
 name = "wcwidth"
 version = "0.2.8"
 description = "Measures the displayed width of unicode strings in a terminal"
@@ -2223,4 +2234,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "497732cd1a0b48275acac354546cd1eb6504d57aeda7b022b4b3760cded8b5cd"
+content-hash = "9a871e1497ecfc50188000de07fed54155606862ca27136d370f4cc7a1c5fc01"

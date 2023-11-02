@@ -23,6 +23,7 @@ requests = "^2.31.0"
 python-neutronclient = "^11.0.0"
 coloredlogs = "^15.0.1"
 colorama = "^0.4.6"
+verboselogs = "^1.7"
 
 
 [build-system]

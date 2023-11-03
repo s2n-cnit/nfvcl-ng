@@ -689,7 +689,7 @@ class NbiUtil:
             logger.error("k8s repository creation error: {}".format(result.reason))
             return False
 
-    def get_kdu_ips(self, nsi, kdu_name):
+    def get_kdu_services(self, nsi, kdu_name):
         vnfi_list = self.get_vnfi_list(nsi)
         for v in vnfi_list:
             vnf_detail = self.get_vnfi_detail(v['id'])

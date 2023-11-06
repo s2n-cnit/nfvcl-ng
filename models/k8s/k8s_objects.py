@@ -42,7 +42,7 @@ class K8sService(NFVCLBaseModel):
     type: K8sServiceType = Field()
     name: str = Field()
     cluster_ip: Optional[str] = Field(default=None)
-    external_ip: Optional[str] = Field(default=None)
+    external_ip: Optional[List[str]] = Field(default=None)
     ports: List[K8sServicePort] = Field(default=[])
 
     @field_validator('cluster_ip', 'external_ip')

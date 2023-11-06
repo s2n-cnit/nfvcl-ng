@@ -35,7 +35,7 @@ class AreaType(Enum):
 
 WORKERS_FLAVOR: VMFlavors = VMFlavors(vcpu_count='4', memory_mb='8192', storage_gb='32')
 CONTROLLER_FLAVOR: VMFlavors = VMFlavors(vcpu_count='4', memory_mb='4096', storage_gb='16')
-VDU_IMAGE = 'ubuntu2204-March-23'
+VDU_IMAGE = 'ubuntu2204'
 DEFAULT_USR = 'root'
 DEFAULT_PASSWD = 'root'
 

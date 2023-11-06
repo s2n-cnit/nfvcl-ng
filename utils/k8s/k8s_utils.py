@@ -7,7 +7,7 @@ from typing import List
 import kubernetes.client
 import kubernetes.utils
 from kubernetes import config
-from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, V1DaemonSet, VersionInfo, V1ConfigMap, \
+from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, VersionInfo, V1ConfigMap, \
     V1Namespace, V1ObjectMeta, V1alpha1ClusterCIDRList
 from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError

@@ -1,0 +1,16 @@
+{
+  "images": [
+    {
+      "name": "ubuntu2204",
+      "url": "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64-disk-kvm.img"
+    },
+    {
+      "name": "ubuntu2004",
+      "url": "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64-disk-kvm.img"
+    },
+    {
+      "name": "ubuntu1804",
+      "url": "https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img"
+    }
+  ]
+}

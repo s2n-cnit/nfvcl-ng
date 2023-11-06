@@ -38,13 +38,13 @@ class LCMWorkersBeta:
         self.db = persistency.DB()
         self.redis_cli = get_redis_instance()
 
-    def set_worker(self, blue: BlueprintBase) -> queue.Queue:
+    def set_worker(self, blue: BlueprintBaseBeta) -> queue.Queue:
         self.worker_queue[blue.get_id()] = queue.Queue()
         blue.set_topology_lock(self.topology_lock)
         self.start_worker(blue)
         return self.worker_queue[blue.get_id()]
 
-    def start_worker(self, blue: BlueprintBase):
+    def start_worker(self, blue: BlueprintBaseBeta):
         thread = threading.Thread(target=BlueLCMworkerBeta, name=blue.get_id(),
                                   args=(self.worker_queue[blue.get_id()], blue, [],))
         thread.daemon = True

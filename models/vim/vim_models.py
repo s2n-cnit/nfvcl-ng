@@ -42,6 +42,16 @@ class VimModel(NFVCLBaseModel):
             return self.name == other.name
         return False
 
+    @field_validator("name")
+    @classmethod
+    def validate_lb_pools(cls, name: str) -> str:
+        # Removing uppercase
+        new_name = name.lower()
+        # Replacing - with _
+        new_name = new_name.replace("-","_")
+
+        return new_name
+
     def add_net(self, net: str):
         """
         Add a network to the VIM

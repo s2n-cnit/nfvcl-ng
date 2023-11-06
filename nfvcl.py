@@ -22,6 +22,7 @@ from rest_endpoints.k8s import k8s_router
 from rest_endpoints.helm import helm_router
 from fastapi.staticfiles import StaticFiles
 from rest_endpoints.osm_rest import osm_router
+from rest_endpoints.openstack import openstack_router
 
 app = FastAPI(
     title="NFVCL",
@@ -43,6 +44,7 @@ app.include_router(day2_router)
 app.include_router(k8s_router)
 app.include_router(helm_router)
 app.include_router(osm_router)
+app.include_router(openstack_router)
 
 day2_files = "day2_files"
 

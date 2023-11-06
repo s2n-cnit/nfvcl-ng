@@ -143,7 +143,10 @@ def render_file_from_template(path: str, render_dict: dict, prefix_to_name: str 
     template = env.get_template(filename)
     data = template.render(confvar=render_dict)
 
-    new_name = prefix_to_name + '_' + filename
+    if prefix_to_name == "":
+        new_name = filename
+    else:
+        new_name = prefix_to_name + '_' + filename
 
     with open('day2_files/' + new_name, 'w') as file:
         file.write(data)

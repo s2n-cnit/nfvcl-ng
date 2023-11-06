@@ -164,6 +164,13 @@ class Topology:
         trigger_event(TopologyEventType.TOPO_DELETE, deleted_topology.model_dump())
 
     # **************************** VIMs ****************************
+    def list_vims(self) -> List[VimModel]:
+        """
+        Return a list of VIMs belonging to topology.
+        """
+        return self._model.get_vims()
+
+
     def get_vim(self, vim_name: str) -> VimModel:
         """
         Return a vim, given the name

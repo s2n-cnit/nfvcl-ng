@@ -24,6 +24,7 @@ Usually we install NFVCL, Redis, MongoDB and OSM on the same machine, but throgh
 In this guide they will be installed on the same location.
 
 ## Requirements
+ - An OpenStack instance (you can use all-in-one installation [here](https://docs.openstack.org/devstack/rocky/guides/single-machine.html))
  - An Ubuntu (22.04 LTS) instance where the NFVCL will be installed and run.
  - Having OSM 14 running on a reachable machine, in the following installation procedure,
    all the services will be installed on the same Ubuntu instance.
@@ -86,9 +87,17 @@ Once configuration is done you can run the NFVCL in the background using **scree
 screen -S nfvcl
 poetry run python ./run.py
 ```
-> To deatach from screen press **CTRL+a** then **d**.
+> :warning: To deatach from screen press **CTRL+a** then **d**.
 > To resume the screen run `screen -r nfvcl`.
-{.is-info}
+
+## Usage
+To interact with the NFVCL you must use REST APIs, a full list is available at:
+`http://NFVCL_IP:5002/docs`
+
+> :warning: Before you begin you will need to define the topology using the appropriate APIs.
+
+You can find request examples in the [wiki](https://github.com/s2n-cnit/nfvcl-ng/wiki)
+
 
 ## Debug
 The NFVCL main output is contained in the **console output**, but additionally it is possible to observe it's output in:
@@ -104,8 +113,8 @@ In order to attach at the NFVCL output it is required to have the Redis IP and p
 
 
 You can use the following Python script as example:
-> Change the IP and Redis port!!!
 
+> :warning: **Change the IP and Redis port!!!**
 
 ```python
 import redis

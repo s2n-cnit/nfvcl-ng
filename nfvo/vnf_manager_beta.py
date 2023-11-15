@@ -212,6 +212,7 @@ class Sol006VnfdBuilderBeta:
             'debug': True,
             'ssh_pwauth': True,
             'password': vnf_data.password,
+            'manage_etc_hosts': True,  # Add the instance hostname to the /etc/hosts file, this fixes 'sudo' slowness
             'disable_root': False,
             'chpasswd': {
                 'list': [vnf_data.username + ":" + vnf_data.password],

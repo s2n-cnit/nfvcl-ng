@@ -7,11 +7,7 @@ import abc
 from models.blueprint.blueprint_base_model import BlueprintBaseModel, BlueNSD, BlueprintVersion
 from models.blueprint.common import BlueEnablePrometheus
 from models.blueprint.rest_blue import BlueGetDataModel, ShortBlueModel
-from models.k8s.topology_k8s_model import K8sModel
-from models.k8s.blueprint_k8s_model import LBPool
 from models.network import NetworkModel, PduModel
-from models.network.network_models import IPv4ReservedRange
-from models.vim import VimModel
 from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
 from models.blueprint.blue_types import blueprint_types
@@ -352,7 +348,7 @@ class BlueprintBaseBeta(abc.ABC):
     def topology_get_pdu_by_area(self, area_id: int) -> PduModel:
         """
         Retrieve the FIRST PDU from the topology by area
-        
+
         Args:
             area_id: the area in witch the function is looking for the PDU
         """
@@ -366,7 +362,7 @@ class BlueprintBaseBeta(abc.ABC):
 
         Args:
             area_id: the area in witch the function is looking for the PDU
-            
+
             pdu_type: the type of the PDU
         """
         topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
@@ -495,11 +491,11 @@ class BlueprintBaseBeta(abc.ABC):
     def updateVnfdNames(vnfd_names, nsd_):
         """
         Updates names of VNFD in blueprint NSDs.
-        
+
         Args:
-            vnfd_names: a List of dictionaries containing 'id' and 'name' values. The 'name' is used to update a VNFD 
+            vnfd_names: a List of dictionaries containing 'id' and 'name' values. The 'name' is used to update a VNFD
             when 'id' is mathing one of the VNFD.
-            
+
             nsd_: the LIST of network service descriptors in witch the VNFDs are updated.
 
         Returns:

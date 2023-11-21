@@ -1,17 +1,4 @@
-# Main file to run NFVCL
-from logging import Logger
-
-import uvicorn
-import sys
 from pathlib import Path
-from models.config_model import NFVCLConfigModel
-from utils.util import get_nfvcl_config
-from utils.log import create_logger
-
-logger: Logger
-PY_MIN_MAJOR = 3
-PY_MIN_MINOR = 11
-
 
 def check_folders():
     """
@@ -21,6 +8,18 @@ def check_folders():
     Path("day2_files").mkdir(parents=True, exist_ok=True)
     Path("logs").mkdir(parents=True, exist_ok=True)
 
+check_folders()
+# Main file to run NFVCL
+from logging import Logger
+import uvicorn
+import sys
+from models.config_model import NFVCLConfigModel
+from utils.util import get_nfvcl_config
+from utils.log import create_logger
+
+logger: Logger
+PY_MIN_MAJOR = 3
+PY_MIN_MINOR = 11
 
 def check_ip() -> NFVCLConfigModel:
     """
@@ -47,7 +46,6 @@ def check_py_version():
 
 
 if __name__ == "__main__":
-    check_folders()
     # Logger must be created after folders!!!
     logger = create_logger("RUN")
     check_py_version()

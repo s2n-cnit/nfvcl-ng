@@ -51,7 +51,7 @@ The OSM installation is automatic, it's sufficient to run a shell script. It tak
 1. Start osm installation
 ``` bash
 chmod +x install_osm.sh
-./install_osm.sh
+./install_osm.sh -y
 ```
 From OSM 14 on, we will need to execute also the following instruction
 ``` bash
@@ -68,14 +68,47 @@ Enter NFVCL folder and run setup.sh, this script will:
 - Build and upload the VNFM image to local registry
 - Install dependencies using Poetry
 ``` 
-cd nfvcl-ng-private
+cd nfvcl-ng
 chmod +x ./setup.sh
 ./setup.sh
 ```
 
 ### Step 3 - Configure NFVCL, Redis and MongoDB
-The last step is the NFVCL configuration, in production it is raccomanded to change values in **config.yaml**, while, for developing you can create a copy of the default configuration and call it **config_dev.yaml**. When the NFVCL starts, it loads the cofiguration from *config_dev.yaml* if present, otherwise the configuration is loaded from the default file.
+The last step is the NFVCL configuration, in production it is raccomanded to change values in **config.yaml**, while, for developing you can create a copy of the default configuration and call it **config_dev.yaml**. 
+When the NFVCL starts, it loads the cofiguration from *config_dev.yaml* if present, otherwise the configuration is loaded from the default file.
 
+```bash
+nano config.yaml
+```
+```
+{
+  'log_level': 20, # 10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0
+  'nfvcl': {
+    'port': 5002,
+    'ip': 'X.Y.Z.K' !!! Must be changed !!!
+  },
+  'osm': {
+    'host': '127.0.0.1',
+    'port': '9999',
+    'username':'admin',
+    'password':'admin',
+    'project': 'admin',
+    'version': 12
+  },
+  'mongodb': {
+    'host': '127.0.0.1',
+    'port': 27017,
+    'db': 'nfvcl'
+  },
+  'prometheus': [],
+  'redis': {
+    'host': '127.0.0.1',
+    'port': 6379
+  }
+  
+  ...
+}
+```
 
 The NFVCL's **IP** must concide with the one of the machine on witch it is installed and running.
 OSM and Redis **IPs** sould be 127.0.0.1 if they are running on the same machine of NFVCL.

@@ -8,7 +8,7 @@ from blueprints.blue_sdcore import sdcore_default_config
 from blueprints.blue_sdcore.configurators.sdcore_upf_configurator import ConfiguratorSDCoreUpf, \
     ConfiguratorSDCoreUPFVars
 from blueprints.blue_sdcore.sdcore_models import BlueSDCoreCreateModel
-from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml
+from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml, SDCoreValuesModel
 from models.base_model import NFVCLBaseModel
 from models.blueprint.blueprint_base_model import BlueKDUConf, BlueVNFD, BlueNSD
 from models.blueprint.rest_blue import BlueGetDataModel
@@ -50,6 +50,7 @@ class BlueSDCoreModel(BlueSDCoreCreateModel):
     upf_mgt_ip: Optional[str] = Field(default=None)
     upf_data_ip: Optional[str] = Field(default=None)
     upf_data_network_cidr: Optional[str] = Field(default=None)
+    sdcore_config_values: Optional[SDCoreValuesModel] = Field(default=None)
 
 
 class BlueSDCore(Blue5GBaseBeta):
@@ -80,6 +81,10 @@ class BlueSDCore(Blue5GBaseBeta):
             }]
         }
         self.blue_model_5g = BlueSDCoreModel.model_validate(self.base_model.conf)
+
+        self.blue_model_5g.sdcore_config_values = copy.deepcopy(sdcore_default_config.default_config)
+        self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml = SimAppYaml()
+
         self.init_base()
 
     def bootstrap_day0(self, model_msg) -> list:
@@ -118,15 +123,11 @@ class BlueSDCore(Blue5GBaseBeta):
         # )
 
         vnfd_k8s = self.core_vnfd(vls=[vim_net_mapping1])
-        #
-
-        config_without_simapp = copy.deepcopy(sdcore_default_config.default_config)
-        config_without_simapp.omec_sub_provision.config.simapp.cfg_files.simapp_yaml = SimAppYaml()
 
         kdu_config = BlueKDUConf(
             kdu_name=self.KDU_NAME,
             k8s_namespace=str(self.get_id()).lower(),
-            additionalParams=config_without_simapp.model_dump(exclude_none=True, by_alias=True)
+            additionalParams=self.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True)
         )
 
         nsd_id = f"{self.get_id()}_{self.NS_ID_INFIX}_{self.blue_model_5g.config.plmn}"
@@ -214,8 +215,25 @@ class BlueSDCore(Blue5GBaseBeta):
         """
         logger.info("Initializing Core Day2 configurations")
         res = []
-        res += self.core_upXade({"upf_ip": self.blue_model_5g.upf_data_ip})
+        res += self.core_init_values_update(upf_ip=self.blue_model_5g.upf_data_ip)
         return res
+
+    def core_init_values_update(self, upf_ip: str) -> list:
+        # Load default configuration
+        self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml = copy.deepcopy(sdcore_default_config.default_config.omec_sub_provision.config.simapp.cfg_files.simapp_yaml)
+
+        # Set upf ip
+        self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.network_slices[0].site_info.upf.upf_name = upf_ip
+
+        # Changing this value force a pod restart, this may be avoided changing the helm chart to add a new unused field inside the pod spec
+        self.blue_model_5g.sdcore_config_values.omec_sub_provision.images.pull_policy = "Always"
+        # TODO check if needed
+        self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.info.version = "2.0.0"
+
+        # Convert the configuration in SD-Core format
+        self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.from_generic_5g_model(self.blue_model_5g)
+
+        return self.kdu_upgrade(self.nsd_core, self.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True), self.KDU_NAME)
 
     def edge_day2_conf(self, model_arg: dict, nsd_item: dict) -> list:
         logger.info("Initializing Edge Day2 configurations")
@@ -270,50 +288,6 @@ class BlueSDCore(Blue5GBaseBeta):
             logger.exception("Exception in get_ip_core")
         # TODO need to be moved
         self.amf_ip = self.blue_model_5g.core_services.amf.external_ip[0]
-
-    def core_upXade(self, msg: dict) -> list:
-
-        new_config = copy.deepcopy(sdcore_default_config.default_config)
-        new_config.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.network_slices[0].site_info.upf.upf_name = msg["upf_ip"]
-
-        # Force pod restart
-        new_config.omec_sub_provision.images.pull_policy = "Always"
-        new_config.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.info.version = "2.0.0"
-        new_config.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.from_generic_5g_model(self.blue_model_5g)
-
-        # new_config["omec-sub-provision"]["config"]["simapp"]["cfgFiles"]["simapp.yaml"]["configuration"]["subscribers"].append(
-        #     {
-        #         "ueId-start": "999930100007487",
-        #         "ueId-end": "999930100007500",
-        #         "plmnId": "20893",
-        #         "opc": "981d464c7c52eb6e5036234984ad0bcf",
-        #         "op": "",
-        #         "key": "5122250214c33e723a5dd523fc145fc0",
-        #         "sequenceNumber": "16f3b3f70fc2"
-        #     }
-        # )
-
-        return self.kdu_upgrade(self.nsd_core, new_config.model_dump(exclude_none=True, by_alias=True))
-
-    def kdu_upgrade(self, nsd: BlueNSD, conf_params: dict, vnf_id="1", kdu_name=KDU_NAME):
-        # TODO is this needed?
-        # if 'kdu_model' not in conf_params:
-        #     conf_params['kdu_model'] = self.CHART_NAME
-
-        res = [
-            {
-                # TODO ci vuole il nome, altro modo per ottenerlo? dovrebbe essere lo stesso di nsd_id?
-                'ns-name': nsd.descr.nsd.nsd[0].name,
-                'nsi_id': nsd.nsi_id,
-                'primitive_data': {
-                    'member_vnf_index': vnf_id,
-                    'kdu_name': kdu_name,
-                    'primitive': 'upgrade',
-                    'primitive_params': conf_params
-                }
-            }
-        ]
-        return res
 
     def pre_initialization_checks(self) -> bool:
         pass

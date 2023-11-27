@@ -187,6 +187,23 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         self.to_db()
         return [nsd_id]
 
+    def kdu_upgrade(self, nsd: BlueNSD, conf_params: dict, kdu_name, vnf_id="1"):
+        # TODO make a Pydantic model for this
+        res = [
+            {
+                # TODO find a better way to get nsd name
+                'ns-name': nsd.descr.nsd.nsd[0].name,
+                'nsi_id': nsd.nsi_id,
+                'primitive_data': {
+                    'member_vnf_index': vnf_id,
+                    'kdu_name': kdu_name,
+                    'primitive': 'upgrade',
+                    'primitive_params': conf_params
+                }
+            }
+        ]
+        return res
+
     @abstractmethod
     def core_day2_conf(self, arg: dict, nsd_item: dict) -> list:
         pass

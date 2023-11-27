@@ -258,7 +258,7 @@ class BlueprintBaseBeta(abc.ABC):
                 nsd.status = status
                 self.to_db()
                 return True
-        logger.error("[ERROR] blueprint ns not found")
+        logger.error(f"[ERROR] blueprint ns '{name}' not found")
         return False
 
     def deploy_config(self, nsd_id: str):
@@ -356,7 +356,7 @@ class BlueprintBaseBeta(abc.ABC):
         pdus: List[PduModel] = topology.get_pdus()
         return next((item for item in pdus if item.area == area_id), None)
 
-    def topology_get_pdu_by_area_and_type(self, area_id: str, pdu_type: str) -> PduModel:
+    def topology_get_pdu_by_area_and_type(self, area_id: int, pdu_type: str) -> PduModel:
         """
         Retrieve the **FIRST** PDU from the topology by area and by type
 
@@ -386,6 +386,10 @@ class BlueprintBaseBeta(abc.ABC):
             vims.append(topology.get_vim_name_from_area_id(area))
 
         topology.del_network(net, vims, terraform=True)
+
+    def topology_get_network(self, network_name: str) -> NetworkModel:
+        topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
+        return topology.get_network(network_name)
 
     def get_vims(self):
         """

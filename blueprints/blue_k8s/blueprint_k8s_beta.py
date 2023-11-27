@@ -11,7 +11,8 @@ from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale
     K8sNsdInterfaceDesc
 from models.k8s.blueprint_k8s_model import LBPool, K8sAreaInfo
 from models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName
-from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel, VMFlavors
+from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel, VMFlavors, \
+    VimNetMap
 from models.virtual_link_desc import VirtLinkDescr
 from nfvo import get_ns_vld_ip, NbiUtil
 from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta
@@ -227,23 +228,41 @@ class K8sBeta(BlueprintBaseBeta):
         ns_id = f'{self.get_id()}_K8S_C' if is_controller else f'{self.get_id()}_K8S_C_A{area.id}_W{replica_id}'
         nsd_type = 'master' if is_controller else 'worker'
 
-        # List of data network to be given when building vnfd
-        data_net_list = []
-        for pool in self.k8s_model.config.network_endpoints.data_nets:
-            data_net_list.append(pool.net_name)
-
         # Building the list of all networks (mgt+data) that is used when building NSD
-        net_list = [self.k8s_model.config.network_endpoints.mgt]
-        net_list.extend(data_net_list)
-        assert net_list[0] == self.k8s_model.config.network_endpoints.mgt  # MGT must be the first
+        net_list = []
+        vim_net_mapping_mgt = VimNetMap.build_vnm(
+            "mgt",
+            "ens3",
+            self.k8s_model.config.network_endpoints.mgt,
+            True,
+            "mgt_net"
+        )
+        net_list.append(vim_net_mapping_mgt)
+
+        net_n = 4
+        # List of data network to be given when building vnfd
+        for pool in self.k8s_model.config.network_endpoints.data_nets:
+            net_list.append(VimNetMap.build_vnm(
+                f"data_{pool.net_name}",
+                f"ens{net_n}",
+                pool.net_name,
+                False
+            ))
+
+        data_net_list = list(map(lambda x: x.net_name, self.k8s_model.config.network_endpoints.data_nets))
 
         # Create the VNFD
         area_type = AreaType.CORE if area.core else AreaType.AREA
         created_vnfd = [self.set_vnfd(is_controller, area_type, area_id=area.id, data_interfaces=data_net_list,
                                       vm_flavor_request=area.worker_flavor_override)]
 
-        nsd_builder = Sol006NSDBuilderBeta(created_vnfd, self.get_topology().get_vim_name_from_area_id(self.k8s_model.config.core_area.id),
-                                           nsd_id=ns_id, nsd_type=nsd_type, vl_map=net_list)
+        nsd_builder = Sol006NSDBuilderBeta(
+            created_vnfd,
+            self.get_topology().get_vim_name_from_area_id(self.k8s_model.config.core_area.id),
+            nsd_id=ns_id,
+            nsd_type=nsd_type,
+            vl_maps=net_list
+        )
 
         nsd = nsd_builder.get_nsd()
 
@@ -257,7 +276,8 @@ class K8sBeta(BlueprintBaseBeta):
 
         return ns_id
 
-    def set_vnfd(self, is_controller: bool, area_type: AreaType, area_id: Optional[int] = None, data_interfaces: Optional[list] = None,
+    def set_vnfd(self, is_controller: bool, area_type: AreaType, area_id: Optional[int] = None,
+                 data_interfaces: Optional[list] = None,
                  vm_flavor_request: Optional[VMFlavors] = None, replica: int = 0) -> BlueVNFD:
         """
         Set the Virtual network function descriptor for an area (both core area and normal area).
@@ -281,7 +301,8 @@ class K8sBeta(BlueprintBaseBeta):
         if is_controller:
             created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, CONTROLLER_FLAVOR)
         else:
-            created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces, vm_flavor_request if vm_flavor_request else WORKERS_FLAVOR)
+            created_vdu = VirtualDeploymentUnit.build_vdu(vdu_id, VDU_IMAGE, data_interfaces,
+                                                          vm_flavor_request if vm_flavor_request else WORKERS_FLAVOR)
 
         created_vnfd = VirtualNetworkFunctionDescriptor.build_vnfd(
             vnfd_id,

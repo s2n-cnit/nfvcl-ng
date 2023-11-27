@@ -197,6 +197,7 @@ class PduInterface(BaseModel):
     intf_type: Optional[str] = Field(default=None)
     ip_address: Union[str, IPv4Address] = Field(alias='ip-address')
     network_name: str = Field(alias='vim-network-name')
+    port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
 
     class Config:
         populate_by_name = True

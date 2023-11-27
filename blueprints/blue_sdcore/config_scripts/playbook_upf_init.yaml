@@ -1,0 +1,15 @@
+---
+- hosts: all
+  tasks:
+    - name: Get hostname
+      command: "hostname"
+      register: hostname_result
+
+    - name: Set hostname as fact
+      set_fact:
+        instance_hostname: "{{ hostname_result.stdout }}"
+
+    - name: Load UPF Docker images
+      shell: |
+        /root/load_images.sh
+...

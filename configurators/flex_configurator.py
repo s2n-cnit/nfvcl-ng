@@ -1,4 +1,5 @@
 import json
+import shutil
 import textwrap
 import uuid
 from jinja2 import Environment, FileSystemLoader
@@ -37,7 +38,7 @@ class Configurator_Flex(Configurator_Base):
     def resetPlaybook(self):
         self.playbook = {'hosts': 'all', 'become': True, 'gather_facts': 'no', 'tasks': []}
 
-    def addJinjaTemplateFile(self, filed, vars_):
+    def addJinjaTemplateFile(self, filed, vars_, ansible_template_resolver=False):
         # filed is the descriptor of the file to be transferred. It should have the following keys:
         # - 'template' name of the template file (with placeholder variables) to be used
         # - 'transfer_name' (name to be used for the transfer between the OSS and the VNFD)
@@ -61,9 +62,22 @@ class Configurator_Flex(Configurator_Base):
         # add the produced file, to the list of elk_files to be downloaded by the VNFM
         self.config_content['conf_files'].append(
             {'src': nfvclURL + filed['transfer_name'], 'name': filed['name']})
+
+        ansible_task_type = "copy" if not ansible_template_resolver else "ansible.builtin.template"
+
         self.playbook['tasks'].append({
             'name': 'Configuration file copy from the VNFM to the VNF',
-            'copy': {'src': filed['name'], 'dest': filed['path'], 'mode': 664, 'force': 'yes', 'backup': 'yes'}
+            ansible_task_type: {'src': filed['name'], 'dest': filed['path'], 'mode': 664, 'force': 'yes', 'backup': 'yes'}
+        })
+
+    def addJinjaTemplateFileResolvedByAnsible(self, filed):
+        shutil.copyfile(filed['template'], 'day2_files/' + filed['transfer_name'])
+        # add the produced file, to the list of elk_files to be downloaded by the VNFM
+        self.config_content['conf_files'].append(
+            {'src': nfvclURL + filed['transfer_name'], 'name': filed['name']})
+        self.playbook['tasks'].append({
+            'name': 'Configuration file copy from the VNFM to the VNF',
+            'ansible.builtin.template': {'src': filed['name'], 'dest': filed['path']}
         })
 
     def addTemplateFile(self, filed, vocabulary):

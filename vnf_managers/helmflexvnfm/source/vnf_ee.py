@@ -57,7 +57,7 @@ def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeo
 
 
 class VnfEE:
-    
+
     PLAYBOOK_PATH = "/tmp/"
     ANSIBLE_CONFIG_PATH = "/etc/ansible/ansible.cfg"
     ANSIBLE_INVENTORY_PATH = "/etc/ansible/hosts"
@@ -133,7 +133,7 @@ class VnfEE:
                     self.config_params["ssh-username"],
                     self.config_params["ssh-password"],
                     300,
-                    30):
+                    5):
                 raise ValueError('SSH connection not available')
 
             self.logger.debug('Applying configurations and commands')
@@ -171,7 +171,7 @@ class VnfEE:
             self.logger.error(traceback.format_tb(e.__traceback__))
             self.logger.error("Error executing flexops: {}".format(repr(e)))
             yield "ERROR", str(e) + "\n".join(traceback.format_tb(e.__traceback__))
-        
+
 
     @staticmethod
     def _check_required_params(params, required_params):

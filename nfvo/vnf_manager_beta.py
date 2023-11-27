@@ -8,7 +8,7 @@ import yaml
 from models.blueprint.blueprint_base_model import BlueVNFD
 from models.charm_models import CharmPrimitive, CharmExecEnviron, CharmDay12, LCMOperationConfig
 from models.network import PduModel, PduInterface
-from models.vim.vim_models import VirtualNetworkFunctionDescriptor, PDUDeploymentUnit, VimLink, VimNetMap
+from models.vim.vim_models import VirtualNetworkFunctionDescriptor, PhysicalDeploymentUnit, VimLink, VimNetMap
 from models.vnfd_model import VNFSol006Descriptor, VDUSol006Descriptor, VirtualComputeDescr006, VirtualStorageDescr006, \
     InstantiationLevel, ExtCPD, IntCPD, KDU, DF, VDULevel, VDUProfile, KDUcluster
 from topology.topology import Topology
@@ -37,6 +37,7 @@ class Sol006VnfdBuilderBeta:
     vnfd_model: VNFSol006Descriptor
     received_vdu_links: List[VimLink]
     received_kdu_links: List[VimNetMap]
+    received_pdu_links: List[PduInterface]
     type: str
 
     def __init__(self, vnf_model_data: VirtualNetworkFunctionDescriptor, hemlflexcharm: bool = False,
@@ -56,6 +57,7 @@ class Sol006VnfdBuilderBeta:
             vnf_model_data.mgmt_cp = vim_net_map.vld
 
         elif len(vnf_model_data.pdu) > 0:
+            self.received_pdu_links = vnf_model_data.pdu[0].interface
             vim_net_map = next(item for item in vnf_model_data.pdu[0].interface if item.mgt)
             vnf_model_data.mgmt_cp = vim_net_map.vld
 
@@ -78,6 +80,11 @@ class Sol006VnfdBuilderBeta:
     def get_vnf_blue_descr_only_kdu(self) -> BlueVNFD:
         blue_vnfd = BlueVNFD.model_validate({'id': 'vnfd', 'name': self.get_id()})
         blue_vnfd.vl = self.received_kdu_links
+        return blue_vnfd
+
+    def get_vnf_blue_descr_only_pdu(self) -> BlueVNFD:
+        blue_vnfd = BlueVNFD.model_validate({'id': 'vnfd', 'name': self.get_id()})
+        blue_vnfd.vl = self.received_pdu_links
         return blue_vnfd
 
     def create_sol006_descriptor_model(self, vnf: VirtualNetworkFunctionDescriptor):
@@ -130,7 +137,8 @@ class Sol006VnfdBuilderBeta:
             for received_pdu in vnf.pdu:
                 pdu = self.manage_pdu_model(received_pdu)
                 # update the username and password
-                vnf.update({'username': pdu.user, 'password': pdu.passwd})
+                vnf.username = pdu.user
+                vnf.password = pdu.passwd
                 # now prepare the descriptor
                 vdu_obj: VDUSol006Descriptor = VDUSol006Descriptor.model_validate({
                     'id': pdu.name,
@@ -141,7 +149,7 @@ class Sol006VnfdBuilderBeta:
                 })
                 self.vnfd_model.vdu.append(vdu_obj)
                 # adding deployment flavor
-                self.add_vdu_df_model('default-df', 'default-instantiation-level', received_pdu['id'])
+                self.add_vdu_df_model('default-df', 'default-instantiation-level', received_pdu.id)
 
         if len(vnf.kdu) > 0:
             self.type = 'knfd'
@@ -337,7 +345,7 @@ class Sol006VnfdBuilderBeta:
         insta_level.vdu_level.append(VDULevel.model_validate({'vdu-id': vdu_id, 'number-of-instances': count}))
         df.vdu_profile.append(VDUProfile.model_validate({'id': vdu_id, 'min-number-of-instances': min_count}))
 
-    def manage_pdu_model(self, pdu_du: PDUDeploymentUnit) -> PduModel:
+    def manage_pdu_model(self, pdu_du: PhysicalDeploymentUnit) -> PduModel:
         topo = Topology.from_db(db=db, nbiutil=osm_nbi_util, lock=RLock())
         candidate_pdu = topo.get_pdu(pdu_du.id)
 
@@ -359,7 +367,7 @@ class Sol006VnfdBuilderBeta:
             res = pnf_manager.delete(pdu_du.id)
             logger.debug('deleting pdu: ' + str(res))
         obj = {
-            'type': candidate_pdu['type'],
+            'type': candidate_pdu.type,
             'name': pdu_du.id,
             'shared': True,
         }
@@ -370,14 +378,14 @@ class Sol006VnfdBuilderBeta:
         obj['vim_accounts'] = vim_accounts
 
         interface = []
-        for i in candidate_pdu['interface']:
+        for i in candidate_pdu.interface:
             interface.append(
                 {
                     # 'vld': i['vld'],
-                    'name': i['name'],
-                    'ip-address': str(i['ip_address']),
-                    'vim-network-name': i['network_name'],
-                    'mgmt': i['mgt']
+                    'name': i.name,
+                    'ip-address': str(i.ip_address),
+                    'vim-network-name': i.network_name,
+                    'mgmt': i.mgt
                 }
             )
         obj['interfaces'] = interface

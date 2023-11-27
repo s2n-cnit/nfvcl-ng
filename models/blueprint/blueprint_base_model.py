@@ -5,6 +5,7 @@ from typing import List, Dict, Optional, Any
 from pydantic import BaseModel, Field
 
 from models.base_model import NFVCLBaseModel
+from models.network import PduInterface
 from models.vim.vim_models import VimLink, VimNetMap
 
 
@@ -100,6 +101,7 @@ class BlueNSD(NFVCLBaseModel):
     nsi_id: str = Field(default="")
     area_id: int = Field(default=-1)  # Needed in VyOS, is it really necessary?
     replica_id: int = Field(default=-1)  # Needed in K8S, is it really necessary?
+    vld: List[PduInterface] = Field(default=[])
 
 
 class BlueprintVersion(str, Enum):

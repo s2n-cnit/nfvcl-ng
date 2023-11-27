@@ -112,7 +112,7 @@ class SubArea(BaseModel):
 class Create5gModel(BaseModel):
     type: Literal["5G"]
     callbackURL: Optional[HttpUrl] = Field(
-        default='',
+        default=None,
         description='url that will be used to notify when the topology terraform ends'
     )
     config: SubConfig

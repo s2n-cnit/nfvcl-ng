@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import Field, field_validator, field_serializer
 
 from models.base_model import NFVCLBaseModel
+from models.network import PduInterface
 from utils.log import create_logger
 
 logger: Logger = create_logger('Vim model')
@@ -276,10 +277,14 @@ class VirtualDeploymentUnit(NFVCLBaseModel):
         return VirtualDeploymentUnit(id=vdu_id, image=vdu_image, vm_flavor=vdu_flavor, interface=interfaces)
 
 
-class PDUDeploymentUnit(NFVCLBaseModel):
+class PhysicalDeploymentUnit(NFVCLBaseModel):
     count: int = Field(default=1)
     id: str
-    interface: dict  # Should correspond to PduInterface in net models
+    interface: List[PduInterface] = Field(default=[]) # Should correspond to PduInterface in net models
+
+    @classmethod
+    def build_pdu(cls, count: int, id: str, interface: List[PduInterface]):
+        return PhysicalDeploymentUnit(count=count, id=id, interface=interface)
 
 
 class KubeDeploymentUnit(NFVCLBaseModel):
@@ -308,7 +313,7 @@ class VirtualNetworkFunctionDescriptor(NFVCLBaseModel):
     username: str = Field(default="root")
     password: str = Field(default="root")
     vdu: Optional[List[VirtualDeploymentUnit]] = Field(default=[])
-    pdu: Optional[List[PDUDeploymentUnit]] = Field(default=[])
+    pdu: Optional[List[PhysicalDeploymentUnit]] = Field(default=[])
     kdu: Optional[List[KubeDeploymentUnit]] = Field(default=[])
     mgmt_cp: Optional[str] = Field(default=None, description="VLD of mgt interface")
     cloud_init: Optional[bool] = Field(default=None)
@@ -320,7 +325,7 @@ class VirtualNetworkFunctionDescriptor(NFVCLBaseModel):
                    vnf_passwd: str = "root",
                    cloud_init: bool = False,
                    vdu_list: List[VirtualDeploymentUnit] = None,
-                   pdu_list: List[PDUDeploymentUnit] = None,
+                   pdu_list: List[PhysicalDeploymentUnit] = None,
                    kdu_list: List[KubeDeploymentUnit] = None):
         vnfd = VirtualNetworkFunctionDescriptor.model_validate({
             'id': vnf_id,

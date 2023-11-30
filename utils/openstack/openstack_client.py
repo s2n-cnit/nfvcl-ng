@@ -112,10 +112,6 @@ class OpenStackClient:
         Returns:
             The result of image importing.
         """
-        uri = (
-            'https://cloud-images.ubuntu.com/jammy/current/'
-            'jammy-server-cloudimg-amd64-disk-kvm.img'
-        )
         imported = self.client.image.import_image(image, method="web-download", uri=uri)
         return imported
 

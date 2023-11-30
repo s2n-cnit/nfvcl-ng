@@ -143,11 +143,12 @@ class Topology:
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
         logger.debug("Deleting the topology. Terraform: {}".format(terraform))
-        deleted_topology: TopologyModel = self._model.model_copy()
         if not self._model:
             msg_err = 'Not possible to delete the topology. No topology is currently allocated'
             logger.error(msg_err)
             raise ValueError(msg_err)
+
+        deleted_topology: TopologyModel = self._model.model_copy()
 
         # Check for terraform is done inside del_vim method
         for vim in self._model.vims:

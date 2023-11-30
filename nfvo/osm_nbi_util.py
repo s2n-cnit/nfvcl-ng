@@ -686,7 +686,7 @@ class NbiUtil:
         if check_rest_response(result):
             return result.json()
         else:
-            logger.error("k8s repository creation error: {}".format(result.reason))
+            logger.error("K8s repository creation error: {}".format(result.reason))
             return False
 
     def get_kdu_services(self, nsi, kdu_name):

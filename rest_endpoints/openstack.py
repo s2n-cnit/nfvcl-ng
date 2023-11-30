@@ -15,14 +15,15 @@ openstack_router = APIRouter(
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
 
-@openstack_router.get("/update_images", response_model=RestAnswer202)
+
+@openstack_router.post("/update_images", response_model=RestAnswer202)
 async def update_images():
     """
     Updates all images needed used for deploying blueprints. The operation in done on all VIMs belonging to the topology.
     If already present, images are removed and then added to the single VIM.
     Image is downloaded from a URL, the procedure can be slow before all images are ready on the VIM.
     """
-    topo = Topology.from_db(db,nbiUtil,topology_lock)
+    topo = Topology.from_db(db, nbiUtil, topology_lock)
     vims: List[VimModel] = topo.list_vims()
     image_list: ImageList = get_nfvcl_image_list()
 

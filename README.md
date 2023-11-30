@@ -46,6 +46,21 @@ wget https://osm-download.etsi.org/ftp/osm-14.0-fourteen/install_osm.sh
 git clone --depth 1 https://github.com/s2n-cnit/nfvcl-ng
 ```
 ### Step 1 - Install OSM
+> :warning::warning::warning: At the moment OSM installation is broken and need to be fixed.
+> 
+> Edit _install_osm.sh_ and add before the last line the following:
+> 
+> ```
+> sudo sed -i 's@.*juju deploy ch:mongodb-k8s.*@juju deploy ch:mongodb-k8s -m $OSM_NAMESPACE --channel latest/stable@' /usr/share/osm-devops/installers/full_install_osm.sh`
+> ```
+> The resulting 3 last line should be:a
+> ``` bash
+> ...
+> sudo DEBIAN_FRONTEND=noninteractive apt-get -y install osm-devops
+> sudo sed -i 's@.*juju deploy ch:mongodb-k8s.*@juju deploy ch:mongodb-k8s -m $OSM_NAMESPACE --channel latest/stable@' /usr/share/osm-devops/installers/full_install_osm.sh
+> $DEVOPS_PATH/installers/full_install_osm.sh -R $RELEASE -r $REPOSITORY -u $REPOSITORY_BASE -D $DEVOPS_PATH -t $DOCKER_TAG "$@"
+> ```
+
 
 The OSM installation is automatic, it's sufficient to run a shell script. It takes a lot of time, **more than 20 minutes**.
 1. Start osm installation

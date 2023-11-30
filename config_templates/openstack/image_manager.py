@@ -1,7 +1,13 @@
 import json
 from models.openstack.images import ImageList
 
+
 def get_nfvcl_image_list() -> ImageList:
+    """
+    Loads the OPENSTACK image list needed by the nfvcl from the json file in config_templates/openstack/images.json
+    Returns:
+        The list of images with the url where to dowmload them
+    """
     file = open("config_templates/openstack/images.json")
     dictionary = json.loads(file.read())
     image_list = ImageList.model_validate(dictionary)

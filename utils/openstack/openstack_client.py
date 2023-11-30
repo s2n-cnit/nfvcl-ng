@@ -77,8 +77,8 @@ class OpenStackClient:
         Returns:
             The result of image downloading from the given URL.
         """
-        image = self.create_image(image.name)
-        return self.web_download_image(image, image.url)
+        os_image = self.create_image(image.name)
+        return self.web_download_image(os_image, image.url)
 
     def create_image(self, image_name: str) -> Image | None:
         """

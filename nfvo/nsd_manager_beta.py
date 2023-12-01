@@ -129,7 +129,12 @@ class Sol006NSDBuilderBeta():
             self.deploy_config.additionalParamsForVnf = []
             for knf_config in knf_configs:
                 # TODO allow multiple vnf per ns
-                self.deploy_config.additionalParamsForVnf.append(BlueVNFAdditionalParams(member_vnf_index="1", additionalParamsForKdu=[knf_config]))
+                self.deploy_config.additionalParamsForVnf.append(
+                    BlueVNFAdditionalParams(
+                        member_vnf_index=str(knf_configs.index(knf_config) + 1),
+                        additionalParamsForKdu=[knf_config]
+                    )
+                )
             logger.debug("Deployment config for kdu: {}".format(self.deploy_config))
 
     def get_nsd(self) -> BlueNSD:

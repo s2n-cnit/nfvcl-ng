@@ -1,0 +1,11 @@
+---
+- hosts: all
+  tasks:
+  - name: load oai-spgwu
+    shell: |
+       docker load --input /root/upfConfig/oai-spgwu.tar.gz
+  - name: start upf container
+    shell: |
+       cd /root/upfConfig
+       docker compose up -d
+...

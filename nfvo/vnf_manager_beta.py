@@ -143,8 +143,7 @@ class Sol006VnfdBuilderBeta:
                 vdu_obj: VDUSol006Descriptor = VDUSol006Descriptor.model_validate({
                     'id': pdu.name,
                     'name': pdu.name,
-                    'int-cpd': [self.add_vdu_cp_model(interface, pdu.name, define_type=False) for interface in
-                                pdu.interface],
+                    'int-cpd': [self.add_vdu_cp_model(interface, pdu.name, define_type=False) for interface in pdu.interface],
                     'pdu-type': pdu.type
                 })
                 self.vnfd_model.vdu.append(vdu_obj)

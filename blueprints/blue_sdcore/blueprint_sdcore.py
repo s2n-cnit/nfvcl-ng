@@ -3,12 +3,12 @@ from typing import *
 
 from pydantic import Field
 
-from blueprints.blue_5g_base.blueprint_5g_base_beta import Blue5GBaseBeta
+from blueprints.blue_5g_base.blueprint_5g_base_beta import Blue5GBaseBeta, EdgeArea5G, CoreArea5G, Area5GTypeEnum
 from blueprints.blue_sdcore import sdcore_default_config
 from blueprints.blue_sdcore.configurators.sdcore_upf_configurator import ConfiguratorSDCoreUpf, \
     ConfiguratorSDCoreUPFVars
 from blueprints.blue_sdcore.sdcore_models import BlueSDCoreCreateModel
-from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml, SDCoreValuesModel
+from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml, SDCoreValuesModel, NetworkSlice
 from models.base_model import NFVCLBaseModel
 from models.blueprint.blueprint_base_model import BlueKDUConf, BlueVNFD, BlueNSD
 from models.blueprint.rest_blue import BlueGetDataModel
@@ -47,9 +47,6 @@ class BlueSDCoreModelServices(NFVCLBaseModel):
 
 class BlueSDCoreModel(BlueSDCoreCreateModel):
     core_services: Optional[BlueSDCoreModelServices] = Field(default=None)
-    upf_mgt_ip: Optional[str] = Field(default=None)
-    upf_data_ip: Optional[str] = Field(default=None)
-    upf_data_network_cidr: Optional[str] = Field(default=None)
     sdcore_config_values: Optional[SDCoreValuesModel] = Field(default=None)
 
 
@@ -90,7 +87,7 @@ class BlueSDCore(Blue5GBaseBeta):
     def bootstrap_day0(self, model_msg) -> list:
         return self.nsd()
 
-    def core_vnfd(self, vls: List[VimNetMap]) -> List[BlueVNFD]:
+    def core_vnfd(self, area: CoreArea5G, vls: List[VimNetMap]) -> List[BlueVNFD]:
         logger.info("Creating Core VNFD(s)")
         core_kdu = KubeDeploymentUnit.build_kdu(self.KDU_NAME, self.CHART_NAME, vls)
         core_vnfd = VirtualNetworkFunctionDescriptor.build_vnfd(
@@ -103,8 +100,8 @@ class BlueSDCore(Blue5GBaseBeta):
         self.to_db()
         return [blue_vnfd]
 
-    def core_nsd(self) -> List[str]:
-        logger.info("Creating Core NSD(s)")
+    def core_nsd(self, area: CoreArea5G) -> List[str]:
+        logger.info(f"Creating Core NSD in area {area.id}")
 
         vim_net_mapping1 = VimNetMap.build_vnm(
             "mgt",
@@ -122,7 +119,7 @@ class BlueSDCore(Blue5GBaseBeta):
         #     "data_net"
         # )
 
-        vnfd_k8s = self.core_vnfd(vls=[vim_net_mapping1])
+        vnfd_k8s = self.core_vnfd(area, vls=[vim_net_mapping1])
 
         kdu_config = BlueKDUConf(
             kdu_name=self.KDU_NAME,
@@ -136,28 +133,28 @@ class BlueSDCore(Blue5GBaseBeta):
             vnfd_k8s,
             self.core_vim.name,
             nsd_id,
-            "core",
+            Area5GTypeEnum.CORE.value,
             [vim_net_mapping1],
             knf_configs=[kdu_config]
         )
 
         nsd_item = n_obj.get_nsd()
-        # TODO improve this
+        nsd_item.area_id = area.id
         self.base_model.nsd_.append(nsd_item)
-        self.nsd_core = nsd_item
+        area.nsd = nsd_item
         self.to_db()
         return [nsd_id]
 
-    def edge_vnfd(self, vls: List[VimNetMap]) -> List[BlueVNFD]:
+    def edge_vnfd(self, area: EdgeArea5G, vls: List[VimNetMap]) -> List[BlueVNFD]:
         logger.info("Creating Edge VNFD(s)")
         created_vdu = VirtualDeploymentUnit.build_vdu(
-            "upf",
+            f"upf_{area.id}",
             "sdcore-upf",
             list(map(lambda x: x.vim_net, vls[1:])),
             VMFlavors(vcpu_count="4", memory_mb="4096", storage_gb="16")
         )
         edge_vnfd = VirtualNetworkFunctionDescriptor.build_vnfd(
-            f'{self.get_id()}_{self.VNF_ID_SUFFIX}_upf',
+            f'{self.get_id()}_{self.VNF_ID_SUFFIX}_upf_{area.id}',
             "root",
             "root",
             cloud_init=True,
@@ -170,8 +167,10 @@ class BlueSDCore(Blue5GBaseBeta):
 
         return [blue_vnfd]
 
-    def edge_nsd(self) -> List[str]:
-        logger.info("Creating Edge NSD(s)")
+    def edge_nsd(self, area: EdgeArea5G) -> List[str]:
+        logger.info(f"Creating Edge NSD in area {area.id}")
+
+        vim = self.get_topology().get_vim_from_area_id_model(area.id)
 
         vim_net_mapping1 = VimNetMap.build_vnm(
             "mgt",
@@ -187,22 +186,22 @@ class BlueSDCore(Blue5GBaseBeta):
             False
         )
 
-        vnfd_edge = self.edge_vnfd(vls=[vim_net_mapping1, vim_net_mapping2])
+        vnfd_edge = self.edge_vnfd(area, vls=[vim_net_mapping1, vim_net_mapping2])
 
-        nsd_id = f"{self.get_id()}_{self.NS_ID_INFIX}_{self.blue_model_5g.config.plmn}_upf"
+        nsd_id = f"{self.get_id()}_{self.NS_ID_INFIX}_{area.id}_{self.blue_model_5g.config.plmn}_upf"
 
         n_obj = Sol006NSDBuilderBeta(
             vnfd_edge,
-            self.core_vim.name,
+            vim.name,
             nsd_id,
-            "edge",
+            Area5GTypeEnum.EDGE.value,
             [vim_net_mapping1, vim_net_mapping2]
         )
 
         nsd_item = n_obj.get_nsd()
-        # TODO improve this
+        nsd_item.area_id = area.id
         self.base_model.nsd_.append(nsd_item)
-        # self.nsd_core = nsd_item
+        area.nsd = nsd_item
         self.to_db()
         return [nsd_id]
 
@@ -215,36 +214,48 @@ class BlueSDCore(Blue5GBaseBeta):
         """
         logger.info("Initializing Core Day2 configurations")
         res = []
-        res += self.core_init_values_update(upf_ip=self.blue_model_5g.upf_data_ip)
+        res += self.core_init_values_update()
+        # res += self.core_init_values_update(upf_ip=self.edge_areas[self.core_area.id].upf_data_ip)
         return res
 
-    def core_init_values_update(self, upf_ip: str) -> list:
+    def core_init_values_update(self) -> list:
         # Load default configuration
         self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml = copy.deepcopy(sdcore_default_config.default_config.omec_sub_provision.config.simapp.cfg_files.simapp_yaml)
 
-        # Set upf ip
-        self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.network_slices[0].site_info.upf.upf_name = upf_ip
+        # Convert the requested configuration in SD-Core format
+        self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.from_generic_5g_model(self.blue_model_5g)
+
+        # Set UPFs ip
+        # TODO need more checking, it may override the ip in some cases
+        for area_for_slice in self.blue_model_5g.areas:
+            for slice_in_area in area_for_slice.slices:
+                # TODO check size, should be 1
+                network_slice: NetworkSlice = list(filter(lambda x: x.slice_id.sd == slice_in_area.sliceId, self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.network_slices))[0]
+                network_slice.site_info.upf.upf_name = self.edge_areas[self.edge_areas[area_for_slice.id].id].upf_data_ip
 
         # Changing this value force a pod restart, this may be avoided changing the helm chart to add a new unused field inside the pod spec
         self.blue_model_5g.sdcore_config_values.omec_sub_provision.images.pull_policy = "Always"
         # TODO check if needed
         self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.info.version = "2.0.0"
 
-        # Convert the configuration in SD-Core format
-        self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.from_generic_5g_model(self.blue_model_5g)
+        logger.debug("SENDING UPDATED CONFIGURATION TO K8S:")
+        logger.debug("-------------------------------------")
+        logger.debug(self.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True))
+        logger.debug("-------------------------------------")
 
-        return self.kdu_upgrade(self.nsd_core, self.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True), self.KDU_NAME)
+        return self.kdu_upgrade(self.core_area.nsd, self.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True), self.KDU_NAME)
 
     def edge_day2_conf(self, model_arg: dict, nsd_item: dict) -> list:
         logger.info("Initializing Edge Day2 configurations")
         res = []
-        res += ConfiguratorSDCoreUpf(
-            self.base_model.nsd_[1].descr.nsd.nsd[0].id, 1, self.get_id(),
-            ConfiguratorSDCoreUPFVars(
-                upf_data_cidr=self.blue_model_5g.upf_data_network_cidr,
-                upf_internet_iface=self.MGT_NETWORK_IF_NAME
-            )
-        ).dump()
+        for edge_area in self.edge_areas.values():
+            res += ConfiguratorSDCoreUpf(
+                edge_area.nsd.descr.nsd.nsd[0].id, 1, self.get_id(),
+                ConfiguratorSDCoreUPFVars(
+                    upf_data_cidr=edge_area.upf_data_network_cidr,
+                    upf_internet_iface=self.MGT_NETWORK_IF_NAME
+                )
+            ).dump()
         return res
 
     def init_day2_conf(self, msg) -> list:
@@ -252,8 +263,7 @@ class BlueSDCore(Blue5GBaseBeta):
         res = []
         res += self.core_day2_conf({}, {})
         res += self.edge_day2_conf({}, {})
-        # Configurator_SDCore(self.base_model.nsd_[0].descr.nsd.nsd[0].id, 1, self.get_id(), {"webui_ip": self.blue_sdcore_model.core_services.webui.external_ip[0]}) #.dump()
-        # res += self.core_upXade({})
+        res += self.ran_day2_conf({}, {})
         return res
 
     def get_ip(self) -> None:
@@ -261,25 +271,27 @@ class BlueSDCore(Blue5GBaseBeta):
         super().get_ip()
 
     def get_ip_edge(self, ns: BlueNSD) -> None:
-        logger.debug('Getting IPs for edge')
+        logger.debug(f'Getting IPs for edge area {ns.area_id}')
         vlds = get_ns_vld_ip(ns.nsi_id, ["mgt", f'data_{self.networks_5g.wan}'])
-        self.blue_model_5g.upf_mgt_ip = vlds["mgt"][0]['ip']
-        self.blue_model_5g.upf_data_ip = vlds[f'data_{self.networks_5g.wan}'][0]['ip']
+
+        self.edge_areas[ns.area_id].upf_mgt_ip = vlds["mgt"][0]['ip']
+        self.edge_areas[ns.area_id].upf_data_ip = vlds[f'data_{self.networks_5g.wan}'][0]['ip']
 
         core_data_network = self.topology_get_network(self.networks_5g.wan)
-        self.blue_model_5g.upf_data_network_cidr = str(core_data_network.cidr)
+        self.edge_areas[ns.area_id].upf_data_network_cidr = str(core_data_network.cidr)
 
-        logger.debug(f'MGT IP for edge: {self.blue_model_5g.upf_mgt_ip}')
-        logger.debug(f'DATA IP for edge: {self.blue_model_5g.upf_data_ip}')
-        logger.debug(f'DATA NETWORK CIDR for edge: {self.blue_model_5g.upf_data_network_cidr}')
+        logger.debug(f'MGT IP for edge: {self.edge_areas[ns.area_id].upf_mgt_ip}')
+        logger.debug(f'DATA IP for edge: {self.edge_areas[ns.area_id].upf_data_ip}')
+        logger.debug(f'DATA NETWORK CIDR for edge: {self.edge_areas[ns.area_id].upf_data_network_cidr}')
+        logger.debug(f'END Getting IPs for edge area {ns.area_id}')
 
-    def get_ip_core(self, n: BlueNSD) -> None:
+    def get_ip_core(self, ns: BlueNSD) -> None:
         """
         Set IP for 5G core k8s services (AMF, SMF, etc)
         """
         logger.debug('Getting Services IPs for core')
         try:
-            kdu_services = get_kdu_services(n.nsi_id, self.KDU_NAME)
+            kdu_services = get_kdu_services(ns.nsi_id, self.KDU_NAME)
             kdu_services_dict = {}
             for kdu_service in kdu_services:
                 kdu_services_dict[kdu_service.name] = kdu_service
@@ -287,7 +299,7 @@ class BlueSDCore(Blue5GBaseBeta):
         except Exception as e:
             logger.exception("Exception in get_ip_core")
         # TODO need to be moved
-        self.amf_ip = self.blue_model_5g.core_services.amf.external_ip[0]
+        self.core_area.amf_ip = self.blue_model_5g.core_services.amf.external_ip[0]
 
     def pre_initialization_checks(self) -> bool:
         pass

@@ -50,6 +50,10 @@ class Configurator_UeRanSimNB(Configurator_Flex):
 
         # self.addShellCmds({'template': 'config_templates/ueransim_nb_init.shell'}, [])
         ansible_vars = {'conf_file': conf_file}
+        if 'disable_offloading' in args:
+            ansible_vars['disable_offloading'] = args['disable_offloading']
+        if 'additional_ip_route' in args:
+            ansible_vars['additional_ip_route'] = args['additional_ip_route']
         self.appendJinjaPbTasks('blueprints/blue_5g_base/config_scripts/playbook_nb_ueransim.yaml', vars_=ansible_vars)
 
     def dump(self):

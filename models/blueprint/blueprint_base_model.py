@@ -12,7 +12,7 @@ from models.vim.vim_models import VimLink, VimNetMap
 class BlueVNFD(NFVCLBaseModel):
     id: str
     name: str
-    vl: Optional[List[VimLink]] | Optional[List[VimNetMap]] = Field(default=None)
+    vl: Optional[List[VimLink]] | Optional[List[VimNetMap]] | Optional[List[PduInterface]] = Field(default=None)
     area_id: int = Field(default=-1)
     type: str = Field(default="")
 
@@ -99,7 +99,7 @@ class BlueNSD(NFVCLBaseModel):
     deploy_config: BlueDeployConfig
     nsd_id: str = Field(default="")
     nsi_id: str = Field(default="")
-    area_id: int = Field(default=-1)  # Needed in VyOS, is it really necessary?
+    area_id: int = Field(default=-1)
     replica_id: int = Field(default=-1)  # Needed in K8S, is it really necessary?
     vld: List[PduInterface] = Field(default=[])
 

@@ -69,7 +69,7 @@ class VDUSol006Descriptor(NFVCLBaseModel):
     id: str
     name: str
     int_cpd: List[IntCPD] = Field(alias='int-cpd')
-    pdu_type: Optional[str] = Field(default=None, alias='pdu_type')
+    pdu_type: Optional[str] = Field(default=None, alias='pdu-type')
     sw_image_desc: Optional[str] = Field(default=None, alias="sw-image-desc")
     virtual_compute_desc: Optional[str] = Field(default=None, alias="virtual-compute-desc", description="Must be a valid existing id")
     virtual_storage_desc: Optional[List[str]] = Field(default=None, alias="virtual-storage-desc", description="Must be a valid existing id")

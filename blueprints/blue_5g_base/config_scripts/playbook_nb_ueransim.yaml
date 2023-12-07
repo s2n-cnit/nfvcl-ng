@@ -1,6 +1,10 @@
 ---
 - hosts: all
   tasks:
+  - name: Disable unattended-upgrades
+    shell: |
+      systemctl stop unattended-upgrades
+      apt-get purge unattended-upgrades -y
   - name: Install screen and ethtool
     apt:
       name:

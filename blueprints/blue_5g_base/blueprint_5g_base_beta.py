@@ -89,16 +89,9 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
     edge_areas: Dict[int, EdgeArea5G] = {}
     ran_areas: Dict[int, RanArea5G] = {}
 
-    nsd_ran: BlueNSD
-
     # TODO get these from the VMs, maybe using the CIDR of their network
     MGT_NETWORK_IF_NAME = "ens3"
     WAN_NETWORK_IF_NAME = "ens4"
-
-    # TODO need to be moved
-    nb_mgt_ip: str
-    nb_wan_ip: str
-    amf_ip: str
 
     def init_base(self):
         logger.debug("init_base")
@@ -244,95 +237,86 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         return res
 
     @abstractmethod
-    def core_day2_conf(self, arg: dict, nsd_item: dict) -> list:
+    def core_day2_conf(self, area: CoreArea5G) -> list:
         pass
 
     @abstractmethod
-    def edge_day2_conf(self, arg: dict, nsd_item: dict) -> List[str]:
+    def edge_day2_conf(self, area: EdgeArea5G) -> List[str]:
         pass
 
-    def ran_day2_conf(self, arg: dict, oldremove: dict) -> list:
+    def ran_day2_conf(self, area: RanArea5G) -> list:
         res = []
+        logger.info(f"Blue {self.get_id()} - Initializing RAN Day2 configurations for area {area.id}")
+        # here we have to find the correct enb_configurator
+        nsd_item = area.nsd
 
-        for ran_area in self.ran_areas.values():
-            logger.info(f"Blue {self.get_id()} - Initializing RAN Day2 configurations for area {ran_area.id}")
-            # here we have to find the correct enb_configurator
-            nsd_item = ran_area.nsd
+        # TODO get area from config
+        vim: VimModel = self.get_topology().get_vim_from_area_id_model(area.id)
+        pdu_item = self.topology_get_pdu_by_area_and_type(area.id, 'nb')
 
-            # TODO get area from config
-            vim: VimModel = self.get_topology().get_vim_from_area_id_model(ran_area.id)
-            pdu_item = self.topology_get_pdu_by_area_and_type(ran_area.id, 'nb')
+        # allocating the correct configurator obj for the pnf
+        nb_configurator = self.db.findone_DB('pnf', {'type': pdu_item.implementation})
+        module = importlib.import_module(nb_configurator['module'])
+        Configurator_NB = getattr(module, nb_configurator['name'])
 
-            # allocating the correct configurator obj for the pnf
-            nb_configurator = self.db.findone_DB('pnf', {'type': pdu_item.implementation})
-            module = importlib.import_module(nb_configurator['module'])
-            Configurator_NB = getattr(module, nb_configurator['name'])
+        # TODO rewrite
+        if len(nsd_item.vld) > 1:
+            # TODO è giusto "data"?
+            wan_vld = next((item for item in nsd_item.vld if item.vld == 'datanet'), None)
+            if wan_vld is None:
+                raise ValueError('wan  vld not found')
+        else:
+            # this is for pnf with only 1 interface
+            wan_vld = nsd_item.vld[0]
 
-            # TODO rewrite
-            if len(nsd_item.vld) > 1:
-                # TODO è giusto "data"?
-                wan_vld = next((item for item in nsd_item.vld if item.vld == 'datanet'), None)
-                if wan_vld is None:
-                    raise ValueError('wan  vld not found')
-            else:
-                # this is for pnf with only 1 interface
-                wan_vld = nsd_item.vld[0]
+        conf_data = {
+            'plmn': self.blue_model_5g.config.plmn,
+            'tac': nsd_item.area_id,
+            'gtp_ip': area.nb_wan_ip,
+            'wan_nic_name': wan_vld.name,
+            'amf_ip': self.core_area.amf_ip,
+            'disable_offloading': "ens4",  # TODO get this from somewhere
+            'additional_ip_route': f"192.168.252.0/24 via {self.edge_areas[area.id].upf_data_ip} dev ens4"  # TODO get the network CIDR and interface name
+        }
 
-            conf_data = {
-                'plmn': self.blue_model_5g.config.plmn,
-                'tac': nsd_item.area_id,
-                'gtp_ip': ran_area.nb_wan_ip,
-                'wan_nic_name': wan_vld.name,
-                'amf_ip': self.core_area.amf_ip,
-                'disable_offloading': "ens4",  # TODO get this from somewhere
-                'additional_ip_route': f"192.168.252.0/24 via {self.edge_areas[ran_area.id].upf_data_ip} dev ens4"  # TODO get the network CIDR and interface name
-            }
+        # add already enabled slices to the ran
+        # TODO fix
+        slices = next(filter(lambda x: x.id == area.id, self.blue_model_5g.areas)).slices
+        if slices:
+            conf_data['nssai'] = [NssiConvertion.toNssi(i) for i in slices]
 
-            # add already enabled slices to the ran
-            # TODO fix
-            slices = next(filter(lambda x: x.id == ran_area.id, self.blue_model_5g.areas)).slices
-            if slices:
-                conf_data['nssai'] = [NssiConvertion.toNssi(i) for i in slices]
+        # override gnb settings from arg
+        # TODO fix
+        # if 'nb_config' in self.blue_model_5g.:
+        #     conf_data['nb_config'] = self.conf['nb_config']
+        # if 'tunnel' in self.conf:
+        #     conf_data['tunnel'] = self.conf['tunnel']
 
-            # override gnb settings from arg
-            # TODO fix
-            # if 'nb_config' in self.blue_model_5g.:
-            #     conf_data['nb_config'] = self.conf['nb_config']
-            # if 'tunnel' in self.conf:
-            #     conf_data['tunnel'] = self.conf['tunnel']
-
-            conf_obj = Configurator_NB(
-                f'{self.get_id()}_NGRAN_{nsd_item.area_id}',
-                1,
-                self.get_id(),
-                conf_data,
-                self.topology_get_pdu_by_area(nsd_item.area_id).model_dump(exclude_none=True)
-            )
-            # TODO a cosa serve?
-            # self.vnf_configurator.append(conf_obj)
-            res += conf_obj.dump()
-            logger.info("e/gNB configuration built for tac " + str(nsd_item.area_id))
+        conf_obj = Configurator_NB(
+            f'{self.get_id()}_NGRAN_{nsd_item.area_id}',
+            1,
+            self.get_id(),
+            conf_data,
+            self.topology_get_pdu_by_area(nsd_item.area_id).model_dump(exclude_none=True)
+        )
+        # TODO a cosa serve?
+        # self.vnf_configurator.append(conf_obj)
+        res += conf_obj.dump()
+        logger.info("e/gNB configuration built for tac " + str(nsd_item.area_id))
         return res
 
-    # def init_day2_conf(self, msg: dict) -> list:
-    #     logger.debug("Blue {} - Initializing Day2 configurations".format(self.get_id()))
-    #     res = []
-    #     tail_res = []
-    #
-    #     for n in self.nsd_:
-    #         if n['type'] == 'core':
-    #             logger.debug("Blue {} - running core Day2 configurations".format(self.get_id()))
-    #             res += self.core_day2_conf(msg, n)
-    #         elif n['type'] == 'edge':
-    #             logger.debug("Blue {} - running edge Day2 configurations".format(self.get_id()))
-    #             res += self.edge_day2_conf(msg, n)
-    #         elif n['type'] == 'ran':
-    #             logger.debug("Blue {} - running ran Day2 configurations".format(self.get_id()))
-    #             res += self.ran_day2_conf(msg, n)
-    #
-    #     self.add_ues(msg)
-    #
-    #     return res
+    def init_day2_conf(self, msg) -> list:
+        logger.info("Initializing Day2 configurations")
+        res = []
+        logger.info(f"Initializing Day2 configuration for core area {self.core_area.id}")
+        res += self.core_day2_conf(self.core_area)
+        for edge_area in self.edge_areas.values():
+            logger.info(f"Initializing Day2 configuration for edge area {edge_area.id}")
+            res += self.edge_day2_conf(edge_area)
+        for ran_area in self.ran_areas.values():
+            logger.info(f"Initializing Day2 configuration for ran area {ran_area.id}")
+            res += self.ran_day2_conf(ran_area)
+        return res
 
     @abstractmethod
     def add_ues(self, msg: dict):

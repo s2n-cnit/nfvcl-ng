@@ -205,17 +205,15 @@ class BlueSDCore(Blue5GBaseBeta):
         self.to_db()
         return [nsd_id]
 
-    def core_day2_conf(self, arg: dict, nsd_item: dict) -> list:
+    def core_day2_conf(self, area: CoreArea5G) -> list:
         """
         Used only to configure 5GC modules OpenStack VM (at the moment of this comment, it is only "UPF")
-        :param arg:
-        :param nsd_item:
+        :param area:
         :return:
         """
         logger.info("Initializing Core Day2 configurations")
         res = []
         res += self.core_init_values_update()
-        # res += self.core_init_values_update(upf_ip=self.edge_areas[self.core_area.id].upf_data_ip)
         return res
 
     def core_init_values_update(self) -> list:
@@ -245,25 +243,16 @@ class BlueSDCore(Blue5GBaseBeta):
 
         return self.kdu_upgrade(self.core_area.nsd, self.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True), self.KDU_NAME)
 
-    def edge_day2_conf(self, model_arg: dict, nsd_item: dict) -> list:
+    def edge_day2_conf(self, area: EdgeArea5G) -> list:
         logger.info("Initializing Edge Day2 configurations")
         res = []
-        for edge_area in self.edge_areas.values():
-            res += ConfiguratorSDCoreUpf(
-                edge_area.nsd.descr.nsd.nsd[0].id, 1, self.get_id(),
-                ConfiguratorSDCoreUPFVars(
-                    upf_data_cidr=edge_area.upf_data_network_cidr,
-                    upf_internet_iface=self.MGT_NETWORK_IF_NAME
-                )
-            ).dump()
-        return res
-
-    def init_day2_conf(self, msg) -> list:
-        logger.info("Initializing Day2 configurations")
-        res = []
-        res += self.core_day2_conf({}, {})
-        res += self.edge_day2_conf({}, {})
-        res += self.ran_day2_conf({}, {})
+        res += ConfiguratorSDCoreUpf(
+            area.nsd.descr.nsd.nsd[0].id, 1, self.get_id(),
+            ConfiguratorSDCoreUPFVars(
+                upf_data_cidr=area.upf_data_network_cidr,
+                upf_internet_iface=self.MGT_NETWORK_IF_NAME
+            )
+        ).dump()
         return res
 
     def get_ip(self) -> None:

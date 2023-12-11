@@ -41,5 +41,9 @@ echo "Building VNFM image"
 sudo docker build -t localhost:5000/vnfm-ee ./vnf_managers/helmflexvnfm --no-cache
 sudo docker push localhost:5000/vnfm-ee
 
+# Needed by some python packages (netifaces)
+echo "Installing build essential tools"
+sudo apt install build-essential
+
 echo "Installing Python project dependencies"
 /home/ubuntu/.local/bin/poetry install

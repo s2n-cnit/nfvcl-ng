@@ -130,13 +130,47 @@ OSM and Redis **IPs** sould be 127.0.0.1 if they are running on the same machine
 
 
 ## Run and Test NFVCL
+You can use _screen_ or create a service to run the NFVCL in the background
+### Using Screen
 Once configuration is done you can run the NFVCL in the background using **screen**.
+> :warning: It may be necessary to use the absolute path '/home/ubuntu/.local/bin/poetry' for running the NFVCL.
 ``` 
 screen -S nfvcl
 poetry run python ./run.py
 ```
 > :warning: To deatach from screen press **CTRL+a** then **d**.
 > To resume the screen run `screen -r nfvcl`.
+
+### Create a service
+Create a service file: `sudo nano /etc/systemd/system/nfvcl.service` with the following content
+>:warning: Change the values in case you performed a custom installation
+```
+[Unit]
+Description=Example service
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+WorkingDirectory=/home/ubuntu/nfvcl-ng
+Type=simple
+Restart=always
+RestartSec=10
+User=ubuntu
+ExecStart=/home/ubuntu/.local/bin/poetry run python /home/ubuntu/nfvcl-ng/run.py
+
+[Install]
+WantedBy=multi-user.target
+```
+```
+sudo systemctl daemon-reload
+sudo systemctl start nfvcl.service
+```
+Check the status of the service and, in case it's everything ok, enable the service.
+```
+sudo systemctl status nfvcl.service
+sudo systemctl enable nfvcl.service
+```
+
 
 ## Usage
 To interact with the NFVCL you must use REST APIs, a full list is available at:

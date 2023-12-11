@@ -1,4 +1,4 @@
-VyOS Blueprint home page
+VyOS Blueprint
 ====================================
 
 .. toctree::

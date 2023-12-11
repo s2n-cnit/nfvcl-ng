@@ -1,8 +1,6 @@
-###########################
-Free5GC Blueprint home page
-###########################
-
-.. title::
+==================
+Free5GC Blueprint
+==================
 
 .. _free5cg_index:
 

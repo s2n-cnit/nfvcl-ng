@@ -1,4 +1,4 @@
-UERANSIM Blueprint home page
+UERANSIM Blueprint
 ====================================
 
 .. toctree::

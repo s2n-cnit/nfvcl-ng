@@ -48,7 +48,7 @@ class K8sConfig(NFVCLBaseModel):
 
 
 class K8sBlueprintCreate(NFVCLBaseModel):
-    type: Literal['K8s', 'K8sBeta']
+    type: Literal['K8sBeta']
     callbackURL: Optional[str] = Field(
         None,
         description='url that will be used to notify when the blueprint processing finishes',

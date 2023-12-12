@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from models.base_model import NFVCLBaseModel
 from models.network import PduInterface
+from models.prometheus.prometheus_model import PrometheusTargetModel
 from models.vim.vim_models import VimLink, VimNetMap
 
 
@@ -132,7 +133,8 @@ class BlueprintBaseModel(NFVCLBaseModel):
     type: str
     vnfi: List = Field(default=[])
     deployment_units: List = Field(default=[])
-    node_exporters: List = Field(default=[], description="List of node exporters active in the blueprint.")
+    node_exporters: List[PrometheusTargetModel] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
+    prometheus_scraper_id: Optional[str] = Field(default=None, description="The prometheus instance in charge of metric scraping")
 
     """
     @field_validator('timestamp')

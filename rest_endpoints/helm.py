@@ -71,4 +71,4 @@ def create_helm_repo():
 
     # The repo name must not contain underscores _
     r = nbiUtil.add_k8s_repo(HELM_REPO_NAME, "http://{}:{}{}".format(nfvcl_config.nfvcl.ip, nfvcl_config.nfvcl.port, helm_url_prefix))
-    logger.debug('Adding helm repo result: {}'.format(r))
+    logger.info('Adding helm repo result: {}'.format(r))

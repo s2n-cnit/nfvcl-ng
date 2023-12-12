@@ -31,7 +31,7 @@ class TopologyModel(BaseModel):
         Args:
             prom_srv: The server to be added
         """
-        # The if is working because the __eq__ function has been overwritten in the PrometheusServerModel.
+        # The if is working because the __eq__ function has been overwritten in the PrometheusServerModel (on the id).
         if prom_srv in self.prometheus_srv:
             msg_err = "In the topology is already present a Prometheus server with id ->{}<-".format(prom_srv.id)
             logger.error(msg_err)
@@ -43,7 +43,7 @@ class TopologyModel(BaseModel):
         index = self.find_prom_srv_index(prom_srv_id)
         prom_srv_to_del = self.prometheus_srv[index]
 
-        if len(prom_srv_to_del.jobs) > 0 and not force:
+        if len(prom_srv_to_del.targets) > 0 and not force:
             msg_err = ("The prometheus instance to be deleted has configured jobs. You have to remove active "
                        "jobs or force the deletion in the request.")
             logger.error(msg_err)
@@ -128,6 +128,8 @@ class TopologyModel(BaseModel):
         # Onboarding the updated cluster if requested and previously not onboarded
         if old_k8s_cluster.nfvo_status == NfvoStatus.NOT_ONBOARDED and k8s_cluster.nfvo_onboard:
             self._k8s_cluster_onboard(k8s_cluster, osm_nbi_util)
+        elif k8s_cluster.nfvo_onboard:
+            logger.debug(f"The k8s cluster was not onboarded because of its status: {old_k8s_cluster.nfvo_status}. The status must be {NfvoStatus.NOT_ONBOARDED}")
         # Update in the topology information
         self.kubernetes[k8s_index] = k8s_cluster
 

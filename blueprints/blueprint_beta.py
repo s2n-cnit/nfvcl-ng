@@ -5,7 +5,7 @@ import traceback
 import importlib
 import abc
 from models.blueprint.blueprint_base_model import BlueprintBaseModel, BlueNSD, BlueprintVersion
-from models.blueprint.common import BlueEnablePrometheus
+from models.blueprint.common import BluePrometheus
 from models.blueprint.rest_blue import BlueGetDataModel, ShortBlueModel
 from models.network import NetworkModel, PduModel
 from nfvo import nsd_build_package, NbiUtil
@@ -13,7 +13,7 @@ from utils.prometheus_manager import PrometheusMan
 from models.blueprint.blue_types import blueprint_types
 from typing import List, Dict, Union, Callable
 from fastapi import APIRouter
-from topology.topology import Topology
+from topology.topology import Topology, get_topology
 from utils.persistency import DB
 from utils.log import create_logger
 
@@ -95,20 +95,24 @@ class BlueprintBaseBeta(abc.ABC):
         Returns:
             The loaded blueprint in its object form.
         """
+        # Looks for the matching blueprint in the database
         db_data = _db.findone_DB("blueprint-instances", {'id': blue_id})
         if not db_data:
             raise ValueError('blueprint {} not found in DB or malformed'.format(blue_id))
+
+        # Get the blueprint type
         type = db_data['conf']['type']
         if type not in blueprint_types:
             raise ValueError('type {} for blueprint {} not found'.format(type, blue_id))
+
+        # Get the class
         blue_class = blueprint_types[type]
         try:
-            return getattr(importlib.import_module("blueprints." + blue_class['module_name']),
-                           blue_class['class_name'])(db_data['conf'], blue_id, data=db_data)
+            # Call the constructor of the class using the db data as parameter
+            return getattr(importlib.import_module("blueprints." + blue_class['module_name']),blue_class['class_name'])(db_data['conf'], blue_id, data=db_data)
         except Exception:
             logger.error(traceback.format_exc())
-            raise ValueError('re-initialization for blueprint {} of type {} failed'
-                             .format(blue_id, db_data['type']))
+            raise ValueError('re-initialization for blueprint {} of type {} failed'.format(blue_id, db_data['type']))
 
     def delete_db(self):
         self.db.delete_DB("action_output", {'blue_id': self.base_model.id})
@@ -665,7 +669,7 @@ class BlueprintBaseBeta(abc.ABC):
             logger.info("no callback message is needed")
             return None
 
-    def setup_prom_scraping(self, prom_info: BlueEnablePrometheus):
+    def setup_prom_scraping(self, prom_info: BluePrometheus):
         """
         Set a scraping job on the requested prometheus server instance (present in the topology).
         The scraping job is configured on the node exporters that belong to the blueprint (present in
@@ -681,10 +685,29 @@ class BlueprintBaseBeta(abc.ABC):
             topology = Topology.from_db(self.db, self.osm_nbiutil, self.topology_lock)
             prom_server = topology.get_prometheus_server(prom_info.prom_server_id)
             # Add new jobs to the existing configuration
-            prom_server.add_jobs(targets=self.base_model.node_exporters, labels={'blueprint': self.get_id()})
+            prom_server.add_targets(targets=self.base_model.node_exporters)
             # Update the sd_file on the prometheus server.
             topology.update_prometheus_server(prom_server)
-            prom_server.update_remote_sd_file()
         else:
             raise ValueError("The prom_server_id is not present in the request")
 
+
+    def disable_prom_scraping(self):
+        """
+        Remove all scraping jobs, for each target of the blueprint, on the prometheus server.
+
+        Raises:
+            ValueError if the prom server instance is not found in the topology.
+        """
+        topology = get_topology()
+        if self.base_model.prometheus_scraper_id is None:
+            e_msg = f"Impossible to disable prometheus scraping for blue {self.base_model.id}, no prometheus scraper is present"
+            logger.error(e_msg)
+        elif len(self.base_model.node_exporters)>0:
+            prom_server = topology.get_prometheus_server(self.base_model.prometheus_scraper_id)
+            prom_server.del_targets(self.base_model.node_exporters)
+            topology.update_prometheus_server(prom_server)
+            prom_server.update_remote_sd_file()
+            logger.info(f"Successfully deleted all prometheus jobs for blue {self.base_model.id}")
+        else:
+            logger.info(f"There are NO prometheus jobs for blue {self.base_model.id}")

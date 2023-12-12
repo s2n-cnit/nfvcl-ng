@@ -40,14 +40,14 @@ def get_nfvcl_config() -> NFVCLConfigModel:
     # Using _nfvcl_config is present
     if not _nfvcl_config:
         _nfvcl_config = _load_nfvcl_config()
-        logger = create_logger("Util")
+        logger = create_logger("Util", ov_log_level=_nfvcl_config.log_level)
     return _nfvcl_config
 
 
 def _load_nfvcl_config() -> NFVCLConfigModel:
     """
     Read the NFVCL config from the configuration file. If config_dev.yaml is present, this function load from this file,
-    otherwise the function read the default config.yaml
+    otherwise the function reads the default config.yaml
 
     Returns:
         The NFVCL configuration
@@ -55,7 +55,7 @@ def _load_nfvcl_config() -> NFVCLConfigModel:
 
     dev_config_file_path = Path("config_dev.yaml")
     default_config_file_path = Path("config.yaml")
-    # Loading develop nfvcl file if present (Not uploaded on Git)
+    # Loading develops nfvcl file if present (Not uploaded on Git)
     config_file_path = dev_config_file_path if dev_config_file_path.is_file() else default_config_file_path
 
     with open(config_file_path, 'r') as stream_file:
@@ -88,7 +88,7 @@ def obj_multiprocess_lock(func):
         self.lock.acquire()
         logger.debug("Acquired lock")
 
-        # In case of crash we still need to unlock the semaphore -> TRY
+        # In case of crash, we still need to unlock the semaphore -> TRY
         try:
             #
             response = func(self, *args, **kwargs)
@@ -97,7 +97,7 @@ def obj_multiprocess_lock(func):
             logger.debug("Released lock")
             return response
         except Exception as excep:
-            # In case of crash we still need to unlock the semaphore
+            # In case of crash, we still need to unlock the semaphore
             self.lock.release()
             raise excep
 

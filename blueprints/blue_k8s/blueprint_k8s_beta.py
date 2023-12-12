@@ -5,12 +5,13 @@ from typing import Union, Dict, Optional, List
 from blueprints import parse_ansible_output
 from main import persistency
 from models.blueprint.blueprint_base_model import BlueVNFD
-from models.blueprint.common import BlueEnablePrometheus
+from models.blueprint.common import BluePrometheus
 from models.blueprint.rest_blue import BlueGetDataModel
 from models.k8s.blueprint_k8s_model import K8sBlueprintCreate, K8sBlueprintScale, K8sBlueprintModel, \
     K8sNsdInterfaceDesc
 from models.k8s.blueprint_k8s_model import LBPool, K8sAreaInfo
 from models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName
+from models.prometheus.prometheus_model import PrometheusTargetModel
 from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel, VMFlavors, \
     VimNetMap
 from models.virtual_link_desc import VirtLinkDescr
@@ -18,7 +19,7 @@ from nfvo import get_ns_vld_ip, NbiUtil
 from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from nfvo.vnf_manager_beta import Sol006VnfdBuilderBeta
-from topology.topology import Topology
+from topology.topology import Topology, get_topology
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 from utils.log import create_logger
 from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
@@ -58,14 +59,21 @@ class K8sBeta(BlueprintBaseBeta):
     @classmethod
     def rest_scale(cls, msg: K8sBlueprintScale, blue_id: str):
         """
-        Defines scale REST for this blueprint. In particular the type of message to be accepted by the scale APIs.
+        Allow to scale up or down the K8S cluster. It is possible to manage nodes belonging to a certain K8s cluster.
         """
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
-    def en_prom(cls, msg: BlueEnablePrometheus, blue_id: str):
+    def enable_prom(cls, msg: BluePrometheus, blue_id: str):
         """
-        Defines scale REST for this blueprint. In particular the type of message to be accepted by the scale APIs.
+        Install and configure a node exporter on each node belonging to the K8s cluster of the specified blueprint.
+        """
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def disable_prom(cls, msg: BluePrometheus, blue_id: str):
+        """
+        Install and configure a node exporter on each node belonging to the K8s cluster of the specified blueprint.
         """
         return cls.api_day2_function(msg, blue_id)
 
@@ -76,7 +84,8 @@ class K8sBeta(BlueprintBaseBeta):
         and the type of call (PUT).
         """
         cls.api_router.add_api_route("/{blue_id}/scale_new", cls.rest_scale, methods=["PUT"])
-        cls.api_router.add_api_route("/{blue_id}/en_prom", cls.en_prom, methods=["PUT"])
+        cls.api_router.add_api_route("/{blue_id}/enable_prom", cls.enable_prom, methods=["PUT"])
+        cls.api_router.add_api_route("/{blue_id}/disable_prom", cls.disable_prom, methods=["PUT"])
 
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         """
@@ -105,9 +114,15 @@ class K8sBeta(BlueprintBaseBeta):
             }],
             'monitor': [{
                 'day0': [],
-                'day2': [{'method': 'enable_node_exporter'},
+                'day2': [{'method': 'prom_pre_checks'},
+                         {'method': 'enable_node_exporter'},
                          {'method': 'enable_scraping'}],
                 'dayN': []
+            }],
+            'disable_monitor': [{
+                'day0': [],
+                'day2': [],
+                'dayN': [{'method': 'disable_scraping'}]
             }],
             'log': [{
                 'day0': [],
@@ -635,10 +650,12 @@ class K8sBeta(BlueprintBaseBeta):
         """
         Called when the blueprint is destroyed.
         """
-        # If onboarded, the k8s cluster is removed from OSM.
         logger.info("Destroying")
 
-        # K8s cluster is removed from the topology and from OSM
+        # Removing monitoring by prometheus
+        self.disable_scraping()
+
+        # K8s cluster is removed from the topology and from OSM if present
         topo: Topology = self.get_topology()
         try:
             topo.get_k8s_cluster(self.get_id())
@@ -654,8 +671,8 @@ class K8sBeta(BlueprintBaseBeta):
         """
         Retrieve information about VM instances IPs.
 
-        VMs are spawned by OSM and OpenStack, we do not decide IPs to be assigned to VMs.
-        For this reason it is necessary to obtain this data after they have been created.
+        VMs are spawned by OSM and OpenStack; we do not decide IPs to be assigned to VMs.
+        For this reason, it is necessary to obtain this data after they have been created.
         """
         logger.debug('getting IP addresses from vnf instances')
 
@@ -699,11 +716,29 @@ class K8sBeta(BlueprintBaseBeta):
 
         return {}
 
-    def enable_node_exporter(self, prom_info: BlueEnablePrometheus):
+
+    def prom_pre_checks(self, prom_info: BluePrometheus):
+        """
+        Checks that the specified prometheus server exists in the topology
+        Args:
+            prom_info: The message coming from the request
+
+        Returns:
+            An empty list of day2 primitives, checks do not need something to be executed
+        """
+        topology = get_topology()
+        # Raise Error if the prometheus server is not present
+        prom_server = topology.get_prometheus_server(prom_info.prom_server_id)
+
+        return [] # Return an empty list of day 2 primitives
+
+
+    # Do not remove unused parameter, otherwise it crashes for unexpected parameter when called!!!
+    def enable_node_exporter(self, prom_info: BluePrometheus):
         """
         Install in every area and every NSD the prometheus-node-exporter.
-        - For each nsd it creates a configurator and dump the configuration to be executed.
-        - Every configuration is executed and node-exporter is installed on every K8s worker and the controller.
+        - For each nsd it creates a configurator and dumps the configuration to be executed.
+        - Every configuration is executed, and node-exporter is installed on every K8s worker and the controller.
         - Save the list of node exporters in the base_model that will be used in the parent class to set up the
           prometheus job.
 
@@ -711,7 +746,7 @@ class K8sBeta(BlueprintBaseBeta):
             configuration dumps to be executed on the target nodes.
         """
         res = []
-        node_exporters_ip_list = []  # List to store all node exporters for server configuration
+        prom_target_list = []  # List to store all node exporters for server configuration
 
         # For each area we install, through APT install, the package node prometheus-node-exporter on every NSD
         for nsd in self.base_model.nsd_:
@@ -730,20 +765,25 @@ class K8sBeta(BlueprintBaseBeta):
             # If it is master
             if nsd.type == 'master':
                 configurator.set_mng_ip(self.k8s_model.config.controller_ip)
-                node_exporters_ip_list.append(self.k8s_model.config.controller_ip + ":9100")  # Adding to the node list
+                prom_target = PrometheusTargetModel()
+                prom_target.targets.append(self.k8s_model.config.controller_ip + ":9100")
+                prom_target.labels = {"type": "controller", "blue_id": self.get_id()}
+                prom_target_list.append(prom_target)  # Adding to the node list
             else:
                 # In case of worker we need to identify witch is the correct mgt IP of this worker
                 # We select the correct area (corresponding to the actual NSD)
                 area = next((area for area in self.k8s_model.areas if area.id == nsd.area_id), None)
                 if area is not None:
-                    # In the area we get the router that have the same nsd_name
+                    # In the area we get the router that has the same nsd_name
                     target_router_nsd_int = next((router_nsd_int for router_nsd_int in area.worker_mgt_int.values()
                                                   if router_nsd_int.nsd_name == nsd_item.name), None)
                     if target_router_nsd_int is not None:  # If found
                         # Add the FIRST management IP as management IP
                         configurator.set_mng_ip(target_router_nsd_int.vld[0].ip)
-                        node_exporters_ip_list.append(
-                            target_router_nsd_int.vld[0].ip + ":9100")  # Adding to the node list
+                        prom_target = PrometheusTargetModel()
+                        prom_target.targets.append(target_router_nsd_int.vld[0].ip + ":9100")
+                        prom_target.labels = {"type": "node", "blue_id": self.get_id()}
+                        prom_target_list.append(prom_target)  # Adding to the node list
                 else:
                     logger.warning("Area not found when trying to enable prometheus")
                     continue  # Skip the current iteration
@@ -752,11 +792,13 @@ class K8sBeta(BlueprintBaseBeta):
             res += configurator.enable_prometheus()
 
         # Saving the node exporter list to be permanent (and used by enable_scraping function)
-        self.base_model.node_exporters = node_exporters_ip_list
+        self.base_model.node_exporters = prom_target_list
+        # Setting the prometheus server as scraper for this blueprint
+        self.base_model.prometheus_scraper_id = prom_info.prom_server_id
         self.to_db()
         return res
 
-    def enable_scraping(self, prom_info: BlueEnablePrometheus):
+    def enable_scraping(self, prom_info: BluePrometheus):
         """
         Set a scraping job on the requested prometheus server instance. See setup_prom_scraping method for further info.
         Args:
@@ -765,3 +807,11 @@ class K8sBeta(BlueprintBaseBeta):
         """
         self.setup_prom_scraping(prom_info=prom_info)
         return []  # Return empty since VNFM does not have to execute tasks.
+
+    def disable_scraping(self, prom_info: BluePrometheus = None):
+        """
+        Disable and remove all scraping jobs by the prometheus server on this blueprint. It does not remove node exporters from each k8s node.
+        """
+        self.disable_prom_scraping()
+
+        return []

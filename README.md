@@ -2,8 +2,9 @@
 The NFVCL is a network-oriented meta-orchestrator, specifically designed for zeroOps and continuous automation. 
 It can create, deploy and manage the lifecycle of different network ecosystems by consistently coordinating multiple 
 artefacts at any programmability levels (from physical devices to cloud-native microservices).
-A more detailed description of the NFVCL will be added to the [Wiki](https://github.com/s2n-cnit/nfvcl-ng/wiki).
+A more detailed description of the NFVCL will be added to the [Wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html).
 
+This README content:
 <!-- TOC -->
 * [NFVCL-NG](#nfvcl-ng)
   * [External Architecture](#external-architecture)
@@ -14,6 +15,13 @@ A more detailed description of the NFVCL will be added to the [Wiki](https://git
     * [Step 2 - Install Redis, Uvicorn, MongoDB and requirements](#step-2---install-redis-uvicorn-mongodb-and-requirements)
     * [Step 3 - Configure NFVCL, Redis and MongoDB](#step-3---configure-nfvcl-redis-and-mongodb)
   * [Run and Test NFVCL](#run-and-test-nfvcl)
+    * [Using Screen](#using-screen)
+    * [Create a service](#create-a-service)
+  * [Usage](#usage)
+  * [Debug](#debug)
+    * [Log file](#log-file)
+    * [Redis **NFVCL_LOG** topic](#redis-nfvcllog-topic)
+  * [Report Issues](#report-issues)
 <!-- TOC -->
 
 ## External Architecture
@@ -178,7 +186,7 @@ To interact with the NFVCL you must use REST APIs, a full list is available at:
 
 > :warning: Before you begin you will need to define the topology using the appropriate APIs.
 
-You can find request examples in the [wiki](https://github.com/s2n-cnit/nfvcl-ng/wiki)
+You can find request examples in the [wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html)
 
 
 ## Debug

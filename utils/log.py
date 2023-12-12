@@ -52,43 +52,49 @@ ROOT_LOGGER_NAME = "RootLogger"
 formatter = logging.Formatter(coloredlog_format_string)
 
 
-def create_logger(name: str) -> logging.Logger:
+def create_logger(name: str, ov_log_level: int = None) -> logging.Logger:
     """
-    Creates a logger that is outputting on: console, redis and on file.
-    In this way an external entity to the NFVCL is able to observe what is going on.
-    The log file allow permanent info in case of failure (NB on next restart the log file is overwritten)
+    Creates a logger outputting on: console, redis, and on file.
+    In this way, an external entity to the NFVCL is able to observe what is going on.
+    The log file allows permanent info in case of failure (NB on next restart the log file is overwritten)
 
     Args:
-
         name: The name of the logger to be displayed in logs.
+        ov_log_level: Can be used to override global log level
 
     Returns:
 
         The created logger
     """
+    # If defined use override log level, otherwise the global.
+    if ov_log_level is not None:
+        local_log_level = ov_log_level
+    else:
+        local_log_level = _log_level
+
     logger = verboselogs.VerboseLogger(name)
     logger.parent = logging.getLogger(ROOT_LOGGER_NAME)
 
     # Adding file handler to post log into file
     # w = every restart log is cleaned
     log_file_handler = RotatingFileHandler("logs/nfvcl.log", maxBytes=10000000, backupCount=4)
-    log_file_handler.setLevel(_log_level)
+    log_file_handler.setLevel(local_log_level)
     log_file_handler.setFormatter(formatter)
     logger.addHandler(log_file_handler)
 
-    # If the config is not yet loaded we cannot get the Redis instance
+    # If the config is not yet loaded, we cannot get the Redis instance
     # Workaround for logging before loading config
     if is_config_loaded():
-        # Adding Redis handler to output the log to redis through publish
+        # Adding Redis handler to output the log to redis through publication
         from utils.redis_utils.redis_manager import get_redis_instance
         _redis_cli: Redis = get_redis_instance()
         redis_handler = RedisLoggingHandler(_redis_cli)
-        redis_handler.setLevel(_log_level)
+        redis_handler.setLevel(local_log_level)
         redis_handler.setFormatter(formatter)
         logger.addHandler(redis_handler)
 
     coloredlogs.install(
-        level=_log_level,
+        level=local_log_level,
         logger=logger,
         fmt=coloredlog_format_string,
         field_styles=field_styles,

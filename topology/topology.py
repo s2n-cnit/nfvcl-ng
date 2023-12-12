@@ -7,6 +7,7 @@ from models.network.network_models import RouterPortModel, IPv4ReservedRange
 from models.prometheus.prometheus_model import PrometheusServerModel
 from models.vim import VimModel, UpdateVimModel
 from topology.topology_events import TopologyEventType
+from utils import persistency
 from utils.log import create_logger
 from utils.ipam import *
 from utils.util import remove_files_by_pattern
@@ -14,7 +15,7 @@ from topology.vim_terraform import VimTerraformer
 from models.topology import TopologyModel
 from models.network import PduModel, NetworkModel, RouterModel
 from utils.persistency import OSSdb
-from nfvo.osm_nbi_util import NbiUtil
+from nfvo.osm_nbi_util import NbiUtil, get_osm_nbi_utils
 import typing
 import json
 import traceback
@@ -970,6 +971,7 @@ class Topology:
             prom_server: The prometheus server to be updated
         """
         updated_instance = self._model.upd_prometheus_srv(prom_server)
+        prom_server.update_remote_sd_file()
 
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_UPDATE_PROM_SRV, updated_instance.model_dump())
@@ -999,3 +1001,14 @@ class Topology:
         """
         list_model = self._data['prometheus_srv']
         return list_model
+
+
+def get_topology() -> Topology:
+    """
+    Build and returns a topology item.
+    Returns:
+        A topology object ready to operate on the topology.
+    """
+    nbiUtil = get_osm_nbi_utils()
+    db = persistency.DB()
+    return Topology.from_db(db,nbiUtil,topology_lock)

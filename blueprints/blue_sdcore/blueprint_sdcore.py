@@ -3,7 +3,7 @@ from typing import *
 
 from pydantic import Field
 
-from blueprints.blue_5g_base.blueprint_5g_base_beta import Blue5GBaseBeta, EdgeArea5G, CoreArea5G, Area5GTypeEnum
+from blueprints.blue_5g_base.blueprint_5g_base_beta import Blue5GBaseBeta, EdgeArea5G, CoreArea5G, Area5GTypeEnum, RanArea5G
 from blueprints.blue_sdcore import sdcore_default_config
 from blueprints.blue_sdcore.configurators.sdcore_upf_configurator import ConfiguratorSDCoreUpf, \
     ConfiguratorSDCoreUPFVars
@@ -254,6 +254,13 @@ class BlueSDCore(Blue5GBaseBeta):
             )
         ).dump()
         return res
+
+    def get_additional_ran_conf(self, area: RanArea5G) -> dict:
+        additional_config = {
+            'disable_offloading': self.WAN_NETWORK_IF_NAME,
+            'additional_ip_route': f"192.168.252.0/24 via {self.edge_areas[area.id].upf_data_ip} dev {self.WAN_NETWORK_IF_NAME}"
+        }
+        return additional_config
 
     def get_ip(self) -> None:
         logger.info('Getting IP addresses of VNFIs (ext version)')

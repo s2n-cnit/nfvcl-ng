@@ -316,7 +316,7 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
                     ),
                     site_name=site_name,
                     upf=Upf(
-                        upf_name="PLACEHOLDER",
+                        upf_name=f"{site_name}-upf",
                         upf_port=8805
                     )
                 )

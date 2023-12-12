@@ -185,14 +185,14 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         vim_net_mapping = [
             VimNetMap.build_vnm(
                 "mgt",
-                "ens3",
+                self.MGT_NETWORK_IF_NAME,
                 self.networks_5g.mgt,
                 True,
                 "mgt_net"
             ),
             VimNetMap.build_vnm(
                 "datanet",
-                "ens4",
+                self.WAN_NETWORK_IF_NAME,
                 self.networks_5g.wan,
                 False,
                 "data_net"
@@ -244,6 +244,10 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
     def edge_day2_conf(self, area: EdgeArea5G) -> List[str]:
         pass
 
+    @abstractmethod
+    def get_additional_ran_conf(self, area: RanArea5G) -> dict:
+        pass
+
     def ran_day2_conf(self, area: RanArea5G) -> list:
         res = []
         logger.info(f"Blue {self.get_id()} - Initializing RAN Day2 configurations for area {area.id}")
@@ -274,13 +278,13 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
             'tac': nsd_item.area_id,
             'gtp_ip': area.nb_wan_ip,
             'wan_nic_name': wan_vld.name,
-            'amf_ip': self.core_area.amf_ip,
-            'disable_offloading': "ens4",  # TODO get this from somewhere
-            'additional_ip_route': f"192.168.252.0/24 via {self.edge_areas[area.id].upf_data_ip} dev ens4"  # TODO get the network CIDR and interface name
+            'amf_ip': self.core_area.amf_ip
         }
 
+        # Merge dictionaries
+        conf_data = conf_data | self.get_additional_ran_conf(area)
+
         # add already enabled slices to the ran
-        # TODO fix
         slices = next(filter(lambda x: x.id == area.id, self.blue_model_5g.areas)).slices
         if slices:
             conf_data['nssai'] = [NssiConvertion.toNssi(i) for i in slices]
@@ -299,8 +303,6 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
             conf_data,
             self.topology_get_pdu_by_area(nsd_item.area_id).model_dump(exclude_none=True)
         )
-        # TODO a cosa serve?
-        # self.vnf_configurator.append(conf_obj)
         res += conf_obj.dump()
         logger.info("e/gNB configuration built for tac " + str(nsd_item.area_id))
         return res

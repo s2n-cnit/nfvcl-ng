@@ -13,6 +13,7 @@ logger = create_logger('ConfiguratorSDCoreUpf')
 class ConfiguratorSDCoreUPFVars(NFVCLBaseModel):
     upf_data_cidr: str = Field()
     upf_internet_iface: str = Field()
+    upf_ue_ip_pool: str = Field()
 
 
 class ConfiguratorSDCoreUpf(Configurator_Flex):
@@ -28,7 +29,9 @@ class ConfiguratorSDCoreUpf(Configurator_Flex):
             'path': '/root/upf/conf',
             'transfer_name': f"{blue_id}_upf.json",
             'name': "upf.json"
-        }, {}, ansible_template_resolver=True)
+        }, {
+            "upf_ue_ip_pool": args.upf_ue_ip_pool
+        }, ansible_template_resolver=True)
 
         self.addJinjaTemplateFile({
             'template': 'blueprints/blue_sdcore/config_scripts/run_upf.env.jinja2',
@@ -37,7 +40,8 @@ class ConfiguratorSDCoreUpf(Configurator_Flex):
             'name': "run_upf.env"
         }, {
             "upf_data_cidr": args.upf_data_cidr,
-            "upf_internet_iface": args.upf_internet_iface
+            "upf_internet_iface": args.upf_internet_iface,
+            "upf_ue_ip_pool": args.upf_ue_ip_pool
         })
 
         self.appendPbTasks("blueprints/blue_sdcore/config_scripts/playbook_upf_start.yaml", jinja=False)

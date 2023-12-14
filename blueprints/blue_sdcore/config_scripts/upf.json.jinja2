@@ -25,7 +25,7 @@
     "dnn": "internet",
     "hostname": "{{ '{{ instance_hostname }}' }}",
     "enable_ue_ip_alloc": false,
-    "ue_ip_pool": "172.250.0.0/16",
+    "ue_ip_pool": "{{ confvar.upf_ue_ip_pool }}",
     "http_port": "8080"
   },
   "qci_qos_config": [

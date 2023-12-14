@@ -8,7 +8,7 @@ from blueprints.blue_sdcore import sdcore_default_config
 from blueprints.blue_sdcore.configurators.sdcore_upf_configurator import ConfiguratorSDCoreUpf, \
     ConfiguratorSDCoreUPFVars
 from blueprints.blue_sdcore.sdcore_models import BlueSDCoreCreateModel
-from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml, SDCoreValuesModel, NetworkSlice
+from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml, SDCoreValuesModel, NetworkSlice, DeviceGroup
 from models.base_model import NFVCLBaseModel
 from models.blueprint.blueprint_base_model import BlueKDUConf, BlueVNFD, BlueNSD
 from models.blueprint.rest_blue import BlueGetDataModel
@@ -57,6 +57,7 @@ class BlueSDCore(Blue5GBaseBeta):
     KDU_NAME = "sdcore"
     VNF_ID_SUFFIX = "sdcore"
     NS_ID_INFIX = "SDCORE"
+    UPF_IMAGE_NAME = "SDCore-UPF-v0.3.0"
 
     @classmethod
     def rest_create(cls, msg: BlueSDCoreCreateModel):
@@ -149,7 +150,7 @@ class BlueSDCore(Blue5GBaseBeta):
         logger.info("Creating Edge VNFD(s)")
         created_vdu = VirtualDeploymentUnit.build_vdu(
             f"upf_{area.id}",
-            "sdcore-upf",
+            self.UPF_IMAGE_NAME,
             list(map(lambda x: x.vim_net, vls[1:])),
             VMFlavors(vcpu_count="4", memory_mb="4096", storage_gb="16")
         )
@@ -231,6 +232,11 @@ class BlueSDCore(Blue5GBaseBeta):
                 network_slice: NetworkSlice = list(filter(lambda x: x.slice_id.sd == slice_in_area.sliceId, self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.network_slices))[0]
                 network_slice.site_info.upf.upf_name = self.edge_areas[self.edge_areas[area_for_slice.id].id].upf_data_ip
 
+                # Set the ip pool in the edge area
+                # TODO this only work with 1 device group
+                device_group: DeviceGroup = list(filter(lambda x: x.name == network_slice.site_device_group[0], self.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.device_groups))[0]
+                self.edge_areas[self.edge_areas[area_for_slice.id].id].upf_ue_ip_pool = device_group.ip_domain_expanded.ue_ip_pool
+
         # Changing this value force a pod restart, this may be avoided changing the helm chart to add a new unused field inside the pod spec
         self.blue_model_5g.sdcore_config_values.omec_sub_provision.images.pull_policy = "Always"
         # TODO check if needed
@@ -250,7 +256,8 @@ class BlueSDCore(Blue5GBaseBeta):
             area.nsd.descr.nsd.nsd[0].id, 1, self.get_id(),
             ConfiguratorSDCoreUPFVars(
                 upf_data_cidr=area.upf_data_network_cidr,
-                upf_internet_iface=self.MGT_NETWORK_IF_NAME
+                upf_internet_iface=self.MGT_NETWORK_IF_NAME,
+                upf_ue_ip_pool=area.upf_ue_ip_pool
             )
         ).dump()
         return res

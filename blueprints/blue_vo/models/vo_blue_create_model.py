@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -8,6 +8,7 @@ class NetEndpoints(BaseModel):
 
 class Config(BaseModel):
     network_endpoints: NetEndpoints
+    vo: Dict[str, Any]
 
 
 class Area(BaseModel):
@@ -15,7 +16,7 @@ class Area(BaseModel):
 
 
 class VoBlueprintRequestInstance(BaseModel):
-    type: Literal["vo"] = Field(
+    type: Literal["VO"] = Field(
         None, description='type of the requested Blueprint'
     )
     callbackURL: Optional[str] = Field(

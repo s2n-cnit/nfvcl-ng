@@ -59,7 +59,7 @@ git clone --depth 1 https://github.com/s2n-cnit/nfvcl-ng
 > Edit _install_osm.sh_ and add before the last line the following:
 > 
 > ```
-> sudo sed -i 's@.*juju deploy ch:mongodb-k8s.*@juju deploy ch:mongodb-k8s -m $OSM_NAMESPACE --channel latest/stable@' /usr/share/osm-devops/installers/full_install_osm.sh`
+> sudo sed -i 's@.*juju deploy ch:mongodb-k8s.*@juju deploy ch:mongodb-k8s -m $OSM_NAMESPACE --channel latest/stable@' /usr/share/osm-devops/installers/full_install_osm.sh
 > ```
 > The resulting 3 last line should be:a
 > ``` bash

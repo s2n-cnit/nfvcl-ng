@@ -15,6 +15,8 @@ class Category(Enum):
     field_5G = '5G'
     service = 'service'
 
+class Area(BaseModel):
+    id: int = Field(..., description='identifier of the topology area to be used for deployment')
 
 class Vim(BaseModel):
     name: str = Field(..., description='name of the VIM (as onboarded into the NFVO)')
@@ -37,8 +39,8 @@ class MqttRequestBlueprintInstance(BaseModel):
         None,
         description='parameters for the day2 configuration of the Blueprint instance',
     )
-    vims: Optional[List[Vim]] = Field(
+    areas: Optional[List[Area]] = Field(
         None,
-        description='list of VIMs to be used for the Blueprint instantiation',
+        description='list of Areas to be used for the Blueprint instantiation',
         min_items=1,
     )

@@ -49,8 +49,6 @@ class MqttBroker(BlueprintBase):
                 'dayN': []
             }],
         }
-        self.primitives = []
-        self.vnfd = []
 
     def bootstrap_day0(self, msg: dict) -> list:
         return self.nsd()
@@ -61,14 +59,14 @@ class MqttBroker(BlueprintBase):
             'name': '{}_mqtt_broker'.format(self.get_id()),
             'kdu': [{
                 'name': 'mqtt_broker',
-                'helm-chart': 'nfvcl_helm_repo/mqttbroker:0.0.2',
+                'helm-chart': 'nfvcl/mqttbroker',
                 'interface': interfaces
             }]})
-        self.vnfd.append({'id': 'mqtt_broker', 'name': vnfd.get_id(), 'vl': interfaces})
+        self.vnfd["area"] = {'id': 'mqtt_broker', 'name': vnfd.get_id(), 'vl': interfaces}
         logger.debug(self.vnfd)
 
     def getVnfd(self):
-        return self.vnfd[0]
+        return self.vnfd["area"]
 
     def broker_nsd(self, area: dict) -> str:
         logger.info("Blue {} building NSD".format(self.get_id()))

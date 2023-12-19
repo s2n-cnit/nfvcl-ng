@@ -49,8 +49,6 @@ class VO(BlueprintBase):
                 'dayN': []
             }],
         }
-        self.primitives = []
-        self.vnfd = []
 
     def upgrade(self, msg: dict) -> list:
         pass
@@ -64,14 +62,14 @@ class VO(BlueprintBase):
         'name': '{}_vo'.format(self.get_id()),
         'kdu': [{
             'name': 'vo',
-            'helm-chart': 'nfvcl_helm_repo/vobject:0.0.10',
+            'helm-chart': 'nfvcl/vobject',
             'interface': interfaces
         }]})
-        self.vnfd.append({'id': 'vo', 'name': vnfd.get_id(), 'vl': interfaces})
+        self.vnfd["vo"] = {'id': 'vo', 'name': vnfd.get_id(), 'vl': interfaces}
         logger.debug(self.vnfd)
 
     def getVnfd(self):
-        return self.vnfd[0]
+        return self.vnfd["vo"]
 
     def vo_nsd(self, area: dict) -> str:
         # fixme: annotate the helm chart with the area
@@ -102,7 +100,8 @@ class VO(BlueprintBase):
                     "registry": "docker.io",
                     "repository": "smartssrl/ebrewery",
                     "pullPolicy": "IfNotPresent"
-                }
+                },
+                "voname": "vo"
                 # "extIPaddress": "172.16.200.151"
             }}]
         }]

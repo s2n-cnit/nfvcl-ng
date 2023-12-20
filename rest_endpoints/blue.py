@@ -238,6 +238,7 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
         if 'version' in db_data:
             if db_data['version'] == BlueprintVersion.ver2_00.value:
                 version = BlueprintVersion.ver2_00
+        # TODO should be BlueprintBaseBeta for v2
         blue = BlueprintBase.from_db(blue_id)  # USED ONLY FOR LOGGING PURPOSE
 
     except Exception:

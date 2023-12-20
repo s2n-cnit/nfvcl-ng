@@ -6,7 +6,7 @@ from blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
 from pydantic import Field
 
 from blueprints.blue_5g_base.models import Create5gModel
-from blueprints.blue_5g_base.models.blue_5g_model import SubDataNets, SubSliceProfiles, SubArea
+from blueprints.blue_5g_base.models.blue_5g_model import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers
 from models.base_model import NFVCLBaseModel
 from utils.log import create_logger
 
@@ -223,6 +223,9 @@ class Plmn(NFVCLBaseModel):
     mcc: str
     mnc: str
 
+    def as_single_string(self) -> str:
+        return f'{self.mcc}{self.mnc}'
+
 
 class Upf(NFVCLBaseModel):
     upf_name: str = Field(..., alias='upf-name')
@@ -252,6 +255,8 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
     subscribers: List[Subscriber]
     device_groups: List[DeviceGroup] = Field(..., alias='device-groups')
     network_slices: List[NetworkSlice] = Field(..., alias='network-slices')
+
+    plmn: Optional[str] = Field(default=None)
 
     def __get_areas_with_slice(self, generic_model: Create5gModel, slice_profile: SubSliceProfiles) -> List[SubArea]:
         area_list: List[SubArea] = []
@@ -295,6 +300,8 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
             logger.warning("config.subscribers[].snssai[].pduSessionIds IGNORED")
             logger.warning("config.subscribers[].snssai[].default_slice IGNORED")
 
+            self.plmn = generic_model.config.plmn
+
             new_network_slice = NetworkSlice(
                 name=slice_name,
                 slice_id=SliceId(
@@ -311,8 +318,8 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
                 site_info=SiteInfo(
                     g_node_bs=list(map(lambda x: GNodeB(name=f"gnb{x.id}", tac=x.id), self.__get_areas_with_slice(generic_model, generic_slice))),
                     plmn=Plmn(
-                        mcc=generic_model.config.plmn[:3],
-                        mnc=generic_model.config.plmn[3:]
+                        mcc=self.plmn[:3],
+                        mnc=self.plmn[3:]
                     ),
                     site_name=site_name,
                     upf=Upf(
@@ -349,22 +356,31 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
             self.network_slices.append(new_network_slice)
 
         for generic_subscriber in generic_model.config.subscribers:
-            self.subscribers.append(Subscriber(
-                ue_id_start=generic_subscriber.imsi,
-                ue_id_end=generic_subscriber.imsi,
-                plmn_id=generic_model.config.plmn,
-                opc=generic_subscriber.opc,
-                op="",
-                key=generic_subscriber.k,
-                sequence_number="16f3b3f70fc2"  # TODO where should we get this from
-            ))
-            for generic_subscriber_snssai in generic_subscriber.snssai:
-                # TODO check size, should be 1
-                matching_slice: NetworkSlice = list(filter(lambda x: x.slice_id.sd == generic_subscriber_snssai.sliceId, self.network_slices))[0]
-                # TODO check size, should be 1
-                # TODO need to be changed if we implement DeviceGroup configuration support (matching_slice.site_device_group)
-                matching_device_groups: DeviceGroup = list(filter(lambda x: x.name == matching_slice.site_device_group[0], self.device_groups))[0]
-                matching_device_groups.imsis.append(generic_subscriber.imsi)
+            self.add_subscriber_from_generic_model(generic_subscriber)
+
+    def add_subscriber_from_generic_model(self, generic_subscriber: SubSubscribers):
+        self.subscribers.append(Subscriber(
+            ue_id_start=generic_subscriber.imsi,
+            ue_id_end=generic_subscriber.imsi,
+            plmn_id=self.plmn,
+            opc=generic_subscriber.opc,
+            op="",
+            key=generic_subscriber.k,
+            sequence_number="16f3b3f70fc2"  # TODO where should we get this from
+        ))
+        for generic_subscriber_snssai in generic_subscriber.snssai:
+            # TODO check size, should be 1
+            matching_slice: NetworkSlice = list(filter(lambda x: x.slice_id.sd == generic_subscriber_snssai.sliceId, self.network_slices))[0]
+            # TODO check size, should be 1
+            # TODO need to be changed if we implement DeviceGroup configuration support (matching_slice.site_device_group)
+            matching_device_groups: DeviceGroup = list(filter(lambda x: x.name == matching_slice.site_device_group[0], self.device_groups))[0]
+            matching_device_groups.imsis.append(generic_subscriber.imsi)
+
+    def delete_subscriber(self, imsi: str):
+        subscriber_to_delete = next(filter(lambda x: x.ue_id_start == imsi, self.subscribers), None)
+        if not subscriber_to_delete:
+            raise ValueError(f"Subscriber {imsi} does not exist")
+        self.subscribers.remove(subscriber_to_delete)
 
 
 class SimAppYaml(NFVCLBaseModel):

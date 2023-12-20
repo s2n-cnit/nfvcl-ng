@@ -86,6 +86,7 @@ class BlueprintBaseBeta(abc.ABC):
 
     @classmethod
     def from_db(cls, blue_id: str):
+        logger.debug(f"Loading {blue_id} from DB")
         """
         Return a blueprint loaded from the database. If the blueprint type is not recognized, then an error is thrown.
 
@@ -119,6 +120,7 @@ class BlueprintBaseBeta(abc.ABC):
         self.db.delete_DB("blueprint-instances", {'id': self.base_model.id})
 
     def to_db(self):
+        logger.debug(f"Saving {self.base_model.id} to DB")
         self.base_model.modified = datetime.datetime.now()
         # self.base_model.model_dump() is NOT working, some fields remain object
         data_serialized = json.loads(self.base_model.model_dump_json(by_alias=True))

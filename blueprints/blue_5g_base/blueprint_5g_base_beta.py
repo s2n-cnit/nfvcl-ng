@@ -1,7 +1,7 @@
 import importlib
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 
 from pydantic import Field
 
@@ -9,13 +9,14 @@ from blueprints.blue_5g_base.models import Create5gModel
 from blueprints.blue_5g_base.models.blue_5g_model import SubArea, SubSlices
 from blueprints.blueprint_beta import BlueprintBaseBeta
 from models.base_model import NFVCLBaseModel
-from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
+from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD, BlueprintBaseModel
 from models.network import PduModel
 from models.vim.vim_models import VimNetMap, VirtualNetworkFunctionDescriptor, PhysicalDeploymentUnit, VimModel
-from nfvo import get_ns_vld_ip
+from nfvo import get_ns_vld_ip, NbiUtil
 from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta
 from nfvo.vnf_manager_beta import Sol006VnfdBuilderBeta
 from utils.log import create_logger
+from utils.persistency import DB
 
 # create logger
 logger = create_logger('Abstract5GBlueBeta')
@@ -82,62 +83,69 @@ class Networks5G(NFVCLBaseModel):
     mgt: str
 
 
-class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
-    blue_model_5g: Create5gModel
-    core_vim: VimModel
-    networks_5g: Networks5G
-    core_area: CoreArea5G
+class Blueprint5GBaseModel(BlueprintBaseModel):
+    blue_model_5g: Optional[Create5gModel] = Field(default=None)
+    core_vim: Optional[VimModel] = Field(default=None)
+    networks_5g: Optional[Networks5G] = Field(default=None)
+    core_area: Optional[CoreArea5G] = Field(default=None)
     edge_areas: Dict[int, EdgeArea5G] = {}
     ran_areas: Dict[int, RanArea5G] = {}
 
+
+class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
     # TODO get these from the VMs, maybe using the CIDR of their network
     MGT_NETWORK_IF_NAME = "ens3"
     WAN_NETWORK_IF_NAME = "ens4"
 
+    def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None, db: DB = None, nbiutil: NbiUtil = None):
+        super().__init__(conf, id_, data, db, nbiutil)
+        # This convert the base_model to the Blueprint5GBaseModel, it is necessary to store more data in the persistence layer
+        self.base_model = Blueprint5GBaseModel.model_validate(self.base_model.model_dump())
+
     def init_base(self):
         logger.debug("init_base")
-        core_areas = list(filter(lambda x: x.core, self.blue_model_5g.areas))
-        non_core_areas = list(filter(lambda x: not x.core, self.blue_model_5g.areas))
+        core_areas = list(filter(lambda x: x.core, self.base_model.blue_model_5g.areas))
+        non_core_areas = list(filter(lambda x: not x.core, self.base_model.blue_model_5g.areas))
 
         if len(core_areas) == 1:
-            self.core_area = CoreArea5G(id=core_areas[0].id)
-            self.edge_areas[core_areas[0].id] = EdgeArea5G(id=core_areas[0].id)
-            self.ran_areas[core_areas[0].id] = RanArea5G(id=core_areas[0].id)
+            self.base_model.core_area = CoreArea5G(id=core_areas[0].id)
+            self.base_model.edge_areas[core_areas[0].id] = EdgeArea5G(id=core_areas[0].id)
+            self.base_model.ran_areas[core_areas[0].id] = RanArea5G(id=core_areas[0].id)
         else:
             # TODO is this correct?
             raise ValueError("Only one area is allowed for core")
 
         for non_core_area in non_core_areas:
-            self.edge_areas[non_core_area.id] = EdgeArea5G(id=non_core_area.id)
-            self.ran_areas[non_core_area.id] = RanArea5G(id=non_core_area.id)
+            self.base_model.edge_areas[non_core_area.id] = EdgeArea5G(id=non_core_area.id)
+            self.base_model.ran_areas[non_core_area.id] = RanArea5G(id=non_core_area.id)
 
-        self.core_vim = self.get_topology().get_vim_from_area_id_model(self.core_area.id)
+        self.base_model.core_vim = self.get_topology().get_vim_from_area_id_model(self.base_model.core_area.id)
         self.check_and_set_networks()
 
     def check_and_set_networks(self):
-        if self.blue_model_5g.config.network_endpoints.wan in self.core_vim.networks:
-            wan_network = self.blue_model_5g.config.network_endpoints.wan
+        if self.base_model.blue_model_5g.config.network_endpoints.wan in self.base_model.core_vim.networks:
+            wan_network = self.base_model.blue_model_5g.config.network_endpoints.wan
         else:
-            raise ValueError(f"Network {self.blue_model_5g.config.network_endpoints.wan} not found in VIM")
+            raise ValueError(f"Network {self.base_model.blue_model_5g.config.network_endpoints.wan} not found in VIM")
 
-        if self.blue_model_5g.config.network_endpoints.mgt in self.core_vim.networks:
-            mgt_network = self.blue_model_5g.config.network_endpoints.mgt
+        if self.base_model.blue_model_5g.config.network_endpoints.mgt in self.base_model.core_vim.networks:
+            mgt_network = self.base_model.blue_model_5g.config.network_endpoints.mgt
         else:
-            raise ValueError(f"Network {self.blue_model_5g.config.network_endpoints.mgt} not found in VIM")
-        self.networks_5g = Networks5G(wan=wan_network, mgt=mgt_network)
+            raise ValueError(f"Network {self.base_model.blue_model_5g.config.network_endpoints.mgt} not found in VIM")
+        self.base_model.networks_5g = Networks5G(wan=wan_network, mgt=mgt_network)
 
     def nsd(self) -> List[str]:
         nsd_list: List[str] = []
 
         # Core area NSDs
-        nsd_list.extend(self.core_nsd(self.core_area))
+        nsd_list.extend(self.core_nsd(self.base_model.core_area))
 
         # Edge areas NSDs
-        for edge_area in self.edge_areas.values():
+        for edge_area in self.base_model.edge_areas.values():
             nsd_list.extend(self.edge_nsd(edge_area))
 
         # Ran areas NSDs
-        for ran_area in self.ran_areas.values():
+        for ran_area in self.base_model.ran_areas.values():
             nsd_list.extend(self.ran_nsd(ran_area))
 
         logger.info("Blue {} - created NSDs: {}".format(self.get_id(), nsd_list))
@@ -187,14 +195,14 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
             VimNetMap.build_vnm(
                 "mgt",
                 self.MGT_NETWORK_IF_NAME,
-                self.networks_5g.mgt,
+                self.base_model.networks_5g.mgt,
                 True,
                 "mgt_net"
             ),
             VimNetMap.build_vnm(
                 "datanet",
                 self.WAN_NETWORK_IF_NAME,
-                self.networks_5g.wan,
+                self.base_model.networks_5g.wan,
                 False,
                 "data_net"
             )
@@ -275,18 +283,18 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
             wan_vld = nsd_item.vld[0]
 
         conf_data = {
-            'plmn': self.blue_model_5g.config.plmn,
+            'plmn': self.base_model.blue_model_5g.config.plmn,
             'tac': nsd_item.area_id,
             'gtp_ip': area.nb_wan_ip,
             'wan_nic_name': wan_vld.name,
-            'amf_ip': self.core_area.amf_ip
+            'amf_ip': self.base_model.core_area.amf_ip
         }
 
         # Merge dictionaries
         conf_data = conf_data | self.get_additional_ran_conf(area)
 
         # add already enabled slices to the ran
-        slices = next(filter(lambda x: x.id == area.id, self.blue_model_5g.areas)).slices
+        slices = next(filter(lambda x: x.id == area.id, self.base_model.blue_model_5g.areas)).slices
         if slices:
             conf_data['nssai'] = [NssiConvertion.toNssi(i) for i in slices]
 
@@ -311,19 +319,15 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
     def init_day2_conf(self, msg) -> list:
         logger.info("Initializing Day2 configurations")
         res = []
-        logger.info(f"Initializing Day2 configuration for core area {self.core_area.id}")
-        res += self.core_day2_conf(self.core_area)
-        for edge_area in self.edge_areas.values():
+        logger.info(f"Initializing Day2 configuration for core area {self.base_model.core_area.id}")
+        res += self.core_day2_conf(self.base_model.core_area)
+        for edge_area in self.base_model.edge_areas.values():
             logger.info(f"Initializing Day2 configuration for edge area {edge_area.id}")
             res += self.edge_day2_conf(edge_area)
-        for ran_area in self.ran_areas.values():
+        for ran_area in self.base_model.ran_areas.values():
             logger.info(f"Initializing Day2 configuration for ran area {ran_area.id}")
             res += self.ran_day2_conf(ran_area)
         return res
-
-    @abstractmethod
-    def add_ues(self, msg: dict):
-        pass
 
     @abstractmethod
     def get_ip_core(self, ns: BlueNSD) -> None:
@@ -337,11 +341,11 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         logger.debug(f'Getting IPs for ran area {ns.area_id}')
 
         vlds = get_ns_vld_ip(ns.nsi_id, ["mgt", "datanet"])
-        self.ran_areas[ns.area_id].nb_mgt_ip = vlds["mgt"][0]['ip']
-        self.ran_areas[ns.area_id].nb_wan_ip = vlds["datanet"][0]['ip']
+        self.base_model.ran_areas[ns.area_id].nb_mgt_ip = vlds["mgt"][0]['ip']
+        self.base_model.ran_areas[ns.area_id].nb_wan_ip = vlds["datanet"][0]['ip']
 
-        logger.debug(f'MGT IP for ran area {ns.area_id}: {self.ran_areas[ns.area_id].nb_mgt_ip}')
-        logger.debug(f'DATA IP for ran area {ns.area_id}: {self.ran_areas[ns.area_id].nb_wan_ip}')
+        logger.debug(f'MGT IP for ran area {ns.area_id}: {self.base_model.ran_areas[ns.area_id].nb_mgt_ip}')
+        logger.debug(f'DATA IP for ran area {ns.area_id}: {self.base_model.ran_areas[ns.area_id].nb_wan_ip}')
 
     def get_ip(self) -> None:
         logger.info('Blue {} - Getting IP addresses of VNF instances'.format(self.get_id()))

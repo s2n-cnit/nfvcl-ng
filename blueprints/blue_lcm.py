@@ -500,7 +500,8 @@ class BlueLCMworker:
             logger.info("Blue {} - Performing Day 2 callback".format(self.blue.get_id()))
             blue_callback(results)
 
-        self.blue.get_timestamp('Blue {} - Day 2 end'.format(self.blue.get_id()))
+        # self.blue.get_timestamp('Blue {} - Day 2 end'.format(self.blue.get_id()))
+        self.blue.get_timestamp('day2_end')
         self.db.insert_DB("nfv_performance", self.blue.get_performance())
         return True
 

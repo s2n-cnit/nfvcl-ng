@@ -48,6 +48,7 @@ class DetailedBlueModel(BaseModel):
     nsd_: List[NetworkServiceSummaryModel] = []
     vnfd: Dict[str, List[VnfDescriptorReference]] = None
     primitives: List[dict] = Field(default=[])
+    timestamp: Dict[str, str] = None
 
 
 class BlueGetDataModel(BaseModel):

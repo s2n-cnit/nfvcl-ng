@@ -19,12 +19,11 @@ from nfvo.osm_nbi_util import NbiUtil, get_osm_nbi_utils
 import typing
 import json
 import traceback
-from multiprocessing import RLock, Queue
+from multiprocessing import RLock
 from utils.util import obj_multiprocess_lock
 from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from utils.redis_utils.topic_list import TOPOLOGY_TOPIC
 
-topology_msg_queue = Queue()
 topology_lock = RLock()
 
 logger: Logger = create_logger('Topology')
@@ -45,7 +44,7 @@ def trigger_event(event_name: TopologyEventType, data: dict):
 
 
 class Topology:
-    _model: TopologyModel
+    _model: TopologyModel | None
 
     def __init__(self, topo: Union[dict, None], db: OSSdb, osmnbiutil: NbiUtil, lock: RLock):
         self.db = db
@@ -121,7 +120,7 @@ class Topology:
 
     @obj_multiprocess_lock
     def create(self, topo: TopologyModel, terraform: bool = False) -> None:
-        logger.debug("Creating topology. Terraform: {}".format(terraform))
+        logger.debug(f"Creating topology. Terraform: {terraform}")
 
         if self._model is not None:
             msg_err = 'It is not possible to allocate a new topology, since another one is already declared'
@@ -166,26 +165,11 @@ class Topology:
         trigger_event(TopologyEventType.TOPO_DELETE, deleted_topology.model_dump())
 
     # **************************** VIMs ****************************
-    def list_vims(self) -> List[VimModel]:
-        """
-        Return a list of VIMs belonging to topology.
-        """
-        return self._model.get_vims()
-
-
-    def get_vim(self, vim_name: str) -> VimModel:
-        """
-        Return a vim, given the name
-        Args:
-            vim_name: the name
-        Returns: the vim
-        """
-        return self._model.get_vim(vim_name)
 
     @obj_multiprocess_lock
     def add_vim(self, vim_model: VimModel, terraform: bool = False):
         """
-        Add a VIM to the topology. IF required create resources on the real VIM. Onboard the VIM on OSM to be menaged by
+        Add a VIM to the topology. IF required, create resources on the real VIM. Onboard the VIM on OSM to be managed by
         it.
         Args:
             vim_model: The VIM to be added in the topology.
@@ -263,7 +247,11 @@ class Topology:
             update_msg: The update message containing information to be edited/added. See the model for further info.
             terraform: If new elements has to be created/destroyed on the VIM (openstack,...)
         """
-        vim_model = self._model.get_vim(update_msg.name)
+        try:
+            vim_model = self._model.get_vim(update_msg.name)
+        except ValueError:
+            logger.error("VIM to update has not been found, check the topology!")
+            return
 
         # Each network to be added in VIM
         for vim_net in update_msg.networks_to_add:
@@ -442,8 +430,7 @@ class Topology:
         """
         Delete a network from the topology. Delete it from required VIM list, terraform if required.
         Args:
-            network: The network to be removed from the topology
-            vim_names_list: The VIMs from witch the network is removed (the nfvcl representation).
+            network_name: The network to be removed from the topology
             terraform: If the net has to be deleted on the VIM (network is removed from openstack)
         Returns:
             The removed network
@@ -1003,7 +990,7 @@ class Topology:
         return list_model
 
 
-def get_topology() -> Topology:
+def build_topology() -> Topology:
     """
     Build and returns a topology item.
     Returns:

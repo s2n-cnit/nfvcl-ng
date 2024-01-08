@@ -358,7 +358,7 @@ class TopologyModel(BaseModel):
         Args:
             router_name: The name of the router to be deleted.
 
-        Returns:  The deleted router from the topo
+        Returns: The deleted router from the topo
         """
         router_idx = self.find_router_index(router_name)
         return self.routers.pop(router_idx)

@@ -6,7 +6,7 @@ from .vyos_area_model import VyOSArea
 
 class VyOSBlueprint(BaseModel):
     """
-    This model represent a vyos blueprint instance. It is used to save and restore the instance state from the DB.
+    This model represents a vyos blueprint instance. It is used to save and restore the instance state from the DB.
     """
     type: Literal['VyOSBlue']
     callbackURL: Optional[str] = Field(

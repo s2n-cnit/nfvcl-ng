@@ -19,7 +19,7 @@ from nfvo import get_ns_vld_ip, NbiUtil
 from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from nfvo.vnf_manager_beta import Sol006VnfdBuilderBeta
-from topology.topology import Topology, get_topology
+from topology.topology import Topology, build_topology
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 from utils.log import create_logger
 from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
@@ -477,21 +477,21 @@ class K8sBeta(BlueprintBaseBeta):
 
     def add_worker_area_label(self, msg):
         """
-        Add the labels on k8s worker nodes. The label must be added though the controller since is a k8s instruction.
+        Add the labels on k8s worker nodes. The label must be added through the controller since it is a k8s instruction.
 
         Args:
             msg: if this method is called in the init phase, the message is the creation request, then we retrieve the
-            workers to be labeled from the blue config model. If it is called by a scaling operation we can get the
+            workers to be labeled from the blue config model. If it is called by a scaling operation, we can get the
             workers to be labeled from this argument (K8sBlueprintScale).
         """
         logger.debug("Blue {} - Triggering Day2 Add area label to workers ".format(self.get_id()))
         if type(msg) is dict:
             # If the request is coming from initial config, msg is a dict (depends on NFVCL code).
-            # But since the message is the same on witch the object is build we can use the data in config model that is
+            # But since the message is the same on witch, the object is build we can use the data in config model that is
             # the same.
             areas = self.k8s_model.areas
         elif type(msg) is K8sBlueprintScale:
-            # Otherwise, for example in scaling operation, we receive an object of type K8sBlueprintScale
+            # Otherwise, for example, in scaling operation, we receive an object of type K8sBlueprintScale
             msg_ojb: K8sBlueprintScale = msg
             areas = msg_ojb.add_areas
         else:
@@ -527,8 +527,8 @@ class K8sBeta(BlueprintBaseBeta):
 
     def add_to_topology(self, callback_msg):
         """
-        Once the K8s cluster is ready it is added to the topology.
-        In this way it is possible to use the cluster to deploy services on top of K8s through the NFVCL.
+        Once the K8s cluster is ready, it is added to the topology.
+        In this way, it is possible to use the cluster to deploy services on top of K8s through the NFVCL.
         """
         for primitive in callback_msg:
             if primitive['result']['charm_status'] != 'completed':
@@ -726,7 +726,7 @@ class K8sBeta(BlueprintBaseBeta):
         Returns:
             An empty list of day2 primitives, checks do not need something to be executed
         """
-        topology = get_topology()
+        topology = build_topology()
         # Raise Error if the prometheus server is not present
         prom_server = topology.get_prometheus_server(prom_info.prom_server_id)
 

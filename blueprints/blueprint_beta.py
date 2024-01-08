@@ -13,7 +13,7 @@ from utils.prometheus_manager import PrometheusMan
 from models.blueprint.blue_types import blueprint_types
 from typing import List, Dict, Union, Callable
 from fastapi import APIRouter
-from topology.topology import Topology, get_topology
+from topology.topology import Topology, build_topology
 from utils.persistency import DB
 from utils.log import create_logger
 
@@ -701,7 +701,7 @@ class BlueprintBaseBeta(abc.ABC):
         Raises:
             ValueError if the prom server instance is not found in the topology.
         """
-        topology = get_topology()
+        topology = build_topology()
         if self.base_model.prometheus_scraper_id is None:
             e_msg = f"Impossible to disable prometheus scraping for blue {self.base_model.id}, no prometheus scraper is present"
             logger.error(e_msg)

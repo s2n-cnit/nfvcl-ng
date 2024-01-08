@@ -17,7 +17,7 @@ from re import match
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # create logger
-logger = create_logger('osm_nbi')
+logger = create_logger('OSM NBI')
 
 
 def nsd_build_package(name, nsd):
@@ -54,11 +54,13 @@ def check_authorization(decorated_function):
     """
     def wrapper(*args):
         # args[0] when called from an object function ( example(self, arg1, arg...) ) is the object itself
-        response = requests.get(args[0].token_url, headers=args[0].headers, verify=False)
+        osm_nbi_utils: NbiUtil = args[0]
+        response = requests.get(osm_nbi_utils.token_url, headers=osm_nbi_utils.headers, verify=False)
 
         # If 401 == unauthorized. Requesting a new token.
         if response.status_code == 401:
-            args[0].new_token()
+            logger.debug("Token was not valid, requiring a new one")
+            osm_nbi_utils.new_token()
         return decorated_function(*args)
 
     return wrapper
@@ -66,7 +68,7 @@ def check_authorization(decorated_function):
 
 def check_rest_response(response: requests.Response) -> bool:
     """
-    Checks that the response is positive
+    Checks that the response is positive (OK, ACCEPTED, CREATED, NO_CONTENT)
     Args:
         response: The response to be analyzed
 
@@ -78,12 +80,13 @@ def check_rest_response(response: requests.Response) -> bool:
                                 requests.codes.no_content):
         return True
     else:
-        logger.error("{} -- {} -- {}".format(response.url, response.status_code, response.reason))
+        logger.error(f"Response from {response.url}: {response.status_code} - {response.reason}")
         logger.error(response.text)
         return False
 
 
 class NbiUtil:
+
     def __init__(self, username: str = "admin", password: str = "admin", project: str = "admin", osm_ip: str = None,
                  osm_port: str = '9999', vim_account_id: str = ""):
 
@@ -186,7 +189,15 @@ class NbiUtil:
             return res.json()
 
     def check_ns_instance(self, ns_id: str) -> dict:
-        if len(ns_id) <= 0:
+        """
+        Retrieve a NS from OSM after checking if the operational status is ok.
+        Args:
+            ns_id: The ID of the network service
+
+        Returns:
+            The network service if ok.s
+        """
+        if ns_id is None or len(ns_id) <= 0:
             msg = "The ns_id is empty, all NS would be retrieved instead of 1"
             logger.error(msg)
             raise ValueError(msg)

@@ -1,14 +1,12 @@
 import json
 import queue
 import threading
-import traceback
 from logging import Logger
 import redis
 from typing import List
 
 from models.event import Event
 from utils import persistency
-from .blueprint import BlueprintBase
 from .blueprint_beta import BlueprintBaseBeta
 from models.blueprint.rest_blue import ShortBlueModel, DetailedBlueModel
 from models.blueprint.blue_events import BlueEventType

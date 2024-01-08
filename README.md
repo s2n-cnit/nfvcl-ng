@@ -37,12 +37,13 @@ In this guide they will be installed on the same location.
  - Having OSM 14 running on a reachable machine, in the following installation procedure,
    all the services will be installed on the same Ubuntu instance.
  - Python 3.11.
- - **RECOMMENDED**: 
-		4 CPUs, 16 GB RAM, 80GB disk and a single interface with Internet access
- - **MINIMUM**: 
-		2 CPUs, 8 GB RAM, 50GB disk and a single interface with Internet access
+ - If the NFVCL and OSM are running on the same machine:
+   - **RECOMMENDED**: 
+          4 CPUs, 16 GB RAM, 80GB disk and a single interface with Internet access
+   - **MINIMUM**: 
+          2 CPUs, 8 GB RAM, 50GB disk and a single interface with Internet access
 
-## Installation
+## Installation (OSM+NFVCL)
 On the Ubuntu 22.04 instance perform the following steps.
 ### Step 0 - Cloning and downloading required files/dependencies
 1. Download OSM 14
@@ -61,7 +62,7 @@ git clone --depth 1 https://github.com/s2n-cnit/nfvcl-ng
 > ```
 > sudo sed -i 's@.*juju deploy ch:mongodb-k8s.*@juju deploy ch:mongodb-k8s -m $OSM_NAMESPACE --channel latest/stable@' /usr/share/osm-devops/installers/full_install_osm.sh
 > ```
-> The resulting 3 last line should be:a
+> The resulting **three** last lines should be:
 > ``` bash
 > ...
 > sudo DEBIAN_FRONTEND=noninteractive apt-get -y install osm-devops

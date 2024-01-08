@@ -17,15 +17,18 @@ def check_network_exists_in_router(target_network_addr: str, target_router_confi
     """
 
     """
+    # Create a list with the mgt net
     router_networks_list: List[VyOSRouterPortModel] = [target_router_config.network_endpoints.mgt]
+    # Add to the list all data nets -> Result in a list of mgt+data networks
     router_networks_list.extend(target_router_config.network_endpoints.data_nets)
     target_network = IPv4Network(target_network_addr)
 
+    # Search for the target network in the list
     target_network = [router_network for router_network in router_networks_list if
                            router_network.network == target_network]
 
     if len(target_network)>0:
-        return target_network[0]
+        return target_network[0] # Return the first element (there should be only one)
     else:
         raise ValueError(
             "Error while looking for network {} in router {}: network NOT found".format(target_network_addr,target_router_config.name))

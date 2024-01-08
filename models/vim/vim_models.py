@@ -62,8 +62,7 @@ class VimModel(NFVCLBaseModel):
         """
         if net in self.networks or net == "":
             msg_err = "Network ->{}<- is already present in the VIM ->{}<-".format(net, self.name)
-            logger.error(msg_err)
-            raise ValueError(msg_err)
+            logger.warning(msg_err)
         else:
             self.networks.append(net)
 
@@ -78,8 +77,7 @@ class VimModel(NFVCLBaseModel):
         """
         if net_name not in self.networks:
             msg_err = "Network ->{}<- is NOT in the VIM ->{}<-. Cannot remove.".format(net_name, self.name)
-            logger.error(msg_err)
-            raise ValueError(msg_err)
+            logger.warning(msg_err)
         else:
             idx = self.networks.index(net_name)
             return self.networks.pop(idx)
@@ -88,7 +86,6 @@ class VimModel(NFVCLBaseModel):
         if net_name not in self.networks:
             msg_err = "Network ->{}<- is NOT in the VIM ->{}<-.".format(net_name, self.name)
             logger.error(msg_err)
-            raise ValueError(msg_err)
         else:
             return net_name
 
@@ -104,8 +101,7 @@ class VimModel(NFVCLBaseModel):
         """
         if router in self.routers or router == "":
             msg_err = "Router ->{}<- is already present in the VIM ->{}<-".format(router, self.name)
-            logger.error(msg_err)
-            raise ValueError(msg_err)
+            logger.warning(msg_err)
         else:
             self.routers.append(router)
 
@@ -120,8 +116,7 @@ class VimModel(NFVCLBaseModel):
         """
         if router_name not in self.networks:
             msg_err = "Router ->{}<- is NOT in the VIM ->{}<-. Cannot remove.".format(router_name, self.name)
-            logger.error(msg_err)
-            raise ValueError(msg_err)
+            logger.warning(msg_err)
         else:
             idx = self.routers.index(router_name)
             return self.routers.pop(idx)
@@ -135,8 +130,7 @@ class VimModel(NFVCLBaseModel):
         """
         if area_id in self.areas or area_id == "":
             msg_err = "Area ->{}<- is already present in the VIM ->{}<-".format(area_id, self.name)
-            logger.error(msg_err)
-            raise ValueError(msg_err)
+            logger.warning(msg_err)
         else:
             self.areas.append(area_id)
 
@@ -150,8 +144,7 @@ class VimModel(NFVCLBaseModel):
         """
         if area_id not in self.areas:
             msg_err = "Area ->{}<- is NOT present in the VIM ->{}<-. Cannot remove.".format(area_id, self.name)
-            logger.error(msg_err)
-            raise ValueError(msg_err)
+            logger.warning(msg_err)
         else:
             idx = self.areas.index(area_id)
             return self.areas.pop(idx)
@@ -162,7 +155,6 @@ class VimModel(NFVCLBaseModel):
         if router_name not in self.routers:
             msg_err = "Router ->{}<- is NOT in the VIM ->{}<-.".format(router_name, self.name)
             logger.error(msg_err)
-            raise ValueError(msg_err)
         else:
             return router_name
 

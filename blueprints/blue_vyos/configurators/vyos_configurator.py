@@ -33,11 +33,11 @@ class Configurator_VyOS(Configurator_Flex):
 
     def initial_configuration(self):
         """
-        Perform initial configuration for VyOS router, this includes:
+        Perform initial configuration for VyOS router; this includes:
         - Set up a name to management interface
         - Setup data interfaces
-        - Configure loopback IP
-        - Add Vyos Info task to retrieve information from VyOS in the callback
+        - Configure loopback interface
+        - Add a Vyos Info task to retrieve information from VyOS in the callback
         """
         self.setup_man_interface_descr()
         self.setup_data_interfaces()
@@ -45,10 +45,20 @@ class Configurator_VyOS(Configurator_Flex):
         self.add_vyos_info_task()
 
     def setup_man_interface_descr(self):
+        """
+        Create a task to be executed for configuring the management interface on the router.
+        Remember that a configurator is assigned to only a router.
+        The task is added to the playbook of the configurator.
+        """
         lines = ["set interface ethernet eth0 description 'Management Network'"]
         self.add_vyos_config_task('Description of eth0', 'vyos.vyos.vyos_config', lines)
 
     def setup_loopback_ip(self):
+        """
+        Create a task to be executed for configuring the loopback interface on the router. Remember that a configurator
+        is assigned to only a router.
+        The task is added to the playbook of the configurator.
+        """
         lines = []
         loopback_ipaddr = "10.200." + str(self.router_area_id) + ".1/32"
         lines.append("set interfaces loopback lo address {}".format(loopback_ipaddr))
@@ -56,8 +66,8 @@ class Configurator_VyOS(Configurator_Flex):
 
     def setup_data_interfaces(self):
         """
-        Once the configurator is build. It is possible to create instructions to set up data interfaces for ansible.
-        Instructions are written in self.playbook.
+        Set up the data interfaces needed for configuring the data interfaces on the router.
+        The task is added to the playbook of the configurator.
         """
         lines = []
 
@@ -66,9 +76,8 @@ class Configurator_VyOS(Configurator_Flex):
         for network in self.network_endpoints.data_nets:
             # Getting prefix length
             prefix_length = network.network.prefixlen
-
+            # Getting the address of the net to be configured on the interface
             interface_address = network.ip_addr.exploded
-            # NOTE: the ip address is got by get IP address, but OSM is not reporting netmask! setting /24 as default
             if interface_address is None:
                 lines.append("set interfaces ethernet eth{} address dhcp".format(interface_index))
             else:
@@ -77,15 +86,18 @@ class Configurator_VyOS(Configurator_Flex):
             lines.append("set interfaces ethernet eth{} description \'{}\'".format(interface_index, self.blue_id))
             lines.append("set interfaces ethernet eth{} duplex auto".format(interface_index))
             lines.append("set interfaces ethernet eth{} speed auto".format(interface_index))
-            # MAX supported MTU is 1450
+            # MAX supported MTU is 1450 by OPENSTACK
             lines.append("set interfaces ethernet eth{} mtu 1450".format(interface_index))
             interface_index = interface_index + 1
         self.add_vyos_config_task('Configure DATA Interfaces', 'vyos.vyos.vyos_config', lines)
 
     def setup_snat_rules(self, rule_list: List[VyOSSourceNATRule]):
         """
-        Create instructions for ansible to set up SNAT rules. Instructions are written in self.playbook
-        @param rule_list: SNAT rules to set up in the VYOS instance
+        Create a task which will add the instructions to configure a list of SNAT rules to the router.
+        The task is added to the playbook of the configurator.
+
+        Args:
+            rule_list: SNAT rules to be set up in the VYOS instance relative to this configurator
         """
         lines = []
 

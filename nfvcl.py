@@ -59,15 +59,6 @@ app.mount("/nfvcl_day2/day2", StaticFiles(directory="day2_files"), name="day2_fi
 app.mount("/helm_repo", StaticFiles(directory="helm_charts"), name="helm_repo")
 
 
-@app.post("/close", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED)
-async def close_nfvcl():
-    """
-    Terminate the NFVCL.
-    """
-    os.kill(os.getpid(), signal.SIGTERM)
-    return RestAnswer202(id="close", description="Closing")
-
-
 @app.get("/", status_code=status.HTTP_308_PERMANENT_REDIRECT)
 async def redirect_to_swagger():
     """

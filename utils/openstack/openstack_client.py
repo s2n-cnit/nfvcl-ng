@@ -1,3 +1,6 @@
+from typing import List
+
+from keystoneauth1.exceptions import Unauthorized
 from openstack.image.v2.image import Image
 from models.openstack.images import ImageRepo
 from models.vim import VimModel
@@ -9,17 +12,19 @@ from utils.util import render_file_from_template
 
 # Logger
 logger = create_logger("OpenStack Client")
-# Client list for singleton pattern. One client for each OS cloud instance
+# Client list for the singleton pattern. One client for each OS cloud instance
 clients: dict = {}
 
-def get_client(cloud_name: str) -> Connection:
+def _get_client(cloud_name: str) -> Connection:
     """
-    Allow to have ONLY one instance for each OS cloud.
+    It creates and connects a client to an OPENSTACK instance.
+    Allows having ONLY ONE instance for each OS cloud.
+    The configuration file path must be set in 'os.environ["OS_CLIENT_CONFIG_FILE"]' before calling this method.
     Args:
-        cloud_name: The name of the cloud instance
+        cloud_name: The name of the cloud instance, to be used for the singleton pattern.
 
     Returns:
-        The OS client for interacting with the cloud. (openstack.connection.Connection)
+        The OS client for interacting with the cloud. (Openstack.connection.Connection)
     """
     if cloud_name in clients.keys():
         return clients[cloud_name]
@@ -28,9 +33,11 @@ def get_client(cloud_name: str) -> Connection:
         clients[cloud_name] = client
         return client
 
+
+
 class OpenStackClient:
     """
-    Client that interact with an Openstack instance
+    Client that interacts with an Openstack instance
     """
     client: Connection
 
@@ -40,10 +47,10 @@ class OpenStackClient:
         Args:
             vim: the vim on witch the client is build.
         """
-        filepath = render_file_from_template("config_templates/openstack/clouds.yaml", vim.model_dump())
+        filepath = render_file_from_template("config_templates/openstack/clouds.yaml", vim.model_dump(), prefix_to_name=vim.name)
         os.environ["OS_CLIENT_CONFIG_FILE"] = filepath
-        # Get the client using singleton pattern
-        self.client = get_client(vim.name)
+        # Get the client using a singleton pattern
+        self.client = _get_client(vim.name)
 
 
     def find_image(self, image_name: str) -> Image | None:
@@ -64,7 +71,7 @@ class OpenStackClient:
             image: The image to be deleted, can be retrieved with
 
         Returns:
-            The delete image if found.
+            The deleted image if found.
         """
         return self.client.delete_image(image)
 

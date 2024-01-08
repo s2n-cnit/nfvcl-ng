@@ -24,12 +24,15 @@ async def update_images():
     Image is downloaded from a URL, the procedure can be slow before all images are ready on the VIM.
     """
     topo = Topology.from_db(db, nbiUtil, topology_lock)
-    vims: List[VimModel] = topo.list_vims()
+    vims: List[VimModel] = topo.get_model().get_vims()
     image_list: ImageList = get_nfvcl_image_list()
 
     for vim in vims:
         client = OpenStackClient(vim)
         for image in image_list.images:
+            if image.to_download is False:
+                continue  # Skip the deletion and download if manual operation is needed
+
             found_image = client.find_image(image.name)
 
             if found_image is not None:

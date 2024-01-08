@@ -9,10 +9,13 @@ from models.network import NetworkModel, RouterModel, PduModel
 from models.topology.topology_worker_model import TopologyWorkerOperation, TopologyWorkerMessage
 from models.vim import VimModel, UpdateVimModel
 from rest_endpoints.nfvcl_callback import callback_router
-from topology.topology import Topology, topology_msg_queue, topology_lock
+from topology.topology import Topology, topology_lock, build_topology
+from topology.topology_worker import topology_msg_queue
 from main import db, nbiUtil
 from pydantic import AnyHttpUrl
 from typing import List
+
+from utils.openstack.openstack_utils import check_openstack_instances
 from .rest_description import *
 
 topology_router = APIRouter(
@@ -98,8 +101,11 @@ async def delete_topology(terraform: bool = False):
 @topology_router.get("/vim/{vim_id}", response_model=VimModel)
 async def get_vim(vim_id: str):
     topology = Topology.from_db(db, nbiUtil, topology_lock)
-    vim: VimModel = topology.get_vim(vim_id)
-    return vim
+    try:
+        vim: VimModel = topology.get_model().get_vim(vim_id)
+        return vim
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Item not found")
 
 
 @topology_router.post("/vim", response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED,
@@ -138,6 +144,21 @@ async def update_vim(updated_vim: UpdateVimModel, terraform: bool = False):
     worker_msg = build_worker_message(TopologyWorkerOperation.UPDATE_VIM, updated_vim.model_dump(), opt_data)
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
+
+@topology_router.get("/vim_check", response_model=OssCompliantResponse, status_code=status.HTTP_200_OK,
+                     callbacks=callback_router.routes)
+async def check_vims_operation():
+    """
+    Checks that images (required by nfvcl) and networks (in the vim info) are present in the VIMs belonging to the topology
+    """
+    topology = build_topology()
+    vim_list = topology.get_model().get_vims()
+
+    err_list = check_openstack_instances(vim_list)
+    names = [vim.name for vim in err_list]
+    if len(err_list)>0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f'The following vims are not working: {names}')
+    return OssCompliantResponse(status=OssStatus.ready, detail="All vims are operative.")
 
 
 @topology_router.delete("/vim/{vim_name}", response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED,

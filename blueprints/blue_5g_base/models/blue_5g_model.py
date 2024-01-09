@@ -73,9 +73,9 @@ class SubSnssai(BaseModel):
 
 
 class SubSubscribers(BaseModel):
-    imsi: constr(pattern=r'^[0-9]*$', min_length=15, max_length=15)
-    k: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
-    opc: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
+    imsi: str = Field(pattern=r'^[0-9]*$', min_length=15, max_length=15)
+    k: str = Field(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
+    opc: str = Field(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
     snssai: List[SubSnssai]
     authenticationMethod: Optional[str] = Field(default="5G_AKA")
     authenticationManagementField: Optional[str] = Field(default="8000")
@@ -83,8 +83,7 @@ class SubSubscribers(BaseModel):
 
 class SubConfig(BaseModel):
     network_endpoints: NetworkEndPoints
-    plmn: constr(pattern=r'^[0-9]*$', min_length=5, max_length=6) = Field(
-        ...,
+    plmn: str = Field(..., pattern=r'^[0-9]*$', min_length=5, max_length=6,
         description='PLMN identifier of the mobile network'
     )
     sliceProfiles: Optional[List[SubSliceProfiles]] = Field(default=None, description="Set Default slices parameters")

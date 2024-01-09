@@ -256,7 +256,9 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
     device_groups: List[DeviceGroup] = Field(..., alias='device-groups')
     network_slices: List[NetworkSlice] = Field(..., alias='network-slices')
 
-    plmn: Optional[str] = Field(default=None)
+    # The fields below are not part of the configuration, these are needed for runtime operations
+    # the "ext_" prefix tell the helm dump function to exclude this field from serialization
+    ext_plmn: Optional[str] = Field(default=None)
 
     def __get_areas_with_slice(self, generic_model: Create5gModel, slice_profile: SubSliceProfiles) -> List[SubArea]:
         area_list: List[SubArea] = []
@@ -270,6 +272,8 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
         self.device_groups = []
         self.network_slices = []
         self.subscribers = []
+
+        self.ext_plmn = generic_model.config.plmn
 
         for generic_slice in generic_model.config.sliceProfiles:
 
@@ -290,7 +294,6 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
                 raise ValueError("Unsupported unit for downlinkAmbr/uplinkAmbr, use one of [mbps, gbps, kbps]")
 
             logger.warning("config.network_endpoints.data_nets[].default5qi IGNORED")
-            # logger.warning("config.sliceProfiles[].sliceType IGNORED")
             logger.warning("config.sliceProfiles[].profileParams IGNORED")
             logger.warning("config.sliceProfiles[].locationConstraints IGNORED")
             logger.warning("config.sliceProfiles[].enabledUEList IGNORED, if a subscriber have a slice in snssai it will be added to the UE list for that slice")
@@ -299,8 +302,6 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
             logger.warning("config.subscribers[].snssai[].sliceType IGNORED")
             logger.warning("config.subscribers[].snssai[].pduSessionIds IGNORED")
             logger.warning("config.subscribers[].snssai[].default_slice IGNORED")
-
-            self.plmn = generic_model.config.plmn
 
             new_network_slice = NetworkSlice(
                 name=slice_name,
@@ -318,8 +319,8 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
                 site_info=SiteInfo(
                     g_node_bs=list(map(lambda x: GNodeB(name=f"gnb{x.id}", tac=x.id), self.__get_areas_with_slice(generic_model, generic_slice))),
                     plmn=Plmn(
-                        mcc=self.plmn[:3],
-                        mnc=self.plmn[3:]
+                        mcc=self.ext_plmn[:3],
+                        mnc=self.ext_plmn[3:]
                     ),
                     site_name=site_name,
                     upf=Upf(
@@ -362,7 +363,7 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
         self.subscribers.append(Subscriber(
             ue_id_start=generic_subscriber.imsi,
             ue_id_end=generic_subscriber.imsi,
-            plmn_id=self.plmn,
+            plmn_id=self.ext_plmn,
             opc=generic_subscriber.opc,
             op="",
             key=generic_subscriber.k,
@@ -377,10 +378,30 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
             matching_device_groups.imsis.append(generic_subscriber.imsi)
 
     def delete_subscriber(self, imsi: str):
-        subscriber_to_delete = next(filter(lambda x: x.ue_id_start == imsi, self.subscribers), None)
+        subscriber_to_delete: Subscriber = next(filter(lambda x: x.ue_id_start == imsi, self.subscribers), None)
         if not subscriber_to_delete:
             raise ValueError(f"Subscriber {imsi} does not exist")
+
+        for device_group in self.device_groups:
+            for dg_imsi in device_group.imsis:
+                if dg_imsi == subscriber_to_delete.ue_id_start:
+                    device_group.imsis.remove(dg_imsi)
+
         self.subscribers.remove(subscriber_to_delete)
+
+    def add_slice_from_generic_model(self, generic_slice: SubSliceProfiles):
+        pass
+
+    def delete_slice(self, slice_id: str):
+        slice_name = f"slice_{slice_id}"
+        device_group_name = f"device-group-{slice_name}"
+        network_slice_to_delete = next(filter(lambda x: x.name == slice_name, self.network_slices), None)
+        device_group_to_delete = next(filter(lambda x: x.name == device_group_name, self.device_groups), None)
+
+        if not network_slice_to_delete or not device_group_to_delete:
+            raise ValueError(f"Slice {slice_id} does not exist")
+        self.network_slices.remove(network_slice_to_delete)
+        self.device_groups.remove(device_group_to_delete)
 
 
 class SimAppYaml(NFVCLBaseModel):
@@ -424,3 +445,12 @@ class SDCoreValuesModel(NFVCLBaseModel):
     omec_control_plane: OmecControlPlane = Field(..., alias='omec-control-plane')
     omec_user_plane: OmecUserPlane = Field(..., alias='omec-user-plane')
     field_5g_ran_sim: Field5gRanSim = Field(..., alias='5g-ran-sim')
+
+    def model_dump_for_helm(self):
+        dump = self.model_dump(exclude_none=True, by_alias=True)
+        # TODO tidy up
+        if "configuration" in dump["omec-sub-provision"]["config"]["simapp"]["cfgFiles"]["simapp.yaml"]:
+            key_to_exclude = list(filter(lambda x: x.startswith("ext_"), list(dump["omec-sub-provision"]["config"]["simapp"]["cfgFiles"]["simapp.yaml"]["configuration"].keys())))
+            for key in key_to_exclude:
+                del dump["omec-sub-provision"]["config"]["simapp"]["cfgFiles"]["simapp.yaml"]["configuration"][key]
+        return dump

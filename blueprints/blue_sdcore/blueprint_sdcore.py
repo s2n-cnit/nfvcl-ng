@@ -416,7 +416,8 @@ class BlueSDCore(Blue5GBaseBeta):
 
     def add_slice(self, add_slice_model: BlueSDCoreAddSliceModel) -> list:
         logger.info(f"Adding Slice with ID: {add_slice_model.sliceId}")
-        # self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.add_subscriber_from_generic_model(subscriber_model)
+        network_slice = self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.add_slice_from_generic_model(add_slice_model, add_slice_model.area_id)
+        network_slice.site_info.upf.upf_name = self.base_model.edge_areas[self.base_model.edge_areas[add_slice_model.area_id].id].upf_data_ip
         return self.update_core()
 
     def del_slice(self, del_slice_model: BlueSDCoreDelSliceModel) -> list:

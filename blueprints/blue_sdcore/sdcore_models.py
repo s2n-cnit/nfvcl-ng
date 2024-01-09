@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, List
 
 from pydantic import Field, constr
 
@@ -25,6 +25,7 @@ class BlueSDCoreDelSubscriberModel(NFVCLBaseModel):
 class BlueSDCoreAddSliceModel(SubSliceProfiles):
     type: Literal["BlueSDCore"] = Field(default="BlueSDCore")
     operation: Literal["add_slice"] = Field(default="add_slice")
+    area_id: int = Field()
 
 
 class BlueSDCoreDelSliceModel(NFVCLBaseModel):

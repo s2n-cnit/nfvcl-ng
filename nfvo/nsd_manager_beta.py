@@ -5,11 +5,13 @@ from pydantic import TypeAdapter
 from models.blueprint.blueprint_base_model import BlueNSD, BlueDescrNsdItem, BlueVNFD, BlueVNFProfile, BlueDescrVLD, \
     BlueKDUConf, BlueVNFAdditionalParams, BlueDeployConfig, BlueVLD
 from models.k8s.k8s_objects import K8sService
+from models.osm.osm_vnfi_model import VNFiModelListOSM, VNFiModelOSM, InterfaceOSM
 from models.vim.vim_models import VimNetMap
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils import persistency
 from utils.log import create_logger
 from utils.util import get_nfvcl_config, NFVCLConfigModel
+from utils.util import deprecated
 
 sol006 = True
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
@@ -26,7 +28,7 @@ def get_nsd_name(nsd_descr: dict) -> str:
     else:
         return nsd_descr['nsd:nsd-catalog']['nsd'][0]['name']
 
-
+@deprecated
 def get_ns_vld_ip(ns_id: str, ns_vlds: list) -> dict:
     """
 
@@ -43,11 +45,28 @@ def get_ns_vld_ip(ns_id: str, ns_vlds: list) -> dict:
         res[vld] = get_vnf_ip(vnfi_list, vld)
     return res
 
+def get_ns_vld_ip_model(ns_id: str, ns_vlds: list) -> dict[str, List[(VNFiModelOSM, InterfaceOSM)]]:
+    """
+
+    Args:
+        ns_id: The network service identifier (NSI)
+        ns_vlds:
+
+    Returns:
+
+    """
+    res = {}
+    vnfi_list = nbiUtil.get_vnfi_list_model(ns_id)
+    for vld in ns_vlds:
+        res[vld] = get_vnf_ip_model(vnfi_list, vld)
+    return res
+
+
 
 def get_kdu_services(ns_id: str, kdu_name: str) -> List[K8sService]:
     return TypeAdapter(List[K8sService]).validate_python(nbiUtil.get_kdu_services(ns_id, kdu_name))
 
-
+@deprecated
 def get_vnf_ip(vnfi_list: list, ns_vld_id: str) -> list:
     addr_list = []
     # logger.debug(vnfi_list)
@@ -72,6 +91,30 @@ def get_vnf_ip(vnfi_list: list, ns_vld_id: str) -> list:
                         addr_item["compute_node"] = i["compute_node"]
                     addr_list.append(addr_item)
     return addr_list
+
+
+def get_vnf_ip_model(vnfi_list: VNFiModelListOSM, ns_vld_id: str) -> List[(VNFiModelOSM, InterfaceOSM)]:
+    """
+    Retrieve a list of VNF instances associated with the NS virtual link descriptor id.
+    Args:
+        vnfi_list: The
+        ns_vld_id:
+
+    Returns:
+        A list of tuple containing the corresponding VNFi<->Interface relationship
+    """
+    vnfi_result_list = []
+    # It looks for a vnfi containing one or more interfaces with the correct vld id
+    for vnfi in vnfi_list.vnf_list:
+        # Looks for interfaces in each vdu
+        for vdu in vnfi.vdur:
+            for interface in vdu.interfaces:
+                # For each interface it looks for match on vld id
+                if interface.ns_vld_id == ns_vld_id:
+                    # Add the vnfi to the list
+                    vnfi_result_list.append((vnfi,interface))
+
+    return vnfi_result_list
 
 
 # this class builds nsd from scratch without starting from a template

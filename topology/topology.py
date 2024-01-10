@@ -193,7 +193,7 @@ class Topology:
         self._save_topology_from_model()
 
         # If one of the vim_net has floating ip enabled -> enable floating IP
-        use_floating_ip: bool = False
+        use_floating_ip: bool = vim_model.config.use_floating_ip
         for vim_net in vim_model.networks:
             use_floating_ip = use_floating_ip or self.check_floating_ips(vim_net)
 
@@ -211,18 +211,21 @@ class Topology:
     def del_vim(self, vim_name: str, terraform=False):
         # VIM is unique by name
         vim_model = self._model.get_vim(vim_name)
-        # FixMe: if there are services on the VIM, OSM will not delete it
         # In every case (of terraform) we need to delete VIM account from OSM.
         try:
             # Check that VIM is present on OSM -> Raise error if not
             osm_vim = self.osm_nbi_util.get_vim_by_tenant_and_name(vim_model.name, vim_model.vim_tenant_name)
 
             logger.info('Removing VIM {} from osm'.format(vim_model.name))
-            # Remote deletion from OSM
-            self.osm_nbi_util.del_vim(osm_vim['_id'])
+            try:
+                # Remote deletion from OSM
+                self.osm_nbi_util.del_vim(osm_vim['_id'])
+            except ValueError as error:
+                logger.error(f"VIM >{vim_name}< has not been deleted from OSM: {error}")
+                return  # In case of error, stop here and does not delete from the topology
+
         except ValueError:
-            logger.warning('VIM >{}< has not been found on OSM, it will be removed anyway from the topology'.
-                           format(vim_model.name))
+            logger.warning(f'VIM >{vim_model.name}< has not been found on OSM, it will be removed anyway from the topology')
 
 
         # If terraform is enabled then we need to delete also OpenStack resources

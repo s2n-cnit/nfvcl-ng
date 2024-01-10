@@ -15,12 +15,17 @@ class VimTypeEnum(str, Enum):
 
 
 class VimModel(NFVCLBaseModel):
+    """
+    Represents the model to be sent at OSM for VIM management
+
+    References:
+        https://osm.etsi.org/docs/user-guide/latest/04-vim-setup.html?highlight=floating#openstack
+    """
     class VimConfigModel(NFVCLBaseModel):
-        # class VimAdditionalProperties(NFVCLBaseModel):
+        # https://osm.etsi.org/docs/user-guide/latest/04-vim-setup.html?highlight=floating#configuration-options-reference
         insecure: bool = True
         APIversion: str = 'v3.3'
         use_floating_ip: bool = False
-        # additionalProp1: VimAdditionalProperties
 
     name: str
     vim_type: VimTypeEnum = 'openstack'
@@ -29,7 +34,7 @@ class VimModel(NFVCLBaseModel):
     vim_tenant_name: str = 'admin'
     vim_user: str = 'admin'
     vim_password: str = 'admin'
-    config: VimConfigModel = {'additionalProp1': {'insecure': True, 'APIversion': 'v3.3'}}
+    config: VimConfigModel = Field(default=VimConfigModel())
     networks: List[str] = []
     routers: List[str] = []
     areas: List[int] = []

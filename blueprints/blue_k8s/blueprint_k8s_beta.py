@@ -91,7 +91,7 @@ class K8sBeta(BlueprintBaseBeta):
         """
         Constructor of the blueprint.
         It calls the parent constructor to build the data structure, then it fills the config model for this blueprint
-        and initialize some values.
+        and initializes some values.
         The supported operations define the order of creation operations (init phase) and the ones to be executed during
         scale and other types of operations
         """
@@ -132,7 +132,7 @@ class K8sBeta(BlueprintBaseBeta):
         }
         # DO NOT remove -> model initialization.
         self.k8s_model = K8sBlueprintModel.model_validate(self.base_model.conf)
-        # Avoid to put self.db
+        # Avoid putting self.db
 
     def bootstrap_day0(self, msg: dict) -> list:
         """

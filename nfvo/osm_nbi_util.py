@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List
 from urllib3.exceptions import InsecureRequestWarning
 from models.k8s.topology_k8s_model import K8sModel
+from models.osm.osm_vnfi_model import VNFiModelListOSM
 from utils.log import create_logger
 from utils.util import get_nfvcl_config
 from re import match
@@ -360,12 +361,38 @@ class NbiUtil:
 
     # Virtual Network Function Instances #####################################################################
     def get_vnfi_list(self, ns_id: str) -> list:
+        """
+        Get a list of VNF instances that belongs a certain NS from OSM
+        Args:
+            ns_id: The NS id from witch the VNFi list is taken
+
+        Returns:
+            Return a list of VNF instances
+        """
         r = self.get_x("/nslcm/v1/vnf_instances?nsr-id-ref={}".format(ns_id))
         if check_rest_response(r):
             return r.json()
         else:
             logger.error("INFO - vnfi list not found")
             return []
+
+
+    def get_vnfi_list_model(self, ns_id: str) -> VNFiModelListOSM:
+        """
+        Get a list of VNF instances that belongs a certain NS from OSM
+        Args:
+            ns_id: The NS id from witch the VNFi list is taken
+
+        Returns:
+            Return a list of VNF instances
+        """
+        r = self.get_x("/nslcm/v1/vnf_instances?nsr-id-ref={}".format(ns_id))
+        if check_rest_response(r):
+            json_content = r.json()
+            return VNFiModelListOSM.model_validate(json_content)
+        else:
+            logger.error("INFO - vnfi list not found")
+            return VNFiModelListOSM()
 
     def get_all_vnfi(self) -> list:
         r = self.get_x("/nslcm/v1/vnf_instances")
@@ -641,7 +668,7 @@ class NbiUtil:
         if check_rest_response(r):
             vim_list = r.json()
             if vim_list is None or not vim_list:
-                msg_err = 'VIM >{}< not found on OSM with tenant name >{}<'.format(name, tenant)
+                msg_err = 'VIM >{}< not found on OSM. Tenant name >{}<'.format(name, tenant)
                 logger.error(msg_err)
                 raise ValueError(msg_err)
             else:
@@ -715,10 +742,10 @@ nbi_util_instance: NbiUtil = None
 
 
 def get_osm_nbi_utils() -> NbiUtil:
-    global nbi_util_instance
     """
     Utils created to avoid importing all the parameters into subclasses.
     """
+    global nbi_util_instance
     if not nbi_util_instance:
         nfvcl_config = get_nfvcl_config()
         nbi_util_instance = NbiUtil(username=nfvcl_config.osm.username, password=nfvcl_config.osm.password,

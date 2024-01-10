@@ -256,7 +256,10 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
     device_groups: List[DeviceGroup] = Field(..., alias='device-groups')
     network_slices: List[NetworkSlice] = Field(..., alias='network-slices')
 
-    plmn: Optional[str] = Field(default=None)
+    # The fields below are not part of the configuration, these are needed for runtime operations
+    # the "ext_" prefix tell the helm dump function to exclude this field from serialization
+    ext_plmn: Optional[str] = Field(default=None)
+    ext_data_nets: Optional[List[SubDataNets]] = Field(default=None)
 
     def __get_areas_with_slice(self, generic_model: Create5gModel, slice_profile: SubSliceProfiles) -> List[SubArea]:
         area_list: List[SubArea] = []
@@ -271,89 +274,12 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
         self.network_slices = []
         self.subscribers = []
 
+        self.ext_data_nets = generic_model.config.network_endpoints.data_nets
+        self.ext_plmn = generic_model.config.plmn
+
         for generic_slice in generic_model.config.sliceProfiles:
-
-            # Prechecks TODO need to be moved
-            if len(generic_slice.dnnList) != 1:
-                raise ValueError("config.sliceProfiles[].dnnList need to be of size 1")
-
-            slice_name = f"slice_{generic_slice.sliceId}"
-            device_group_name = f"device-group-{slice_name}"
-            site_name = f"site-{slice_name}"
-
-            # TODO check size, should be 1
-            data_net_for_this_slice: SubDataNets = list(filter(lambda x: x.dnn == generic_slice.dnnList[0], generic_model.config.network_endpoints.data_nets))[0]
-
-            if data_net_for_this_slice.downlinkAmbr.split(" ")[1].lower() != data_net_for_this_slice.uplinkAmbr.split(" ")[1].lower():
-                raise ValueError("SD-Core does not support different units for downlinkAmbr and uplinkAmbr")
-            if data_net_for_this_slice.downlinkAmbr.split(" ")[1].lower() not in ["mbps", "gbps", "kbps"]:
-                raise ValueError("Unsupported unit for downlinkAmbr/uplinkAmbr, use one of [mbps, gbps, kbps]")
-
-            logger.warning("config.network_endpoints.data_nets[].default5qi IGNORED")
-            # logger.warning("config.sliceProfiles[].sliceType IGNORED")
-            logger.warning("config.sliceProfiles[].profileParams IGNORED")
-            logger.warning("config.sliceProfiles[].locationConstraints IGNORED")
-            logger.warning("config.sliceProfiles[].enabledUEList IGNORED, if a subscriber have a slice in snssai it will be added to the UE list for that slice")
-            logger.warning("config.subscribers[].authenticationMethod IGNORED")
-            logger.warning("config.subscribers[].authenticationManagementField IGNORED")
-            logger.warning("config.subscribers[].snssai[].sliceType IGNORED")
-            logger.warning("config.subscribers[].snssai[].pduSessionIds IGNORED")
-            logger.warning("config.subscribers[].snssai[].default_slice IGNORED")
-
-            self.plmn = generic_model.config.plmn
-
-            new_network_slice = NetworkSlice(
-                name=slice_name,
-                slice_id=SliceId(
-                    sd=generic_slice.sliceId,
-                    sst=SstConvertion.sstType[generic_slice.sliceType]
-                ),
-                site_device_group=[device_group_name],
-                application_filtering_rules=[ApplicationFilteringRule(  # TODO read this from config
-                    rule_name="ALLOW-ALL",
-                    priority=250,
-                    action="permit",
-                    endpoint="0.0.0.0/0"
-                )],
-                site_info=SiteInfo(
-                    g_node_bs=list(map(lambda x: GNodeB(name=f"gnb{x.id}", tac=x.id), self.__get_areas_with_slice(generic_model, generic_slice))),
-                    plmn=Plmn(
-                        mcc=self.plmn[:3],
-                        mnc=self.plmn[3:]
-                    ),
-                    site_name=site_name,
-                    upf=Upf(
-                        upf_name=f"{site_name}-upf",  # Is replaced in blueprint
-                        upf_port=8805
-                    )
-                )
-            )
-            new_device_group = DeviceGroup(
-                name=device_group_name,
-                imsis=[],
-                ip_domain_name="pool1",  # TODO what is this used for?
-                ip_domain_expanded=IpDomainExpanded(
-                    dnn=data_net_for_this_slice.dnn,
-                    dns_primary=data_net_for_this_slice.dns,
-                    mtu=1410,
-                    ue_ip_pool=data_net_for_this_slice.pools[0].cidr,  # TODO multiple pools? what else other than cidr?
-                    ue_dnn_qos=UeDnnQos(
-                        dnn_mbr_downlink=int(data_net_for_this_slice.downlinkAmbr.split(" ")[0]),
-                        dnn_mbr_uplink=int(data_net_for_this_slice.uplinkAmbr.split(" ")[0]),
-                        bitrate_unit=data_net_for_this_slice.downlinkAmbr.split(" ")[1].lower(),  # Can be gbps, mbps, kbps
-                        traffic_class=TrafficClass(  # TODO read this from config
-                            name="platinum",
-                            qci=9,
-                            arp=6,
-                            pdb=300,
-                            pelr=6
-                        )
-                    )
-                ),
-                site_info=site_name
-            )
-            self.device_groups.append(new_device_group)
-            self.network_slices.append(new_network_slice)
+            # TODO handle one slice in multiple area, sd-core does not support multiple upf per slice
+            self.add_slice_from_generic_model(generic_slice, list(map(lambda x: x.id, self.__get_areas_with_slice(generic_model, generic_slice)))[0])
 
         for generic_subscriber in generic_model.config.subscribers:
             self.add_subscriber_from_generic_model(generic_subscriber)
@@ -362,7 +288,7 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
         self.subscribers.append(Subscriber(
             ue_id_start=generic_subscriber.imsi,
             ue_id_end=generic_subscriber.imsi,
-            plmn_id=self.plmn,
+            plmn_id=self.ext_plmn,
             opc=generic_subscriber.opc,
             op="",
             key=generic_subscriber.k,
@@ -377,10 +303,108 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
             matching_device_groups.imsis.append(generic_subscriber.imsi)
 
     def delete_subscriber(self, imsi: str):
-        subscriber_to_delete = next(filter(lambda x: x.ue_id_start == imsi, self.subscribers), None)
+        subscriber_to_delete: Subscriber = next(filter(lambda x: x.ue_id_start == imsi, self.subscribers), None)
         if not subscriber_to_delete:
             raise ValueError(f"Subscriber {imsi} does not exist")
+
+        for device_group in self.device_groups:
+            for dg_imsi in device_group.imsis:
+                if dg_imsi == subscriber_to_delete.ue_id_start:
+                    device_group.imsis.remove(dg_imsi)
+
         self.subscribers.remove(subscriber_to_delete)
+
+    def add_slice_from_generic_model(self, generic_slice: SubSliceProfiles, area_id: int) -> NetworkSlice:
+        # Prechecks TODO need to be moved
+        if len(generic_slice.dnnList) != 1:
+            raise ValueError("config.sliceProfiles[].dnnList need to be of size 1")
+
+        slice_name = f"slice_{generic_slice.sliceId}"
+        device_group_name = f"device-group-{slice_name}"
+        site_name = f"site-{slice_name}"
+
+        # TODO check size, should be 1
+        data_net_for_this_slice: SubDataNets = list(filter(lambda x: x.dnn == generic_slice.dnnList[0], self.ext_data_nets))[0]
+
+        if data_net_for_this_slice.downlinkAmbr.split(" ")[1].lower() != data_net_for_this_slice.uplinkAmbr.split(" ")[1].lower():
+            raise ValueError("SD-Core does not support different units for downlinkAmbr and uplinkAmbr")
+        if data_net_for_this_slice.downlinkAmbr.split(" ")[1].lower() not in ["mbps", "gbps", "kbps"]:
+            raise ValueError("Unsupported unit for downlinkAmbr/uplinkAmbr, use one of [mbps, gbps, kbps]")
+
+        logger.warning("config.network_endpoints.data_nets[].default5qi IGNORED")
+        logger.warning("config.sliceProfiles[].profileParams IGNORED")
+        logger.warning("config.sliceProfiles[].locationConstraints IGNORED")
+        logger.warning("config.sliceProfiles[].enabledUEList IGNORED, if a subscriber have a slice in snssai it will be added to the UE list for that slice")
+        logger.warning("config.subscribers[].authenticationMethod IGNORED")
+        logger.warning("config.subscribers[].authenticationManagementField IGNORED")
+        logger.warning("config.subscribers[].snssai[].sliceType IGNORED")
+        logger.warning("config.subscribers[].snssai[].pduSessionIds IGNORED")
+        logger.warning("config.subscribers[].snssai[].default_slice IGNORED")
+
+        new_network_slice = NetworkSlice(
+            name=slice_name,
+            slice_id=SliceId(
+                sd=generic_slice.sliceId,
+                sst=SstConvertion.sstType[generic_slice.sliceType]
+            ),
+            site_device_group=[device_group_name],
+            application_filtering_rules=[ApplicationFilteringRule(  # TODO read this from config
+                rule_name="ALLOW-ALL",
+                priority=250,
+                action="permit",
+                endpoint="0.0.0.0/0"
+            )],
+            site_info=SiteInfo(
+                g_node_bs=[GNodeB(name=f"gnb{area_id}", tac=area_id)], #list(map(lambda x: GNodeB(name=f"gnb{x}", tac=x), areas)),
+                plmn=Plmn(
+                    mcc=self.ext_plmn[:3],
+                    mnc=self.ext_plmn[3:]
+                ),
+                site_name=site_name,
+                upf=Upf(
+                    upf_name=f"{site_name}-upf",  # Is replaced in blueprint
+                    upf_port=8805
+                )
+            )
+        )
+        new_device_group = DeviceGroup(
+            name=device_group_name,
+            imsis=[],
+            ip_domain_name="pool1",  # TODO what is this used for?
+            ip_domain_expanded=IpDomainExpanded(
+                dnn=data_net_for_this_slice.dnn,
+                dns_primary=data_net_for_this_slice.dns,
+                mtu=1410,
+                ue_ip_pool=data_net_for_this_slice.pools[0].cidr,  # TODO multiple pools? what else other than cidr?
+                ue_dnn_qos=UeDnnQos(
+                    dnn_mbr_downlink=int(data_net_for_this_slice.downlinkAmbr.split(" ")[0]),
+                    dnn_mbr_uplink=int(data_net_for_this_slice.uplinkAmbr.split(" ")[0]),
+                    bitrate_unit=data_net_for_this_slice.downlinkAmbr.split(" ")[1].lower(),  # Can be gbps, mbps, kbps
+                    traffic_class=TrafficClass(  # TODO read this from config
+                        name="platinum",
+                        qci=9,
+                        arp=6,
+                        pdb=300,
+                        pelr=6
+                    )
+                )
+            ),
+            site_info=site_name
+        )
+        self.device_groups.append(new_device_group)
+        self.network_slices.append(new_network_slice)
+        return new_network_slice
+
+    def delete_slice(self, slice_id: str):
+        slice_name = f"slice_{slice_id}"
+        device_group_name = f"device-group-{slice_name}"
+        network_slice_to_delete = next(filter(lambda x: x.name == slice_name, self.network_slices), None)
+        device_group_to_delete = next(filter(lambda x: x.name == device_group_name, self.device_groups), None)
+
+        if not network_slice_to_delete or not device_group_to_delete:
+            raise ValueError(f"Slice {slice_id} does not exist")
+        self.network_slices.remove(network_slice_to_delete)
+        self.device_groups.remove(device_group_to_delete)
 
 
 class SimAppYaml(NFVCLBaseModel):
@@ -424,3 +448,12 @@ class SDCoreValuesModel(NFVCLBaseModel):
     omec_control_plane: OmecControlPlane = Field(..., alias='omec-control-plane')
     omec_user_plane: OmecUserPlane = Field(..., alias='omec-user-plane')
     field_5g_ran_sim: Field5gRanSim = Field(..., alias='5g-ran-sim')
+
+    def model_dump_for_helm(self):
+        dump = self.model_dump(exclude_none=True, by_alias=True)
+        # TODO tidy up
+        if "configuration" in dump["omec-sub-provision"]["config"]["simapp"]["cfgFiles"]["simapp.yaml"]:
+            key_to_exclude = list(filter(lambda x: x.startswith("ext_"), list(dump["omec-sub-provision"]["config"]["simapp"]["cfgFiles"]["simapp.yaml"]["configuration"].keys())))
+            for key in key_to_exclude:
+                del dump["omec-sub-provision"]["config"]["simapp"]["cfgFiles"]["simapp.yaml"]["configuration"][key]
+        return dump

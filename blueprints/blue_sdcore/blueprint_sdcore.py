@@ -8,7 +8,7 @@ from blueprints.blue_sdcore import sdcore_default_config
 from blueprints.blue_sdcore.configurators.sdcore_upf_configurator import ConfiguratorSDCoreUpf, \
     ConfiguratorSDCoreUPFVars
 from blueprints.blue_sdcore.rest_description import *
-from blueprints.blue_sdcore.sdcore_models import BlueSDCoreCreateModel, BlueSDCoreAddSubscriberModel, BlueSDCoreDelSubscriberModel
+from blueprints.blue_sdcore.sdcore_models import BlueSDCoreCreateModel, BlueSDCoreAddSubscriberModel, BlueSDCoreDelSubscriberModel, BlueSDCoreAddSliceModel, BlueSDCoreDelSliceModel
 from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml, SDCoreValuesModel, NetworkSlice, DeviceGroup
 from models.base_model import NFVCLBaseModel
 from models.blueprint.blueprint_base_model import BlueKDUConf, BlueVNFD, BlueNSD
@@ -67,12 +67,20 @@ class BlueSDCore(Blue5GBaseBeta):
         return cls.api_day0_function(msg)
 
     @classmethod
-    def rest_add_subscriber(cls, subscriber_model: BlueSDCoreAddSubscriberModel, blue_id: str):
-        return cls.api_day2_function(subscriber_model, blue_id)
+    def rest_add_subscriber(cls, add_subscriber_model: BlueSDCoreAddSubscriberModel, blue_id: str):
+        return cls.api_day2_function(add_subscriber_model, blue_id)
 
     @classmethod
-    def rest_del_subscriber(cls, subscriber_model: BlueSDCoreDelSubscriberModel, blue_id: str):
-        return cls.api_day2_function(subscriber_model, blue_id)
+    def rest_del_subscriber(cls, del_subscriber_model: BlueSDCoreDelSubscriberModel, blue_id: str):
+        return cls.api_day2_function(del_subscriber_model, blue_id)
+
+    @classmethod
+    def rest_add_slice(cls, add_slice_model: BlueSDCoreAddSliceModel, blue_id: str):
+        return cls.api_day2_function(add_slice_model, blue_id)
+
+    @classmethod
+    def rest_del_slice(cls, del_slice_model: BlueSDCoreDelSliceModel, blue_id: str):
+        return cls.api_day2_function(del_slice_model, blue_id)
 
     @classmethod
     def day2_methods(cls):
@@ -90,20 +98,20 @@ class BlueSDCore(Blue5GBaseBeta):
         #     description=DEL_TAC_DESCRIPTION,
         #     summary=DEL_TAC_DESCRIPTION
         # )
-        # cls.api_router.add_api_route(
-        #     path="/{blue_id}/add_slice",
-        #     endpoint=cls.rest_add_slice,
-        #     methods=["PUT"],
-        #     description=ADD_SLICE_DESCRIPTION,
-        #     summary=ADD_SLICE_DESCRIPTION
-        # )
-        # cls.api_router.add_api_route(
-        #     path="/{blue_id}/del_slice",
-        #     endpoint=cls.rest_del_slice,
-        #     methods=["PUT"],
-        #     description=DEL_SLICE_DESCRIPTION,
-        #     summary=DEL_SLICE_DESCRIPTION
-        # )
+        cls.api_router.add_api_route(
+            path="/{blue_id}/add_slice",
+            endpoint=cls.rest_add_slice,
+            methods=["PUT"],
+            description=ADD_SLICE_DESCRIPTION,
+            summary=ADD_SLICE_DESCRIPTION
+        )
+        cls.api_router.add_api_route(
+            path="/{blue_id}/del_slice",
+            endpoint=cls.rest_del_slice,
+            methods=["PUT"],
+            description=DEL_SLICE_DESCRIPTION,
+            summary=DEL_SLICE_DESCRIPTION
+        )
         cls.api_router.add_api_route(
             path="/{blue_id}/add_subscriber",
             endpoint=cls.rest_add_subscriber,
@@ -151,6 +159,16 @@ class BlueSDCore(Blue5GBaseBeta):
                 'day2': [{'method': 'del_ues'}],
                 'dayN': []
             }],
+            'add_slice': [{
+                'day0': [],
+                'day2': [{'method': 'add_slice'}],
+                'dayN': []
+            }],
+            'del_slice': [{
+                'day0': [],
+                'day2': [{'method': 'del_slice'}],
+                'dayN': []
+            }],
         }
 
     def bootstrap_day0(self, model_msg) -> list:
@@ -193,7 +211,7 @@ class BlueSDCore(Blue5GBaseBeta):
         kdu_config = BlueKDUConf(
             kdu_name=self.KDU_NAME,
             k8s_namespace=str(self.get_id()).lower(),
-            additionalParams=self.base_model.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True)
+            additionalParams=self.base_model.blue_model_5g.sdcore_config_values.model_dump_for_helm()
         )
 
         nsd_id = f"{self.get_id()}_{self.NS_ID_INFIX}_{self.base_model.blue_model_5g.config.plmn}"
@@ -312,10 +330,10 @@ class BlueSDCore(Blue5GBaseBeta):
 
         logger.debug("SENDING UPDATED CONFIGURATION TO K8S:")
         logger.debug("-------------------------------------")
-        logger.debug(self.base_model.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True))
+        logger.debug(self.base_model.blue_model_5g.sdcore_config_values.model_dump_for_helm())
         logger.debug("-------------------------------------")
 
-        return self.kdu_upgrade(self.base_model.core_area.nsd, self.base_model.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True), self.KDU_NAME)
+        return self.kdu_upgrade(self.base_model.core_area.nsd, self.base_model.blue_model_5g.sdcore_config_values.model_dump_for_helm(), self.KDU_NAME)
 
     def edge_day2_conf(self, area: EdgeArea5G) -> list:
         logger.info("Initializing Edge Day2 configurations")
@@ -382,14 +400,27 @@ class BlueSDCore(Blue5GBaseBeta):
         # TODO to be implemented
         pass
 
+    def update_core(self):
+        self.to_db()
+        return self.kdu_upgrade(self.base_model.core_area.nsd, self.base_model.blue_model_5g.sdcore_config_values.model_dump_for_helm(), self.KDU_NAME)
+
     def add_ues(self, subscriber_model: BlueSDCoreAddSubscriberModel) -> list:
         logger.info(f"Adding UE with IMSI: {subscriber_model.imsi}")
         self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.add_subscriber_from_generic_model(subscriber_model)
-        self.to_db()
-        return self.kdu_upgrade(self.base_model.core_area.nsd, self.base_model.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True), self.KDU_NAME)
+        return self.update_core()
 
     def del_ues(self, subscriber_model: BlueSDCoreDelSubscriberModel) -> list:
         logger.info(f"Deleting UE with IMSI: {subscriber_model.imsi}")
         self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.delete_subscriber(subscriber_model.imsi)
-        self.to_db()
-        return self.kdu_upgrade(self.base_model.core_area.nsd, self.base_model.blue_model_5g.sdcore_config_values.model_dump(exclude_none=True, by_alias=True), self.KDU_NAME)
+        return self.update_core()
+
+    def add_slice(self, add_slice_model: BlueSDCoreAddSliceModel) -> list:
+        logger.info(f"Adding Slice with ID: {add_slice_model.sliceId}")
+        network_slice = self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.add_slice_from_generic_model(add_slice_model, add_slice_model.area_id)
+        network_slice.site_info.upf.upf_name = self.base_model.edge_areas[self.base_model.edge_areas[add_slice_model.area_id].id].upf_data_ip
+        return self.update_core()
+
+    def del_slice(self, del_slice_model: BlueSDCoreDelSliceModel) -> list:
+        logger.info(f"Deleting Slice with ID: {del_slice_model.sliceId}")
+        self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.delete_slice(del_slice_model.sliceId)
+        return self.update_core()

@@ -15,10 +15,11 @@ from models.prometheus.prometheus_model import PrometheusTargetModel
 from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimModel, VMFlavors, \
     VimNetMap
 from models.virtual_link_desc import VirtLinkDescr
-from nfvo import get_ns_vld_ip, NbiUtil
+from nfvo import NbiUtil
 from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from nfvo.vnf_manager_beta import Sol006VnfdBuilderBeta
+from nfvo.nsd_manager_beta import get_ns_vld_model
 from topology.topology import Topology, build_topology
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 from utils.log import create_logger
@@ -298,6 +299,7 @@ class K8sBeta(BlueprintBaseBeta):
         Set the Virtual network function descriptor for an area (both core area and normal area).
 
         Args:
+            is_controller: indicates if it is the k8s controller (or master)
             area_type: the area type
             area_id: the optional area id (for not core areas)
             data_interfaces: optional virtual link descriptors for data interfaces
@@ -679,8 +681,8 @@ class K8sBeta(BlueprintBaseBeta):
         for nsd in self.base_model.nsd_:
             if nsd.type == 'master':
                 # Retrieve the complete virtual link descriptors for the only interface of the k8s controller!
-                vlds = get_ns_vld_ip(nsd.nsi_id, ["mgt"])
-                self.k8s_model.config.controller_ip = vlds["mgt"][0]['ip']
+                vlds = get_ns_vld_model(nsd.nsi_id, ["mgt"])
+                self.k8s_model.config.controller_ip = vlds["mgt"][0].ip
             if nsd.type == 'worker':
                 # Looking for the area corresponding to the actual NSD
                 target_area = next(area for area in self.k8s_model.areas if area.id == nsd.area_id)
@@ -695,7 +697,7 @@ class K8sBeta(BlueprintBaseBeta):
                         vld_names.append('data_{}'.format(pool.net_name))
 
                 # Retrieve the complete virtual link descriptors for every link of the network service (k8s WORKER)!
-                vlds = get_ns_vld_ip(nsd.nsi_id, vld_names)
+                vlds: dict[str, List[VirtLinkDescr]] = get_ns_vld_model(nsd.nsi_id, vld_names)
 
                 # Need to add interfaces names such that we can assign the correct ip later on!
                 target_area.worker_mgt_int[str(nsd.replica_id)] = K8sNsdInterfaceDesc(
@@ -707,7 +709,7 @@ class K8sBeta(BlueprintBaseBeta):
                 target_area.worker_data_int[nsd.replica_id] = K8sNsdInterfaceDesc(
                     nsd_id=nsd.nsi_id,
                     nsd_name=nsd.descr.nsd.nsd[0].name,
-                    vld=[VirtLinkDescr.model_validate(item) for item in vlds[nsd_data_int_key]])
+                    vld=vlds[nsd_data_int_key])
             self.to_db()
 
     def get_data(self, get_request: BlueGetDataModel) -> dict:

@@ -355,7 +355,9 @@ class Topology:
             network: the network to be added in the topology
 
             areas: area ID list used to retrieve the VIMs. The network is then added to every VIM in the list and,
-            if terraform is set to true the net is created on these VIMs.
+            if terraform is set to true, the net is created on these VIMs.
+
+            terraform: indicate if the network should be created in the VIM
         """
         vims = []
         for a in areas:

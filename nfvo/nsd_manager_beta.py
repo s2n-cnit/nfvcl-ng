@@ -28,7 +28,7 @@ def get_nsd_name(nsd_descr: dict) -> str:
         return nsd_descr['nsd:nsd-catalog']['nsd'][0]['name']
 
 @deprecated
-def get_ns_vld(ns_id: str, ns_vlds: list) -> dict:
+def get_ns_vld_ip(ns_id: str, ns_vlds: list) -> dict:
     """
 
     Args:

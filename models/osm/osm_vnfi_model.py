@@ -30,7 +30,7 @@ class InterfaceOSM(BaseModel):
     ns_vld_id: str = Field(..., alias='ns-vld-id')
     type: str
     port_security: bool
-    compute_node: str
+    compute_node: str = Field(...)
     ip_address: str = Field(..., alias='ip-address')
     mac_address: str = Field(..., alias='mac-address')
     pci: Any
@@ -53,7 +53,7 @@ class VdurItem(BaseModel):
     affinity_or_anti_affinity_group_id: List = Field(
         ..., alias='affinity-or-anti-affinity-group-id'
     )
-    cloud_init: str = Field(..., alias='cloud-init')
+    cloud_init: Optional[str] = Field(default=None, alias='cloud-init')
     count_index: int = Field(..., alias='count-index')
     id: str
     interfaces: List[InterfaceOSM]
@@ -93,7 +93,3 @@ class VNFiModelOSM(BaseModel):
     connection_point: List[ConnectionPointItem] = Field(..., alias='connection-point')
     ip_address: str = Field(..., alias='ip-address')
     revision: int
-
-
-class VNFiModelListOSM(BaseModel):
-    vnf_list: List[VNFiModelOSM] = []

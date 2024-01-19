@@ -1,3 +1,6 @@
+from ipaddress import IPv4Address
+from typing import List
+
 from pydantic import Field
 
 from models.base_model import NFVCLBaseModel
@@ -14,3 +17,17 @@ class VirtLinkDescr(NFVCLBaseModel):
     member_vnf_index_ref: str = Field(default="", alias="member-vnf-index-ref")
     intf_mac: str = Field(default="")
     compute_node: str = Field(default="")
+
+    def get_ip(self) -> List[IPv4Address]:
+        """
+        Return a list of IP of the VLD (Every interface can have multiple IPs
+        Returns:
+            A list of IP, usually composed only by a single IP, but, when the interface has floating IPs (for example)
+            more than one IP is returned.
+        """
+        return_list = []
+        ip_list_str = self.ip.split(";")
+        for ip in ip_list_str:
+            return_list.append(IPv4Address(ip))
+
+        return return_list

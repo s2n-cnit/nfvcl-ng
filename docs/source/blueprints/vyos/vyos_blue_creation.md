@@ -21,7 +21,7 @@ For additional functionalities, look at the [GitHub](https://github.com/vyos/vyo
     ```console
     git clone https://github.com/vyos/vyos-vm-images.git && cd vyos-vm-images
     ``` 
-5. If the MTU is different from 1500 in the network where the image will be used (it happens in OpenStack) you will need to edit 
+5. (Optional) If the MTU is different from 1500 in the network where the image will be used (it happens in OpenStack) you will need to edit 
     the configuration file that will be mounted. 
     ```console
     nano ./roles/install-config/config.boot.j2
@@ -141,86 +141,4 @@ An example of VyOS's status after creation should result like this:
     "blueprint_instance_id": "K2ZSWQ",
     "blueprint_type": "VyOSBlue"
   }
-```
-
-# Setup NAT rules
-
-### 1 to 1 NAT
-![nat_1-to1-schema.png](images/nat_1-to1-schema.png)
-- API (PUT): *{{ base_url }}/nfvcl/v1/api/blue/VyOSBlue/{{ blue_id }}/1to1nat*
-- Body:
-```json
-{
-  "callbackURL": "",
-  "operation": "1to1nat",
-  "area": 0,
-  "router_name": "K2ZSWQ_vyos_router_area_0_0",
-  "rules": [
-		{
-      "inbound_network": "10.168.0.0/16",
-      "virtual_ip": "10.0.0.1",
-      "real_destination_ip": "10.170.3.9",
-      "source_address": "10.170.3.9",
-      "outbound_network": "10.168.0.0/16",
-      "rule_number": 16,
-      "description": "TEST"
-    }
-  ]
-}
-```
-
-### SNAT
-- API (PUT): *{{ base_url }}/nfvcl/v1/api/blue/VyOSBlue/{{ blue_id }}/snat*
-- Body:
-```json
-{
-  "callbackURL": "string",
-  "operation": "snat",
-  "area": 0,
-  "router_name": "K2ZSWQ_vyos_router_area_0_0",
-  "rules": [
-    {
-      "outbound_network": "10.168.0.0/16",
-			"source_address": "10.170.0.0/16",
-      "rule_number": 10,
-      "description": "Radio_OSJDRI to Radio_test_paolo"
-    }
-  ]
-}
-```
-
-### DNAT
-- API (PUT): *{{ base_url }}/nfvcl/v1/api/blue/VyOSBlue/{{ blue_id }}/dnat*
-- Body:
-```json
-{
-  "callbackURL": "string",
-  "operation": "dnat",
-  "area": 0,
-  "router_name": "K2ZSWQ_vyos_router_area_0_0",
-  "rules": [
-    {
-			"inbound_network": "10.168.0.0/16",
-      "virtual_ip": "7.7.7.7",
-      "real_destination_ip": "10.170.3.9",
-      "rule_number": 1,
-      "description": ""
-    }
-  ]
-}
-```
-
-# NAT rule deletion
-- API (DELETE): *{{ base_url }}/nfvcl/v1/api/blue/VyOSBlue/{{ blue_id }}/nat*
-- Body:
-``` json
-{
-  "callbackURL": "string",
-  "operation": "del_nat",
-  "area": 0,
-  "router_name": "8C1R3H_vyos_router_area_0_0",
-  "rules": [
-    1
-  ]
-}
 ```

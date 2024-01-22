@@ -1,4 +1,6 @@
 # NFVCL-NG
+[![Documentation Status](https://readthedocs.org/projects/nfvcl-ng/badge/?version=latest)](https://nfvcl-ng.readthedocs.io/en/latest/?badge=latest)
+
 The NFVCL is a network-oriented meta-orchestrator, specifically designed for zeroOps and continuous automation. 
 It can create, deploy and manage the lifecycle of different network ecosystems by consistently coordinating multiple 
 artefacts at any programmability levels (from physical devices to cloud-native microservices).

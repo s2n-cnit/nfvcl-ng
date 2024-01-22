@@ -99,12 +99,26 @@ Documentation contents
 **********************
 
 .. toctree::
+   :caption: Topology
+   :maxdepth: 2
+   :hidden:
 
-    topology/topology_creation
-    blueprints/free5gc/free5gc_blue_index
-    blueprints/k8s/k8s_blue_index
-    blueprints/ueransim/ueransim_blue_index
-    blueprints/vyos/vyos_blue_index
-    prometheus/prometheus
+   topology/topology_creation
 
+.. toctree::
+   :caption: Blueprints
+   :maxdepth: 2
+   :hidden:
+
+   blueprints/free5gc/free5gc_blue_index
+   blueprints/k8s/k8s_blue_index
+   blueprints/ueransim/ueransim_blue_index
+   blueprints/vyos/vyos_blue_index
+
+.. toctree::
+   :caption: Data Analitics
+   :maxdepth: 2
+   :hidden:
+
+   prometheus/prometheus
 

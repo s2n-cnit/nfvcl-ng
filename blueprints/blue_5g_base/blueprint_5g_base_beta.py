@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Union
 from pydantic import Field
 
 from blueprints.blue_5g_base.models import Create5gModel
-from blueprints.blue_5g_base.models.blue_5g_model import SubArea, SubSlices
+from blueprints.blue_5g_base.models.blue_5g_model import SubArea, SubSlices, SubAreaOnlyId
 from blueprints.blueprint_beta import BlueprintBaseBeta
 from models.base_model import NFVCLBaseModel
 from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD, BlueprintBaseModel
@@ -100,7 +100,7 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None, db: DB = None, nbiutil: NbiUtil = None):
         super().__init__(conf, id_, data, db, nbiutil)
         # This convert the base_model to the Blueprint5GBaseModel, it is necessary to store more data in the persistence layer
-        self.base_model = Blueprint5GBaseModel.model_validate(self.base_model.model_dump())
+        self.base_model: Blueprint5GBaseModel = Blueprint5GBaseModel.model_validate(self.base_model.model_dump())
 
     def init_base(self):
         logger.debug("init_base")
@@ -170,6 +170,7 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         )
         built_ran_vnfd_package = Sol006VnfdBuilderBeta(ran_vnfd, hemlflexcharm=True)
         blue_vnfd = built_ran_vnfd_package.get_vnf_blue_descr_only_pdu()
+        blue_vnfd.area_id = area.id
         self.base_model.vnfd.area.append(blue_vnfd)
         self.to_db()
         return [blue_vnfd]
@@ -328,6 +329,70 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
             logger.info(f"Initializing Day2 configuration for ran area {ran_area.id}")
             res += self.ran_day2_conf(ran_area)
         return res
+
+    def add_tac(self, area: SubArea):
+        logger.info("Add TAC Day0")
+
+        nsd_list: List[str] = []
+
+        for already_existing_area in self.base_model.blue_model_5g.areas:
+            if already_existing_area.id == area.id:
+                raise ValueError("An area with this id is already present")
+        self.base_model.blue_model_5g.areas.append(area)
+        self.base_model.edge_areas[area.id] = EdgeArea5G(id=area.id)
+        self.base_model.ran_areas[area.id] = RanArea5G(id=area.id)
+
+        nsd_list.extend(self.edge_nsd(self.base_model.edge_areas[area.id]))
+        nsd_list.extend(self.ran_nsd(self.base_model.ran_areas[area.id]))
+
+        return nsd_list
+
+    def add_tac_day2(self, area: SubArea):
+        logger.info("Add TAC Day2 configurations")
+        edge_area: EdgeArea5G = self.base_model.edge_areas[area.id]
+        ran_area: RanArea5G = self.base_model.ran_areas[area.id]
+        self.get_ip_edge(edge_area.nsd)
+        self.get_ip_ran(ran_area.nsd)
+        res = []
+        res += self.edge_day2_conf(edge_area)
+        res += self.ran_day2_conf(ran_area)
+        return res
+
+    def del_tac(self, area: SubAreaOnlyId):
+        nsd_list: List[str] = [
+            self.base_model.edge_areas[area.id].nsd.nsi_id,
+            self.base_model.ran_areas[area.id].nsd.nsi_id
+        ]
+        return nsd_list
+
+    def del_tac_callback(self, callback_msg: list):
+        logger.debug("Del tac callback")
+
+        edge_to_be_deleted = []
+        ran_to_be_deleted = []
+        for edge_area in list(self.base_model.edge_areas.values()):
+            if edge_area.nsd.nsi_id in callback_msg:
+                edge_to_be_deleted.append(edge_area.id)
+
+        for ran_area in list(self.base_model.ran_areas.values()):
+            if ran_area.nsd.nsi_id in callback_msg:
+                ran_to_be_deleted.append(ran_area.id)
+
+        for ed in edge_to_be_deleted:
+            del self.base_model.edge_areas[ed]
+
+        for ra in ran_to_be_deleted:
+            del self.base_model.ran_areas[ra]
+
+        for area in self.base_model.blue_model_5g.areas.copy():
+            if area.id in edge_to_be_deleted or area.id in ran_to_be_deleted:
+                self.base_model.blue_model_5g.areas.remove(area)
+
+    def del_tac_day2(self, area: SubArea):
+        """
+        Override this method to perform day2 operations on the core when a tac area is deleted
+        """
+        return []
 
     @abstractmethod
     def get_ip_core(self, ns: BlueNSD) -> None:

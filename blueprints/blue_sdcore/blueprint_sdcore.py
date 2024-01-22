@@ -1,6 +1,7 @@
 import copy
 from typing import *
 
+from blueprints.blue_5g_base.models.blue_5g_model import SubArea, SubAreaOnlyId
 from pydantic import Field
 
 from blueprints.blue_5g_base.blueprint_5g_base_beta import Blue5GBaseBeta, EdgeArea5G, CoreArea5G, Area5GTypeEnum, RanArea5G, Blueprint5GBaseModel
@@ -8,8 +9,8 @@ from blueprints.blue_sdcore import sdcore_default_config
 from blueprints.blue_sdcore.configurators.sdcore_upf_configurator import ConfiguratorSDCoreUpf, \
     ConfiguratorSDCoreUPFVars
 from blueprints.blue_sdcore.rest_description import *
-from blueprints.blue_sdcore.sdcore_models import BlueSDCoreCreateModel, BlueSDCoreAddSubscriberModel, BlueSDCoreDelSubscriberModel, BlueSDCoreAddSliceModel, BlueSDCoreDelSliceModel
-from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml, SDCoreValuesModel, NetworkSlice, DeviceGroup
+from blueprints.blue_sdcore.sdcore_models import BlueSDCoreCreateModel, BlueSDCoreAddSubscriberModel, BlueSDCoreDelSubscriberModel, BlueSDCoreAddSliceModel, BlueSDCoreDelSliceModel, BlueSDCoreAddTacModel, BlueSDCoreDelTacModel
+from blueprints.blue_sdcore.sdcore_values_model import SimAppYaml, SDCoreValuesModel, NetworkSlice, DeviceGroup, GNodeB, SimAppYamlConfiguration
 from models.base_model import NFVCLBaseModel
 from models.blueprint.blueprint_base_model import BlueKDUConf, BlueVNFD, BlueNSD
 from models.blueprint.rest_blue import BlueGetDataModel
@@ -62,6 +63,10 @@ class BlueSDCore(Blue5GBaseBeta):
     NS_ID_INFIX = "SDCORE"
     UPF_IMAGE_NAME = "SDCore-UPF-v0.3.0"
 
+    @property
+    def config_ref(self) -> SimAppYamlConfiguration:
+        return self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration
+
     @classmethod
     def rest_create(cls, msg: BlueSDCoreCreateModel):
         return cls.api_day0_function(msg)
@@ -83,21 +88,29 @@ class BlueSDCore(Blue5GBaseBeta):
         return cls.api_day2_function(del_slice_model, blue_id)
 
     @classmethod
+    def rest_add_tac(cls, add_slice_model: BlueSDCoreAddTacModel, blue_id: str):
+        return cls.api_day2_function(add_slice_model, blue_id)
+
+    @classmethod
+    def rest_del_tac(cls, del_slice_model: BlueSDCoreDelTacModel, blue_id: str):
+        return cls.api_day2_function(del_slice_model, blue_id)
+
+    @classmethod
     def day2_methods(cls):
-        # cls.api_router.add_api_route(
-        #     path="/{blue_id}/add_tac",
-        #     endpoint=cls.rest_add_tac,
-        #     methods=["PUT"],
-        #     description=ADD_TAC_DESCRIPTION,
-        #     summary=ADD_TAC_DESCRIPTION
-        # )
-        # cls.api_router.add_api_route(
-        #     path="/{blue_id}/del_tac",
-        #     endpoint=cls.rest_del_tac,
-        #     methods=["PUT"],
-        #     description=DEL_TAC_DESCRIPTION,
-        #     summary=DEL_TAC_DESCRIPTION
-        # )
+        cls.api_router.add_api_route(
+            path="/{blue_id}/add_tac",
+            endpoint=cls.rest_add_tac,
+            methods=["PUT"],
+            description=ADD_TAC_DESCRIPTION,
+            summary=ADD_TAC_DESCRIPTION
+        )
+        cls.api_router.add_api_route(
+            path="/{blue_id}/del_tac",
+            endpoint=cls.rest_del_tac,
+            methods=["PUT"],
+            description=DEL_TAC_DESCRIPTION,
+            summary=DEL_TAC_DESCRIPTION
+        )
         cls.api_router.add_api_route(
             path="/{blue_id}/add_slice",
             endpoint=cls.rest_add_slice,
@@ -168,6 +181,16 @@ class BlueSDCore(Blue5GBaseBeta):
                 'day0': [],
                 'day2': [{'method': 'del_slice'}],
                 'dayN': []
+            }],
+            'add_tac': [{
+                'day0': [{'method': 'add_tac', 'callback': 'add_tac_callback'}],
+                'day2': [{'method': 'add_tac_day2'}],
+                'dayN': []
+            }],
+            'del_tac': [{
+                'day0': [],
+                'day2': [{'method': 'del_tac_day2'}],
+                'dayN': [{'method': 'del_tac', 'callback': 'del_tac_callback'}]
             }],
         }
 
@@ -308,19 +331,19 @@ class BlueSDCore(Blue5GBaseBeta):
         self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml = copy.deepcopy(sdcore_default_config.default_config.omec_sub_provision.config.simapp.cfg_files.simapp_yaml)
 
         # Convert the requested configuration in SD-Core format
-        self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.from_generic_5g_model(self.base_model.blue_model_5g)
+        self.config_ref.from_generic_5g_model(self.base_model.blue_model_5g)
 
         # Set UPFs ip
         # TODO need more checking, it may override the ip in some cases
         for area_for_slice in self.base_model.blue_model_5g.areas:
             for slice_in_area in area_for_slice.slices:
                 # TODO check size, should be 1
-                network_slice: NetworkSlice = list(filter(lambda x: x.slice_id.sd == slice_in_area.sliceId, self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.network_slices))[0]
+                network_slice: NetworkSlice = list(filter(lambda x: x.slice_id.sd == slice_in_area.sliceId, self.config_ref.network_slices))[0]
                 network_slice.site_info.upf.upf_name = self.base_model.edge_areas[self.base_model.edge_areas[area_for_slice.id].id].upf_data_ip
 
                 # Set the ip pool in the edge area
                 # TODO this only work with 1 device group
-                device_group: DeviceGroup = list(filter(lambda x: x.name == network_slice.site_device_group[0], self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.device_groups))[0]
+                device_group: DeviceGroup = list(filter(lambda x: x.name == network_slice.site_device_group[0], self.config_ref.device_groups))[0]
                 self.base_model.edge_areas[self.base_model.edge_areas[area_for_slice.id].id].upf_ue_ip_pool = device_group.ip_domain_expanded.ue_ip_pool
 
         # Changing this value force a pod restart, this may be avoided changing the helm chart to add a new unused field inside the pod spec
@@ -406,21 +429,68 @@ class BlueSDCore(Blue5GBaseBeta):
 
     def add_ues(self, subscriber_model: BlueSDCoreAddSubscriberModel) -> list:
         logger.info(f"Adding UE with IMSI: {subscriber_model.imsi}")
-        self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.add_subscriber_from_generic_model(subscriber_model)
+        self.config_ref.add_subscriber_from_generic_model(subscriber_model)
         return self.update_core()
 
     def del_ues(self, subscriber_model: BlueSDCoreDelSubscriberModel) -> list:
         logger.info(f"Deleting UE with IMSI: {subscriber_model.imsi}")
-        self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.delete_subscriber(subscriber_model.imsi)
+        self.config_ref.delete_subscriber(subscriber_model.imsi)
         return self.update_core()
 
     def add_slice(self, add_slice_model: BlueSDCoreAddSliceModel) -> list:
         logger.info(f"Adding Slice with ID: {add_slice_model.sliceId}")
-        network_slice = self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.add_slice_from_generic_model(add_slice_model, add_slice_model.area_id)
+        network_slice = self.config_ref.add_slice_from_generic_model(add_slice_model, add_slice_model.area_id)
         network_slice.site_info.upf.upf_name = self.base_model.edge_areas[self.base_model.edge_areas[add_slice_model.area_id].id].upf_data_ip
         return self.update_core()
 
     def del_slice(self, del_slice_model: BlueSDCoreDelSliceModel) -> list:
         logger.info(f"Deleting Slice with ID: {del_slice_model.sliceId}")
-        self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.config.simapp.cfg_files.simapp_yaml.configuration.delete_slice(del_slice_model.sliceId)
+        self.config_ref.delete_slice(del_slice_model.sliceId)
         return self.update_core()
+
+    def get_slices_for_area(self, area: SubArea):
+        network_slices_to_ret: List[NetworkSlice] = []
+
+        for slice_in_area in area.slices:
+            network_slices: List[NetworkSlice] = list(filter(lambda x: x.slice_id.sd == slice_in_area.sliceId, self.config_ref.network_slices))
+
+            if len(network_slices) == 0:
+                raise Exception("No network slice for this area")
+
+            network_slices_to_ret.append(network_slices[0])
+
+        return network_slices_to_ret
+
+    def add_tac(self, area: SubArea):
+        res = super().add_tac(area)
+
+        for network_slice in self.get_slices_for_area(area):
+            network_slice.site_info.g_node_bs = [GNodeB(name=f"gnb{area.id}", tac=area.id)]
+            network_slice.site_info.upf.upf_name = self.base_model.edge_areas[self.base_model.edge_areas[area.id].id].upf_data_ip
+
+            # Set the ip pool in the edge area
+            # TODO this only work with 1 device group
+            device_group: DeviceGroup = list(filter(lambda x: x.name == network_slice.site_device_group[0], self.config_ref.device_groups))[0]
+            self.base_model.edge_areas[self.base_model.edge_areas[area.id].id].upf_ue_ip_pool = device_group.ip_domain_expanded.ue_ip_pool
+
+        return res
+
+    def add_tac_day2(self, area: SubArea):
+        res = super().add_tac_day2(area)
+
+        for network_slice in self.get_slices_for_area(area):
+            network_slice.site_info.upf.upf_name = self.base_model.edge_areas[self.base_model.edge_areas[area.id].id].upf_data_ip
+
+        # The configuration is updated in add_tac and sent to the core here
+        res += self.update_core()
+        return res
+
+    def del_tac_day2(self, area: SubArea):
+        res = super().del_tac_day2(area)
+
+        for network_slice in self.get_slices_for_area(area):
+            network_slice.site_info.g_node_bs = []
+            network_slice.site_info.upf.upf_name = "PLACEHOLDER"
+
+        res += self.update_core()
+        return res

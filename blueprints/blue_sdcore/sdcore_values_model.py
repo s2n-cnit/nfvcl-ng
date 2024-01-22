@@ -279,7 +279,11 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
 
         for generic_slice in generic_model.config.sliceProfiles:
             # TODO handle one slice in multiple area, sd-core does not support multiple upf per slice
-            self.add_slice_from_generic_model(generic_slice, list(map(lambda x: x.id, self.__get_areas_with_slice(generic_model, generic_slice)))[0])
+            area_id = None
+            areas_with_slice = list(map(lambda x: x.id, self.__get_areas_with_slice(generic_model, generic_slice)))
+            if len(areas_with_slice) == 1:
+                area_id = areas_with_slice[0]
+            self.add_slice_from_generic_model(generic_slice, area_id)
 
         for generic_subscriber in generic_model.config.subscribers:
             self.add_subscriber_from_generic_model(generic_subscriber)
@@ -314,7 +318,7 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
 
         self.subscribers.remove(subscriber_to_delete)
 
-    def add_slice_from_generic_model(self, generic_slice: SubSliceProfiles, area_id: int) -> NetworkSlice:
+    def add_slice_from_generic_model(self, generic_slice: SubSliceProfiles, area_id: Optional[int]) -> NetworkSlice:
         # Prechecks TODO need to be moved
         if len(generic_slice.dnnList) != 1:
             raise ValueError("config.sliceProfiles[].dnnList need to be of size 1")
@@ -341,6 +345,8 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
         logger.warning("config.subscribers[].snssai[].pduSessionIds IGNORED")
         logger.warning("config.subscribers[].snssai[].default_slice IGNORED")
 
+        gnbs = [GNodeB(name=f"gnb{area_id}", tac=area_id)] if area_id is not None else []
+
         new_network_slice = NetworkSlice(
             name=slice_name,
             slice_id=SliceId(
@@ -355,7 +361,7 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
                 endpoint="0.0.0.0/0"
             )],
             site_info=SiteInfo(
-                g_node_bs=[GNodeB(name=f"gnb{area_id}", tac=area_id)], #list(map(lambda x: GNodeB(name=f"gnb{x}", tac=x), areas)),
+                g_node_bs=gnbs,
                 plmn=Plmn(
                     mcc=self.ext_plmn[:3],
                     mnc=self.ext_plmn[3:]

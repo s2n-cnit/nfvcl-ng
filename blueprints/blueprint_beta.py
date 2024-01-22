@@ -429,10 +429,9 @@ class BlueprintBaseBeta(abc.ABC):
         Returns:
         """
         logger.info("Destroying the blueprint {}".format(self.get_id()))
-        if hasattr(self, "pdu"):
-            for p in self.pdu:
-                logger.debug("deleting pdu {}".format(p))
-                self.topology_del_pdu(p)
+        for p in self.base_model.pdu:
+            logger.debug("deleting pdu {}".format(p))
+            self.topology_del_pdu(p)
         self._destroy()
         self.delete_db()
 
@@ -452,7 +451,7 @@ class BlueprintBaseBeta(abc.ABC):
             nsi: The identifier of the network service to be deleted
         """
         nsd: BlueNSD
-        res = [nsd for nsd in self.base_model.nsd_ if 'nsi_id' in nsd and not (nsd.nsd_id == nsi)]
+        res = [nsd for nsd in self.base_model.nsd_ if not (nsd.nsi_id == nsi)]
         self.base_model.nsd_ = res
         self.to_db()
 

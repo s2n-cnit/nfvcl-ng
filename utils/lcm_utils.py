@@ -300,10 +300,14 @@ def dayN_operation(handler, msg: dict, osmNbiUtil: NbiUtil, blue: BlueprintBaseB
     # Call The blueprint handler for dayN operation
     nsi_list_to_delete = getattr(blue, handler['method'])(msg)
     # Delete NSs
-    init_dayN(nsi_list_to_delete, osmNbiUtil, blue)
+    if 'callback' in handler:
+        handler_fun = getattr(blue, handler['callback'])
+    else:
+        handler_fun = None
+    init_dayN(nsi_list_to_delete, osmNbiUtil, blue, blue_callback=handler_fun)
 
 
-def init_dayN(nsi_list, osmNbiUtil: NbiUtil, blue: BlueprintBaseBeta):
+def init_dayN(nsi_list, osmNbiUtil: NbiUtil, blue: BlueprintBaseBeta, blue_callback=None):
     """
     Handle the dayN of Network services. Call OSM for:
         - Delete all network services in the list.
@@ -377,6 +381,10 @@ def init_dayN(nsi_list, osmNbiUtil: NbiUtil, blue: BlueprintBaseBeta):
 
     for nsi in nsi_list:
         blue.delete_nsd(nsi)
+
+    if blue_callback is not None:
+        logger.info("Blue {} - Performing Day N callback".format(blue.get_id()))
+        blue_callback(nsi_list)
 
 
 def checkVims(vims: List[VimModel], osmNbiUtil: NbiUtil):

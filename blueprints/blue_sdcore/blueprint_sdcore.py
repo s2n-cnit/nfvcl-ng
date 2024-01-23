@@ -424,6 +424,9 @@ class BlueSDCore(Blue5GBaseBeta):
         pass
 
     def update_core(self):
+        """
+        Save the current configuration to the db and update the core
+        """
         self.to_db()
         return self.kdu_upgrade(self.base_model.core_area.nsd, self.base_model.blue_model_5g.sdcore_config_values.model_dump_for_helm(), self.KDU_NAME)
 
@@ -449,6 +452,14 @@ class BlueSDCore(Blue5GBaseBeta):
         return self.update_core()
 
     def get_slices_for_area(self, area: SubArea):
+        """
+        Returns list of network slices in given area
+        Args:
+            area: Area to get slices for
+
+        Returns: Slices found
+
+        """
         network_slices_to_ret: List[NetworkSlice] = []
 
         for slice_in_area in area.slices:

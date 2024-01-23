@@ -54,17 +54,33 @@ class Area5GTypeEnum(Enum):
 
 
 class Area5G(NFVCLBaseModel):
+    """
+    Base class that define an Area for 5G blueprints
+    """
     id: int
     type: Area5GTypeEnum
     nsd: Optional[BlueNSD] = Field(default=None)
 
 
 class CoreArea5G(Area5G):
+    """
+    Class that define a core area for 5G blueprints
+
+    amf_ip: IP address of the amf core function, needs to be reachable by the gnb
+    """
     type: Area5GTypeEnum = Area5GTypeEnum.CORE
     amf_ip: Optional[str] = Field(default=None)
 
 
 class EdgeArea5G(Area5G):
+    """
+    Class that define a edge area for 5G blueprints
+
+    upf_mgt_ip: IP address of the mgt interface of the UPF vm in this area
+    upf_data_ip: IP address of the data interface of the UPF vm in this area
+    upf_data_network_cidr: CIDR of the data network
+    upf_ue_ip_pool: Pool of IP to use for UEs connecting to this area
+    """
     type: Area5GTypeEnum = Area5GTypeEnum.EDGE
     upf_mgt_ip: Optional[str] = Field(default=None)
     upf_data_ip: Optional[str] = Field(default=None)
@@ -73,6 +89,12 @@ class EdgeArea5G(Area5G):
 
 
 class RanArea5G(Area5G):
+    """
+    Class that define a edge area for 5G blueprints
+
+    nb_mgt_ip: IP address of the mgt interface of the GNB vm in this area
+    nb_wan_ip: IP address of the data interface of the GNB vm in this area
+    """
     type: Area5GTypeEnum = Area5GTypeEnum.RAN
     nb_mgt_ip: Optional[str] = Field(default=None)
     nb_wan_ip: Optional[str] = Field(default=None)
@@ -84,6 +106,9 @@ class Networks5G(NFVCLBaseModel):
 
 
 class Blueprint5GBaseModel(BlueprintBaseModel):
+    """
+    Class that contains additional blueprint data that need to be saved in NFVCL's database
+    """
     blue_model_5g: Optional[Create5gModel] = Field(default=None)
     core_vim: Optional[VimModel] = Field(default=None)
     networks_5g: Optional[Networks5G] = Field(default=None)
@@ -103,6 +128,10 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         self.base_model: Blueprint5GBaseModel = Blueprint5GBaseModel.model_validate(self.base_model.model_dump())
 
     def init_base(self):
+        """
+        Initialize areas and networks
+        """
+
         logger.debug("init_base")
         core_areas = list(filter(lambda x: x.core, self.base_model.blue_model_5g.areas))
         non_core_areas = list(filter(lambda x: not x.core, self.base_model.blue_model_5g.areas))
@@ -123,6 +152,10 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         self.check_and_set_networks()
 
     def check_and_set_networks(self):
+        """
+        Check if the networks present in the config exists inside the topology
+        If a network does not exist raise an exception, if everything is ok a reference to the networks is saved in self.base_model.networks_5g
+        """
         if self.base_model.blue_model_5g.config.network_endpoints.wan in self.base_model.core_vim.networks:
             wan_network = self.base_model.blue_model_5g.config.network_endpoints.wan
         else:
@@ -230,6 +263,10 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         return [nsd_id]
 
     def kdu_upgrade(self, nsd: BlueNSD, conf_params: dict, kdu_name, vnf_id="1"):
+        """
+        Send updated configuration to a KDU
+        This is similar to running `helm upgrade` after editing `values.yaml`
+        """
         # TODO make a Pydantic model for this
         res = [
             {
@@ -264,8 +301,6 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         # here we have to find the correct enb_configurator
         nsd_item = area.nsd
 
-        # TODO get area from config
-        vim: VimModel = self.get_topology().get_vim_from_area_id_model(area.id)
         pdu_item = self.topology_get_pdu_by_area_and_type(area.id, 'nb')
 
         # allocating the correct configurator obj for the pnf
@@ -275,7 +310,7 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
 
         # TODO rewrite
         if len(nsd_item.vld) > 1:
-            # TODO è giusto "data"?
+            # TODO what is `datanet`?
             wan_vld = next((item for item in nsd_item.vld if item.vld == 'datanet'), None)
             if wan_vld is None:
                 raise ValueError('wan  vld not found')
@@ -318,6 +353,10 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         return res
 
     def init_day2_conf(self, msg) -> list:
+        """
+        Create day2 configuration for every area of every type
+        """
+
         logger.info("Initializing Day2 configurations")
         res = []
         logger.info(f"Initializing Day2 configuration for core area {self.base_model.core_area.id}")
@@ -331,6 +370,11 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         return res
 
     def add_tac(self, area: SubArea):
+        """
+        Add a tac to the blueprint
+        Args:
+            area: Area to add tac to
+        """
         logger.info("Add TAC Day0")
 
         nsd_list: List[str] = []

@@ -20,7 +20,7 @@ from topology.topology import Topology
 from models.k8s.topology_k8s_model import K8sModel
 from .blue_models import *
 from main import old_workers, db, persistency, id_generator, nbiUtil, topology_lock, workers
-from utils.k8s import get_pods_for_k8s_namespace, get_k8s_config_from_file_content, parse_k8s_clusters_from_dict
+from utils.k8s import get_pods_for_k8s_namespace, get_k8s_config_from_file_content
 from utils.log import create_logger
 from .rest_description import *
 from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event

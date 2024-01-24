@@ -3,7 +3,6 @@ import shutil
 import tarfile
 import typing
 import yaml
-from pydantic import Field
 
 import utils.persistency
 from . import NbiUtil, PNFmanager

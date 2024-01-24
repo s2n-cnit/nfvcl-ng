@@ -1,13 +1,13 @@
 # Kubernetes blueprint creation
 
-`POST /nfvcl/v1/api/blue/K8sBeta`
+`POST /nfvcl/v1/api/blue/K8sBlue`
 
 Example request body:
 ```json
 {
-  "type": "K8sBeta",
+  "type": "K8sBlue",
   "config": {
-    "version": "v1.24",
+    "version": "v1.28",
     "nfvo_onboard": "true",
     "cni": "flannel",
     "network_endpoints": {

@@ -1,14 +1,19 @@
+from logging import Logger
 from configurators.flex_configurator import Configurator_Flex
+from models.k8s.blueprint_k8s_model import K8sBlueprintModel
 from utils import persistency
 from utils.log import create_logger
 
-logger = create_logger('Configurator_K8s')
+logger: Logger = create_logger('K8S CONF')
 
 
-class ConfiguratorK8s(Configurator_Flex):
-    def __init__(self, nsd_id, m_id, blue_id, args, role='worker', master_key=None):
+class ConfiguratorK8sBeta(Configurator_Flex):
+    def __init__(self, nsd_id, m_id, blue_id: str, config_model: K8sBlueprintModel, role='worker', master_key=None,
+                 step: int = 1):
         self.type = "k8s"
-        super(ConfiguratorK8s, self).__init__(nsd_id, m_id, blue_id)
+        super(ConfiguratorK8sBeta, self).__init__(nsd_id, m_id, blue_id)
+        # Must set after initialization of father, otherwise self.dump_number is reset to 1!!!
+        self.dump_number = step
         logger.info("Blue {}: Configurator_K8s created for nsd {} and vnfd {}".format(blue_id, nsd_id, m_id))
         self.db = persistency.DB()
 
@@ -17,28 +22,18 @@ class ConfiguratorK8s(Configurator_Flex):
 
         self.role = role
 
-        jinja_vars = {
-            'pod_network_cidr': args['config']['pod_network_cidr'],
-            'lb_pools': args['config']['network_endpoints']['data_nets']
-        }
-        logger.debug(jinja_vars)
         ansible_vars = []
-        if self.role == 'master':
-            ansible_vars = [
-                {'pod_network_cidr': args['config']['pod_network_cidr']},
-                # ^-- repeated here because it is used as ansible vars in playbook_kubernetes_master.yml
-                # {'rbac_manifest_file': args['rbac_manifest_file']},
-                {'k8s_master_ip': args['config']['controller_ip']},
-                # {'pod_network_manifest_file': args['pod_network_manifest_file']},
-                {'metallb_configmap_file': "~/metallb_config.yaml"},
-                {'cni': args['config']['cni']}
-                # Default cni is flannel -> See K8sConfig model
-            ]
-            if 'linkerd' in args:
-                ansible_vars.append({'linkerd': args['linkerd']})
 
         if self.role == 'worker':
             ansible_vars = [{'master_key': master_key}]
+
+        if self.role == 'master':
+            ansible_vars = [
+                {'pod_network_cidr': config_model.config.pod_network_cidr},
+                {'k8s_master_ip': config_model.config.controller_internal_ip},
+                {'k8s_master_external_ip': config_model.config.controller_ip}
+                # ^-- They are used as ansible vars in playbook_kubernetes_master.yml
+            ]
 
         self.addPlaybook('blueprints/blue_k8s/config_scripts/playbook_kubernetes_common.yaml', vars_=ansible_vars)
 
@@ -64,15 +59,18 @@ class ConfiguratorK8s(Configurator_Flex):
     def dump(self):
         logger.debug("Blue {}: Dumping nsd {}".format(self.blue_id, self.nsd_id))
         self.dumpAnsibleFile(10, str(self.nsd_id) + '_ansible_k8s_' + str(self.nsd['member-vnfd-id']))
-        return super(ConfiguratorK8s, self).dump()
+        return super(ConfiguratorK8sBeta, self).dump()
 
     def get_logpath(self):
         # return [self.conf['log_filename']]
         return []
 
     def custom_prometheus_exporter(self):
-        # self.addPackage('screen')
-        pass
+
+        return []
 
     def destroy(self):
         logger.info("Destroying")
+        # TODO remove prometheus jobs
+
+        # super(Configurator_AmariEPC, self).destroy()

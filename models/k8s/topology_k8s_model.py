@@ -23,6 +23,7 @@ class K8sVersion(str, Enum):
     V1_25 = 'v1.25'
     V1_26 = 'v1.26'
     V1_27 = 'v1.27'
+    V1_28 = 'v1.28'
 
     @classmethod
     def has_value(cls, value):

@@ -38,7 +38,7 @@ In this guide they will be installed on the same location.
  - An Ubuntu (22.04 LTS) instance where the NFVCL will be installed and run.
  - Having OSM 14 running on a reachable machine, in the following installation procedure,
    all the services will be installed on the same Ubuntu instance.
- - Python 3.11.
+ - Python 3.11 (Installation performed in setup.sh)
  - If the NFVCL and OSM are running on the same machine:
    - **RECOMMENDED**: 
           4 CPUs, 16 GB RAM, 80GB disk and a single interface with Internet access
@@ -56,7 +56,7 @@ wget https://osm-download.etsi.org/ftp/osm-14.0-fourteen/install_osm.sh
 ``` bash
 git clone --depth 1 https://github.com/s2n-cnit/nfvcl-ng
 ```
-### Step 1 - Install OSM
+### Step 1 - Install OSM 14
 > :warning::warning::warning: At the moment OSM installation is broken and need to be fixed.
 > 
 > Edit _install_osm.sh_ and add before the last line the following:
@@ -84,7 +84,7 @@ From OSM 14 on, we will need to execute also the following instruction
 kubectl set env deployment -n osm lcm OSMLCM_VCA_EEGRPC_POD_ADMISSION_POLICY=privileged
 ```
 
-### Step 2 - Install Redis, Uvicorn, MongoDB and requirements
+### Step 2 - Install Python 3.11, Redis, Uvicorn, Poetry, MongoDB and requirements (using poetry)
 
 Enter NFVCL folder and run setup.sh, this script will:
 - Install uvicorn, Poetry, Redis and MongoDB.
@@ -99,7 +99,7 @@ chmod +x ./setup.sh
 ./setup.sh
 ```
 
-### Step 3 - Configure NFVCL, Redis and MongoDB
+### Step 3 - NFVCL, Redis and MongoDB configuration
 The last step is the NFVCL configuration, in production it is raccomanded to change values in **config.yaml**, while, for developing you can create a copy of the default configuration and call it **config_dev.yaml**. 
 When the NFVCL starts, it loads the cofiguration from *config_dev.yaml* if present, otherwise the configuration is loaded from the default file.
 

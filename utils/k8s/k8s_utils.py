@@ -437,7 +437,7 @@ def get_k8s_version(kube_client_config: kubernetes.client.Configuration) -> K8sV
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         version_api = kubernetes.client.VersionApi(api_client)
         try:
-            api_version: VersionInfo = version_api.get_code()
+            api_version: VersionInfo = version_api.get_code(_request_timeout=10)
         except ApiException as error:
             logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
             raise error
@@ -451,34 +451,6 @@ def get_k8s_version(kube_client_config: kubernetes.client.Configuration) -> K8sV
         return K8sVersion(main_ver)
 
 
-@check_k8s_version(min_version=K8sVersion.V1_26)
-def get_k8s_cidr_info2s(kube_client_config: kubernetes.client.Configuration) -> V1alpha1ClusterCIDRList:
-    """
-        Return the pod CIDR of a k8s cluster
-
-        Args:
-            kube_client_config: the configuration of K8s on which the client is built.
-
-        Returns:
-            A String representing the pod CIDR
-
-        Warnings:
-            Require k8s>1.26
-        """
-    with kubernetes.client.ApiClient(kube_client_config) as api_client:
-        networking_v1_alpha = kubernetes.client.NetworkingV1alpha1Api(api_client)
-        try:
-            cluster_cidr_list: V1alpha1ClusterCIDRList = networking_v1_alpha.list_cluster_cidr()
-        except ApiException as error:
-            logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
-            raise error
-        finally:
-            api_client.close()
-
-        return cluster_cidr_list
-
-
-@deprecated
 def get_k8s_cidr_info(kube_client_config: kubernetes.client.Configuration) -> str:
     """
     Return the pod CIDR of a k8s cluster

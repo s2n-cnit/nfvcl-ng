@@ -9,8 +9,9 @@ from models.vim.vim_models import VMFlavors
 
 class K8sNetworkEndpoints(NFVCLBaseModel):
     mgt: str = Field(
-        ..., description='name of the topology network to be used for management'
+        ..., description='The name of the topology network to be used for management'
     )
+    mgt_internal: Optional[str] = None
     data_nets: List[LBPool] = Field(description='topology networks to be used by the load balancer', min_items=1)
 
 
@@ -30,7 +31,7 @@ class K8sAreaInfo(NFVCLBaseModel):
 
 
 class K8sConfig(NFVCLBaseModel):
-    version: K8sVersion = Field(default=K8sVersion.V1_24)
+    version: K8sVersion = Field(default=K8sVersion.V1_28)
     cni: Cni = Field(default=Cni.flannel)
     linkerd: dict = Field(default={})
     pod_network_cidr: str = Field(default="10.254.0.0/16", description='K8s Pod network IPv4 cidr to init the cluster')
@@ -39,7 +40,8 @@ class K8sConfig(NFVCLBaseModel):
     master_flavors: VMFlavors = VMFlavors()
     nfvo_onboard: bool = False
     core_area: Optional[K8sAreaInfo] = Field(default=None, description="The core are of the cluster")
-    controller_ip: str = Field(default="", description="The IP of the k8s controller or master")
+    controller_ip: str = Field(default="", description="The IP of the k8s controller or master, reachable from the outside (es. floating IP)")
+    controller_internal_ip: Optional[str] = Field(default=None, description="The IP of the k8s controller or master, in the internal net")
     master_key_add_worker: str = Field(default="", description="The master key to be used by a worker to join the k8s cluster")
     master_credentials: str = Field(default="", description="The certificate of the admin, to allow k8s administration")
 
@@ -48,7 +50,7 @@ class K8sConfig(NFVCLBaseModel):
 
 
 class K8sBlueprintCreate(NFVCLBaseModel):
-    type: Literal['K8sBeta']
+    type: Literal['K8sBlue']
     callbackURL: Optional[str] = Field(
         None,
         description='url that will be used to notify when the blueprint processing finishes',

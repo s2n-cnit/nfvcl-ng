@@ -4,7 +4,7 @@
   gather_facts: no
   tasks:
    - name: Intilizing Kubernetes Cluster
-     command: kubeadm init --pod-network-cidr "{{ pod_network_cidr }}"  --apiserver-advertise-address "{{ k8s_master_ip }}"
+     command: kubeadm init --pod-network-cidr "{{ pod_network_cidr }}"  --apiserver-advertise-address "{{ k8s_master_ip }}" --apiserver-cert-extra-sans "{{ k8s_master_external_ip }}"
    - pause: seconds=30
    - name: Create directory for kube config.
      file: 

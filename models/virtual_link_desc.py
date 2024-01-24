@@ -31,3 +31,14 @@ class VirtLinkDescr(NFVCLBaseModel):
             return_list.append(IPv4Address(ip))
 
         return return_list
+
+    def get_ip_str(self) -> List[str]:
+        """
+        Return a list of IP of the VLD (Every interface can have multiple IPs
+        Returns:
+            A list of IP, usually composed only by a single IP, but, when the interface has floating IPs (for example)
+            more than one IP is returned.
+        """
+        ip_list_str = self.ip.split(";")
+
+        return ip_list_str

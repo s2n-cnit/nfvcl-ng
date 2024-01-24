@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 from ipaddress import IPv4Address
 from logging import Logger
@@ -23,7 +24,7 @@ from nfvo.nsd_manager_beta import get_ns_vld_model
 from topology.topology import Topology, build_topology
 from utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, get_k8s_cidr_info
 from utils.log import create_logger
-from .configurators.k8s_configurator_beta import ConfiguratorK8sBeta
+from .configurators.k8s_configurator import ConfiguratorK8sBeta
 from ..blueprint_beta import BlueprintBaseBeta
 
 db = persistency.DB()
@@ -43,7 +44,7 @@ DEFAULT_USR = 'root'
 DEFAULT_PASSWD = 'root'
 
 
-class K8sBeta(BlueprintBaseBeta):
+class K8sBlue(BlueprintBaseBeta):
     k8s_model: K8sBlueprintModel
 
     def pre_initialization_checks(self) -> bool:
@@ -397,6 +398,9 @@ class K8sBeta(BlueprintBaseBeta):
                                                                                'worker join key', 'msg')
             self.k8s_model.config.master_credentials = parse_ansible_output(action_output, playbook_name,
                                                                             'k8s credentials', 'msg')['stdout']
+
+            # If there is a floating IP, we need to use this one in the k8s config file (instead of the internal one)
+            self.k8s_model.config.master_credentials = re.sub("https:\/\/(.*):6443", f"https://{self.k8s_model.config.controller_ip}:6443", self.k8s_model.config.master_credentials)
         self.to_db()
 
     def add_worker(self, msg: K8sBlueprintScale) -> List[str]:
@@ -566,7 +570,7 @@ class K8sBeta(BlueprintBaseBeta):
         workers_mgt_int = []
         for area in self.k8s_model.areas:
             for worker_interface in area.worker_mgt_int.values():
-                workers_mgt_int.append(worker_interface.vld[0].ip)  # string
+                workers_mgt_int.append(worker_interface.vld[0].get_ip_str()[0]) # Taking the first ip that should be the floating in case present
 
         # Get the pool list for metal load balancer
         pool_list = self.k8s_model.config.network_endpoints.data_nets
@@ -646,7 +650,7 @@ class K8sBeta(BlueprintBaseBeta):
             # dictionary into the model
             self.k8s_model = K8sBlueprintModel.model_validate(self.base_model.conf)
         # To save the data (in particular the self.conf variable) we call the super method
-        super(K8sBeta, self).to_db()
+        super(K8sBlue, self).to_db()
 
     def _destroy(self):
         """
@@ -682,7 +686,11 @@ class K8sBeta(BlueprintBaseBeta):
             if nsd.type == 'master':
                 # Retrieve the complete virtual link descriptors for the only interface of the k8s controller!
                 vlds = get_ns_vld_model(nsd.nsi_id, ["mgt"])
-                self.k8s_model.config.controller_ip = vlds["mgt"][0].ip
+                ip_mgt_list = vlds["mgt"][0].get_ip_str()
+
+                self.k8s_model.config.controller_ip = ip_mgt_list[0] # Taking the first ip that should be the floating in case present
+                # If we have a floating IP, we assign the internal IP. Otherwise the same IP is internal/external
+                self.k8s_model.config.controller_internal_ip = ip_mgt_list[0] if len(ip_mgt_list)<=1 else ip_mgt_list[1]
             if nsd.type == 'worker':
                 # Looking for the area corresponding to the actual NSD
                 target_area = next(area for area in self.k8s_model.areas if area.id == nsd.area_id)
@@ -713,6 +721,10 @@ class K8sBeta(BlueprintBaseBeta):
             self.to_db()
 
     def get_data(self, get_request: BlueGetDataModel) -> dict:
+
+        client_config = get_k8s_config_from_file_content(self.k8s_model.config.master_credentials)
+        info = get_k8s_cidr_info(client_config)
+
         # TODO IMPLEMENT IF NECESSARY
         logger.info(get_request.model_dump_json())
 

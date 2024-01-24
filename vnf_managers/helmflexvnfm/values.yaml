@@ -11,7 +11,7 @@ replicaCount: 1
 image:
   repository: localhost:5000/vnfm-ee
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 imagePullSecrets: []
 nameOverride: ""

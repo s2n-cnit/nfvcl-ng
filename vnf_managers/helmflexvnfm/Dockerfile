@@ -5,7 +5,7 @@ RUN apt-get install -y software-properties-common wget \
     && apt-add-repository --yes --update ppa:ansible/ansible \
     && apt-get update && apt install -y ansible \
     && echo "host_key_checking = False" >> /etc/ansible/ansible.cfg \
-    && pip3 install PyYAML && pip3 install requests && pip3 install paramiko && pip3 install jinja2 \
+    && pip3 install PyYAML==6.0.1 requests==2.27.1 paramiko==3.4.0 Jinja2==3.0.3 coloredlogs==15.0.1 verboselogs==1.7 colorama==0.4.5\
     && ansible-galaxy collection install vyos.vyos \
     && ansible-galaxy collection install prometheus.prometheus
 

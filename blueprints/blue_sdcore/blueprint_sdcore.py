@@ -345,6 +345,7 @@ class BlueSDCore(Blue5GBaseBeta):
                 # TODO this only work with 1 device group
                 device_group: DeviceGroup = list(filter(lambda x: x.name == network_slice.site_device_group[0], self.config_ref.device_groups))[0]
                 self.base_model.edge_areas[self.base_model.edge_areas[area_for_slice.id].id].upf_ue_ip_pool = device_group.ip_domain_expanded.ue_ip_pool
+                self.base_model.edge_areas[self.base_model.edge_areas[area_for_slice.id].id].upf_dnn = device_group.ip_domain_expanded.dnn
 
         # Changing this value force a pod restart, this may be avoided changing the helm chart to add a new unused field inside the pod spec
         self.base_model.blue_model_5g.sdcore_config_values.omec_sub_provision.images.pull_policy = "Always"
@@ -366,7 +367,8 @@ class BlueSDCore(Blue5GBaseBeta):
             ConfiguratorSDCoreUPFVars(
                 upf_data_cidr=area.upf_data_network_cidr,
                 upf_internet_iface=self.MGT_NETWORK_IF_NAME,
-                upf_ue_ip_pool=area.upf_ue_ip_pool
+                upf_ue_ip_pool=area.upf_ue_ip_pool,
+                upf_dnn=area.upf_dnn
             )
         ).dump()
         return res
@@ -444,6 +446,7 @@ class BlueSDCore(Blue5GBaseBeta):
         logger.info(f"Adding Slice with ID: {add_slice_model.sliceId}")
         network_slice = self.config_ref.add_slice_from_generic_model(add_slice_model, add_slice_model.area_id)
         network_slice.site_info.upf.upf_name = self.base_model.edge_areas[self.base_model.edge_areas[add_slice_model.area_id].id].upf_data_ip
+        # TODO add the slice to gnb
         return self.update_core()
 
     def del_slice(self, del_slice_model: BlueSDCoreDelSliceModel) -> list:
@@ -483,6 +486,7 @@ class BlueSDCore(Blue5GBaseBeta):
             # TODO this only work with 1 device group
             device_group: DeviceGroup = list(filter(lambda x: x.name == network_slice.site_device_group[0], self.config_ref.device_groups))[0]
             self.base_model.edge_areas[self.base_model.edge_areas[area.id].id].upf_ue_ip_pool = device_group.ip_domain_expanded.ue_ip_pool
+            self.base_model.edge_areas[self.base_model.edge_areas[area.id].id].upf_dnn = device_group.ip_domain_expanded.dnn
 
         return res
 

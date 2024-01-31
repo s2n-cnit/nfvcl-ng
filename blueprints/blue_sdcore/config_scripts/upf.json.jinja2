@@ -22,7 +22,7 @@
   "enable_notify_bess": true,
   "notify_sockaddr": "/pod-share/notifycp",
   "cpiface": {
-    "dnn": "internet",
+    "dnn": "{{ confvar.upf_dnn }}",
     "hostname": "{{ '{{ instance_hostname }}' }}",
     "enable_ue_ip_alloc": false,
     "ue_ip_pool": "{{ confvar.upf_ue_ip_pool }}",

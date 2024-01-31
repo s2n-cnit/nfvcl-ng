@@ -86,6 +86,7 @@ class EdgeArea5G(Area5G):
     upf_data_ip: Optional[str] = Field(default=None)
     upf_data_network_cidr: Optional[str] = Field(default=None)
     upf_ue_ip_pool: Optional[str] = Field(default=None)
+    upf_dnn: Optional[str] = Field(default=None)
 
 
 class RanArea5G(Area5G):

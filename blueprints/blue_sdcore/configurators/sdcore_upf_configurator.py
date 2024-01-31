@@ -14,6 +14,7 @@ class ConfiguratorSDCoreUPFVars(NFVCLBaseModel):
     upf_data_cidr: str = Field()
     upf_internet_iface: str = Field()
     upf_ue_ip_pool: str = Field()
+    upf_dnn: str = Field()
 
 
 class ConfiguratorSDCoreUpf(Configurator_Flex):
@@ -30,7 +31,8 @@ class ConfiguratorSDCoreUpf(Configurator_Flex):
             'transfer_name': f"{blue_id}_upf.json",
             'name': "upf.json"
         }, {
-            "upf_ue_ip_pool": args.upf_ue_ip_pool
+            "upf_ue_ip_pool": args.upf_ue_ip_pool,
+            "upf_dnn": args.upf_dnn
         }, ansible_template_resolver=True)
 
         self.addJinjaTemplateFile({

@@ -1,6 +1,4 @@
 from typing import List
-
-from blueprints.blue_5g_base.blueprint_5g_base_beta import Blue5GBaseBeta
 from fastapi import APIRouter, Query, HTTPException, status
 from blueprints.blueprint_beta import BlueprintBaseBeta
 from models.blueprint.blue_events import BlueEventType
@@ -181,16 +179,24 @@ async def get_blueprints(
 
 
 @blue_router.get("/{blue_id}", response_model=dict)
-async def get_blueprint(
-    blue_id: str,
-    detailed: bool = Query(default=False, description="Detailed or summarized view list")
-) -> dict:
+async def get_blueprint(blue_id: str, detailed: bool = Query(default=False, description="Detailed or summarized view list")) -> dict:
+    """
+    Return (optionally) detailed information about a specific blueprint.
+    Args:
+        blue_id: The ID of the blueprint
+        detailed: Requires information to be detailed
+
+    Returns:
+        Info about the specified blueprint
+    """
     if detailed:
         res = old_workers.get_blue_detailed_summary({'id': blue_id})
+        to_ret = res[0].model_dump()
     else:
         res = old_workers.get_blue_short_summary({'id': blue_id})
+        to_ret = res[0].model_dump()
     if len(res) > 0:
-        return res[0]
+        return to_ret
     else:
         data = {'status': 'error', 'resource': 'blueprint',
                 'description': "Blueprint instance {} not found".format(blue_id)}

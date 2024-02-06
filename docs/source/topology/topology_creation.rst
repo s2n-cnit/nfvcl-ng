@@ -8,6 +8,8 @@ there is a list of VIMs, you should add there at least valid one.
 
 .. warning::
     The VIM user must be administrator for the target project
+.. warning::
+    When adding a VIM, it is really important to use the correct value for the field use_floating_ip otherwise the VNF manager cannot talk to the VNF if the NFVCL instance is outside the openstack network.
 
 With the next step the OpenStack server will be registered in OSM and NFVCL. The networks of the VIM must be appended to the
 network list. At least a management network should be present.

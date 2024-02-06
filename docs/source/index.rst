@@ -10,11 +10,15 @@ The installation procedure is described in the main `README <https://github.com/
 The NFVCL is working through REST API calls, you can see every available API in the offered swagger by the NFVCL.
 You can find the swagger at URL: http://NFVCL-IP:5002/docs
 
-VIM onboarding
-**************
+Topology Creation and VIM onboarding
+************************************
 
+What is the topology? You can find a general description here :doc:`topology/topology`
 Once the NFVCL is installed and running, the first operation that must be performed
 is the creation of :doc:`topology/topology_creation`.
+
+VIM setup
+*********
 
 The second step is to prepare VIMs: they should have images ready to be deployed. The images ready in a VIM should include
 (name - description - used by blueprint)
@@ -103,20 +107,30 @@ Documentation contents
    :maxdepth: 2
    :hidden:
 
+   topology/topology
    topology/topology_creation
+   topology/topology_mgt
 
 .. toctree::
    :caption: Blueprints
    :maxdepth: 2
    :hidden:
 
+   blueprints/blueprint
    blueprints/free5gc/free5gc_blue_index
    blueprints/k8s/k8s_blue_index
    blueprints/ueransim/ueransim_blue_index
    blueprints/vyos/vyos_blue_index
 
 .. toctree::
-   :caption: Data Analitics
+   :caption: OSM
+   :maxdepth: 2
+   :hidden:
+
+   osm/osm_utility
+
+.. toctree::
+   :caption: Data Analytics
    :maxdepth: 2
    :hidden:
 

@@ -45,6 +45,12 @@ class UeRanSim(BlueprintBase):
         # FIXME: how to connect radionets among different vims??
 
     def vim_terraform(self, msg):
+        """
+        Creates a network on the VIM for Ueransim.
+
+        Args:
+            msg: msg['areas'] contains the area on witch the net is created
+        """
         net = {
             "name": "radio_{}".format(self.get_id()),
             "external": False,
@@ -140,7 +146,7 @@ class UeRanSim(BlueprintBase):
         }
         # tag, tac, list of vnf interfaces
         vnfd = self.getVnfd('NB', area_id=area['id'])
-        logger.warn(vnfd)
+        logger.debug(vnfd)
         n_obj = sol006_NSD_builder([vnfd], self.get_vim_name(area), param, area['vnf_interfaces'])
         n_ = n_obj.get_nsd()
         n_['area'] = area['id']
@@ -190,7 +196,7 @@ class UeRanSim(BlueprintBase):
                 raise ValueError(self.detailed_status)
 
     def init_day2_conf(self, msg: dict) -> list:
-        logger.info("triggering day2 operations for ueransim blueprint with id {}".format(self.get_id()))
+        logger.info("Triggering day2 operations for ueransim blueprint with id {}".format(self.get_id()))
         res = []
         gnb_radio_ips = []
         # before we have to get info from all the NodeBs (IP address on the radio interface), then we can pass to UEs
@@ -199,6 +205,7 @@ class UeRanSim(BlueprintBase):
             if nsd_item['type'] == 'nb':
                 for area in self.conf['areas']:
                     if 'area' in nsd_item and area['id'] == nsd_item['area']:
+                        # Checking that the PDU is not already existing
                         pdu_check = self.topology_get_pdu_by_area(area['id'])
                         if pdu_check:
                             self.status = 'error'

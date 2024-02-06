@@ -376,18 +376,18 @@ class Sol006VnfdBuilderBeta:
             vim_accounts.append(v['_id'])
         obj['vim_accounts'] = vim_accounts
 
-        interface = []
-        for i in candidate_pdu.interface:
-            interface.append(
+        interface_list = []
+        for interface in candidate_pdu.interface:
+            interface_list.append(
                 {
                     # 'vld': i['vld'],
-                    'name': i.name,
-                    'ip-address': str(i.ip_address),
-                    'vim-network-name': i.network_name,
-                    'mgmt': i.mgt
+                    'name': interface.name,
+                    'ip-address': str(interface.get_ip_str()[0]),
+                    'vim-network-name': interface.network_name,
+                    'mgmt': interface.mgt
                 }
             )
-        obj['interfaces'] = interface
+        obj['interfaces'] = interface_list
 
         # onboard the pdu on osm
         pnf_manager.create(obj)

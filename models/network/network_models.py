@@ -195,15 +195,41 @@ class PduInterface(BaseModel):
     name: str
     mgt: bool = Field(alias='mgmt')
     intf_type: Optional[str] = Field(default=None)
-    ip_address: Union[str, IPv4Address] = Field(alias='ip-address')
+    ip_address: Union[str, IPv4Address] = Field(alias='ip-address') # TODO pass to only str???
     network_name: str = Field(alias='vim-network-name')
     port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
+
+    def get_ip(self) -> List[IPv4Address]:
+        """
+        Return a list of IP of the VLD (Every interface can have multiple IPs
+        Returns:
+            A list of IP, usually composed only by a single IP, but, when the interface has floating IPs (for example)
+            more than one IP is returned.
+        """
+        return_list = []
+        ip_list_str = self.ip_address.split(";")
+        for ip in ip_list_str:
+            return_list.append(IPv4Address(ip))
+
+        return return_list
+
+    def get_ip_str(self) -> List[str]:
+        """
+        Return a list of IP of the VLD (Every interface can have multiple IPs
+        Returns:
+            A list of IP, usually composed only by a single IP, but, when the interface has floating IPs (for example)
+            more than one IP is returned.
+        """
+        ip_list_str = self.ip_address.split(";")
+
+        return ip_list_str
 
     class Config:
         populate_by_name = True
 
 
 class PduModel(BaseModel):
+    """Model for a Physical deployment unit"""
     name: str
     area: int
     type: str

@@ -85,6 +85,11 @@ class NetworkModel(BaseModel):
     reserved_ranges: List[IPv4ReservedRange] = []
     dns_nameservers: List[IPv4Address] = []
 
+
+    @classmethod
+    def build_network_model(cls, name: str, type: NetworkTypeEnum, cidr: IPv4Network):
+        NetworkModel(name=name, type=type, cidr=cidr)
+
     def __eq__(self, other):
         """
         Overrides the default equals implementation. In this way it is possible to directly compare objects
@@ -198,6 +203,10 @@ class PduInterface(BaseModel):
     ip_address: Union[str, IPv4Address] = Field(alias='ip-address') # TODO pass to only str???
     network_name: str = Field(alias='vim-network-name')
     port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
+
+    @classmethod
+    def build_pdu(cls, vld: str, name: str, mgt: bool, ip_address: str, network_name: str):
+        return PduInterface(vld=vld, name=name, mgt=mgt, ip_address=ip_address, network_name=network_name)
 
     def get_ip(self) -> List[IPv4Address]:
         """

@@ -193,7 +193,6 @@ class UpdateVimModel(NFVCLBaseModel):
 
 
 class VimLink(NFVCLBaseModel):
-    # TODO aggregate with PduInterface??? They are very similar models
     vld: str
     name: str
     mgt: bool
@@ -207,10 +206,14 @@ class VimNetMap(NFVCLBaseModel):
     vim_net: str
     mgt: bool
     k8s_cluster_net: str = Field(alias='k8s-cluster-net', default='data_net')
+    ip_address: Optional[str] = Field(default=None, alias='ip-address', description="Ip address of the Network mapping")
 
     @classmethod
     def build_vnm(cls, vld, name, vim_net, mgt, k8s_cluster_net='data_net'):
         return VimNetMap(vld=vld, name=name, vim_net=vim_net, mgt=mgt, k8s_cluster_net=k8s_cluster_net)
+
+    def get_vim_link(self, intf_type: str = None, port_security_enabled: bool = True):
+        return VimLink(vld=self.vld, name=self.name, mgt=self.mgt, intf_type=intf_type, port_security_enabled=port_security_enabled)
 
 
 class VMFlavors(NFVCLBaseModel):
@@ -272,6 +275,18 @@ class VirtualDeploymentUnit(NFVCLBaseModel):
             intf_index += 1
 
         return VirtualDeploymentUnit(id=vdu_id, image=vdu_image, vm_flavor=vdu_flavor, interface=interfaces)
+
+    @classmethod
+    def build_vdu_vim_link(cls, vdu_id, vdu_image, vdu_int_list: List[VimLink], vdu_flavor: VMFlavors = VMFlavors()):
+        """
+
+        Args:
+            vdu_id: The ID of the vdu
+            vdu_image: The name of the image used in openstack (origin)
+            vdu_data_int_list: A list of networks (VimLink)
+            vdu_flavor: Flavor to be assigned to this vdu.
+        """
+        return VirtualDeploymentUnit(id=vdu_id, image=vdu_image, vm_flavor=vdu_flavor, interface=vdu_int_list)
 
 
 class PhysicalDeploymentUnit(NFVCLBaseModel):

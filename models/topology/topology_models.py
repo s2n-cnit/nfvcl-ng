@@ -263,6 +263,23 @@ class TopologyModel(BaseModel):
 
         return vim
 
+    def get_vim_list_by_area(self, area_id: int) -> List[VimModel]:
+        """
+        Retrieve VIM list given an area of interest.
+        Args:
+            area_id: The ID of the area
+
+        Returns: A VIM list that have the required area.
+        """
+        item: VimModel
+        vim_list = [item for item in self.vims if area_id in item.areas]
+        if 0 >= len(vim_list):
+            msg_err = "The VIM of area ->{}<- was not found in the topology.".format(area_id)
+            logger.error(msg_err)
+            raise ValueError(msg_err)
+
+        return vim_list
+
     def get_vim_name_by_area(self, area_id: int) -> str:
         """
         Retrieve the name of the first VIM given an area of interest.

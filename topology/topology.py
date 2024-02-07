@@ -308,6 +308,17 @@ class Topology:
         """
         return self._model.get_vim_by_area(area_id=area)
 
+
+    def get_vim_list_from_area_id_model(self, area: int) -> List[VimModel]:
+        """
+        Returns the list of VIM given the area id
+        Args:
+            area: The area id from witch the VIM is obtained.
+        Returns:
+            The list of vim belonging to that area.
+        """
+        return self._model.get_vim_list_by_area(area_id=area)
+
     # **************************** Networks *************************
     def get_network(self, net_name: str, vim_name: typing.Optional[str] = None) -> NetworkModel:
         """
@@ -365,7 +376,7 @@ class Topology:
             logger.debug("For area {} the following vims have been selected: {}".format(a, vims))
         self.add_network(network, vims, terraform=terraform)
 
-    # Do NOT put obj_multiprocess_lock since it calls the next function that already have it.
+    # !!! Do NOT put obj_multiprocess_lock since it calls the next function that already have it.
     def add_network(self, network: Union[NetworkModel, dict], vim_names_list: Union[list, None] = None,
                     terraform: bool = False):
         """

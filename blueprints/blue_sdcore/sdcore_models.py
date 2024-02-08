@@ -36,9 +36,9 @@ class BlueSDCoreDelSliceModel(NFVCLBaseModel):
 
 class BlueSDCoreAddTacModel(SubArea):
     type: Literal["BlueSDCore"] = Field(default="BlueSDCore")
-    operation: Literal["add_slice"] = Field(default="add_tac")
+    operation: Literal["add_tac"] = Field(default="add_tac")
 
 
 class BlueSDCoreDelTacModel(SubArea):
     type: Literal["BlueSDCore"] = Field(default="BlueSDCore")
-    operation: Literal["del_slice"] = Field(default="del_tac")
+    operation: Literal["del_tac"] = Field(default="del_tac")

@@ -17,3 +17,17 @@ DEL_NAT_DESCRIPTION: str = "This method remove a rule number. NB if a source NAT
 DEL_NAT_SUMMARY: str = "Delete a NAT rule of a vyos instance of the blueprint"
 GET_VYOS_BY_AREA_DESCRIPTION: str = ""
 GET_VYOS_BY_AREA_SUMMARY: str = ""
+ADD_FIR_DESCRIPTION: str = "This method allows to add a port, a network, an address or an interface group"
+ADD_FIR_SUMMARY: str = "Add a group to a vyos instance of the blueprint"
+ADD_FIR_RULE_DESCRIPTION: str = "This method allow to create a Firewall (the only mandatory parameter is the firewallname)" \
+                                " in which it is possible to apply firewall rules to one or more VyOS interfaces that provide" \
+                                " an action (example: accept, drop) to ports, addresses, networks, port groups, address groups" \
+                                " or network groups (depending on the optional parameters that are set in the body of the call)." \
+                                " It is possible to specify a VyOS default action, a protocol to which a rule can be applied" \
+                                " (for example tcp, udp, all). In the body of the function, if a firewall rule is inserted, it is necessary to specify" \
+                                " the var parameter (source or destination). When creating the firewall it is possible to set the “en_ping” parameter" \
+                                " enable or disable. If it is set as enable, VyOS will respond to every ICMP request, unless there is a rule that provides" \
+                                " for the rejection of ICMP echo requests. Finally, the “variable” parameter (local, i.e. the set of rules is applied to packets" \
+                                " destined for this router, in, applied to packets forwarded on an incoming interface, or out, applied to packets forwarded" \
+                                " on an outgoing interface) must be specified if you want to apply a firewall to an interface."
+ADD_FIR_RULE_SUMMARY: str = "Add Firewall rule to a vyos instance of the blueprint"

@@ -1,9 +1,9 @@
 from typing import List
-from ipaddress import IPv4Network
 from configurators.flex_configurator import Configurator_Flex
 from ..models import VyOSRouterNetworkEndpoints, VyOSSourceNATRule, VyOSDestNATRule
 import secrets
 from utils.log import create_logger
+from ..models.vyos_firewall_rules_model import VyOSFirewallRule, VyOSFirewallRuleSecond
 
 logger = create_logger('VyOS Conf')
 
@@ -33,11 +33,11 @@ class Configurator_VyOS(Configurator_Flex):
 
     def initial_configuration(self):
         """
-        Perform initial configuration for VyOS router; this includes:
+        Perform initial configuration for VyOS router, this includes:
         - Set up a name to management interface
         - Setup data interfaces
-        - Configure loopback interface
-        - Add a Vyos Info task to retrieve information from VyOS in the callback
+        - Configure loopback IP
+        - Add Vyos Info task to retrieve information from VyOS in the callback
         """
         self.setup_man_interface_descr()
         self.setup_data_interfaces()
@@ -45,20 +45,10 @@ class Configurator_VyOS(Configurator_Flex):
         self.add_vyos_info_task()
 
     def setup_man_interface_descr(self):
-        """
-        Create a task to be executed for configuring the management interface on the router.
-        Remember that a configurator is assigned to only a router.
-        The task is added to the playbook of the configurator.
-        """
         lines = ["set interface ethernet eth0 description 'Management Network'"]
         self.add_vyos_config_task('Description of eth0', 'vyos.vyos.vyos_config', lines)
 
     def setup_loopback_ip(self):
-        """
-        Create a task to be executed for configuring the loopback interface on the router. Remember that a configurator
-        is assigned to only a router.
-        The task is added to the playbook of the configurator.
-        """
         lines = []
         loopback_ipaddr = "10.200." + str(self.router_area_id) + ".1/32"
         lines.append("set interfaces loopback lo address {}".format(loopback_ipaddr))
@@ -66,8 +56,8 @@ class Configurator_VyOS(Configurator_Flex):
 
     def setup_data_interfaces(self):
         """
-        Set up the data interfaces needed for configuring the data interfaces on the router.
-        The task is added to the playbook of the configurator.
+        Once the configurator is build. It is possible to create instructions to set up data interfaces for ansible.
+        Instructions are written in self.playbook.
         """
         lines = []
 
@@ -76,8 +66,9 @@ class Configurator_VyOS(Configurator_Flex):
         for network in self.network_endpoints.data_nets:
             # Getting prefix length
             prefix_length = network.network.prefixlen
-            # Getting the address of the net to be configured on the interface
+
             interface_address = network.ip_addr.exploded
+            # NOTE: the ip address is got by get IP address, but OSM is not reporting netmask! setting /24 as default
             if interface_address is None:
                 lines.append("set interfaces ethernet eth{} address dhcp".format(interface_index))
             else:
@@ -86,18 +77,15 @@ class Configurator_VyOS(Configurator_Flex):
             lines.append("set interfaces ethernet eth{} description \'{}\'".format(interface_index, self.blue_id))
             lines.append("set interfaces ethernet eth{} duplex auto".format(interface_index))
             lines.append("set interfaces ethernet eth{} speed auto".format(interface_index))
-            # MAX supported MTU is 1450 by OPENSTACK
+            # MAX supported MTU is 1450
             lines.append("set interfaces ethernet eth{} mtu 1450".format(interface_index))
             interface_index = interface_index + 1
         self.add_vyos_config_task('Configure DATA Interfaces', 'vyos.vyos.vyos_config', lines)
 
     def setup_snat_rules(self, rule_list: List[VyOSSourceNATRule]):
         """
-        Create a task which will add the instructions to configure a list of SNAT rules to the router.
-        The task is added to the playbook of the configurator.
-
-        Args:
-            rule_list: SNAT rules to be set up in the VYOS instance relative to this configurator
+        Create instructions for ansible to set up SNAT rules. Instructions are written in self.playbook
+        @param rule_list: SNAT rules to set up in the VYOS instance
         """
         lines = []
 
@@ -110,6 +98,62 @@ class Configurator_VyOS(Configurator_Flex):
                 "set nat source rule {} translation address {}".format(rule.rule_number, rule.virtual_ip))
 
         self.add_vyos_config_task('Configure SNAT rules', 'vyos.vyos.vyos_config', lines)
+
+    def setup_firewall(self, rule_list: List[VyOSFirewallRule]):
+
+        lines = []
+
+        for rule in rule_list:
+
+            if rule.interface_group_name is not None and rule.interface is not None:
+                lines.append(f"set firewall group interface-group {rule.interface_group_name} interface {rule.interface}")
+
+            if rule.port_group_name is not None and rule.port_number is not None:
+                lines.append(f"set firewall group port-group {rule.port_group_name} port {rule.port_number}")
+
+            if rule.address_group_name is not None and rule.address is not None:
+                lines.append(f"set firewall group address-group {rule.address_group_name} address {rule.address}")
+
+            if rule.network_group_name is not None and rule.network is not None:
+                lines.append(f"set firewall group network-group {rule.network_group_name} network {rule.network}")
+
+
+        self.add_vyos_config_task('Configure Firewall rules', 'vyos.vyos.vyos_config', lines)
+
+    def setup_firewall_rules(self, rule_list: List[VyOSFirewallRuleSecond]):
+
+        lines = []
+
+        for rule in rule_list:
+            lines.append(f"set firewall name {rule.firewallname} default-action {rule.defaultaction}")
+            lines.append(f"set firewall all-ping {rule.en_ping}")
+            lines.append(f"set firewall name {rule.firewallname} rule {rule.rule_number} action {rule.action}")
+            lines.append(f"set firewall name {rule.firewallname} rule {rule.rule_number} protocol  {rule.protocol}")
+
+            if rule.port is not None:
+                lines.append(f"set firewall name {rule.firewallname} rule {rule.rule_number} {rule.var} port {rule.port}")
+
+            if rule.dest_address is not None:
+                lines.append(
+                    f"set firewall name {rule.firewallname} rule {rule.rule_number} {rule.var} address {rule.dest_address}")
+
+            if rule.port_group_name is not None:
+                lines.append(f"set firewall name {rule.firewallname} rule {rule.rule_number} {rule.var} group port-group {rule.port_group_name}")
+
+            if rule.address_group_name is not None:
+                lines.append(f"set firewall name {rule.firewallname} rule {rule.rule_number} {rule.var} group address-group {rule.address_group_name}")
+
+            if rule.network_group_name is not None:
+                lines.append(f"set firewall name {rule.firewallname} rule {rule.rule_number} {rule.var} group network-group {rule.network_group_name}")
+
+            if rule.interface is not None and rule.variable is not None:
+                lines.append(f"set firewall interface {rule.interface} {rule.variable} name {rule.firewallname}")
+
+            #if rule.interface_group_name is not None and rule.variable is not None:
+            #    lines.append(f"set firewall interface {rule.interface} {rule.variable} name {rule.firewallname}")
+
+        self.add_vyos_config_task('Configure Firewall rules', 'vyos.vyos.vyos_config', lines)
+
 
     def setup_dnat_rules(self, rule_list: List[VyOSDestNATRule]):
         """

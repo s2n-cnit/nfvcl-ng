@@ -51,7 +51,7 @@ class Free5GC_K8s(Blue5GBase):
 
     @classmethod
     def rest_del_slice(cls, msg: Free5gck8sSliceModel, blue_id: str):
-        msg_dict = msg.model_dum
+        msg_dict = msg.model_dump()
         msg_dict["operation"] = "del_slice"
         msg = Free5gck8sSliceModel.model_validate(msg_dict)
         return cls.api_day2_function(msg, blue_id)
@@ -596,7 +596,7 @@ class Free5GC_K8s(Blue5GBase):
 
     def add_tac_nsd(self, model_msg) -> list:
         nsd_names = []
-        msg = model_msg.model_dum
+        msg = model_msg.model_dump()
 
         # save msg because "add_tac_nsd" modifies it and "add_tac_conf" uses the changed version.
         self.msg["add_tac"] = msg
@@ -754,7 +754,7 @@ class Free5GC_K8s(Blue5GBase):
         return res
 
     def del_tac_nsd(self, model_msg) -> list:
-        msg = model_msg.model_dum
+        msg = model_msg.model_dump()
         nsi_to_delete = super().del_area(msg)
         if "areas" in msg:
             for area in msg['areas']:
@@ -886,7 +886,7 @@ class Free5GC_K8s(Blue5GBase):
         return res
 
     def del_tac_conf(self, model_msg) -> list:
-        msg = model_msg.model_dum
+        msg = model_msg.model_dump()
         res = []
         tail_res = []
         # add callback IP in self.conf
@@ -906,7 +906,7 @@ class Free5GC_K8s(Blue5GBase):
         res = []
         tail_res = []
 
-        msg = msg_model.model_dum
+        msg = msg_model.model_dump()
         self.sumConfig(self.conf, msg)
 
         # Add edge slices (msg) to the core (self.conf)
@@ -998,7 +998,7 @@ class Free5GC_K8s(Blue5GBase):
         if isinstance(msg_model, dict):
             msg = msg_model
         else:
-            msg = msg_model.model_dum
+            msg = msg_model.model_dump()
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":
             self.conf["callback"] = msg["callbackURL"]
@@ -1012,7 +1012,7 @@ class Free5GC_K8s(Blue5GBase):
         if isinstance(msg_model, dict):
             msg = msg_model
         else:
-            msg = msg_model.model_dum
+            msg = msg_model.model_dump()
 
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":
@@ -1028,7 +1028,7 @@ class Free5GC_K8s(Blue5GBase):
 
     def del_slice(self, msg_model) -> list:
         logger.info("del_ues method starts ... type(msg_model) = {}".format(type(msg_model)))
-        msg = msg_model.model_dum
+        msg = msg_model.model_dump()
 
         # add callback IP in self.conf
         if "callbackURL" in msg and msg["callbackURL"] != "":

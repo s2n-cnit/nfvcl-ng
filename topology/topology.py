@@ -820,7 +820,7 @@ class Topology:
                 vim_accounts.append(vim['_id'])
 
             # Upload the PDU into OSM
-            get_osm_nbi_utils().add_pdu(OSMPduModel.build_from_topology_pdu(pdu_input, vim_accounts=vim_accounts).model_dump(by_alias=True))
+            get_osm_nbi_utils().add_pdu(OSMPduModel.build_from_topology_pdu(pdu_input, vim_accounts_ids=vim_accounts).model_dump(by_alias=True))
 
             # Saving changes to the topology
             self._save_topology_from_model()

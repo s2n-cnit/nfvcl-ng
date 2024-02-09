@@ -4,6 +4,7 @@ from models.event import Event
 from models.k8s.common_k8s_model import LBPool
 from models.k8s.topology_k8s_model import K8sModel
 from models.network.network_models import RouterPortModel, IPv4ReservedRange
+from models.osm.osm_pdu_model import OSMPduModel
 from models.prometheus.prometheus_model import PrometheusServerModel
 from models.vim import VimModel, UpdateVimModel
 from topology.topology_events import TopologyEventType
@@ -444,10 +445,10 @@ class Topology:
     @obj_multiprocess_lock
     def del_network_by_name(self, network_name: str, terraform: bool = False):
         """
-        Delete a network from the topology. Delete it from required VIM list, terraform if required.
+        Delete a network from the topology. If terraform option, delete it from every VIM in the topology.
         Args:
             network_name: The network to be removed from the topology
-            terraform: If the net has to be deleted on the VIM (network is removed from openstack)
+            terraform: If the net has to be deleted on every VIM (network is removed from every connected openstack)
         Returns:
             The removed network
         """
@@ -802,7 +803,7 @@ class Topology:
             return removed_range
 
     @obj_multiprocess_lock
-    def add_pdu(self, pdu_input: PduModel):
+    def add_pdu(self, pdu_input: PduModel, nfvo_onboard: bool = False):
         """
         Add PDU to the topology
         Args:
@@ -812,8 +813,18 @@ class Topology:
         try:
             pdu_input.details = ""
             self._model.add_pdu(pdu_input)
+
+            # Create vim accounts list to be uploaded into OSM
+            vim_accounts = []
+            for vim in self.osm_nbi_util.get_vims():
+                vim_accounts.append(vim['_id'])
+
+            # Upload the PDU into OSM
+            get_osm_nbi_utils().add_pdu(OSMPduModel.build_from_topology_pdu(pdu_input, vim_accounts=vim_accounts).model_dump(by_alias=True))
+
             # Saving changes to the topology
             self._save_topology_from_model()
+
             trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.model_dump())
 
         except ValueError:

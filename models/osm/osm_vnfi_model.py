@@ -28,13 +28,13 @@ class InterfaceOSM(BaseModel):
     mgmt_vnf: Optional[bool] = Field(None, alias='mgmt-vnf')
     name: str
     ns_vld_id: str = Field(..., alias='ns-vld-id')
-    type: str
-    port_security: bool
-    compute_node: str = Field(...)
+    type: str | None = None
+    port_security: bool | None = None
+    compute_node: str | None = None
     ip_address: str = Field(..., alias='ip-address')
-    mac_address: str = Field(..., alias='mac-address')
-    pci: Any
-    vlan: Optional[int]
+    mac_address: str | None = Field(default=None, alias='mac-address')
+    pci: Any | None = None
+    vlan: int | None = None
 
 
 class InternalConnectionPointItem(BaseModel):
@@ -49,7 +49,7 @@ class VirtualStorage(BaseModel):
 
 class VdurItem(BaseModel):
     _id: str
-    additionalParams: AdditionalParams
+    additionalParams: AdditionalParams | None = None
     affinity_or_anti_affinity_group_id: List = Field(
         ..., alias='affinity-or-anti-affinity-group-id'
     )
@@ -62,13 +62,13 @@ class VdurItem(BaseModel):
     )
     ip_address: str = Field(..., alias='ip-address')
     ns_flavor_id: str = Field(..., alias='ns-flavor-id')
-    ns_image_id: str = Field(..., alias='ns-image-id')
+    ns_image_id: str | None = Field(default=None, alias='ns-image-id')
     vdu_id_ref: str = Field(..., alias='vdu-id-ref')
     vdu_name: str = Field(..., alias='vdu-name')
-    vim_info: dict
+    vim_info: dict | None = None
     virtual_storages: List[VirtualStorage] = Field(..., alias='virtual-storages')
-    status: str
-    vim_id: str = Field(..., alias='vim-id')
+    status: str | None = None
+    vim_id: str | None = Field(default=None, alias='vim-id')
     name: str
 
 class ConnectionPointItem(BaseModel):

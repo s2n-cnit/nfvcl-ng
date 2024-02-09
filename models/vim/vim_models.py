@@ -198,7 +198,7 @@ class VimLink(NFVCLBaseModel):
     name: str
     mgt: bool
     intf_type: Optional[str] = Field(default=None)
-    port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
+    port_security_enabled: bool = Field(default=True, alias="port-security-enabled") # TODO probably the correct name should be port_security, this field probably is added but ignored from OSM
 
 
 class VimNetMap(NFVCLBaseModel):

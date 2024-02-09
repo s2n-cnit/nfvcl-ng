@@ -58,7 +58,7 @@ def get_ns_vld_model(ns_id: str, ns_vlds_ids: list) -> dict[str, List[VirtLinkDe
         If a VLD is not found, then the relative key is not present in the dictionary.
     """
     res = {}
-    vnfi_list = nbiUtil.get_vnfi_list_model(ns_id)
+    vnfi_list: List[VNFiModelOSM] = nbiUtil.get_vnfi_list_model(ns_id)
     for vld in ns_vlds_ids:
         res[vld] = get_vnf_vld(vnfi_list, vld)
     return res

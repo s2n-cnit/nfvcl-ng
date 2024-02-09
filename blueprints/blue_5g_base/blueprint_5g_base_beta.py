@@ -13,7 +13,7 @@ from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD, BlueprintBa
 from models.network import PduModel
 from models.vim.vim_models import VimNetMap, VirtualNetworkFunctionDescriptor, PhysicalDeploymentUnit, VimModel
 from nfvo import get_ns_vld_ip, NbiUtil
-from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta
+from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta, get_ns_vld_model
 from nfvo.vnf_manager_beta import Sol006VnfdBuilderBeta
 from utils.log import create_logger
 from utils.persistency import DB
@@ -450,9 +450,9 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
     def get_ip_ran(self, ns: BlueNSD) -> None:
         logger.debug(f'Getting IPs for ran area {ns.area_id}')
 
-        vlds = get_ns_vld_ip(ns.nsi_id, ["mgt", "datanet"])
-        self.base_model.ran_areas[ns.area_id].nb_mgt_ip = vlds["mgt"][0]['ip']
-        self.base_model.ran_areas[ns.area_id].nb_wan_ip = vlds["datanet"][0]['ip'] # vld is called datanet from ueransim blueprint
+        vlds = get_ns_vld_model(ns.nsi_id, ["mgt", "datanet"])
+        self.base_model.ran_areas[ns.area_id].nb_mgt_ip = vlds["mgt"][0].get_ip_str()[0]
+        self.base_model.ran_areas[ns.area_id].nb_wan_ip = vlds["datanet"][0].get_ip_str()[0] # vld is called datanet from ueransim blueprint
 
         logger.debug(f'MGT IP for ran area {ns.area_id}: {self.base_model.ran_areas[ns.area_id].nb_mgt_ip}')
         logger.debug(f'DATA IP for ran area {ns.area_id}: {self.base_model.ran_areas[ns.area_id].nb_wan_ip}')

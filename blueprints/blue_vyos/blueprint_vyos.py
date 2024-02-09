@@ -10,8 +10,9 @@ from blueprints.blueprint_beta import BlueprintBaseBeta
 from main import persistency
 from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
 from models.blueprint.rest_blue import BlueGetDataModel
-from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimLink, VimModel
+from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimLink, VimModel, VMFlavors
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
+from nfvo.nsd_manager_beta import get_ns_vld_model
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from topology.topology import Topology
 from utils.log import create_logger
@@ -133,7 +134,7 @@ class VyOSBlue(BlueprintBaseBeta):
         """
         logger.debug('getting IP addresses from vnf instances')
         for nsd in self.base_model.nsd_:
-            management_vld = get_ns_vld_ip(nsd.nsi_id, ["mgt"])
+            management_vld = get_ns_vld_model(nsd.nsi_id, ["mgt"])
 
             area_iterator: VyOSArea
             config_iterator: VyOSConfig
@@ -149,18 +150,20 @@ class VyOSBlue(BlueprintBaseBeta):
             data_interface_list = []
             for data_network_endpoint in target_router.network_endpoints.data_nets:
                 data_interface_list.append(data_network_endpoint.net_name)
-            vlds = get_ns_vld_ip(nsd.nsi_id, data_interface_list)
+            vlds = get_ns_vld_model(nsd.nsi_id, data_interface_list)
 
             for virtual_link_descriptor_name in vlds:
                 for virtual_link_descriptor in vlds[virtual_link_descriptor_name]:
                     target_data_net = next(data_net for data_net in target_router.network_endpoints.data_nets if
-                                           data_net.net_name == virtual_link_descriptor['ns_vld_id'])
-                    target_data_net.ip_addr = IPv4Address(virtual_link_descriptor['ip'])
-                    target_data_net.osm_interface_name = virtual_link_descriptor['intf_name']
+                                           data_net.net_name == virtual_link_descriptor.ns_vld_id)
+                    ip_list = virtual_link_descriptor.get_ip()
+                    target_data_net.ip_addr = IPv4Address(ip_list[0])  # The first one should be the floating IP, if present
+                    target_data_net.osm_interface_name = virtual_link_descriptor.intf_name
                     self.get_network_cidr(target_data_net)
 
             # We insert the management ip in the model
-            target_router.network_endpoints.mgt.ip_addr = IPv4Address(management_vld["mgt"][0]['ip'])
+            ip_list = management_vld["mgt"][0].get_ip()
+            target_router.network_endpoints.mgt.ip_addr = IPv4Address(ip_list[0]) # The first one should be the floating IP, if present
             self.get_network_cidr(target_router.network_endpoints.mgt)
         self.to_db()
 
@@ -199,7 +202,7 @@ class VyOSBlue(BlueprintBaseBeta):
             for area in self.vyos_model.areas:
                 logger.debug("Blue {} - checking area {}".format(self.get_id(), area.id))
                 # Check if the vim exists
-                vim: VimModel = self.topology_get_vim_by_area(area.id)  # Throw error in case not found
+                vim: VimModel = self.get_topology().get_vim_from_area_id_model(area.id)  # Throw error in case not found
 
                 config: VyOSConfig
                 device_index = 0
@@ -234,7 +237,7 @@ class VyOSBlue(BlueprintBaseBeta):
                 target_config: VyOSConfig = None) -> dict:
         logger.debug("setting VNFd of VyOS for area " + str(area_id))
 
-        vm_flavor = {'memory-mb': '4098', 'storage-gb': '16', 'vcpu-count': '2'}
+        vm_flavor = VMFlavors(memory_mb='4098', storage_gb='16', vcpu_count='2')
 
         # If there is an explicit request for the flavor, we update it
         if vm_flavor_request is not None:
@@ -326,7 +329,7 @@ class VyOSBlue(BlueprintBaseBeta):
             self.setVnfd(area_id, vld=vim_net_mapping, vm_flavor_request=vm_flavor, device_number=device_number,
                          target_config=target_config)]
 
-        n_obj = sol006_NSD_builder(created_vnfd, self.get_vim_name(area_id), param, vim_net_mapping)
+        n_obj = sol006_NSD_builder(created_vnfd, self.get_topology().get_vim_name_from_area_id(area_id), param, vim_net_mapping)
 
         n_ = n_obj.get_nsd()
         n_['area_id'] = area_id

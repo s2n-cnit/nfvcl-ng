@@ -32,4 +32,4 @@ class OSMPduModel(NFVCLBaseModel):
         for to_be_conv in topo_pdu.interface:
             interfaces.append(OSMPduInterface.build_from_topology_pdu_interface(to_be_conv))
 
-        return OSMPduModel(type=topo_pdu.type, name=topo_pdu.name, vim_accounts=vim_accounts, interfaces=interfaces)
+        return OSMPduModel(type=topo_pdu.type, name=topo_pdu.name, vim_accounts=vim_accounts_ids, interfaces=interfaces)

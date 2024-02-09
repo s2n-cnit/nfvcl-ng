@@ -191,15 +191,6 @@ class UpdateVimModel(NFVCLBaseModel):
         description="List of served area identifiers declared in the topology to be added to the VIM"
     )
 
-
-class VimLink(NFVCLBaseModel):
-    vld: str
-    name: str
-    mgt: bool
-    intf_type: Optional[str] = Field(default=None)
-    port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
-
-
 class VimNetMap(NFVCLBaseModel):
     vld: str
     name: str
@@ -212,8 +203,16 @@ class VimNetMap(NFVCLBaseModel):
     def build_vnm(cls, vld, name, vim_net, mgt, k8s_cluster_net='data_net'):
         return VimNetMap(vld=vld, name=name, vim_net=vim_net, mgt=mgt, k8s_cluster_net=k8s_cluster_net)
 
-    def get_vim_link(self, intf_type: str = None, port_security_enabled: bool = True):
-        return VimLink(vld=self.vld, name=self.name, mgt=self.mgt, intf_type=intf_type, port_security_enabled=port_security_enabled)
+class VimLink(NFVCLBaseModel):
+    vld: str
+    name: str
+    mgt: bool
+    intf_type: Optional[str] = Field(default=None)
+    port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
+
+    @classmethod
+    def build_vim_link(self, net_map: VimNetMap, intf_type: str = None, port_security_enabled: bool = True):
+        return VimLink(vld=net_map.vld, name=net_map.name, mgt=net_map.mgt, intf_type=intf_type, port_security_enabled=port_security_enabled)
 
 
 class VMFlavors(NFVCLBaseModel):

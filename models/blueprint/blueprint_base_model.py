@@ -103,7 +103,7 @@ class BlueNSD(NFVCLBaseModel):
     nsi_id: str = Field(default="")
     area_id: int = Field(default=-1)
     replica_id: int = Field(default=-1)  # Needed in K8S, is it really necessary?
-    ue_id: Optional[str] = Field(default=None, description="Used by ueransim blue to save the UE id")
+    ue_id: int | None = Field(default=None, description="Used by ueransim blue to save the UE id")
     vld: List[PduInterface] = Field(default=[])
 
 

@@ -88,7 +88,7 @@ class NetworkModel(BaseModel):
 
     @classmethod
     def build_network_model(cls, name: str, type: NetworkTypeEnum, cidr: IPv4Network):
-        NetworkModel(name=name, type=type, cidr=cidr)
+        return NetworkModel(name=name, type=type, cidr=cidr)
 
     def __eq__(self, other):
         """

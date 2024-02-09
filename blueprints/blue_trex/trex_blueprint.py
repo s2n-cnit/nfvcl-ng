@@ -1,4 +1,5 @@
-from blueprints import BlueprintBase, parse_ansible_output
+from blueprints import BlueprintBase
+from utils.ansible_parser import parse_ansible_output
 from . import Configurator_trex
 from .models import TrexRequestBlueprintInstance
 from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
@@ -33,7 +34,7 @@ class Trex(BlueprintBase):
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         BlueprintBase.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
         """
-        conf["blueprint_instance_id"] = id_ 
+        conf["blueprint_instance_id"] = id_
         conf : input configurations
         """
         logger.info("Creating trex Blueprint")

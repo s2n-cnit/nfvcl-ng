@@ -3,7 +3,7 @@ from enum import Enum
 from ipaddress import IPv4Address
 from logging import Logger
 from typing import Union, Dict, Optional, List
-from blueprints import parse_ansible_output
+from utils.ansible_parser import parse_ansible_output
 from main import persistency
 from models.blueprint.blueprint_base_model import BlueVNFD
 from models.blueprint.common import BluePrometheus

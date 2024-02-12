@@ -45,6 +45,12 @@
     cli_command:
       command: ngu-remote {{ upf_ip }}
 
+# RADIO
+
+  - name: Set frequency
+    cli_command:
+      command: frequency set-frequency-{{ frequency }}
+
 #  - name: Commit changes
 #    cli_command:
 #      command: commit

@@ -115,10 +115,19 @@ class Configurator_Flex(Configurator_Base):
             if len(plays_) > 1:
                 print("WARNING! the playbook {} contains multiple plays. Only the first one will be considered."
                       .format(playbook_file))
-            if vars_ is not None:
-                self.playbook['vars'] = vars_
+
+            if 'vars' in plays_[0]:
+                self.playbook['vars'] = dict(plays_[0]['vars'])
             else:
-                self.playbook['vars'] = plays_[0]['vars']
+                self.playbook['vars'] = {}
+            if vars_ is not None:
+                self.playbook['vars'] = self.playbook['vars'] | vars_
+
+            if 'become' in plays_[0]:
+                self.playbook['become'] = plays_[0]['become']
+
+            if 'connection' in plays_[0]:
+                self.playbook['connection'] = plays_[0]['connection']
 
             if 'gather_facts' not in self.playbook:
                 self.playbook['gather_facts'] = 'no'

@@ -36,14 +36,9 @@ spec:
           volumeMounts:
           - name: osm-ee
             mountPath: /app/storage
-          - name: osm-ee-source
-            mountPath: /app/EE/osm_ee/vnf
           securityContext:
             allowPrivilegeEscalation: true
       volumes:      
-      - name: osm-ee-source
-        configMap: 
-          name:  {{ include "helmflexvnfm.fullname" . }}
       - name: osm-ee
         hostPath:
           path: /var/lib/osm/osm/osm_osm_packages/_data

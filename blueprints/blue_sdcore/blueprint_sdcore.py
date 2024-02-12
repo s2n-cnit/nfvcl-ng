@@ -88,12 +88,12 @@ class BlueSDCore(Blue5GBaseBeta):
         return cls.api_day2_function(del_slice_model, blue_id)
 
     @classmethod
-    def rest_add_tac(cls, add_slice_model: BlueSDCoreAddTacModel, blue_id: str):
-        return cls.api_day2_function(add_slice_model, blue_id)
+    def rest_add_tac(cls, add_tac_model: BlueSDCoreAddTacModel, blue_id: str):
+        return cls.api_day2_function(add_tac_model, blue_id)
 
     @classmethod
-    def rest_del_tac(cls, del_slice_model: BlueSDCoreDelTacModel, blue_id: str):
-        return cls.api_day2_function(del_slice_model, blue_id)
+    def rest_del_tac(cls, del_tac_model: BlueSDCoreDelTacModel, blue_id: str):
+        return cls.api_day2_function(del_tac_model, blue_id)
 
     @classmethod
     def day2_methods(cls):

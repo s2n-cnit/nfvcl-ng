@@ -12,7 +12,7 @@ from nfvo import nsd_build_package, NbiUtil
 from utils.prometheus_manager import PrometheusMan
 from models.blueprint.blue_types import blueprint_types
 from typing import List, Dict, Union, Callable
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 from topology.topology import Topology, build_topology
 from utils.persistency import DB
 from utils.log import create_logger
@@ -712,3 +712,10 @@ class BlueprintBaseBeta(abc.ABC):
             logger.info(f"Successfully deleted all prometheus jobs for blue {self.base_model.id}")
         else:
             logger.info(f"There are NO prometheus jobs for blue {self.base_model.id}")
+
+    def raise_http_error(self, error_msg: str, status_code: status):
+        """
+        Print the error in the console and raise HTTP error
+        """
+        logger.error(error_msg)
+        raise HTTPException(status_code=status_code, detail=error_msg)

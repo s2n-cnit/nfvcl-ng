@@ -21,6 +21,7 @@ class BlueVNFD(NFVCLBaseModel):
 class BlueVNFDs(NFVCLBaseModel):
     core: List[BlueVNFD] = Field(default=[])
     area: List[BlueVNFD] = Field(default=[])
+    ues: List[BlueVNFD] = Field(default=[])
 
 
 class BlueVLD(NFVCLBaseModel):
@@ -102,6 +103,7 @@ class BlueNSD(NFVCLBaseModel):
     nsi_id: str = Field(default="")
     area_id: int = Field(default=-1)
     replica_id: int = Field(default=-1)  # Needed in K8S, is it really necessary?
+    ue_id: int | None = Field(default=None, description="Used by ueransim blue to save the UE id")
     vld: List[PduInterface] = Field(default=[])
 
 

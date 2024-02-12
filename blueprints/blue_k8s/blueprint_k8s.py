@@ -3,7 +3,7 @@ from enum import Enum
 from ipaddress import IPv4Address
 from logging import Logger
 from typing import Union, Dict, Optional, List
-from blueprints import parse_ansible_output
+from utils.ansible_parser import parse_ansible_output
 from main import persistency
 from models.blueprint.blueprint_base_model import BlueVNFD
 from models.blueprint.common import BluePrometheus
@@ -570,7 +570,7 @@ class K8sBlue(BlueprintBaseBeta):
         workers_mgt_int = []
         for area in self.k8s_model.areas:
             for worker_interface in area.worker_mgt_int.values():
-                workers_mgt_int.append(worker_interface.vld[0].get_ip_str()[0]) # Taking the first ip that should be the floating in case present
+                workers_mgt_int.append(worker_interface.vld[0].get_ip_list_str()[0]) # Taking the first ip that should be the floating in case present
 
         # Get the pool list for metal load balancer
         pool_list = self.k8s_model.config.network_endpoints.data_nets
@@ -686,7 +686,7 @@ class K8sBlue(BlueprintBaseBeta):
             if nsd.type == 'master':
                 # Retrieve the complete virtual link descriptors for the only interface of the k8s controller!
                 vlds = get_ns_vld_model(nsd.nsi_id, ["mgt"])
-                ip_mgt_list = vlds["mgt"][0].get_ip_str()
+                ip_mgt_list = vlds["mgt"][0].get_ip_list_str()
 
                 self.k8s_model.config.controller_ip = ip_mgt_list[0] # Taking the first ip that should be the floating in case present
                 # If we have a floating IP, we assign the internal IP. Otherwise the same IP is internal/external

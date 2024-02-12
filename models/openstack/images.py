@@ -27,7 +27,7 @@ class OpenStackImage(NFVCLBaseModel):
     tags: List
     self: str
     file: str
-    schema: str # TODO SHADOW AN INTERNAL PYDANTIC VALUE
+    schema_osm: str = Field(alias="schema")
 
 class ImageRepo(NFVCLBaseModel):
     name: str

@@ -12,7 +12,6 @@ from utils.log import create_logger
 from utils.util import get_nfvcl_config, NFVCLConfigModel
 from utils.util import deprecated
 
-sol006 = True
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 nbiUtil = get_osm_nbi_utils()
 db = persistency.DB()

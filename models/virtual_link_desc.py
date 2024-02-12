@@ -32,7 +32,7 @@ class VirtLinkDescr(NFVCLBaseModel):
 
         return return_list
 
-    def get_ip_str(self) -> List[str]:
+    def get_ip_list_str(self) -> List[str]:
         """
         Return a list of IP of the VLD (Every interface can have multiple IPs
         Returns:

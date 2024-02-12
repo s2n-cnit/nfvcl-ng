@@ -245,12 +245,16 @@ class Sol006VnfdBuilderBeta:
             'parameter': [{'name': 'config-content', 'default-value': '', 'data-type': 'STRING'}],
         })
 
+        optional_params = []
+        if vnf_data.become_password:
+            optional_params.append({'name': 'become-password', 'value': vnf_data.become_password})
+
         initial_config = CharmPrimitive.model_validate({
             'name': 'config',
             'execution-environment-ref': ex_environ,
             'parameter': [{'name': 'ssh-hostname', 'value': '<rw_mgmt_ip>'},
                           {'name': 'ssh-username', 'value': vnf_data.username},
-                          {'name': 'ssh-password', 'value': vnf_data.password}],
+                          {'name': 'ssh-password', 'value': vnf_data.password}] + optional_params,
             'seq': '1'
         })
         # HELM

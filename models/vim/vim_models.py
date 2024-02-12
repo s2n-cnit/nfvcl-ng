@@ -311,6 +311,7 @@ class VirtualNetworkFunctionDescriptor(NFVCLBaseModel):
     name: str
     username: str = Field(default="root")
     password: str = Field(default="root")
+    become_password: Optional[str] = Field(default="root")
     vdu: Optional[List[VirtualDeploymentUnit]] = Field(default=[])
     pdu: Optional[List[PhysicalDeploymentUnit]] = Field(default=[])
     kdu: Optional[List[KubeDeploymentUnit]] = Field(default=[])
@@ -325,13 +326,15 @@ class VirtualNetworkFunctionDescriptor(NFVCLBaseModel):
                    cloud_init: bool = False,
                    vdu_list: List[VirtualDeploymentUnit] = None,
                    pdu_list: List[PhysicalDeploymentUnit] = None,
-                   kdu_list: List[KubeDeploymentUnit] = None):
+                   kdu_list: List[KubeDeploymentUnit] = None,
+                   vnf_become_passwd: Optional[str] = None):
         vnfd = VirtualNetworkFunctionDescriptor.model_validate({
             'id': vnf_id,
             'name': vnf_id,
             'password': vnf_passwd,
             'username': vnf_username,
         })
+        vnfd.become_password = vnf_become_passwd
         vnfd.vdu = vdu_list if vdu_list is not None else []
         vnfd.pdu = pdu_list if pdu_list is not None else []
         vnfd.kdu = kdu_list if kdu_list is not None else []

@@ -275,18 +275,6 @@ class VirtualDeploymentUnit(NFVCLBaseModel):
 
         return VirtualDeploymentUnit(id=vdu_id, image=vdu_image, vm_flavor=vdu_flavor, interface=interfaces)
 
-    @classmethod
-    def build_vdu_vim_link(cls, vdu_id, vdu_image, vdu_int_list: List[VimLink], vdu_flavor: VMFlavors = VMFlavors()):
-        """
-
-        Args:
-            vdu_id: The ID of the vdu
-            vdu_image: The name of the image used in openstack (origin)
-            vdu_data_int_list: A list of networks (VimLink)
-            vdu_flavor: Flavor to be assigned to this vdu.
-        """
-        return VirtualDeploymentUnit(id=vdu_id, image=vdu_image, vm_flavor=vdu_flavor, interface=vdu_int_list)
-
 
 class PhysicalDeploymentUnit(NFVCLBaseModel):
     count: int = Field(default=1)

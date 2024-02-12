@@ -1,24 +1,25 @@
+import re
+import traceback
 from ipaddress import IPv4Address
 from multiprocessing import RLock
+from typing import Union, List, Dict, Optional
+
 from pydantic import ValidationError
+
 from blueprints.blueprint_beta import BlueprintBaseBeta
+from main import persistency
 from models.blueprint.blueprint_base_model import BlueNSD, BlueVNFD
 from models.blueprint.rest_blue import BlueGetDataModel
 from models.vim.vim_models import VirtualDeploymentUnit, VirtualNetworkFunctionDescriptor, VimLink, VimModel, VMFlavors
-from nfvo import sol006_VNFbuilder, sol006_NSD_builder
+from nfvo import sol006_VNFbuilder, sol006_NSD_builder, get_ns_vld_ip
 from nfvo.nsd_manager_beta import get_ns_vld_model
 from nfvo.osm_nbi_util import get_osm_nbi_utils
-from typing import Union, List, Dict, Optional
 from topology.topology import Topology
-from .models import *
-from .models.blue_vyos_rest_model import VyOSBlueprintGetRouters
-from .utils import search_for_target_router_in_area, check_network_exists_in_router, check_rule_exists_in_router
-from .configurators import Configurator_VyOS
-from main import persistency
 from utils.log import create_logger
-import traceback
-import re
-
+from .configurators import Configurator_VyOS
+from .models import *
+from .models.blue_vyos_rest_model import VyOSBlueprintGetRouters, VyOSBlueprintFirCreate, VyOSBlueprintFirCreateRules
+from .utils import search_for_target_router_in_area, check_network_exists_in_router, check_rule_exists_in_router
 from .utils.vyos_utils import search_for_routers_in_area
 
 db = persistency.DB()
@@ -53,6 +54,15 @@ class VyOSBlue(BlueprintBaseBeta):
         return cls.api_day2_function(msg, blue_id)
 
     @classmethod
+    def rest_fir_create(cls, msg: VyOSBlueprintFirCreate, blue_id: str):
+        return cls.api_day2_function(msg, blue_id)
+
+    @classmethod
+    def rest_fir_create_Destrules(cls, msg: VyOSBlueprintFirCreateRules, blue_id: str):
+        return cls.api_day2_function(msg, blue_id)
+
+
+    @classmethod
     def day2_methods(cls):
         cls.api_router.add_api_route(path="/{blue_id}/snat", endpoint=cls.rest_snat, methods=["PUT"],
                                      description=ADD_SNAT_DESCRIPTION, summary=ADD_SNAT_DESCRIPTION)
@@ -62,6 +72,11 @@ class VyOSBlue(BlueprintBaseBeta):
                                      description=ADD_DNAT_DESCRIPTION, summary=ADD_DNAT_SUMMARY)
         cls.api_router.add_api_route(path="/{blue_id}/nat", endpoint=cls.rest_nat_delete, methods=["DELETE"],
                                      description=DEL_NAT_DESCRIPTION, summary=DEL_NAT_SUMMARY)
+        cls.api_router.add_api_route(path="/{blue_id}/fir", endpoint=cls.rest_fir_create, methods=["PUT"],
+                                     description=ADD_FIR_DESCRIPTION, summary=ADD_FIR_SUMMARY)
+        cls.api_router.add_api_route(path="/{blue_id}/firDestRule", endpoint=cls.rest_fir_create_Destrules, methods=["PUT"],
+                                     description=ADD_FIR_RULE_DESCRIPTION, summary=ADD_FIR_RULE_SUMMARY)
+
 
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):
         BlueprintBaseBeta.__init__(self, conf, id_, data=data, nbiutil=nbiUtil, db=db)
@@ -91,7 +106,17 @@ class VyOSBlue(BlueprintBaseBeta):
                 'day0': [],
                 'day2': [{'method': 'delete_nat_rules'}],
                 'dayN': []
-            }]
+            }],
+            'fir': [{
+                'day0': [],
+                'day2': [{'method': 'set_fir'}],
+                'dayN': []
+            }],
+            'firDestRule': [{
+                'day0': [],
+                'day2': [{'method': 'set_fir_dest_rules'}],
+                'dayN': []
+            }],
         }
         # DO NOT remove -> model initialization.
         self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
@@ -132,7 +157,7 @@ class VyOSBlue(BlueprintBaseBeta):
                     target_data_net = next(data_net for data_net in target_router.network_endpoints.data_nets if
                                            data_net.net_name == virtual_link_descriptor.ns_vld_id)
                     ip_list = virtual_link_descriptor.get_ip()
-                    target_data_net.ip_addr = IPv4Address(ip_list[0]) # The first one should be the floating IP, if present
+                    target_data_net.ip_addr = IPv4Address(ip_list[0])  # The first one should be the floating IP, if present
                     target_data_net.osm_interface_name = virtual_link_descriptor.intf_name
                     self.get_network_cidr(target_data_net)
 
@@ -216,7 +241,7 @@ class VyOSBlue(BlueprintBaseBeta):
 
         # If there is an explicit request for the flavor, we update it
         if vm_flavor_request is not None:
-            vm_flavor = VMFlavors().model_validate(vm_flavor_request)
+            vm_flavor.update(vm_flavor_request)
 
         if vld is None:
             # Management interface
@@ -419,6 +444,7 @@ class VyOSBlue(BlueprintBaseBeta):
                                                                       target_router_name=request.router_name)
         primitives_to_exec = []
         rule: VyOSSourceNATRule
+
         for rule in request.rules:
             # Checking if the interface exists.
             target_outbound_network = check_network_exists_in_router(target_network_addr=rule.outbound_network,
@@ -619,6 +645,73 @@ class VyOSBlue(BlueprintBaseBeta):
         self.to_db()
 
         return primitives_to_exec
+
+    def set_fir(self, msg: dict, request: VyOSBlueprintFirCreate = None):
+        """
+        This method is the handler for Firewall creation request.
+        """
+        if not self.vyos_model:
+            self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
+        if not request:
+            request = VyOSBlueprintFirCreate.model_validate(msg)
+
+        target_router: VyOSConfig
+        target_area, target_router = search_for_target_router_in_area(area_list=self.vyos_model.areas,
+                                                                      target_area_id=request.area,
+                                                                      target_router_name=request.router_name)
+        primitives_to_exec = []
+
+        # Creating the configurator for deploying the ruleS
+        vyos_configurator = Configurator_VyOS(
+            area_id=target_area.id,
+            nsd_name=target_router.name,
+            m_id=1,
+            blue_id=self.get_id(),
+            admin_password=target_router.admin_password
+        )
+        vyos_configurator.setup_firewall(request.rules)
+
+        primitives_to_exec.extend(vyos_configurator.dump())
+
+        target_router.extend_firewall_rules(request.rules)
+
+        self.to_db()
+
+        return primitives_to_exec
+
+    def set_fir_dest_rules(self, msg: dict, request: VyOSBlueprintFirCreateRules = None):
+        """
+        This method is the handler for Firewall creation request.
+        """
+        if not self.vyos_model:
+            self.vyos_model = VyOSBlueprint.model_validate(self.base_model.conf)
+        if not request:
+            request = VyOSBlueprintFirCreateRules.model_validate(msg)
+
+        target_router: VyOSConfig
+        target_area, target_router = search_for_target_router_in_area(area_list=self.vyos_model.areas,
+                                                                      target_area_id=request.area,
+                                                                      target_router_name=request.router_name)
+        primitives_to_exec = []
+
+        # Creating the configurator for deploying the ruleS
+        vyos_configurator = Configurator_VyOS(
+            area_id=target_area.id,
+            nsd_name=target_router.name,
+            m_id=1,
+            blue_id=self.get_id(),
+            admin_password=target_router.admin_password
+        )
+        vyos_configurator.setup_firewall_dest_rules(request.rules)
+
+        primitives_to_exec.extend(vyos_configurator.dump())
+
+        target_router.extend_firewall_rules(request.rules)
+
+        self.to_db()
+
+        return primitives_to_exec
+
 
     def get_data(self, get_request: BlueGetDataModel) -> dict:
         """

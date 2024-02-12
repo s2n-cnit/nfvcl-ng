@@ -1,6 +1,7 @@
 from typing import Optional, Literal, List
 from pydantic import BaseModel, Field, conlist
 from .vyos_area_model import VyOSArea
+from .vyos_firewall_rules_model import VyOSFirewallRule, VyOSFirewallRuleSecond
 from .vyos_nat_rules_model import VyOSSourceNATRule, VyOSDestNATRule, VyOS1to1NATRule
 
 
@@ -66,6 +67,26 @@ class VyOSBlueprintNATdelete(BaseModel):
     area: int
     router_name: str
     rules: List[int] = Field(title="List of rules to delete in the specified vyos instance of the blueprint")
+
+class VyOSBlueprintFirCreate(BaseModel):
+    callbackURL: Optional[str] = Field(
+        None,
+        description='url that will be used to notify when the blueprint processing finishes',
+    )
+    operation: Literal['fir']
+    area: int
+    router_name: str
+    rules: List[VyOSFirewallRule]
+
+class VyOSBlueprintFirCreateRules(BaseModel):
+    callbackURL: Optional[str] = Field(
+        None,
+        description='url that will be used to notify when the blueprint processing finishes',
+    )
+    operation: Literal['firDestRule']
+    area: int
+    router_name: str
+    rules: List[VyOSFirewallRuleSecond]
 
 
 class VyOSBlueprintGetRouters(BaseModel):

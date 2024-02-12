@@ -15,8 +15,8 @@ class VirtLinkDescr(NFVCLBaseModel):
     intf_name: str = Field(default="")
     external_cp_ref: str = Field(default="", alias="external-cp-ref")
     member_vnf_index_ref: str = Field(default="", alias="member-vnf-index-ref")
-    intf_mac: str = Field(default="")
-    compute_node: str = Field(default="")
+    intf_mac: str | None = None
+    compute_node: str | None = None
 
     def get_ip(self) -> List[IPv4Address]:
         """

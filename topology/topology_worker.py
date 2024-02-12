@@ -101,7 +101,8 @@ class TopologyWorker:
 
             # Pdu
             case TopologyWorkerOperation.ADD_PDU:
-                topology.add_pdu(PduModel.model_validate(worker_message.data))
+                pdu_model = PduModel.model_validate(worker_message.data)
+                topology.add_pdu(pdu_model, pdu_model.nfvo_onboarded)
 
             case TopologyWorkerOperation.DEL_PDU:
                 topology.del_router(worker_message.data['pdu_id'])

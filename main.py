@@ -12,6 +12,7 @@ from nfvo import PNFmanager
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from blueprints import LCMWorkers
 from subscribe_endpoints.k8s_manager import initialize_k8s_man_subscriber
+from utils.helm_repository import setup_helm_repo
 import signal
 import atexit
 
@@ -32,6 +33,9 @@ topology_worker.start()
 # Starting subscribe managers. ADD here all child process start for sub/pub
 logger.info("Starting subscribers")
 initialize_k8s_man_subscriber(db, nbiUtil, topology_lock)
+
+# ----------------------- HELM REPO --------------------
+setup_helm_repo()
 
 # ----------------------- ON CLOSE SECTION --------------------
 # Retrieving the list of spawned child (subscribers to nfvcl messages/events, e.g. K8S manager)
@@ -58,12 +62,12 @@ atexit.register(handle_exit)
 signal.signal(signal.SIGTERM, handle_exit)
 signal.signal(signal.SIGINT, handle_exit)
 
-######################### CHECKS ##########
+# ----------------------- CHECKS --------------------
 
-def starting_checks():
+def starting_async_checks():
     # Checking that vims are working
     topology = build_topology()
     vim_list = topology.get_model().get_vims()
     err_list = check_openstack_instances(vim_list)
 
-Process(target=starting_checks, args=()).start()
+Process(target=starting_async_checks, args=()).start()

@@ -36,8 +36,8 @@ logger = create_logger("BLUE")
 
 def initialize_blueprints_routers():
     """
-    Load Blueprint specific routers into the general blue router. This method must be called in order to enable
-    blueprint specific APIs
+    Load Blueprint specific routers into the general blue router. This method must be called to enable
+    blueprint-specific APIs
     """
     # !! VERY IMPORTANT
     # This piece of code is adding Blueprint specific POST and PUT methods to the router
@@ -351,8 +351,8 @@ def get_data_from_blue(blue_id: str, request: BlueGetDataModel):
                  summary=BLUE_GET_PODS_SUMMARY)
 def get_pods(blue_id: str):
     """
-    Obtain pods for a blueprint OVER ALL k8s clusters.
-    Differently from get_pods in k8s management this method iterate over all k8s clusters and check if there are
+    Returns pods, that belongs to a blueprint, OVER ALL k8s clusters.
+    Differently from get_pods in k8s management, this method iterate over all k8s clusters, and, check if there are
     some pods in a namespace that have the same name of the blueprint
 
     Args:

@@ -1,5 +1,7 @@
+from typing import List
 import utils.persistency as persistency
 from models.config_model import NFVCLConfigModel
+from models.helm.helm_model import HelmChart, HelmIndex
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils.log import create_logger
 from datetime import datetime
@@ -13,69 +15,97 @@ nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 logger = create_logger('HelmRepository')
 db = persistency.DB()
-chart_path = 'helm_charts/'
+REPO_PATH = 'helm_charts/'
+CHART_PATH = REPO_PATH + 'charts/'
 helm_url_prefix = '/helm_repo/'
+# The repo name must NOT contain underscores _, upper case
+HELM_REPO_NAME = "nfvcl"
+
+def setup_helm_repo():
+    """
+    Setup helm repo for NFVCL.
+    """
+    _create_helm_index_file(_load_helm_charts())
+    _setup_osm_helm_repo()
 
 
-def get_timestring() -> str:
-    return datetime.utcnow().replace(microsecond=0).isoformat()+'Z'
+def _load_helm_charts() -> List[HelmChart]:
+    """
+    Read all the files present in helm_charts/charts and build a list of HelmChart to be included in the index file.
+    All files in the helm_charts folder must be named {name}-{version}.tgz.
+    Name must not include '-' character.
+    Version must be formatted like '0.4.2'.
 
-class HelmRepository:
-    @staticmethod
-    def get_entries() -> list:
-        return db.find_DB('helm_charts', {})
+    Returns:
+        The list of hemlchart to be included in the index file.
+    """
+    chart_list = []
 
-    def set_entry(self, item: dict):
-        # FIXME: check versions and update db item
-        for key in ['description', 'name', 'version']:
-            if key not in item.keys():
-                raise ValueError("Chart Entry is missing of the >{}< key".format(key))
-
-        item['created'] = get_timestring()
-        filename = '{}-{}.tgz'.format(item['name'], item['version'])
-        if not os.path.isfile(chart_path + 'charts/' + filename):
-            print(chart_path + 'charts/' + filename)
-            raise ValueError("chart {} not existing".format(filename))
-        with open(chart_path + 'charts/' + filename, "rb") as f:
-            file_bytes = f.read()
-            item['digest'] = hashlib.sha256(file_bytes).hexdigest()
-
-        item['home'] = 'https://helm.sh/helm'
-        item['sources'] = ['https://github.com/helm/helm']
-        item['urls'] = ['http://{}:{}{}charts/{}'.format(nfvcl_config.nfvcl.ip, nfvcl_config.nfvcl.port, helm_url_prefix, filename)]
-
-        db.insert_DB('helm_charts', item)
-        self.create_index()
-
-    def create_index(self):
-        global yaml_file
-        db_charts = self.get_entries()
-        registry_index = {'apiVersion': 'v1', 'entries': {}, 'generated': get_timestring()}
-        for c in db_charts:
-            if c['name'] not in registry_index['entries']:
-                logger.info("found new entry {}".format(c['name']))
-                registry_index['entries'][str(c['name'])] = []
-            # remove the _id key from the c dict
-            c.pop('_id', None)
-
-            # update the URL with the current IP address
-            filename = '{}-{}.tgz'.format(c['name'], c['version'])
-            c['urls'] = ['http://{}:{}{}charts/{}'.format(nfvcl_config.nfvcl.ip, nfvcl_config.nfvcl.port, helm_url_prefix, filename)]
-            # aggregate all the version of the same chart into a same array
-            registry_index['entries'][c['name']].append(c)
+    try:
+        file_list = os.listdir(CHART_PATH)
+        #Remove useless file that was uploaded by mistake TODO remove in future version, here just for compatibility
         try:
-            yaml_file = open(chart_path + 'index.yaml', 'w')
-        except FileNotFoundError as e:
-            logger.error('Helm chart folder not existing, recreating')
-            os.mkdir(chart_path)
-            yaml_file = open(chart_path + 'index.yaml', 'w')
-        except Exception as e:
-            logger.error(e.with_traceback(None))
-        finally:
-            logger.info("dumping registry file")
-            yaml.dump(registry_index, yaml_file)
+            os.remove(CHART_PATH+'index.yaml')
+        except FileNotFoundError:
+            logger.debug("Useless file index was already deleted")
+    except FileNotFoundError:
+        logger.warning(f"The directory '{CHART_PATH}' does not exist. Creating...")
+        os.mkdir(REPO_PATH)
+        os.mkdir(CHART_PATH)
+        file_list = []
+
+    # For each file we build the HELM chart object
+    for file in file_list:
+        digest = ""
+        with open(CHART_PATH + file, "rb") as f:
+            file_bytes = f.read()
+            digest = hashlib.sha256(file_bytes).hexdigest()
+
+        chart_url = f'http://{nfvcl_config.nfvcl.ip}:{nfvcl_config.nfvcl.port}{helm_url_prefix}charts/{file}'
+
+        name_no_extension = file[0:-4] # Remove .tgz (last 4 chars)
+        name = name_no_extension.split('-')[0]
+
+        if name.count('_') > 0 or any(char.isupper() for char in name):
+            raise ValueError(f"The name of the helm chart contains invalid characters {name}")
+
+        version = name_no_extension.split('-')[1]
+
+        chart_list.append(HelmChart(name=name, version=version, digest=digest, urls=[chart_url]))
+
+    return chart_list
 
 
-helm_repo = HelmRepository()
-helm_repo.create_index()
+def _create_helm_index_file(chart_list: List[HelmChart]):
+    """
+    Creates the index file for the helm repo. The index file contains the list of helm chart available in the helm repo.
+    The index file is used from VNF instances to retrieve helm charts.
+
+    Args:
+        chart_list: the list of the chart to be included in the index file
+    """
+    helm_index = HelmIndex.build_index(chart_list)
+
+    try:
+        yaml_file = open(REPO_PATH + 'index.yaml', 'w')
+        logger.debug("Writing helm repo index file...")
+        yaml.dump(helm_index.model_dump(), yaml_file)
+        logger.debug("DONE")
+    except Exception as e:
+        logger.error(e.with_traceback(None))
+
+def _setup_osm_helm_repo():
+    # Checking that the repo is not aready existing in OSM. Getting the repos and filter it with the name
+    repo = next((item for item in nbiUtil.get_k8s_repos() if item['name'] == HELM_REPO_NAME), None)
+    if repo is not None:
+        logger.info('Deleting previous helm repository')
+        nbiUtil.delete_k8s_repo(HELM_REPO_NAME)
+
+    # Adding Helm repository to OSM
+    # The repo name must not contain underscores _
+    repo = nbiUtil.add_k8s_repo(HELM_REPO_NAME, f"http://{nfvcl_config.nfvcl.ip}:{nfvcl_config.nfvcl.port}{helm_url_prefix}")
+    logger.info('Adding helm repo result: {}'.format(repo))
+
+#helm_repo = HelmRepositoryManager()
+#helm_repo.create_index()
 

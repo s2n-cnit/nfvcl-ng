@@ -451,8 +451,8 @@ class Blue5GBaseBeta(BlueprintBaseBeta, ABC):
         logger.debug(f'Getting IPs for ran area {ns.area_id}')
 
         vlds = get_ns_vld_model(ns.nsi_id, ["mgt", "datanet"])
-        self.base_model.ran_areas[ns.area_id].nb_mgt_ip = vlds["mgt"][0].get_ip_str()[0]
-        self.base_model.ran_areas[ns.area_id].nb_wan_ip = vlds["datanet"][0].get_ip_str()[0] # vld is called datanet from ueransim blueprint
+        self.base_model.ran_areas[ns.area_id].nb_mgt_ip = vlds["mgt"][0].get_ip_list_str()[0]
+        self.base_model.ran_areas[ns.area_id].nb_wan_ip = vlds["datanet"][0].get_ip_list_str()[0] # vld is called datanet from ueransim blueprint
 
         logger.debug(f'MGT IP for ran area {ns.area_id}: {self.base_model.ran_areas[ns.area_id].nb_mgt_ip}')
         logger.debug(f'DATA IP for ran area {ns.area_id}: {self.base_model.ran_areas[ns.area_id].nb_wan_ip}')

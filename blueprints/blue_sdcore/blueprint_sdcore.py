@@ -1,9 +1,7 @@
 import copy
 from typing import *
-
-from blueprints.blue_5g_base.models.blue_5g_model import SubArea, SubAreaOnlyId
+from blueprints.blue_5g_base.models.blue_5g_model import SubArea
 from pydantic import Field
-
 from blueprints.blue_5g_base.blueprint_5g_base_beta import Blue5GBaseBeta, EdgeArea5G, CoreArea5G, Area5GTypeEnum, RanArea5G, Blueprint5GBaseModel
 from blueprints.blue_sdcore import sdcore_default_config
 from blueprints.blue_sdcore.configurators.sdcore_upf_configurator import ConfiguratorSDCoreUpf, \
@@ -17,7 +15,7 @@ from models.blueprint.rest_blue import BlueGetDataModel
 from models.k8s.k8s_objects import K8sService
 from models.vim.vim_models import VimNetMap, KubeDeploymentUnit, VirtualNetworkFunctionDescriptor, \
     VirtualDeploymentUnit, VMFlavors
-from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta, get_kdu_services, get_ns_vld_ip
+from nfvo.nsd_manager_beta import Sol006NSDBuilderBeta, get_kdu_services, get_ns_vld_model
 from nfvo.osm_nbi_util import get_osm_nbi_utils
 from nfvo.vnf_manager_beta import Sol006VnfdBuilderBeta
 from utils.log import create_logger
@@ -57,7 +55,7 @@ class BlueprintSdCoreBaseModel(Blueprint5GBaseModel):
 
 
 class BlueSDCore(Blue5GBaseBeta):
-    CHART_NAME = "nfvcl/sd-core"
+    CHART_NAME = "nfvcl/sdcore"
     KDU_NAME = "sdcore"
     VNF_ID_SUFFIX = "sdcore"
     NS_ID_INFIX = "SDCORE"
@@ -386,10 +384,10 @@ class BlueSDCore(Blue5GBaseBeta):
 
     def get_ip_edge(self, ns: BlueNSD) -> None:
         logger.debug(f'Getting IPs for edge area {ns.area_id}')
-        vlds = get_ns_vld_ip(ns.nsi_id, ["mgt", f'data_{self.base_model.networks_5g.wan}'])
+        vlds = get_ns_vld_model(ns.nsi_id, ["mgt", f'data_{self.base_model.networks_5g.wan}'])
 
-        self.base_model.edge_areas[ns.area_id].upf_mgt_ip = vlds["mgt"][0]['ip']
-        self.base_model.edge_areas[ns.area_id].upf_data_ip = vlds[f'data_{self.base_model.networks_5g.wan}'][0]['ip']
+        self.base_model.edge_areas[ns.area_id].upf_mgt_ip = vlds["mgt"][0].get_ip_list_str()[0]
+        self.base_model.edge_areas[ns.area_id].upf_data_ip = vlds[f'data_{self.base_model.networks_5g.wan}'][0].get_ip_list_str()[0]
 
         core_data_network = self.topology_get_network(self.base_model.networks_5g.wan)
         self.base_model.edge_areas[ns.area_id].upf_data_network_cidr = str(core_data_network.cidr)

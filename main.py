@@ -67,7 +67,12 @@ signal.signal(signal.SIGINT, handle_exit)
 def starting_async_checks():
     # Checking that vims are working
     topology = build_topology()
-    vim_list = topology.get_model().get_vims()
-    err_list = check_openstack_instances(vim_list)
+    topo_model = topology.get_model()
+
+    if not (topo_model is None):
+        vim_list = topology.get_model().get_vims()
+        err_list = check_openstack_instances(vim_list)
+    else:
+        logger.warning("Cannot perform initial checks. Topology still need to be initialized.")
 
 Process(target=starting_async_checks, args=()).start()

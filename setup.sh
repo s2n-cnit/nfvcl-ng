@@ -34,13 +34,6 @@ sudo systemctl restart mongod
 echo "Fixing PodSecurity issue for VNFM"
 kubectl set env deployment -n osm lcm OSMLCM_VCA_EEGRPC_POD_ADMISSION_POLICY=privileged
 
-echo "Setting up the registry for local image deployment"
-sudo docker run -d -p 5000:5000 --restart=always --name registry registry:2
-echo "Building VNFM image"
-# The build should take enough time to let the registry start
-sudo docker build -t localhost:5000/vnfm-ee ./vnf_managers/helmflexvnfm --no-cache
-sudo docker push localhost:5000/vnfm-ee
-
 # Needed by some python packages (netifaces)
 echo "Installing build essential tools"
 sudo apt install build-essential

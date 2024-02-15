@@ -1,10 +1,11 @@
-from typing import List, Optional, Dict
+from typing import Optional, List, Dict
 
 from pydantic import Field
 
-from blueprints_ng.blueprint_ng_provider_interface import VmResource, VmResourceImage, VmResourceFlavor, \
-    BlueprintNGCreateModel, BlueprintNG, VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, BlueprintNGState
-from blueprints_ng.blueprint_ng_provider_native import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
+from blueprints_ng.blueprint_ng import BlueprintNGCreateModel, BlueprintNGState, BlueprintNG
+from blueprints_ng.providers.blueprint_ng_provider_native import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
+
+from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResource, VmResourceImage, VmResourceFlavor
 from models.base_model import NFVCLBaseModel
 
 
@@ -29,10 +30,12 @@ class FedoraVmResourceConfiguration(VmResourceNativeConfiguration):
         for i in range(1, self.max_num):
             print(i)
 
+
 class Pippo(NFVCLBaseModel):
     vm1: Optional[VmResource] = Field(default=None)
     vmddd: Dict[str, VmResource] = Field(default={})
     vmlll: List[VmResource] = Field(default={})
+
 
 class DemoBlueprintNGState(BlueprintNGState):
     areas: List[str] = Field(default_factory=list)
@@ -40,6 +43,7 @@ class DemoBlueprintNGState(BlueprintNGState):
     vm_fedora: Optional[VmResource] = Field(default=None)
     vm_fedora_configurator: Optional[FedoraVmResourceConfiguration] = Field(default=None)
     prova_lista: Optional[List[Pippo]] = Field(default=None)
+
 
 class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataDemo, DemoCreateModel]):
     def create(self, create_model: DemoCreateModel):
@@ -80,7 +84,6 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
 
         vm_ubuntu.create()
         self.state.vm_fedora.create()
-
 
         vm_ubuntu_configurator.configure()
         self.state.vm_fedora_configurator.configure()
@@ -123,7 +126,6 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
         # new_vm_configurator.configure()
 
 
-
 if __name__ == "__main__":
     prova = NGDemoBlueprint(BlueprintsNgProviderDemo, DemoBlueprintNGState)
     prova.create(DemoCreateModel(var="CIAOOOO"))
@@ -138,6 +140,7 @@ if __name__ == "__main__":
 
     serializzato2 = reistanza.to_db()
     import gc
+
     del prova
 
     collected = gc.collect()
@@ -154,5 +157,3 @@ if __name__ == "__main__":
     assert id(reistanza.state.vm_fedora) == id(reistanza.state.vm_fedora_configurator.vm_resource)
     reistanza.add_area()
     assert id(reistanza.state.vm_fedora) == id(reistanza.state.vm_fedora_configurator.vm_resource)
-
-

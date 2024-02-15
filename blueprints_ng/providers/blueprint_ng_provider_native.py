@@ -1,6 +1,7 @@
 from typing import Dict
 
-from blueprints_ng.blueprint_ng_provider_interface import BlueprintNGProviderInterface, VmResource, VmResourceConfiguration, VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, BlueprintNGProviderData
+from blueprints_ng.providers.blueprint_ng_provider_interface import *
+from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration
 
 
 class BlueprintNGProviderDataDemo(BlueprintNGProviderData):

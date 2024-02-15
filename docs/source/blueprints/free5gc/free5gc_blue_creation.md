@@ -6,7 +6,8 @@ In this page there is described how to deploy a Free5GC blueprint.
 
 
 - Having a K8s cluster that is **onboarded** on the NFVO (OSM). Check [Onboarding external K8S Cluster](Onboarding-external-K8S-Cluster) for more info on adding an external cluster or [Kubernetes Blueprint](Kubernetes-Blueprint) to deploy a new cluster automatically onboarded by NFVCL.
-- Having a gNB running, it can be deployed through UERANSIM blueprint. See [UERANSIM Blueprint](UERANSIM-Blueprint) for more information.
+  The cluster must be connected to a `mgt` and `data` network.
+- Having a gNB running, it can be deployed through UERANSIM blueprint. See [UERANSIM Blueprint](UERANSIM-Blueprint) for more information. Use the same `mgt` and `data` network of the previous point.
 - Add collection 'pnf' in the NFVCL mongo database with the following content 
   ```
   {

@@ -1,4 +1,8 @@
 # UERANSIM blueprint creation
+To initialize a blueprint for UERanSim you can use the following dedicated call. If the blueprint is deployed to be connected to another
+ blueprint, ensure that they are on the same network.
+For example, if the K8S blueprint on witch a 5G Core is running, is connected to `dmz-internal` management network and to `data_paolo` data network, 
+the blueprint should be deployed like follows. We are supposing that the 5G Core is deployed correctly and expose services on `data_paolo` network.
 
 `POST /nfvcl/v1/api/blue/UeRanSim`
 ```json
@@ -7,12 +11,12 @@
     "config": {
         "network_endpoints": {
             "mgt": "dmz-internal",
-            "wan": "dmz-internal"
+            "wan": "data_paolo"
         }
     },
     "areas": [
         {
-            "id": 1,
+            "id": 3,
             "nci": "0x00000002",
             "idLength": 32,
             "ues": [

@@ -236,11 +236,13 @@ class Configurator_VyOS(Configurator_Flex):
 
     # Setup ssh user and password
     def add_vyos_config_vars(self, username: str, password: str):
-        if not self.playbook['vars']:
-            self.playbook['vars'] = []
-        self.playbook['vars'].append({'ansible_user': username})
-        self.playbook['vars'].append({'ansible_ssh_pass': password})
-        self.playbook['vars'].append({'ansible_password': password})
+        """
+        Add username and password as vars to the playbook. Otherwise, execution fails due to required authentication
+        Args:
+            username: The vyos username
+            password: The vyos password
+        """
+        self.add_playbook_vars({'ansible_user': username,'ansible_ssh_pass': password,'ansible_password': password})
 
     def dump(self):
         logger.info("Dumping")

@@ -105,6 +105,13 @@ class Configurator_Flex(Configurator_Base):
         })
 
     def addPlaybook(self, playbook_file: str, vars_=None):
+        """
+        Adds a playbook from FILE to the configurator playbook. Then the playbook can be edited using configurator functions.
+
+        Args:
+            playbook_file (str): The source file to be used as base playbook
+            vars_ (dict): Additional variables (to the ones present in the file) to be added as playbook vars)
+        """
         # print(os.path.dirname(os.path.abspath(__file__)) + '/' + playbook_file)
         with open(playbook_file, 'r+') as stream_:
             plays_ = yaml.load(stream_)
@@ -117,7 +124,14 @@ class Configurator_Flex(Configurator_Base):
                       .format(playbook_file))
 
             if 'vars' in plays_[0]:
-                self.playbook['vars'] = dict(plays_[0]['vars'])
+                # When multiple vars are given to an ansible playbook >plays_[0]['vars']< contains something like [{'ansible_python_interpreter': '/usr/bin/python3'}, {'ansible_network_os': 'vyos'}, {'ansible_connection': 'network_cli'}]
+                # dict(plays_[0]['vars']) crash
+                if isinstance(plays_[0]['vars'], list):
+                    self.playbook['vars'] = {}
+                    for dictionary in plays_[0]['vars']:
+                        self.playbook['vars'].update(dictionary)
+                else:
+                    self.playbook['vars'] = dict(plays_[0]['vars'])
             else:
                 self.playbook['vars'] = {}
             if vars_ is not None:
@@ -131,6 +145,19 @@ class Configurator_Flex(Configurator_Base):
 
             if 'gather_facts' not in self.playbook:
                 self.playbook['gather_facts'] = 'no'
+
+    def add_playbook_vars(self, dictionary: dict):
+        """
+        Add all the key<->values from a dictionary as variables of the playbook
+        Args:
+            dictionary: a dictionary containing all the key<->values to be added as variables to the playbook
+            {'ansible_user': username,'ansible_ssh_pass': password,'ansible_password': password}
+        """
+        # self.playbook['vars'] is a dictionary. Every key<->value is a var<->value ref
+        if not self.playbook['vars']:
+            self.playbook['vars'] = {}
+
+        self.playbook['vars'].update(dictionary)
 
     def appendPbTasks(self, playbook_file: str, jinja: bool = False):
         with open(playbook_file, 'r+') as stream_:
@@ -224,9 +251,21 @@ class Configurator_Flex(Configurator_Base):
             }
         })
 
-    def dumpAnsibleFile(self, prio, transfer_name):
-        with open('day2_files/' + transfer_name + "_step" + str(self.dump_number) + ".yaml", 'w') as file:
-            # yaml = YAML()
+    def dumpAnsibleFile(self, prio, transfer_name: str):
+        """
+        Create the ansible file using the configurator parameters. The file is created in day2_files/ folder.
+        The file name is generated from '{transfer_name}_step{str(self.dump_number)}.yaml'
+        Args:
+            prio:
+            transfer_name: The prefix of the filename
+
+        Returns:
+
+        """
+        file_name = f"{transfer_name}_step{str(self.dump_number)}.yaml"
+        file_path = f"day2_files/{file_name}"
+        with open(file_path, 'w') as file:
+            # Open and write the content of the playbook in the disired file
             try:
                 yaml.dump([self.playbook], file)
             except Exception as e:
@@ -235,8 +274,8 @@ class Configurator_Flex(Configurator_Base):
         self.config_content['playbooks'].append(
             {
                 'prio': prio,
-                'src': nfvclURL + transfer_name + "_step" + str(self.dump_number) + ".yaml",
-                'name': transfer_name + "_step" + str(self.dump_number) + ".yaml"
+                'src': nfvclURL + file_name,
+                'name': file_name
             }
         )
 

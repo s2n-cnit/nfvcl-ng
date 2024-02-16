@@ -20,15 +20,22 @@ ProviderDataTypeVar = TypeVar("ProviderDataTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
 
 
-def get_class_from_path(class_path: str):
-    field_type_splitted = class_path.split(".")
+def get_class_from_path(class_path: str) -> Any:
+    """
+    Get class from the give string module path
+    Args:
+        class_path: module path
 
-    module_name = ".".join(field_type_splitted[:-1])
-    class_name = field_type_splitted[-1]
+    Returns: The class found
+    """
+    field_type_split = class_path.split(".")
+
+    module_name = ".".join(field_type_split[:-1])
+    class_name = field_type_split[-1]
 
     module = importlib.import_module(module_name)
-    CorrectClass = getattr(module, class_name)
-    return CorrectClass
+    found_class = getattr(module, class_name)
+    return found_class
 
 
 class BlueprintNGStatus(NFVCLBaseModel):
@@ -49,22 +56,28 @@ class RegisteredResource(NFVCLBaseModel):
 class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar]):
     id: str = Field()
     type: str = Field()
-    # TODO provare a mettere un serializzatore di modello sullo stato (quello generico) e serializzare a mano i campi
+
+    # Store every resource that a blueprint manage
     registered_resources: Dict[str, RegisteredResource] = Field(default={})
 
+    # Blueprint state, should contain running configuration and reference to resources
     state_type: str = Field()
-    state: StateTypeVar = Field()  # TODO questa è la running-config
+    state: StateTypeVar = Field()
+
+    # Initial config for the blueprint, may be used in the future for a reset functionality
     create_config_type: str = Field()
     create_config: CreateConfigTypeVar = Field()
+
+    # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
+    provider_type: str = Field()
+    provider_data_type: str = Field()
+    provider_data: ProviderDataTypeVar = Field()
+
     created: Optional[datetime] = Field(default=None)
     status: BlueprintNGStatus = Field(default=BlueprintNGStatus())
 
     # TODO il tipo dovrebbe essere PrometheusTargetModel
     node_exporters: List[str] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
-
-    provider_type: str = Field()
-    provider_data_type: str = Field()
-    provider_data: ProviderDataTypeVar = Field()
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**self.fix_types(["state", "provider_data", "create_config"], **kwargs))
@@ -112,12 +125,20 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             )
 
     def register_resource(self, resource: Resource):
+        """
+        Register a resource in the blueprint, this is mandatory
+        Args:
+            resource: the resource to be registered
+        """
         if not resource.id:
             resource.id = str(uuid.uuid4())
         resource.set_context(self)
         self.base_model.registered_resources[resource.id] = RegisteredResource(type=f"{resource.__class__.__module__}.{resource.__class__.__qualname__}", value=resource)
 
     def init_blueprint_type(self):
+        """
+        Initialize the blueprint
+        """
         self.api_router = APIRouter(
             prefix="/{}".format(self.__name__),
             tags=["Blueprint {}".format(self.__name__)],
@@ -125,6 +146,13 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         )
 
     def register_api(self, path: str, request_type: HttpRequestType, method: Callable):
+        """
+        Register a new API endpoint for this blueprint
+        Args:
+            path: Endpoint path
+            request_type: Type of HTTP request (GET, POST, PUT, DELETE)
+            method: Method to be called when the API is called
+        """
         self.api_router.add_api_route(path, method, methods=[request_type.value])
 
     def create(self, create_model: BlueprintNGCreateModel):
@@ -145,55 +173,45 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
     def provider_data(self) -> ProviderDataTypeVar:
         return self.base_model.provider_data
 
-    def find_resource_occurrences(self, obj, tipo, path=()):
+    def __find_field_occurrences(self, obj, type_to_find, path=(), check_fun=lambda x: True):
+        """
+        Recursively find every occurrence of a certain field type, check_fun can be set for additional conditional check
+        Args:
+            obj: Starting object
+            type_to_find: Type of the fields to find
+            path: Current exploration path
+            check_fun: Function used on the field for additional checks, should return a bool
+
+        Returns: List of occurrences found
+        """
         occurrences = []
 
-        if isinstance(obj, tipo):
+        if isinstance(obj, type_to_find) and check_fun(obj):
             occurrences.append(path)
 
         if isinstance(obj, dict):
             for key, value in obj.items():
-                occurrences.extend(self.find_resource_occurrences(value, tipo, path + (key,)))
+                occurrences.extend(self.__find_field_occurrences(value, type_to_find, path=(path + (key,)), check_fun=check_fun))
         elif isinstance(obj, list):
             for idx, item in enumerate(obj):
-                occurrences.extend(self.find_resource_occurrences(item, tipo, path + (idx,)))
-        elif hasattr(obj, '__dict__'):
-            for attr_name in vars(obj):
+                occurrences.extend(self.__find_field_occurrences(item, type_to_find, path=(path + (idx,)), check_fun=check_fun))
+        elif hasattr(obj, '__dict__'):  # True when obj is an instance of a generic class
+            for attr_name in vars(obj):  # vars get the fields of obj
                 attr_value = getattr(obj, attr_name)
-                occurrences.extend(self.find_resource_occurrences(attr_value, tipo, path + (attr_name,)))
+                occurrences.extend(self.__find_field_occurrences(attr_value, type_to_find, path=(path + (attr_name,)), check_fun=check_fun))
 
         return occurrences
 
-    def find_REF_occurrences(self, obj, path=()):
-        occurrences = []
-
-        if isinstance(obj, str) and obj.startswith('REF='):
-            occurrences.append(path)
-
-        if isinstance(obj, dict):
-            for key, value in obj.items():
-                occurrences.extend(self.find_REF_occurrences(value, path + (key,)))
-        elif isinstance(obj, list):
-            for idx, item in enumerate(obj):
-                occurrences.extend(self.find_REF_occurrences(item, path + (idx,)))
-        elif hasattr(obj, '__dict__'):
-            for attr_name in vars(obj):
-                attr_value = getattr(obj, attr_name)
-                occurrences.extend(self.find_REF_occurrences(attr_value, path + (attr_name,)))
-
-        return occurrences
-
-    def override_variables_in_dict(self, example_obj, obj_dict, tipo):
-        occ = self.find_resource_occurrences(example_obj, tipo)
-
+    def __override_variables_in_dict(self, obj, obj_dict, tipo):
+        occ = self.__find_field_occurrences(obj, tipo)
         for path in sorted(occ, key=lambda x: len(x), reverse=True):
             current = obj_dict
             for key in path[:-1]:
                 current = current[key]
             current[path[-1]] = f'REF={current[path[-1]]["id"]}'
 
-    def override_variables_in_dict_REF(self, example_obj, obj_dict, registered_resource):
-        occ = self.find_REF_occurrences(example_obj)
+    def __override_variables_in_dict_ref(self, obj, obj_dict, registered_resource):
+        occ = self.__find_field_occurrences(obj, type_to_find=str, check_fun=lambda x: x.startswith('REF='))
         for path in sorted(occ, key=lambda x: len(x), reverse=True):
             current = obj_dict
             for key in path[:-1]:
@@ -201,33 +219,43 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             current[path[-1]] = registered_resource[current[path[-1]].split("REF=")[1]].value
 
     def to_db(self):
-        aaa = self.base_model.model_dump()
+        serialized_dict = self.base_model.model_dump()
 
-        self.override_variables_in_dict(self.base_model.state, aaa["state"], Resource)
-        for chiave, valore in self.base_model.registered_resources.items():
-            if isinstance(valore.value, ResourceConfiguration):
-                self.override_variables_in_dict(valore.value, aaa["registered_resources"][chiave]["value"], ResourceDeployable)
+        # Find every occurrence of type Resource in the state amd replace them with a reference
+        self.__override_variables_in_dict(self.base_model.state, serialized_dict["state"], Resource)
 
-        return json.dumps(aaa, indent=4)
+        # Find every occurrence of type ResourceConfiguration in the registered_resources and replace the ResourceDeployable field with a reference
+        for key, value in self.base_model.registered_resources.items():
+            if isinstance(value.value, ResourceConfiguration):
+                self.__override_variables_in_dict(value.value, serialized_dict["registered_resources"][key]["value"], ResourceDeployable)
+
+        return json.dumps(serialized_dict, indent=4)
 
     def from_db(self, serialized: str):
         deserialized_dict = json.loads(serialized)
 
+        # Remove fields that need to be manually deserialized from the input and validate
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)
         del deserialized_dict_edited["registered_resources"]
         deserialized_dict_edited["state"] = self.state_type().model_dump()
         self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar].model_validate(deserialized_dict_edited)
 
+        # Register the reloaded resources of type ResourceDeployable
         for resource_id, resource in deserialized_dict["registered_resources"].items():
             if resource["value"]["type"] == "ResourceDeployable":
                 self.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
 
+        # Register the reloaded resources of type ResourceConfiguration, also resolve the references within and link them to the same object instance registered above
         for resource_id, resource in deserialized_dict["registered_resources"].items():
             if resource["value"]["type"] == "ResourceConfiguration":
-                self.override_variables_in_dict_REF(resource["value"], resource["value"], self.base_model.registered_resources)
+                self.__override_variables_in_dict_ref(resource["value"], resource["value"], self.base_model.registered_resources)
                 self.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
 
-        self.override_variables_in_dict_REF(deserialized_dict["state"], deserialized_dict["state"], self.base_model.registered_resources)
+        # Here the registered_resources should be in the same state as before saving the blueprint to the db
 
+        # Resolve all reference in the state
+        self.__override_variables_in_dict_ref(deserialized_dict["state"], deserialized_dict["state"], self.base_model.registered_resources)
+
+        # Deserialized remaining fields in the state and override the field in base_model
         self.base_model.state = self.state_type.model_validate(deserialized_dict["state"])
         return self.base_model.state

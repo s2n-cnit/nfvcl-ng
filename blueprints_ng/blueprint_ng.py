@@ -153,8 +153,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             raise BlueprintNGException(f"Already registered")
         if not resource.id:
             resource.id = str(uuid.uuid4())
-        resource.set_context(self)
-        self.base_model.registered_resources[resource.id] = RegisteredResource(type=f"{resource.__class__.__module__}.{resource.__class__.__qualname__}", value=resource)
+        self.base_model.registered_resources[resource.id] = RegisteredResource(type=f"{resource.__class__.__module__}.{resource.__class__.__qualname__}", value=resource) # TODO why registered resource? to save the type?
 
     def init_blueprint_type(self):
         """
@@ -225,11 +224,22 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         return occurrences
 
     def __override_variables_in_dict(self, obj, obj_dict, tipo):
+        """
+        Replace every Resource with its reference ID within the object.
+
+        Args:
+            obj: The object in witch reference are searched
+            obj_dict: The dictionary in witch the references are replaced with their object reference ID
+            tipo: The (filter) type of the objects to be replaced in the dict
+        """
+        # Getting a tuple list of path inside the object to be replaced with reference ID
         occ = self.__find_field_occurrences(obj, tipo)
-        for path in sorted(occ, key=lambda x: len(x), reverse=True):
+        # Replacing every object in the list with its reference id
+        for path in sorted(occ, key=lambda x: len(x), reverse=True):  # Ordered because replace inner ref in advance
             current = obj_dict
-            for key in path[:-1]:
+            for key in path[:-1]:  # This is done because cannot perform path[:-1][a][b][c].... dynamically
                 current = current[key]
+            # Replacing the object with its reference ID
             current[path[-1]] = f'REF={current[path[-1]]["id"]}'
 
     def __override_variables_in_dict_ref(self, obj, obj_dict, registered_resource):
@@ -241,6 +251,11 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             current[path[-1]] = registered_resource[current[path[-1]].split("REF=")[1]].value
 
     def to_db(self):
+        """
+        TODO complete. Temporaly return a json that represent what is going to be saved in the DB
+        Returns:
+
+        """
         serialized_dict = self.base_model.model_dump()
 
         # Find every occurrence of type Resource in the state amd replace them with a reference

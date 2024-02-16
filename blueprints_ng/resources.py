@@ -11,12 +11,6 @@ class Resource(NFVCLBaseModel):
     id: Optional[str] = Field(default=None)
     type: Literal['Resource'] = "Resource"
 
-    def set_context(self, context):
-        self._context = context
-
-    def get_context(self):
-        return self._context
-
 
 class ResourceDeployable(Resource):
     """

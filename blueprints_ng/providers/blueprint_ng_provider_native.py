@@ -26,6 +26,7 @@ class BlueprintsNgProviderDemo(BlueprintNGProviderInterface):
         print("create_vm end")
 
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration):
+        super().configure_vm(vm_resource_configuration)
         print("configure_vm begin")
 
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):
@@ -38,7 +39,7 @@ class BlueprintsNgProviderDemo(BlueprintNGProviderInterface):
 
         print("configure_vm end")
 
-    def destroy_vm(self):
+    def destroy_vm(self, vm_resource: VmResource):
         print("destroy_vm")
 
     def install_helm_chart(self):

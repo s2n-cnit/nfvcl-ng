@@ -17,7 +17,7 @@ class ResourceDeployable(Resource):
     Represents a VM, Helm Chart or PDU
     """
     type: Literal['ResourceDeployable'] = "ResourceDeployable"
-    area: str = Field()
+    area: int = Field()
     name: str = Field()
 
 
@@ -26,7 +26,6 @@ class ResourceConfiguration(Resource):
     Represents a configuration for a Resource
     """
     type: Literal['ResourceConfiguration'] = "ResourceConfiguration"
-    pass
 
 
 class VmResourceImage(NFVCLBaseModel):

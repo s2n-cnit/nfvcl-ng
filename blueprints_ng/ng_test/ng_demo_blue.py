@@ -48,7 +48,7 @@ class DemoBlueprintNGState(BlueprintNGState):
 class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataDemo, DemoCreateModel]):
     def create(self, create_model: DemoCreateModel):
         vm_ubuntu = VmResource(
-            area="0",
+            area=0,
             name="VM Ubuntu",
             image=VmResourceImage(name="ubuntu2204"),
             flavor=VmResourceFlavor(),
@@ -59,7 +59,7 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
         )
 
         self.state.vm_fedora = VmResource(
-            area="0",
+            area=0,
             name="VM Fedora",
             image=VmResourceImage(name="fedora"),
             flavor=VmResourceFlavor(),
@@ -102,7 +102,7 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
 
     def add_area(self):
         new_vm = VmResource(
-            area="1",
+            area=1,
             name="VM Fedora in area 1",
             image=VmResourceImage(name="fedora"),
             flavor=VmResourceFlavor(),

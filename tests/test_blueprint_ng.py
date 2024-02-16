@@ -66,7 +66,7 @@ class TestBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataD
     def create(self, create: TestCreateModel):
         super().create(create)
         self.state.vm_ubuntu = VmResource(
-            area="0",
+            area=0,
             name="VM Ubuntu",
             image=VmResourceImage(name="ubuntu2204"),
             flavor=VmResourceFlavor(),
@@ -77,7 +77,7 @@ class TestBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataD
         )
 
         self.state.vm_fedora = VmResource(
-            area="0",
+            area=0,
             name="VM Fedora",
             image=VmResourceImage(name="fedora"),
             flavor=VmResourceFlavor(),
@@ -115,7 +115,7 @@ class TestBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataD
 
     def add_area(self):
         new_vm = VmResource(
-            area="1",
+            area=1,
             name="VM Fedora in area 1",
             image=VmResourceImage(name="fedora"),
             flavor=VmResourceFlavor(),
@@ -141,6 +141,12 @@ class TestBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataD
 
 
 unittest.TestLoader.sortTestMethodsUsing = lambda self, a, b: (a > b) - (a < b)
+
+
+def get_vm_resources_from_memory():
+    objects_in_interpreter = gc.get_objects()
+    objects_in_interpreter_filtered = list(filter(lambda x: isinstance(x, VmResource), objects_in_interpreter))
+    return objects_in_interpreter_filtered
 
 
 def random_string(length):
@@ -234,29 +240,19 @@ class UnitTestBlueprintNG(unittest.TestCase):
         print(self.serialized)
         self.assertEqual(18, serialized.count("REF="))
 
-    def get_vm_resources_from_memory(self):
-        objects_in_interpreter = gc.get_objects()
-        objects_in_interpreter_filtered = list(filter(lambda x: isinstance(x, VmResource), objects_in_interpreter))
-        return objects_in_interpreter_filtered
-
     def test_999_check_memory_instances(self):
         # There should be 5 object in memory here:
         # self.blue_instance: 2
         # self.recreated_instance: 2 + 1 (new area)
-        self.assertEqual(5, len(self.get_vm_resources_from_memory()))
+        self.assertEqual(5, len(get_vm_resources_from_memory()))
 
         # Delete the object from memory
         del self.blue_instance.base_model
-        # del objects_in_interpreter
-        # del objects_in_interpreter_filtered
         gc.collect()
-
-        # objects_in_interpreter = gc.get_objects()
-        # objects_in_interpreter_filtered = list(filter(lambda x: isinstance(x, VmResource), objects_in_interpreter))
 
         # There should be 3 object in memory here:
         # self.recreated_instance: 2 + 1 (new area)
-        self.assertEqual(3, len(self.get_vm_resources_from_memory()))
+        self.assertEqual(3, len(get_vm_resources_from_memory()))
 
 
 if __name__ == '__main__':

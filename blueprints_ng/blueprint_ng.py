@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
 
 from fastapi import APIRouter
-from pydantic import SerializeAsAny, create_model, Field
+from pydantic import SerializeAsAny, Field
 
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable
@@ -136,10 +136,10 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar](
                 id=str(uuid.uuid4()),
                 type=f"{self.__class__.__qualname__}",
-                state_type=f"{state.__class__.__module__}.{state.__class__.__qualname__}",
+                state_type=get_class_path_str_from_obj(state),
                 state=state,
-                provider_type=self.provider.__class__.__qualname__,
-                provider_data_type=f"{self.provider.data.__class__.__module__}.{self.provider.data.__class__.__qualname__}",
+                provider_type=get_class_path_str_from_obj(self.provider),
+                provider_data_type=get_class_path_str_from_obj(self.provider.data),
                 provider_data=self.provider.data
             )
 
@@ -153,7 +153,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             raise BlueprintNGException(f"Already registered")
         if not resource.id:
             resource.id = str(uuid.uuid4())
-        self.base_model.registered_resources[resource.id] = RegisteredResource(type=f"{resource.__class__.__module__}.{resource.__class__.__qualname__}", value=resource) # TODO why registered resource? to save the type?
+        self.base_model.registered_resources[resource.id] = RegisteredResource(type=get_class_path_str_from_obj(resource), value=resource)
 
     def init_blueprint_type(self):
         """

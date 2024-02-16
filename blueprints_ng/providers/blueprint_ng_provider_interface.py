@@ -10,6 +10,10 @@ class BlueprintNGProviderData(NFVCLBaseModel):
     pass
 
 
+class BlueprintNGProviderException(Exception):
+    pass
+
+
 class BlueprintNGProviderInterface(abc.ABC):
     data: BlueprintNGProviderData
 
@@ -19,7 +23,8 @@ class BlueprintNGProviderInterface(abc.ABC):
 
     @abc.abstractmethod
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration):
-        pass
+        if not vm_resource_configuration.created:
+            raise BlueprintNGProviderException("VM Resource not created")
 
     @abc.abstractmethod
     def destroy_vm(self):

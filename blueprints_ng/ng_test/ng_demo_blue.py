@@ -82,11 +82,10 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
         self.register_resource(vm_ubuntu_configurator)
         self.register_resource(self.state.vm_fedora_configurator)
 
-        vm_ubuntu.create()
-        self.state.vm_fedora.create()
-
-        vm_ubuntu_configurator.configure()
-        self.state.vm_fedora_configurator.configure()
+        self.provider.create_vm(vm_ubuntu)
+        self.provider.create_vm(self.state.vm_fedora)
+        self.provider.configure_vm(vm_ubuntu_configurator)
+        self.provider.configure_vm(self.state.vm_fedora_configurator)
 
         self.state.prova_lista = [
             Pippo(
@@ -118,12 +117,10 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
         self.register_resource(new_vm)
         self.register_resource(new_vm_configurator)
 
-        new_vm.create()
+        self.provider.create_vm(new_vm)
 
         self.state.vm_fedora_configurator.max_num = 2
-        self.state.vm_fedora_configurator.configure()
-
-        # new_vm_configurator.configure()
+        self.provider.configure_vm(self.state.vm_fedora_configurator)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,6 @@ from models.k8s.k8s_objects import K8sService
 
 
 class Resource(NFVCLBaseModel):
-    _context: Optional[Any]
     id: Optional[str] = Field(default=None)
     type: Literal['Resource'] = "Resource"
 
@@ -85,18 +84,9 @@ class VmResource(ResourceDeployable):
     # TODO accesa, spenta, in inizializzazione..., cambiare tipo con enum
     state: Optional[str] = Field(default=None)
 
-    def create(self):
-        self.get_context().provider.create_vm(self)
-
 
 class VmResourceConfiguration(ResourceConfiguration):
     vm_resource: VmResource = Field()
-
-    def configure(self):
-        if not self.vm_resource.created:
-            # TODO change type
-            raise Exception("VM Resource not created")
-        self.get_context().provider.configure_vm(self)
 
 
 class VmResourceAnsibleConfiguration(VmResourceConfiguration):
@@ -123,15 +113,9 @@ class HelmChartResource(ResourceDeployable):
     created: bool = Field(default=False)
     created_services: Optional[List[K8sService]] = Field(default=None)
 
-    def create(self):
-        pass
-
 
 class K8SResourceConfiguration(ResourceConfiguration):
     def __init__(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         super().__init__()
         self.helm_chart_resource = helm_chart_resource
         self.values = values
-
-    def configure(self):
-        pass

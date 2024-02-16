@@ -38,6 +38,10 @@ def get_class_from_path(class_path: str) -> Any:
     return found_class
 
 
+def get_class_path_str_from_obj(obj: Any) -> str:
+    return f"{obj.__class__.__module__}.{obj.__class__.__qualname__}"
+
+
 class BlueprintNGStatus(NFVCLBaseModel):
     error: bool = Field(default=False)
     current_operation: str = Field(default="")
@@ -65,8 +69,8 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTyp
     state: StateTypeVar = Field()
 
     # Initial config for the blueprint, may be used in the future for a reset functionality
-    create_config_type: str = Field()
-    create_config: CreateConfigTypeVar = Field()
+    create_config_type: Optional[str] = Field(default=None)
+    create_config: Optional[CreateConfigTypeVar] = Field(default=None)
 
     # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
     provider_type: str = Field()
@@ -93,9 +97,10 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTyp
         Returns: Fixed kwargs
         """
         for field_name in field_names:
-            field_value = kwargs[field_name]
-            if isinstance(field_value, dict):
-                kwargs[field_name] = get_class_from_path(kwargs[f"{field_name}_type"]).model_validate(field_value)
+            if field_name in kwargs:
+                field_value = kwargs[field_name]
+                if isinstance(field_value, dict):
+                    kwargs[field_name] = get_class_from_path(kwargs[f"{field_name}_type"]).model_validate(field_value)
         return kwargs
 
 
@@ -109,6 +114,10 @@ class HttpRequestType(Enum):
 
 class BlueprintNGState(NFVCLBaseModel):
     last_update: Optional[datetime] = Field(default=None)
+
+
+class BlueprintNGException(Exception):
+    pass
 
 
 class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar]):
@@ -131,9 +140,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
                 state=state,
                 provider_type=self.provider.__class__.__qualname__,
                 provider_data_type=f"{self.provider.data.__class__.__module__}.{self.provider.data.__class__.__qualname__}",
-                provider_data=self.provider.data,
-                create_config=BlueprintNGCreateModel(),
-                create_config_type=f"{BlueprintNGCreateModel.__module__}.{BlueprintNGCreateModel.__qualname__}"
+                provider_data=self.provider.data
             )
 
     def register_resource(self, resource: Resource):
@@ -142,6 +149,8 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         Args:
             resource: the resource to be registered
         """
+        if resource.id and resource.id in self.base_model.registered_resources:
+            raise BlueprintNGException(f"Already registered")
         if not resource.id:
             resource.id = str(uuid.uuid4())
         resource.set_context(self)
@@ -167,8 +176,9 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         """
         self.api_router.add_api_route(path, method, methods=[request_type.value])
 
-    def create(self, model: BlueprintNGCreateModel):
-        pass
+    def create(self, model: CreateConfigTypeVar):
+        self.base_model.create_config = model
+        self.base_model.create_config_type = get_class_path_str_from_obj(model)
 
     def destroy(self):
         pass

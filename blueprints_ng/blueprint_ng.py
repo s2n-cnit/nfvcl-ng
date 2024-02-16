@@ -83,6 +83,15 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTyp
         super().__init__(**self.fix_types(["state", "provider_data", "create_config"], **kwargs))
 
     def fix_types(self, field_names: List[str], **kwargs: Any):
+        """
+        Pydantic deserialize as parent class, this override the value deserializing as the correct class
+        Require the class type to be saved as a field in the Class
+        Args:
+            field_names: List of fields to fix
+            **kwargs: Constructor kwargs
+
+        Returns: Fixed kwargs
+        """
         for field_name in field_names:
             field_value = kwargs[field_name]
             if isinstance(field_value, dict):
@@ -93,6 +102,9 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTyp
 class HttpRequestType(Enum):
     GET = "GET"
     POST = "POST"
+    PUT = "PUT"
+    PATCH = "PATCH"
+    DELETE = "DELETE"
 
 
 class BlueprintNGState(NFVCLBaseModel):
@@ -155,7 +167,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         """
         self.api_router.add_api_route(path, method, methods=[request_type.value])
 
-    def create(self, create_model: BlueprintNGCreateModel):
+    def create(self, model: BlueprintNGCreateModel):
         pass
 
     def destroy(self):

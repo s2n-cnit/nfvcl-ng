@@ -3,7 +3,8 @@ from typing import Optional, List, Dict
 from pydantic import Field
 
 from blueprints_ng.blueprint_ng import BlueprintNGCreateModel, BlueprintNGState, BlueprintNG
-from blueprints_ng.providers.blueprint_ng_provider_native import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
+from blueprints_ng.providers.blueprint_ng_provider_demo import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
+from blueprints_ng.providers.blueprint_ng_provider_native import BlueprintsNgProviderNative
 
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResource, VmResourceImage, VmResourceFlavor
 from models.base_model import NFVCLBaseModel
@@ -61,7 +62,7 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
         self.state.vm_fedora = VmResource(
             area=0,
             name="VM Fedora",
-            image=VmResourceImage(name="fedora"),
+            image=VmResourceImage(name="Fedora38"),
             flavor=VmResourceFlavor(),
             username="fedora",
             password="root",
@@ -104,7 +105,7 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
         new_vm = VmResource(
             area=1,
             name="VM Fedora in area 1",
-            image=VmResourceImage(name="fedora"),
+            image=VmResourceImage(name="Fedora38"),
             flavor=VmResourceFlavor(),
             username="fedora",
             password="root",
@@ -124,33 +125,14 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
 
 
 if __name__ == "__main__":
-    prova = NGDemoBlueprint(BlueprintsNgProviderDemo, DemoBlueprintNGState)
+    prova = NGDemoBlueprint(BlueprintsNgProviderNative, DemoBlueprintNGState)
     prova.create(DemoCreateModel(var="CIAOOOO"))
     serializzato = prova.to_db()
     print(serializzato)
-
-    reistanza = NGDemoBlueprint(BlueprintsNgProviderDemo, DemoBlueprintNGState)
-
+    reistanza = NGDemoBlueprint(BlueprintsNgProviderNative, DemoBlueprintNGState)
     reistanza.from_db(serializzato)
-    print(reistanza.state.vm_fedora_configurator.vm_resource)
-    print(reistanza.state.vm_fedora)
-
-    serializzato2 = reistanza.to_db()
-    import gc
-
-    del prova
-
-    collected = gc.collect()
-
-    # Prints Garbage collector
-    # as 0 object
-    print("Garbage collector: collected",
-          "%d objects." % collected)
-
-    print(f"UGUALI: {serializzato == serializzato2}")
-
-    test = gc.get_objects()
-    test_filtered = list(filter(lambda x: isinstance(x, VmResource), test))
-    assert id(reistanza.state.vm_fedora) == id(reistanza.state.vm_fedora_configurator.vm_resource)
     reistanza.add_area()
-    assert id(reistanza.state.vm_fedora) == id(reistanza.state.vm_fedora_configurator.vm_resource)
+    print("PAUSA")
+    reistanza.destroy()
+    # prova.destroy()
+    print("PAUSA2")

@@ -46,6 +46,16 @@ class VmResourceFlavor(NFVCLBaseModel):
     vcpu_count: str = Field(default="4", alias='vcpu-count')
 
 
+class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):
+    mac: str = Field()
+    ip: str = Field()
+
+
+class VmResourceNetworkInterface(NFVCLBaseModel):
+    fixed: VmResourceNetworkInterfaceAddress = Field()
+    floating: Optional[VmResourceNetworkInterfaceAddress] = Field(default=None)
+
+
 class VmResource(ResourceDeployable):
     """
     Represent a VM Resource to BE instantiated
@@ -73,7 +83,7 @@ class VmResource(ResourceDeployable):
     # Potrebbe mettersi la data di creazione
     created: bool = Field(default=False)
     # TODO il tipo deve essere la rappresentazione dell'interfaccia di OS, con IP, mac, nome, port sec, gateway ...
-    network_interfaces: Optional[Dict[str, Any]] = Field(default=None)
+    network_interfaces: Dict[str, VmResourceNetworkInterface] = Field(default_factory=dict)
     # TODO accesa, spenta, in inizializzazione..., cambiare tipo con enum
     state: Optional[str] = Field(default=None)
 

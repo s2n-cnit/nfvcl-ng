@@ -8,7 +8,7 @@ from typing import Optional, List, Dict
 from pydantic import Field
 
 from blueprints_ng.blueprint_ng import BlueprintNGCreateModel, BlueprintNGState, BlueprintNG, get_class_path_str_from_obj
-from blueprints_ng.providers.blueprint_ng_provider_native import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
+from blueprints_ng.providers.blueprint_ng_provider_demo import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
 
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResource, VmResourceImage, VmResourceFlavor, VmResourceConfiguration
 from models.base_model import NFVCLBaseModel
@@ -31,8 +31,6 @@ class TestFedoraVmResourceConfiguration(VmResourceNativeConfiguration):
     max_num: int = Field(default=10)
 
     def run_code(self):
-        print(f"###Configuro la macchina ubuntu con IP {self.vm_resource.network_interfaces[self.vm_resource.management_network]}, max_num={self.max_num}")
-
         for i in range(1, self.max_num):
             print(i)
 

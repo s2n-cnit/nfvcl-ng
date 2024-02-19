@@ -12,7 +12,7 @@ from fastapi import APIRouter
 from pydantic import SerializeAsAny, Field
 
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
-from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable
+from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource
 from models.base_model import NFVCLBaseModel
 
 StateTypeVar = TypeVar("StateTypeVar")
@@ -180,7 +180,9 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         self.base_model.create_config_type = get_class_path_str_from_obj(model)
 
     def destroy(self):
-        pass
+        for key, value in self.base_model.registered_resources.items():
+            if isinstance(value.value, VmResource):
+                self.provider.destroy_vm(value.value)
 
     @property
     def state(self) -> StateTypeVar:
@@ -295,4 +297,5 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
 
         # Deserialized remaining fields in the state and override the field in base_model
         self.base_model.state = self.state_type.model_validate(deserialized_dict["state"])
+        self.provider.data = self.provider_data.model_validate(deserialized_dict["provider_data"])
         return self.base_model.state

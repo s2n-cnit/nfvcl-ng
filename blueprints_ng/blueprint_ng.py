@@ -125,23 +125,20 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
     api_router: APIRouter
     provider: BlueprintNGProviderInterface
 
-    def __init__(self, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState], db_data: Optional[str] = None):
+    def __init__(self, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = None):
         super().__init__()
         self.provider = provider_type()
         self.state_type = state_type
-        if db_data is not None:
-            self.base_model = BlueprintNGBaseModel.model_validate_json(db_data)
-        else:
-            state = state_type()
-            self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar](
-                id=str(uuid.uuid4()),
-                type=get_class_path_str_from_obj(self),
-                state_type=get_class_path_str_from_obj(state),
-                state=state,
-                provider_type=get_class_path_str_from_obj(self.provider),
-                provider_data_type=get_class_path_str_from_obj(self.provider.data),
-                provider_data=self.provider.data
-            )
+        state = state_type()
+        self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar](
+            id=str(uuid.uuid4()),
+            type=get_class_path_str_from_obj(self),
+            state_type=get_class_path_str_from_obj(state),
+            state=state,
+            provider_type=get_class_path_str_from_obj(self.provider),
+            provider_data_type=get_class_path_str_from_obj(self.provider.data),
+            provider_data=self.provider.data
+        )
 
     def register_resource(self, resource: Resource):
         """
@@ -281,7 +278,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         provider_type = get_class_from_path(provider_type_str)
 
         # Create a new instance
-        instance = cls(provider_type, state_type)
+        instance = cls(provider_type)
 
         # Remove fields that need to be manually deserialized from the input and validate
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)

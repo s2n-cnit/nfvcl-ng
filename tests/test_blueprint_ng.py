@@ -9,6 +9,7 @@ from pydantic import Field
 
 from blueprints_ng.blueprint_ng import BlueprintNGCreateModel, BlueprintNGState, BlueprintNG, get_class_path_str_from_obj
 from blueprints_ng.providers.blueprint_ng_provider_demo import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
+from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResource, VmResourceImage, VmResourceFlavor, VmResourceConfiguration
 from models.base_model import NFVCLBaseModel
@@ -61,6 +62,9 @@ class TestBlueprintNGState(BlueprintNGState):
 
 
 class TestBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataDemo, TestCreateModel]):
+    def __init__(self, provider_type: type[BlueprintNGProviderInterface]):
+        super().__init__(provider_type, TestBlueprintNGState)
+
     def create(self, create: TestCreateModel):
         super().create(create)
         self.state.vm_ubuntu = VmResource(
@@ -174,7 +178,7 @@ class UnitTestBlueprintNG(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.blue_instance = TestBlueprintNG(BlueprintsNgProviderDemo, TestBlueprintNGState)
+        cls.blue_instance = TestBlueprintNG(BlueprintsNgProviderDemo)
 
     @classmethod
     def tearDownClass(cls):

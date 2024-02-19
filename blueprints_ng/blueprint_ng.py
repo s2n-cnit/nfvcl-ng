@@ -135,7 +135,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             state = state_type()
             self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar](
                 id=str(uuid.uuid4()),
-                type=f"{self.__class__.__qualname__}",
+                type=get_class_path_str_from_obj(self),
                 state_type=get_class_path_str_from_obj(state),
                 state=state,
                 provider_type=get_class_path_str_from_obj(self.provider),
@@ -270,32 +270,42 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
 
         return json.dumps(serialized_dict, indent=4)
 
-    def from_db(self, serialized: str):
+    @classmethod
+    def from_db(cls, serialized: str):
         deserialized_dict = json.loads(serialized)
+
+        # Manually load state and provider classes
+        state_type_str = deserialized_dict["state_type"]
+        provider_type_str = deserialized_dict["provider_type"]
+        state_type = get_class_from_path(state_type_str)
+        provider_type = get_class_from_path(provider_type_str)
+
+        # Create a new instance
+        instance = cls(provider_type, state_type)
 
         # Remove fields that need to be manually deserialized from the input and validate
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)
         del deserialized_dict_edited["registered_resources"]
-        deserialized_dict_edited["state"] = self.state_type().model_dump()
-        self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar].model_validate(deserialized_dict_edited)
+        deserialized_dict_edited["state"] = instance.state_type().model_dump()
+        instance.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar].model_validate(deserialized_dict_edited)
 
         # Register the reloaded resources of type ResourceDeployable
         for resource_id, resource in deserialized_dict["registered_resources"].items():
             if resource["value"]["type"] == "ResourceDeployable":
-                self.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
+                instance.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
 
         # Register the reloaded resources of type ResourceConfiguration, also resolve the references within and link them to the same object instance registered above
         for resource_id, resource in deserialized_dict["registered_resources"].items():
             if resource["value"]["type"] == "ResourceConfiguration":
-                self.__override_variables_in_dict_ref(resource["value"], resource["value"], self.base_model.registered_resources)
-                self.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
+                instance.__override_variables_in_dict_ref(resource["value"], resource["value"], instance.base_model.registered_resources)
+                instance.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
 
         # Here the registered_resources should be in the same state as before saving the blueprint to the db
 
         # Resolve all reference in the state
-        self.__override_variables_in_dict_ref(deserialized_dict["state"], deserialized_dict["state"], self.base_model.registered_resources)
+        instance.__override_variables_in_dict_ref(deserialized_dict["state"], deserialized_dict["state"], instance.base_model.registered_resources)
 
         # Deserialized remaining fields in the state and override the field in base_model
-        self.base_model.state = self.state_type.model_validate(deserialized_dict["state"])
-        self.provider.data = self.provider_data.model_validate(deserialized_dict["provider_data"])
-        return self.base_model.state
+        instance.base_model.state = instance.state_type.model_validate(deserialized_dict["state"])
+        instance.provider.data = instance.provider_data.model_validate(deserialized_dict["provider_data"])
+        return instance

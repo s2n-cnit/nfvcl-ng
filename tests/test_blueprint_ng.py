@@ -222,8 +222,7 @@ class UnitTestBlueprintNG(unittest.TestCase):
         self.assertEqual(15, self.serialized.count("REF="))
 
     def test_004_deserialize(self):
-        self.recreated_instance = TestBlueprintNG(BlueprintsNgProviderDemo, TestBlueprintNGState)
-        self.recreated_instance.from_db(self.serialized)
+        self.recreated_instance = TestBlueprintNG.from_db(self.serialized)
 
     def test_005_deserialized_integrity_check(self):
         self.check_state_after_creation(self.recreated_instance)

@@ -1,10 +1,15 @@
+import tempfile
 from typing import Dict, List
 
+import ansible_runner
 import openstack
 from openstack.compute.v2.server import Server
 from openstack.network.v2.port import Port
+
 from blueprints_ng.providers.blueprint_ng_provider_interface import *
-from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResourceNetworkInterface, VmResourceNetworkInterfaceAddress
+from blueprints_ng.providers.utils import create_ansible_inventory, wait_for_ssh_to_be_ready
+from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
+    VmResourceNetworkInterfaceAddress
 
 
 class BlueprintNGProviderDataNative(BlueprintNGProviderData):
@@ -28,11 +33,13 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
 
     def create_vm(self, vm_resource: VmResource):
         print("create_vm begin")
+        # Get the image to use for the instance, TODO download it from url if not on server (see OS utils)
         image = self.conn.get_image(vm_resource.image.name)
 
-        # Find a flavor with at least 512M of RAM
+        # TODO create a new flavor
         flavor = self.conn.get_flavor("big")
 
+        # TODO build the cloudinit config, create a generic builder
         cloudin = """
         #cloud-config
         manage_etc_hosts: true
@@ -41,41 +48,91 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         ssh_pwauth: 1
         """
 
+        # Create a list with all the network interfaces that need to be added to the new VM
         networks = [vm_resource.management_network]
         networks.extend(vm_resource.additional_networks)
 
+        # Create the VM and wait for completion
         server_obj: Server = self.conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=vm_resource.require_floating_ip, network=networks, userdata=cloudin)
         print("######################################################################")
         print(server_obj.access_ipv4)
 
+        # Parse the OS output and create a structured network_interfaces dictionary
         self.__parse_os_addresses(vm_resource, server_obj.addresses)
-        vm_resource.access_ip = server_obj.access_ipv4
 
+        # Find the IP to use for configuring the VM, floating if present or the fixed one from the management interface if not
+        if server_obj.access_ipv4 and len(server_obj.access_ipv4) > 0:
+            vm_resource.access_ip = server_obj.access_ipv4
+        else:
+            vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network].fixed.ip
+
+        # Disable port security on very port
         server_ports: List[Port] = self.conn.list_ports(filters={"device_id": server_obj.id})
         if len(server_ports) != len(networks):
             raise BlueprintsNgProviderNativeException(f"Mismatch in number of request network interface and ports, query: device_id={server_obj.id}")
-
         for port in server_ports:
             self.__disable_port_security(port.id)
 
+        # The VM is now created
         vm_resource.created = True
+
+        # Register the VM in the provider data, this is needed to be able to delete it using only the vm_resource id
         self.data.os_dict[vm_resource.id] = server_obj.id
 
         print("create_vm end")
 
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration):
+        # The parent method checks if the resource is created and throw an exception if not
         super().configure_vm(vm_resource_configuration)
         print("configure_vm begin")
 
-        # if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):
-        #     dumped = vm_resource_configuration.dump_playbook()
-        #     print(f"Sending dumped playbook to ansible: {dumped}")
-        # elif isinstance(vm_resource_configuration, VmResourceNativeConfiguration):
-        #     print("Running the requested code")
-        #     vm_resource_configuration.run_code()
-        #     print("Finished running code")
+        # Different handlers for different configuration types
+        if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  #VmResourceNativeConfiguration
+            self.__configure_vm_ansible(vm_resource_configuration)
 
         print("configure_vm end")
+
+    def __configure_vm_ansible(self, vm_resource_configuration: VmResourceAnsibleConfiguration):
+        tmp_playbook = tempfile.NamedTemporaryFile(mode="w")
+        tmp_inventory = tempfile.NamedTemporaryFile(mode="w")
+        tmp_private_data_dir = tempfile.TemporaryDirectory()
+
+        # Write the inventory and playbook to files
+        tmp_inventory.write(create_ansible_inventory(vm_resource_configuration.vm_resource.access_ip, vm_resource_configuration.vm_resource.username, vm_resource_configuration.vm_resource.password))
+        tmp_playbook.write(vm_resource_configuration.dump_playbook())
+        tmp_playbook.flush()
+        tmp_inventory.flush()
+
+        # container_volume_mounts = [
+        #     f"{tmp_playbook.name}:{tmp_playbook.name}",
+        #     f"{tmp_inventory.name}:{tmp_inventory.name}",
+        #     f"{tmp_private_data_dir.name}:{tmp_private_data_dir.name}",
+        # ]
+
+        # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections
+        wait_for_ssh_to_be_ready(
+            vm_resource_configuration.vm_resource.access_ip,
+            22,
+            vm_resource_configuration.vm_resource.username,
+            vm_resource_configuration.vm_resource.password,
+            300,
+            5
+        )
+
+        # Run the playbook, TODO better integration, error checking, logging, ...
+        r = ansible_runner.run(
+            playbook=tmp_playbook.name,
+            inventory=tmp_inventory.name,
+            private_data_dir=tmp_private_data_dir.name,
+            # process_isolation_executable="docker",
+            # process_isolation=True,
+            # container_volume_mounts=container_volume_mounts
+        )
+
+        # Close the tmp files, this will delete them
+        tmp_playbook.close()
+        tmp_inventory.close()
+        tmp_private_data_dir.cleanup()
 
     def destroy_vm(self, vm_resource: VmResource):
         print("start destroy_vm")

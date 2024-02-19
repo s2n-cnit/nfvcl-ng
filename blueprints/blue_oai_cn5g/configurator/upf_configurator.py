@@ -1,25 +1,40 @@
+from blueprints.blue_oai_cn5g.models.blue_OAI_model import Currentconfig
 from configurators.flex_configurator import Configurator_Flex
+from models.base_model import NFVCLBaseModel
 from utils.log import create_logger
+from pydantic import Field
 
 logger = create_logger('Configurator_OAI_UPF')
 
 
+class ConfiguratorOAIUPFVars(NFVCLBaseModel):
+    upf_id: int = Field()
+    nrf_ipv4_address: str = Field()
+    upf_conf: str = Field()
+
+
 class Configurator_OAI_UPF(Configurator_Flex):
-    def __init__(self, nsd_id: str, m_id: int, blue_id: str, args: dict):
+    def __init__(self, nsd_id: str, m_id: int, blue_id: str, args: ConfiguratorOAIUPFVars):
         super(Configurator_OAI_UPF, self).__init__(nsd_id, m_id, blue_id)
 
-        # self.addPlaybook('blueprints/blue_oai_cn5g/configurator_scripts/upfDirectoryCreation.yaml', vars_={})
-
         self.conf = {
-            "ip": args["ip"],
-            "interface": args["interface"]
+            "upf_id": args.upf_id,
+            "nrf_ipv4_address": args.nrf_ipv4_address,
+            "upf_conf": args.upf_conf
         }
 
         self.addJinjaTemplateFile({
             'template': 'blueprints/blue_oai_cn5g/configurator_scripts/compose.jinja2',
             'path': '/root/upfConfig',
-            'transfer_name': f"{blue_id}_compose.yaml",
+            'transfer_name': f"{blue_id}_{args.upf_id}_compose.yaml",
             'name': "compose.yaml"
+        }, self.conf)
+
+        self.addJinjaTemplateFile({
+            'template': 'blueprints/blue_oai_cn5g/configurator_scripts/upf_conf.jinja2',
+            'path': '/root/upfConfig/conf',
+            'transfer_name': f"{blue_id}_{args.upf_id}_basic_nrf_config.yaml",
+            'name': "basic_nrf_config.yaml"
         }, self.conf)
 
         self.appendPbTasks('blueprints/blue_oai_cn5g/configurator_scripts/compose.yaml')

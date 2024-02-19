@@ -1,1 +1,1 @@
-from .blue_OAI_k8s_model import OAIBlueCreateModel
+from .blue_OAI_model import OAIBlueCreateModel

@@ -1,7 +1,0 @@
----
-- hosts: all
-  tasks:
-  - name: test
-    shell: |
-       mkdir /root/upfConfig
-...

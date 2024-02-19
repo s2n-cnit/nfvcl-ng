@@ -116,8 +116,9 @@ class sol006_NSD_builder():
             self.deploy_config["additionalParamsForVnf"] = []
             for knf in knf_configs:
                  self.deploy_config["additionalParamsForVnf"].append({
+                     "member-vnf-index": str(knf_configs.index(knf) + 1),
                      #"member-vnf-index": knf['vnf_id'],
-                     "member-vnf-index": "1",
+                     #"member-vnf-index": "1",
                      "additionalParamsForKdu": knf['kdu_confs']
                  })
             logger.debug("deployment config for kdu: {}".format(self.deploy_config))

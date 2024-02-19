@@ -1,8 +1,8 @@
-from typing import Dict
+from typing import Dict, List
 
 import openstack
 from openstack.compute.v2.server import Server
-
+from openstack.network.v2.port import Port
 from blueprints_ng.providers.blueprint_ng_provider_interface import *
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResourceNetworkInterface, VmResourceNetworkInterfaceAddress
 
@@ -11,13 +11,17 @@ class BlueprintNGProviderDataNative(BlueprintNGProviderData):
     os_dict: Dict[str, str] = {}
 
 
+class BlueprintsNgProviderNativeException(BlueprintNGProviderException):
+    pass
+
+
 class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
 
     def __init__(self):
         super().__init__()
         self.data: BlueprintNGProviderDataNative = BlueprintNGProviderDataNative()
         # Initialize and turn on debug logging
-        openstack.enable_logging(debug=True)
+        openstack.enable_logging(debug=False)
 
         # Initialize connection
         self.conn = openstack.connect(cloud='oslab')
@@ -37,21 +41,22 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         ssh_pwauth: 1
         """
 
-        # Boot a server, wait for it to boot, and then do whatever is needed
-        # to get a public IP address for it.
-        server_obj: Server = self.conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=True, network=['dmz-internal'], userdata=cloudin)
+        networks = [vm_resource.management_network]
+        networks.extend(vm_resource.additional_networks)
+
+        server_obj: Server = self.conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=vm_resource.require_floating_ip, network=networks, userdata=cloudin)
         print("######################################################################")
         print(server_obj.access_ipv4)
 
-        for network_name, network_info in server_obj.addresses.items():
-            fixed = None
-            floating = None
-            for address in network_info:
-                if address["OS-EXT-IPS:type"] == "fixed":
-                    fixed = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"])
-                if address["OS-EXT-IPS:type"] == "floating":
-                    floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"])
-            vm_resource.network_interfaces[network_name] = VmResourceNetworkInterface(fixed=fixed, floating=floating)
+        self.__parse_os_addresses(vm_resource, server_obj.addresses)
+        vm_resource.access_ip = server_obj.access_ipv4
+
+        server_ports: List[Port] = self.conn.list_ports(filters={"device_id": server_obj.id})
+        if len(server_ports) != len(networks):
+            raise BlueprintsNgProviderNativeException(f"Mismatch in number of request network interface and ports, query: device_id={server_obj.id}")
+
+        for port in server_ports:
+            self.__disable_port_security(port.id)
 
         vm_resource.created = True
         self.data.os_dict[vm_resource.id] = server_obj.id
@@ -85,3 +90,20 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
 
     def uninstall_helm_chart(self):
         print("uninstall_helm_chart")
+
+    def __parse_os_addresses(self, vm_resource: VmResource, addresses):
+        for network_name, network_info in addresses.items():
+            fixed = None
+            floating = None
+            for address in network_info:
+                if address["OS-EXT-IPS:type"] == "fixed":
+                    fixed = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"])
+                if address["OS-EXT-IPS:type"] == "floating":
+                    floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"])
+            vm_resource.network_interfaces[network_name] = VmResourceNetworkInterface(fixed=fixed, floating=floating)
+
+    def __disable_port_security(self, port_id):
+        try:
+            return self.conn.update_port(port_id, port_security_enabled=False, security_groups=[])
+        except Exception as e:
+            raise e

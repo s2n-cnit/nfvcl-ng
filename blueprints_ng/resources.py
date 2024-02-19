@@ -79,10 +79,11 @@ class VmResource(ResourceDeployable):
     become_password: Optional[str] = Field(default=None)
     management_network: str = Field()
     additional_networks: List[str] = Field(default=[])
+    require_floating_ip: bool = Field(default=False)
 
     # Potrebbe mettersi la data di creazione
     created: bool = Field(default=False)
-    # TODO il tipo deve essere la rappresentazione dell'interfaccia di OS, con IP, mac, nome, port sec, gateway ...
+    access_ip: Optional[str] = Field(default=None)
     network_interfaces: Dict[str, VmResourceNetworkInterface] = Field(default_factory=dict)
     # TODO accesa, spenta, in inizializzazione..., cambiare tipo con enum
     state: Optional[str] = Field(default=None)

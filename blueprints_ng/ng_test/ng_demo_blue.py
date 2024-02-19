@@ -67,7 +67,8 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
             username="fedora",
             password="root",
             management_network="dmz-internal",
-            additional_networks=["alderico-net"]
+            require_floating_ip=True
+            # additional_networks=["alderico-net"]
         )
 
         self.state.areas.append("1")

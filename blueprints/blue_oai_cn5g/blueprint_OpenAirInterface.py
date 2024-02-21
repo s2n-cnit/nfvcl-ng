@@ -751,7 +751,7 @@ class OpenAirInterface(Blue5GBaseBeta):
         :param config: config to add the item to.
         :param mcc: mcc of the item.
         :param mnc: mnc of the item.
-        :param area_id: area id of the.
+        :param area_id: area id of the item.
         :param nssai: nssai of the item.
         :return: True if item was successfully added, otherwise None.
         """
@@ -801,10 +801,12 @@ class OpenAirInterface(Blue5GBaseBeta):
         :return: day2 instruction to reload all upf (except the one with id except_id, if except_id provided).
         """
         res = []
-        for area_id in self.base_model.edge_areas.keys():
-            if except_id is not None and area_id != except_id:
-                res += self.reload_upf(self.base_model.edge_areas[area_id])
-            else:
+        if except_id is not None:
+            for area_id in self.base_model.edge_areas.keys():
+                if area_id != except_id:
+                    res += self.reload_upf(self.base_model.edge_areas[area_id])
+        else:
+            for area_id in self.base_model.edge_areas.keys():
                 res += self.reload_upf(self.base_model.edge_areas[area_id])
         return res
 
@@ -915,109 +917,112 @@ class OpenAirInterface(Blue5GBaseBeta):
         Calls OAI api to add new UE and his SMS (Session Management Subscription) to DB.
         :param subscriber_model: UE to add.
         """
-        logger.info(f"Try to add user: {subscriber_model.imsi}")
-        with httpx.Client(http1=False, http2=True) as client:
-            # Add UE to DB
-            api_url_ue = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v2/subscription-data/{subscriber_model.imsi}/authentication-data/authentication-subscription"
-            api_url_ue = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v2/subscription-data/{subscriber_model.imsi}/authentication-data/authentication-subscription"
-            payload_ue = Ue(
-                authentication_method=subscriber_model.authenticationMethod,
-                enc_permanent_key=subscriber_model.k,
-                protection_parameter_id=subscriber_model.k,
-                # authentication_management_field=subscriber_model.authenticationManagementField,
-                enc_opc_key=subscriber_model.opc,
-                enc_topc_key=subscriber_model.opc,
-                supi=subscriber_model.imsi
-            )
-            response = client.put(api_url_ue, json=payload_ue.model_dump(by_alias=True))
-            logger.info(f"Status code: {response.status_code}")
-            logger.info(f"Response content: {response.text}")
-
-            # Add Session Management Subscription to DB
-            api_url_sms = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v2/subscription-data/{subscriber_model.imsi}/{self.base_model.blue_model_5g.config.plmn}/provisioned-data/sm-data"
-            new_slice = single_nssai = Snssai(
-                sst=SstConvertion.to_int(subscriber_model.snssai[0].sliceType),
-                sd=str(int(subscriber_model.snssai[0].sliceId, 16))
-            )
-            # Only 1 slice for subscriber and plmn is supported by OAI
-            for subscriber_model.imsi in self.base_model.blue_model_5g.ue_dict.keys():
-                self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi][0] = single_nssai
-            else:
-                self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi] = []
-                self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi].append(single_nssai)
-            payload_sms = SessionManagementSubscriptionData(
-                single_nssai=single_nssai
-            )
-            sub_slice = self.get_slice(subscriber_model.snssai[0].sliceId)
-            for dnn in sub_slice.dnnList:
-                sub_dnn = self.get_dnn(dnn)
-                configuration = DnnConfiguration(
-                    s_ambr=SessionAmbr(
-                        uplink=sub_dnn.uplinkAmbr.replace(" ", ""),
-                        downlink=sub_dnn.downlinkAmbr.replace(" ", "")
-                    ),
-                    five_qosProfile=FiveQosProfile(
-                        five_qi=sub_dnn.default5qi
-                    )
+        if subscriber_model.imsi not in self.base_model.blue_model_5g.ue_dict.keys():
+            logger.info(f"Try to add user: {subscriber_model.imsi}")
+            with httpx.Client(http1=False, http2=True) as client:
+                # Add UE to DB
+                api_url_ue = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v1/subscription-data/{subscriber_model.imsi}/authentication-data/authentication-subscription"
+                payload_ue = Ue(
+                    authentication_method=subscriber_model.authenticationMethod,
+                    enc_permanent_key=subscriber_model.k,
+                    protection_parameter_id=subscriber_model.k,
+                    # authentication_management_field=subscriber_model.authenticationManagementField,
+                    enc_opc_key=subscriber_model.opc,
+                    enc_topc_key=subscriber_model.opc,
+                    supi=subscriber_model.imsi
                 )
-                payload_sms.add_configuration(dnn, configuration)
-                response = client.put(api_url_sms, json=payload_sms.model_dump(by_alias=True))
+                response = client.put(api_url_ue, json=payload_ue.model_dump(by_alias=True))
                 logger.info(f"Status code: {response.status_code}")
                 logger.info(f"Response content: {response.text}")
-            # for slice in subscriber_model.snssai:
-            #     single_nssai = Snssai(
-            #         sst=SstConvertion.to_int(slice.sliceType),
-            #         sd=str(int(slice.sliceId, 16))
-            #     )
-            #     if subscriber_model.imsi in self.base_model.blue_model_5g.ue_dict.keys():
-            #         if single_nssai not in self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi]:
-            #             self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi].append(single_nssai)
-            #     else:
-            #         self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi] = []
-            #         self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi].append(single_nssai)
-            #
-            #     payload_sms = SessionManagementSubscriptionData(
-            #         single_nssai=single_nssai
-            #     )
-            #     sub_slice = self.get_slice(slice.sliceId)
-            #     for dnn in sub_slice.dnnList:
-            #         sub_dnn = self.get_dnn(dnn)
-            #         configuration = DnnConfiguration(
-            #             s_ambr=SessionAmbr(
-            #                 uplink=sub_dnn.uplinkAmbr.replace(" ", ""),
-            #                 downlink=sub_dnn.downlinkAmbr.replace(" ", "")
-            #             ),
-            #             five_qosProfile=FiveQosProfile(
-            #                 five_qi=sub_dnn.default5qi
-            #             )
-            #         )
-            #         payload_sms.add_configuration(dnn, configuration)
-            #         response = client.put(api_url_sms, json=payload_sms.model_dump(by_alias=True))
-            #         logger.info(f"Status code: {response.status_code}")
-            #         logger.info(f"Response content: {response.text}")
 
-            return []
+                # Add Session Management Subscription to DB
+                api_url_sms = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v1/subscription-data/{subscriber_model.imsi}/{self.base_model.blue_model_5g.config.plmn}/provisioned-data/sm-data"
+                single_nssai = Snssai(
+                    sst=SstConvertion.to_int(subscriber_model.snssai[0].sliceType),
+                    sd=str(int(subscriber_model.snssai[0].sliceId, 16))
+                )
+                # Only 1 slice for subscriber and plmn is supported by OAI
+                self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi] = []
+                self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi].append(single_nssai)
+                # if subscriber_model.imsi in self.base_model.blue_model_5g.ue_dict.keys():
+                #     self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi][0] = single_nssai
+                # else:
+                #     self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi] = []
+                #     self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi].append(single_nssai)
+                payload_sms = SessionManagementSubscriptionData(
+                    single_nssai=single_nssai
+                )
+                sub_slice = self.get_slice(subscriber_model.snssai[0].sliceId)
+                for dnn in sub_slice.dnnList:
+                    sub_dnn = self.get_dnn(dnn)
+                    configuration = DnnConfiguration(
+                        s_ambr=SessionAmbr(
+                            uplink=sub_dnn.uplinkAmbr.replace(" ", ""),
+                            downlink=sub_dnn.downlinkAmbr.replace(" ", "")
+                        ),
+                        five_qosProfile=FiveQosProfile(
+                            five_qi=sub_dnn.default5qi
+                        )
+                    )
+                    payload_sms.add_configuration(dnn, configuration)
+                    response = client.put(api_url_sms, json=payload_sms.model_dump(by_alias=True))
+                    logger.info(f"Status code: {response.status_code}")
+                    logger.info(f"Response content: {response.text}")
+                # for slice in subscriber_model.snssai:
+                #     single_nssai = Snssai(
+                #         sst=SstConvertion.to_int(slice.sliceType),
+                #         sd=str(int(slice.sliceId, 16))
+                #     )
+                #     if subscriber_model.imsi in self.base_model.blue_model_5g.ue_dict.keys():
+                #         if single_nssai not in self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi]:
+                #             self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi].append(single_nssai)
+                #     else:
+                #         self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi] = []
+                #         self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi].append(single_nssai)
+                #
+                #     payload_sms = SessionManagementSubscriptionData(
+                #         single_nssai=single_nssai
+                #     )
+                #     sub_slice = self.get_slice(slice.sliceId)
+                #     for dnn in sub_slice.dnnList:
+                #         sub_dnn = self.get_dnn(dnn)
+                #         configuration = DnnConfiguration(
+                #             s_ambr=SessionAmbr(
+                #                 uplink=sub_dnn.uplinkAmbr.replace(" ", ""),
+                #                 downlink=sub_dnn.downlinkAmbr.replace(" ", "")
+                #             ),
+                #             five_qosProfile=FiveQosProfile(
+                #                 five_qi=sub_dnn.default5qi
+                #             )
+                #         )
+                #         payload_sms.add_configuration(dnn, configuration)
+                #         response = client.put(api_url_sms, json=payload_sms.model_dump(by_alias=True))
+                #         logger.info(f"Status code: {response.status_code}")
+                #         logger.info(f"Response content: {response.text}")
+
+        return []
 
     def del_ues(self, subscriber_model: OAIDelSubscriberModel) -> list:
         """
         Calls OAI api to delete an existing UE and all his related SMS from DB.
         :param subscriber_model: imsi to delete.
         """
-        logger.info(f"Try to delete user: {subscriber_model.imsi}")
-        with httpx.Client(http1=False, http2=True) as client:
-            api_url = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v2/subscription-data/{subscriber_model.imsi}/authentication-data/authentication-subscription"
-            response = client.delete(api_url)
-            logger.info(f"Status code: {response.status_code}")
-            logger.info(f"Response content: {response.text}")
-
-        for sms in self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi]:
+        if subscriber_model.imsi in self.base_model.blue_model_5g.ue_dict.keys():
+            logger.info(f"Try to delete user: {subscriber_model.imsi}")
             with httpx.Client(http1=False, http2=True) as client:
-                api_url = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v2/subscription-data/{subscriber_model.imsi}/{self.base_model.blue_model_5g.config.plmn}/provisioned-data/sm-data"
-                response = client.delete(api_url, params={'sst': sms.sst, 'sd': sms.sd})
+                api_url = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v1/subscription-data/{subscriber_model.imsi}/authentication-data/authentication-subscription"
+                response = client.delete(api_url)
                 logger.info(f"Status code: {response.status_code}")
                 logger.info(f"Response content: {response.text}")
 
-        del self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi]
+            for sms in self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi]:
+                with httpx.Client(http1=False, http2=True) as client:
+                    api_url = f"http://{self.base_model.blue_model_5g.core_services.udr.external_ip[0]}:80/nudr-dr/v1/subscription-data/{subscriber_model.imsi}/{self.base_model.blue_model_5g.config.plmn}/provisioned-data/sm-data"
+                    response = client.delete(api_url, params={'sst': sms.sst, 'sd': sms.sd})
+                    logger.info(f"Status code: {response.status_code}")
+                    logger.info(f"Response content: {response.text}")
+
+                del self.base_model.blue_model_5g.ue_dict[subscriber_model.imsi]
         return []
 
     def add_slice(self, add_slice_model: OAIAddSliceModel):
@@ -1150,7 +1155,6 @@ class OpenAirInterface(Blue5GBaseBeta):
                 if del_slice_model.sliceId == ue_slice.sd:
                     self.base_model.blue_model_5g.ue_dict[imsi].remove(ue_slice)
                     if len(self.base_model.blue_model_5g.ue_dict[imsi]) == 0:
-                        del self.base_model.blue_model_5g.ue_dict[imsi]
                         self.del_ues(imsi)
 
         self.del_slice_from_conf(sub_slice, sub_area)

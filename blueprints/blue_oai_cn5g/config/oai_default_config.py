@@ -241,7 +241,7 @@ default_config: OaiValuesModel = OaiValuesModel.model_validate({
                 "host": "oai-amf",
                 "sbi": {
                     "port": 80,
-                    "api_version": "v2",
+                    "api_version": "v1",
                     "interface_name": "eth0"
                 },
                 "n2": {
@@ -253,7 +253,7 @@ default_config: OaiValuesModel = OaiValuesModel.model_validate({
                 "host": "oai-smf",
                 "sbi": {
                     "port": 80,
-                    "api_version": "v2",
+                    "api_version": "v1",
                     "interface_name": "eth0"
                 },
                 "n4": {
@@ -265,7 +265,7 @@ default_config: OaiValuesModel = OaiValuesModel.model_validate({
                 "host": "oai-upf",
                 "sbi": {
                     "port": 80,
-                    "api_version": "v2",
+                    "api_version": "v1",
                     "interface_name": "eth0"
                 },
                 "n3": {
@@ -288,7 +288,7 @@ default_config: OaiValuesModel = OaiValuesModel.model_validate({
                 "host": "oai-udm",
                 "sbi": {
                     "port": 80,
-                    "api_version": "v2",
+                    "api_version": "v1",
                     "interface_name": "eth0"
                 }
             },
@@ -296,7 +296,7 @@ default_config: OaiValuesModel = OaiValuesModel.model_validate({
                 "host": "oai-udr",
                 "sbi": {
                     "port": 80,
-                    "api_version": "v2",
+                    "api_version": "v1",
                     "interface_name": "eth0"
                 }
             },
@@ -304,7 +304,7 @@ default_config: OaiValuesModel = OaiValuesModel.model_validate({
                 "host": "oai-ausf",
                 "sbi": {
                     "port": 80,
-                    "api_version": "v2",
+                    "api_version": "v1",
                     "interface_name": "eth0"
                 }
             },
@@ -312,7 +312,7 @@ default_config: OaiValuesModel = OaiValuesModel.model_validate({
                 "host": "oai-nrf",
                 "sbi": {
                     "port": 80,
-                    "api_version": "v2",
+                    "api_version": "v1",
                     "interface_name": "eth0"
                 }
             }

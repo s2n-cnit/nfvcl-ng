@@ -76,7 +76,8 @@ The current version of NFVCL can deploy the following blueprints:
      - 5G Core
      - K8s cluster onboarded in OSM
      -
-   * - OpenAirInterface
+   * - :doc:`blueprints/openairinterface/openairinterface_blue_index`
+     - OpenAirInterface
      - 5G Core
      - K8s cluster onboarded in OSM + VIM
      -
@@ -121,6 +122,7 @@ Documentation contents
    blueprints/k8s/k8s_blue_index
    blueprints/ueransim/ueransim_blue_index
    blueprints/vyos/vyos_blue_index
+   blueprints/openairinterface/openairinterface_blue_index
 
 .. toctree::
    :caption: OSM

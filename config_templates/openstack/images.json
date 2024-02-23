@@ -14,6 +14,11 @@
       "name": "ubuntu1804",
       "to_download": true,
       "url": "https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img"
+    },
+    {
+      "name": "VyOS",
+      "to_download": false,
+      "url": ""
     }
   ]
 }

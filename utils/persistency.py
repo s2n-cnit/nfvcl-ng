@@ -101,6 +101,11 @@ class DB:
 nfvcl_database: DB | None = None
 
 def _get_database():
+    """
+    Allow to retrieve the only instance of the database.
+    Returns:
+        The database.
+    """
     global nfvcl_database
     if nfvcl_database is None:
         nfvcl_database = DB()
@@ -108,23 +113,47 @@ def _get_database():
 
 
 def get_ng_blue_by_id_filter(blueprint_id: str) -> dict | None:
+    """
+    Retrieve a blueprint from the database, given the blueprint ID.
+
+    Args:
+        blueprint_id: The blueprint ID
+
+    Returns:
+        The FIRST MATCH of blueprint (dict) if found, None otherwise.
+    """
     blue_list = _get_database().find_DB(BLUE_COLLECTION_V2, {'id': blueprint_id})
     for blue in blue_list:
         return blue # Return the first match
     return None
 
 def get_ng_blue_list(blueprint_type: str = None) -> List[dict]:
+    """
+    Retrieve all blueprints from the database.
+    Args:
+        blueprint_type: The optional filter to be used to filter results.
+
+    Returns:
+        The filtered blueprint list.
+    """
     blue_filter = {}
     if blueprint_type:
         blue_filter = {'type': type}
     blue_list = _get_database().find_DB(BLUE_COLLECTION_V2, blue_filter)
     return list(blue_list)
 
-def get_cursor_ng_by_id_filter(blueprint_id: str) -> Cursor[dict]:
-    return _get_database().find_DB(BLUE_COLLECTION_V2, {'id': blueprint_id})
-
 
 def save_ng_blue(blueprint_id: str, dict_blue: dict):
+    """
+    Save a blueprint to the database. IF already existing it updates the object, otherwise it creates a new one.
+
+    Args:
+        blueprint_id: The blueprint ID, used to look for blueprints in the database.
+        dict_blue: The object to be saved/updated.
+
+    Returns:
+        The result of the operation (saved object)
+    """
     database_instance = _get_database()
     if database_instance.exists_DB(BLUE_COLLECTION_V2, {'id': blueprint_id}):
         return database_instance.update_DB(BLUE_COLLECTION_V2, dict_blue,{'id': blueprint_id})
@@ -132,4 +161,12 @@ def save_ng_blue(blueprint_id: str, dict_blue: dict):
         return database_instance.insert_DB(BLUE_COLLECTION_V2, dict_blue)
 
 def destroy_ng_blue(blueprint_id: str):
+    """
+    Destroy a blueprint in the database if it exists.
+    Args:
+        blueprint_id: The blueprint ID
+
+    Returns:
+        The destroyed blueprint.
+    """
     return _get_database().delete_DB(BLUE_COLLECTION_V2, {'id': blueprint_id})

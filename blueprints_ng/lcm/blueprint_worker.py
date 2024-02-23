@@ -1,6 +1,6 @@
 import multiprocessing
 from logging import Logger
-from multiprocessing import Process, Value
+from multiprocessing import Process
 from typing import Any
 from blueprints_ng.blueprint_ng import BlueprintNG
 from blueprints_ng.lcm.blueprint_route_manager import get_function_to_be_called
@@ -23,13 +23,26 @@ class BlueprintWorker:
         self.process.start()
 
     def stop_listening(self):
+        # TODO check stop from outside
         self.process.close()
 
     def put_message(self, msg_type: WorkerMessageType, path: str, message: Any):
+        """
+        Insert the worker message into the queue. This function should be called by an external process to the worker.
+        THREAD SAFE.
+
+        Args:
+            msg_type: The type of the message (DAY0 (creation), DAY2, STOP)
+            path: The path of the request.
+            message: The message of the request.
+        """
         worker_message = WorkerMessage(message_type=msg_type, message=message, path=path)
         self.message_queue.put(worker_message) # Thread safe
 
     def destroy_blueprint(self):
+        """
+        Sent a termination message to the worker. This function should be called by an external process to the worker.
+        """
         worker_message = WorkerMessage(message_type=WorkerMessageType.STOP, message="", path="")
         self.message_queue.put(worker_message)  # Thread safe
 
@@ -40,9 +53,12 @@ class BlueprintWorker:
             logger.debug(f"MSG for blueprint {self.blueprint.base_model.id}: {received_message.message}")
             match received_message.message_type:
                 case WorkerMessageType.DAY0:
+                    # This is the case of blueprint creation (create and start VMs, Dockers, ...)
                     self.blueprint.create(received_message.message)
                 case WorkerMessageType.DAY2:
+                    # This is the DAY2 message, getting the function to be called
                     function = get_function_to_be_called(received_message.path)
+                    # Starting processing the request.
                     result = getattr(self.blueprint, function)(received_message.message)
                 case WorkerMessageType.STOP:
                     self.blueprint.destroy()

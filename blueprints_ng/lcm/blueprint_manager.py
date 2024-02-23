@@ -18,11 +18,14 @@ logger: Logger = create_logger("BlueprintNGManager")
 
 class BlueprintManager:
     """
-    This class is responsible for managing blueprints. All blueprints that have been created will be managed by this class.
-    When a request arrives at the NFVCL, the blueprint to be updated is returned by this class.
+    This class is responsible for managing blueprints. This class will manage all blueprints that have been created.
+    When a request arrives at the NFVCL, the blueprint worker of the blueprint is returned.
 
     Attributes:
-        TODO
+        worker_collection (dict[str, BlueprintWorker]): The collection of active workers
+        blue_router (APIRouter): The main router for the blueprints
+        create_endpoint (Callable): The function to be pointed for ALL blueprints creation.
+        update_endpoint (Callable): The function to be pointed for ALL blueprints day2 calls.
     """
     worker_collection: dict[str, BlueprintWorker] = {}
     blue_router: APIRouter
@@ -38,12 +41,15 @@ class BlueprintManager:
 
     def get_worker(self, blueprint_id: str) -> BlueprintWorker:
         """
-        TODO
+        Return the blueprint dedicated worker, given the blueprint ID
         Args:
-            blueprint_id:
+            blueprint_id: The ID of the blueprint
 
         Returns:
+            The worker
 
+        Raises:
+            BlueprintNotFoundException if blue does nor exist.
         """
         if blueprint_id in self.worker_collection:
             # The worker for the blueprint has already been instantiated/re-instantiated
@@ -61,12 +67,12 @@ class BlueprintManager:
 
     def _load_blue_from_db(self, blueprint_id: str) -> BlueprintNG | None:
         """
-        TODO
+        Load the blueprint (OBJ) from the database
         Args:
-            blueprint_id:
+            blueprint_id: The ID of the blueprint to be loaded.
 
         Returns:
-
+            The blueprint if found, None otherwise.
         """
         blue: dict = get_ng_blue_by_id_filter(blueprint_id)
 
@@ -78,41 +84,45 @@ class BlueprintManager:
 
     def _load_all_blue_dict_from_db(self, blueprint_type: str = None) -> List[dict]:
         """
-        TODO
-        Returns:
+        Load all the blueprints (dict) from the database
+        Args:
+            blueprint_type (Optional[str]): The type of the blueprint to be retrieved
 
+        Returns:
+            The blueprint (dict) list.
         """
         return get_ng_blue_list(blueprint_type)
 
     def _load_all_blue_from_db(self, blueprint_type: str = None) -> List[BlueprintNG]:
         """
-        TODO
-        Returns:
+        Load all the blueprints (ojb) from the database
+        Args:
+            blueprint_type (Optional[str]): The type of the blueprint to be retrieved
 
+        Returns:
+            The blueprint list (List[BlueprintNG]).
         """
         return [BlueprintNG.from_db(item) for item in self._load_all_blue_dict_from_db()]
 
 
-    def create_blueprint(self, msg: Any, blue_type: str) -> str:
+    def create_blueprint(self, msg: Any, path: str) -> str:
         """
         Create a base, EMPTY, blueprint given the type of the blueprint.
         Then create a dedicated worker for the blueprint that spawns (ASYNC) the blueprint on the VIM.
         Args:
             msg: The message received from the user. The type change on the blueprint type. It is checked by fastAPI on the request.
-            blue_type: The type of blueprint (e.g., vyos)
+            path: The blueprint-specific path, the last part of the URL for the creation request (e.g., /nfvcl/v2/api/blue/vyos ----> path='vyos')
 
         Returns:
             The ID of the created blueprint.
         """
-
-
         blue_id = generate_blueprint_id()
         # Check that a blueprint with that ID is not existing in the DB
         if self._load_blue_from_db(blue_id) is not None:
             raise BlueprintAlreadyExisting(blue_id)
         else:
             # Get the class, based on the blue type.
-            BlueClass = get_blueprint_class(blue_type)
+            BlueClass = get_blueprint_class(path)
             # Instantiate the object (creation of services is done by the worker)
             created_blue: BlueprintNG = BlueClass(blue_id, BlueprintsNgProviderDemo)
             # Creating and starting the worker
@@ -120,26 +130,57 @@ class BlueprintManager:
             worker.start_listening() # Start another PROCESS
             self.worker_collection[blue_id] = worker
             # Putting the creation message into the worker (the spawn happens asynch)
-            worker.put_message(WorkerMessageType.DAY0, f'/{blue_type}', msg)
+            worker.put_message(WorkerMessageType.DAY0, f'{path}', msg)
             return blue_id
 
-    def delete_blueprint(self, blueprint_id: str) -> None:
+    def delete_blueprint(self, blueprint_id: str) -> str:
+        """
+        Deletes the blueprint from the NFVCL (DB+worker)
+
+        Args:
+            blueprint_id: The ID of the blueprint to be deleted.
+
+        Raises:
+            BlueprintNotFoundException if blue does nor exist.
+        """
         worker = self.get_worker(blueprint_id)
         worker.destroy_blueprint()
         self.worker_collection.pop(blueprint_id)
+        return blueprint_id
 
     def delete_all_blueprints(self) -> None:
+        """
+        Deletes all blueprints in the NFVCL (DB+worker).
+        """
         for key, worker in self.worker_collection.items():
             worker.destroy_blueprint()
             self.worker_collection.pop(key)
 
     def get_blueprint_summary_by_id(self, blueprint_id: str, detailed: bool = False) -> dict:
+        """
+        Retrieves the blueprint summary for the given blueprint ID.
+        Args:
+            blueprint_id: The blueprint to be retrieved.
+            detailed: If true, return all the info saved in the database about the blueprints.
+
+        Returns:
+            The summary/details of a blueprint
+        """
         blueprint: BlueprintNG = self._load_blue_from_db(blueprint_id)
         if blueprint is None:
             raise BlueprintNotFoundException(blueprint_id)
         return blueprint.to_dict(detailed)
 
     def get_blueprint_summary_list(self, blue_type: str, detailed: bool = False) -> List[dict]:
+        """
+        Retrieves the blueprint summary for the given blueprint ID.
+        Args:
+            blue_type:The optional filter to be used to filter results on a type basis (e.g., 'vyos').
+            detailed: If true, return all the info saved in the database about the blueprints.
+
+        Returns:
+            The summary/details of all blueprints that satisfy the given filter.
+        """
         if detailed:
             # Avoid to parse to model and then to dict
             return self._load_all_blue_dict_from_db()
@@ -151,8 +192,8 @@ class BlueprintManager:
     def _load_modules(self):
         """
         IMPORT all blueprints modules in the NFVCL. When a module is loaded in the memory, decorators are read and executed.
-        @declare_blue_type is used to actually load the info about the module in the global collection.
-        When all blueprint modules have been loaded, they are iterated to create and add the blueprint module router to the main blue router.
+        @declare_blue_type is used to actually load the info about every single module in the global collection.
+        When all blueprint modules have been loaded, they are iterated by this function to create and add the router (for every blueprint type) to the main blue router.
         """
         importlib.import_module(BLUEPRINTS_MODULE_FOLDER)
 

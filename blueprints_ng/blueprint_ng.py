@@ -238,9 +238,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
 
     def to_db(self) -> None:
         """
-        TODO complete. Temporaly return a json that represent what is going to be saved in the DB
-        Returns:
-
+        Generates the blueprint serialized representation and save it in the database.
         """
         serialized_dict = self.__serialize_content()
         save_ng_blue(self.base_model.id, serialized_dict)
@@ -322,7 +320,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             class_obj = getattr(module, func_class)
             bound_method = getattr(class_obj, func_name)
 
-            cls.api_router.add_api_route(day2_route.path, bound_method, methods=day2_route.get_methods_str())
+            cls.api_router.add_api_route(day2_route.final_path, bound_method, methods=day2_route.get_methods_str())
 
 
         return cls.api_router

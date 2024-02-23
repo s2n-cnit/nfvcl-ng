@@ -65,11 +65,12 @@ class TestBlueprintNGState(BlueprintNGState):
 
     container_list: Optional[List[TestStateResourcesContainer]] = Field(default=None)
 
-@declare_blue_type("vyos")
+VYOS_BLUE_TYPE = "vyos"
+
+@declare_blue_type(VYOS_BLUE_TYPE)
 class VyosBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataDemo, TestCreateModel]):
     def __init__(self, blueprint_id: str, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = TestBlueprintNGState):
         super().__init__(blueprint_id, provider_type, state_type)
-        self.to_db()
 
     def create(self, create: TestCreateModel):
         super().create(create)
@@ -130,7 +131,7 @@ class VyosBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataD
     def add_area_endpoint(cls, msg: TestCreateModel, blue_id: str, request: Request):
         return cls.api_day2_function(msg, blue_id, request)
 
-    @add_route("/test_api_path", [HttpRequestType.POST], add_area_endpoint)
+    @add_route(VYOS_BLUE_TYPE,"/test_api_path", [HttpRequestType.POST], add_area_endpoint)
     def add_area(self, msg):
         new_vm = VmResource(
             area=1,
@@ -163,7 +164,7 @@ class VyosBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataD
     def add_area3234_endpoint(cls, msg: TestDay2Model, blue_id: str, request: Request):
         return cls.api_day2_function(msg, blue_id, request)
 
-    @add_route("/test_api_path3234", [HttpRequestType.POST], add_area3234_endpoint)
+    @add_route(VYOS_BLUE_TYPE,"/test_api_path3234", [HttpRequestType.POST], add_area3234_endpoint)
     def add_area3234(self, msg):
         new_vm = VmResource(
             area=1,

@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 
 class OssStatus(str, Enum):
     ready: str = 'ready'
+    deploying: str = 'deploying'
+    processing: str = 'processing'
     failed: str = 'failed'
     unknown: str = 'unknown'
 

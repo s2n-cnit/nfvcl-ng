@@ -76,6 +76,7 @@ def get_blueprint_class(blue_path: str):
     Returns:
         The class corresponding to the blueprint that should process the request
     """
+    blue_path = blue_path.split('/')[-1]
     module = get_blueprint_module(blue_path)
     BlueClass = getattr(importlib.import_module(module.module), module.class_name)
     return BlueClass

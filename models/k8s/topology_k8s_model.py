@@ -92,7 +92,7 @@ class K8sQuota(NFVCLBaseModel):
     """
     Model used to add a quota reservation (for resources) to a namespace.
     """
-    request_cpu: str = Field(default=1, alias="requests.cpu")
+    request_cpu: str = Field(default="1", alias="requests.cpu")
     request_memory: str = Field(default="1Gi", alias="requests.memory")
-    limit_cpu: str = Field(default=2, alias="limits.cpu")
+    limit_cpu: str = Field(default="2", alias="limits.cpu")
     limit_memory: str = Field(default="2Gi", alias="limits.memory")

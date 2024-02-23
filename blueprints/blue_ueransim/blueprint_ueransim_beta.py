@@ -53,8 +53,8 @@ class UeRanSimBeta(BlueprintBaseBeta):
 
     @classmethod
     def day2_methods(cls):
-        cls.api_router.add_api_route("/{blue_id}/ues", cls.rest_add_ues, methods=["PUT"])
-        cls.api_router.add_api_route("/{blue_id}/ues", cls.rest_del_ues, methods=["DEL"])
+        cls.api_router.add_api_route("/{blue_id}/add_ues", cls.rest_add_ues, methods=["PUT"])
+        cls.api_router.add_api_route("/{blue_id}/del_ues", cls.rest_del_ues, methods=["DEL"])
 
 
     def __init__(self, conf: dict, id_: str, data: Union[Dict, None] = None):

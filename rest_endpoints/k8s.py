@@ -460,7 +460,7 @@ async def create_service_account(cluster_id: str, namespace: str, user: str):
 
 
 @k8s_router.post("/{cluster_id}/secret/{namespace}/{user}", response_model=dict)
-async def create_secret_for_sa(cluster_id: str, namespace: str, username: str, secret_name: str):
+async def create_secret_for_sa(cluster_id: str, namespace: str, user: str, secret_name: str):
     """
     Create secret for the target service account in a namespace
 
@@ -469,7 +469,7 @@ async def create_secret_for_sa(cluster_id: str, namespace: str, username: str, s
 
         namespace: the mandatory namespace in witch the service account is created
 
-        username: the mandatory name to be bounded at the service account
+        user: the mandatory name to be bounded at the service account
 
         secret_name: the mandatory name to be given at the created secret.
 
@@ -484,7 +484,7 @@ async def create_secret_for_sa(cluster_id: str, namespace: str, username: str, s
     try:
         # Retrieving service account list filtered by username and namespace
         created_secret: V1Secret = k8s_create_secret_for_user(kube_client_config=k8s_config,
-                                                              namespace=namespace, username=username,
+                                                              namespace=namespace, username=user,
                                                               secret_name=secret_name)
 
     except (ValueError, ApiException) as val_err:

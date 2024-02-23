@@ -14,7 +14,7 @@ class VyOSSourceNATRule(BaseModel):
     source_address: str = Field(title="The source IP or ip range to witch the rule is applied. Example 10.170.2.0/24")
     virtual_ip: str = Field(default="masquerade",title="The desired new IP of packets exiting the interface. This value"
                                                         "can be set to 'masquerade' or to a valid IP/32 (10.170.2.66)")
-    rule_number : int = Field(default="1",title="The rule number. It already present the rule is overwritten on the router.")
+    rule_number : int = Field(default=1,title="The rule number. It already present the rule is overwritten on the router.")
     description : str = Field(title="Description to assign at the rule")
 
 
@@ -28,7 +28,7 @@ class VyOSDestNATRule(BaseModel):
     virtual_ip: str = Field(title="The virtual IP represent the target IP or the IP range to convert into the "
                                   "real_destination_ip. Example 7.7.7.7")
     real_destination_ip: str = Field(title="The real destination. Example 192.168.0.45")
-    rule_number: int = Field(default="1",title="The rule number. It already present the rule is overwritten on the router.")
+    rule_number: int = Field(default=1,title="The rule number. It already present the rule is overwritten on the router.")
     description : str = Field(default="",title="Description to assign at the rule")
 
 class VyOS1to1NATRule(BaseModel):
@@ -41,7 +41,7 @@ class VyOS1to1NATRule(BaseModel):
     real_destination_ip: str = Field(title="The real destination behind the virtual IP. Example 192.168.0.45")
     source_address: str = Field(title="The IP address to convert into the virtual IP (source NAT). This field should correspond to real destination IP to realize 1 to 1 NAT. Example 192.168.0.45")
     outbound_network: str = Field(title="The network to send the packet coming from source_address IP. This field should correspond to inbound_network for 1 to 1 NAT. Example 10.168.0.0/16")
-    rule_number: int = Field(default="1",title="The rule number. It already present the rule is overwritten on the router.")
+    rule_number: int = Field(default=1,title="The rule number. It already present the rule is overwritten on the router.")
     description: str = Field(default="",title="Description to assign at the rule")
     outbound_interface: Optional[str]
     inbound_interface: Optional[str]

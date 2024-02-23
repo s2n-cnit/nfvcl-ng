@@ -35,7 +35,7 @@ async def get_blueprints(blue_type: Optional[str] = Query(default=None, descript
     return blue_man.get_blueprint_summary_list(blue_type, detailed=detailed)
 
 
-@blue_ng_router.get("/{blue_id}", response_model=dict)
+@blue_ng_router.get("/{blueprint_id}", response_model=dict)
 async def get_blueprint(blueprint_id: str, detailed: bool = Query(default=False, description="Detailed or summarized view list")):
     blue_man = get_blueprint_manager()
     return blue_man.get_blueprint_summary_by_id(blueprint_id=blueprint_id, detailed=detailed)
@@ -50,7 +50,7 @@ def create_blueprint(msg: dict, request: Request):
 
 def update_blueprint(msg: dict, blue_id: str, request: Request):
     blue_man = get_blueprint_manager()
-    path = f"/{request.url.path.split('/')[-1]}"
+    path = "/".join(request.url.path.split('/')[-2:]) # Takes only the last 2 paths "abc/bcd/fde/have" -> fde/have
     blue_worker = blue_man.get_worker(blue_id)
     blue_worker.put_message(WorkerMessageType.DAY2, path, msg)
     return OssCompliantResponse(detail=f"Blueprint message to {blue_id} given to the worker.")

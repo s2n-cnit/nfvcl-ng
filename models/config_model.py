@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 
 class NFVCLParameters(BaseModel):
+    version: str
     ip: str
     port: int
 

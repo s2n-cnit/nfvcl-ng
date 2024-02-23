@@ -27,14 +27,16 @@ from fastapi.staticfiles import StaticFiles
 from rest_endpoints.osm_rest import osm_router
 from rest_endpoints.openstack import openstack_router
 
+swagger_parameters={"syntaxHighlight.theme": "obsidian", "tryItOutEnabled": True, "deepLinking": True}
 app = FastAPI(
     title="NFVCL",
     # description=description,
-    version="0.0.1",
+    version=_nfvcl_config.nfvcl.version,
     license_info={
         "name": "Apache 2.0",
         "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
     },
+    swagger_ui_parameters = swagger_parameters
 )
 
 # Populate blue_router with all blueprints APIs before include it.

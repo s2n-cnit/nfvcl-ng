@@ -534,13 +534,13 @@ async def get_prom_list():
     return prom_list
 
 
-@topology_router.get("/prometheus/{id}", response_model=PrometheusServerModel, status_code=status.HTTP_202_ACCEPTED,
+@topology_router.get("/prometheus/{prometheus_id}", response_model=PrometheusServerModel, status_code=status.HTTP_202_ACCEPTED,
                      callbacks=callback_router.routes, summary=GET_PROM_SRV_SUMMARY,
                      description=GET_PROM_SRV_DESCRIPTION)
-async def get_prom(prom_id: str):
+async def get_prom(prometheus_id: str):
     topology = Topology.from_db(db, nbiUtil, topology_lock)
     try:
-        prom_inst = topology.get_prometheus_server(prom_server_id=prom_id)
+        prom_inst = topology.get_prometheus_server(prom_server_id=prometheus_id)
     except ValueError:
         return OssCompliantResponse(status=OssStatus.failed, detail="Prometheus server has not been found.")
 

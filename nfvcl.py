@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 from rest_endpoints.rest_callback import RestAnswer202
 from rest_endpoints.topology import topology_router
 from rest_endpoints.blue import blue_router
+from rest_endpoints.blue_ng_router import blue_ng_router
 from rest_endpoints.day2action import day2_router
 from rest_endpoints.k8s import k8s_router
 from rest_endpoints.helm import helm_router
@@ -38,10 +39,12 @@ app = FastAPI(
 
 # Populate blue_router with all blueprints APIs before include it.
 rest_endpoints.blue.initialize_blueprints_routers()
+rest_endpoints.blue_ng_router.get_blueprint_manager()
 
 # Including routers for each case. In this part all APIs definitions are loaded.
 app.include_router(topology_router)
 app.include_router(blue_router)
+app.include_router(blue_ng_router)
 app.include_router(day2_router)
 app.include_router(k8s_router)
 app.include_router(helm_router)

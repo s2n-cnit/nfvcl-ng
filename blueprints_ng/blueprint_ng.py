@@ -1,24 +1,22 @@
 from __future__ import annotations
-
+import abc
+import sys
 import copy
 import importlib
-import json
 import uuid
 from datetime import datetime
-from enum import Enum
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import SerializeAsAny, Field
-
+from blueprints_ng.lcm.blueprint_route_manager import get_routes
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource
 from models.base_model import NFVCLBaseModel
+from utils.persistency import save_ng_blue, destroy_ng_blue
 
 StateTypeVar = TypeVar("StateTypeVar")
 ProviderDataTypeVar = TypeVar("ProviderDataTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
-
 
 def get_class_from_path(class_path: str) -> Any:
     """
@@ -104,14 +102,6 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTyp
         return kwargs
 
 
-class HttpRequestType(Enum):
-    GET = "GET"
-    POST = "POST"
-    PUT = "PUT"
-    PATCH = "PATCH"
-    DELETE = "DELETE"
-
-
 class BlueprintNGState(NFVCLBaseModel):
     last_update: Optional[datetime] = Field(default=None)
 
@@ -124,14 +114,16 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
     base_model: BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar]
     api_router: APIRouter
     provider: BlueprintNGProviderInterface
+    api_day0_function: Callable
+    api_day2_function: Callable
 
-    def __init__(self, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = None):
+    def __init__(self, blueprint_id: str, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = None):
         super().__init__()
         self.provider = provider_type()
         self.state_type = state_type
         state = state_type()
         self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar](
-            id=str(uuid.uuid4()),
+            id=blueprint_id,
             type=get_class_path_str_from_obj(self),
             state_type=get_class_path_str_from_obj(state),
             state=state,
@@ -152,26 +144,6 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             resource.id = str(uuid.uuid4())
         self.base_model.registered_resources[resource.id] = RegisteredResource(type=get_class_path_str_from_obj(resource), value=resource)
 
-    def init_blueprint_type(self):
-        """
-        Initialize the blueprint
-        """
-        self.api_router = APIRouter(
-            prefix="/{}".format(self.__name__),
-            tags=["Blueprint {}".format(self.__name__)],
-            responses={404: {"description": "Not found"}}
-        )
-
-    def register_api(self, path: str, request_type: HttpRequestType, method: Callable):
-        """
-        Register a new API endpoint for this blueprint
-        Args:
-            path: Endpoint path
-            request_type: Type of HTTP request (GET, POST, PUT, DELETE)
-            method: Method to be called when the API is called
-        """
-        self.api_router.add_api_route(path, method, methods=[request_type.value])
-
     def create(self, model: CreateConfigTypeVar):
         self.base_model.create_config = model
         self.base_model.create_config_type = get_class_path_str_from_obj(model)
@@ -180,6 +152,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         for key, value in self.base_model.registered_resources.items():
             if isinstance(value.value, VmResource):
                 self.provider.destroy_vm(value.value)
+        destroy_ng_blue(blueprint_id=self.base_model.id)
 
     @property
     def state(self) -> StateTypeVar:
@@ -249,12 +222,8 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
                 current = current[key]
             current[path[-1]] = registered_resource[current[path[-1]].split("REF=")[1]].value
 
-    def to_db(self):
-        """
-        TODO complete. Temporaly return a json that represent what is going to be saved in the DB
-        Returns:
 
-        """
+    def __serialize_content(self) -> dict:
         serialized_dict = self.base_model.model_dump()
 
         # Find every occurrence of type Resource in the state amd replace them with a reference
@@ -265,20 +234,27 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             if isinstance(value.value, ResourceConfiguration):
                 self.__override_variables_in_dict(value.value, serialized_dict["registered_resources"][key]["value"], ResourceDeployable)
 
-        return json.dumps(serialized_dict, indent=4)
+        return serialized_dict
+
+    def to_db(self) -> None:
+        """
+        TODO complete. Temporaly return a json that represent what is going to be saved in the DB
+        Returns:
+
+        """
+        serialized_dict = self.__serialize_content()
+        save_ng_blue(self.base_model.id, serialized_dict)
 
     @classmethod
-    def from_db(cls, serialized: str):
-        deserialized_dict = json.loads(serialized)
-
+    def from_db(cls, deserialized_dict: dict):
         # Manually load state and provider classes
         state_type_str = deserialized_dict["state_type"]
         provider_type_str = deserialized_dict["provider_type"]
         state_type = get_class_from_path(state_type_str)
         provider_type = get_class_from_path(provider_type_str)
 
-        # Create a new instance
-        instance = cls(provider_type)
+        BlueSavedClass = get_class_from_path(deserialized_dict['type'])
+        instance = BlueSavedClass(deserialized_dict['id'], provider_type) # Had to add a state type
 
         # Remove fields that need to be manually deserialized from the input and validate
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)
@@ -306,3 +282,47 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         instance.base_model.state = instance.state_type.model_validate(deserialized_dict["state"])
         instance.provider.data = instance.provider_data.model_validate(deserialized_dict["provider_data"])
         return instance
+
+    def to_dict(self, detailed: bool) -> dict:
+        """
+        Return a dictionary representation of the blueprint instance.
+
+        Args:
+            detailed: Return the same content saved in the database containing all the details of the blueprint.
+
+        Returns:
+
+        """
+        if detailed:
+            return self.__serialize_content()
+        else:
+            return {"SUMMARY": f"TO BE IMPLEMENTED: {self.base_model.id}"} # TODO
+
+    @classmethod
+    @abc.abstractmethod
+    def rest_create(cls, msg: dict, request: Request):
+        pass
+
+    @classmethod
+    def init_router(cls,_day0_func: Callable, _day2_func: Callable, prefix: str) -> APIRouter:
+        cls.api_day0_function = _day0_func
+        cls.api_day2_function = _day2_func
+        cls.api_router = APIRouter(
+            prefix=f"/{prefix}",
+            tags=[f"Blueprint {cls.__name__}"],
+            responses={404: {"description": "Not found"}}
+        )
+        cls.api_router.add_api_route("", cls.rest_create, methods=["POST"])
+
+        for day2_route in get_routes():
+            fake_endpoint = day2_route.fake_endpoint
+            module_location = fake_endpoint.__module__
+            module = sys.modules[module_location]
+            func_class, func_name = day2_route.fake_endpoint.__func__.__qualname__.split('.')
+            class_obj = getattr(module, func_class)
+            bound_method = getattr(class_obj, func_name)
+
+            cls.api_router.add_api_route(day2_route.path, bound_method, methods=day2_route.get_methods_str())
+
+
+        return cls.api_router

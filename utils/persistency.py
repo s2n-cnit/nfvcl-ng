@@ -1,14 +1,16 @@
 import json
+from typing import List, Any, Mapping
+
 from pymongo import MongoClient
+from pymongo.cursor import Cursor
 
 from models.config_model import NFVCLConfigModel
 from utils.util import get_nfvcl_config
-
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 
-persLayer = MongoClient("mongodb://{}:{}/".format(nfvcl_config.mongodb.host, nfvcl_config.mongodb.port))
-OSSdb = persLayer[nfvcl_config.mongodb.db]
+mongo_client: MongoClient = MongoClient("mongodb://{}:{}/".format(nfvcl_config.mongodb.host, nfvcl_config.mongodb.port))
+OSSdb = mongo_client[nfvcl_config.mongodb.db]
 
 persistent_collections = [
     "blueprints",
@@ -31,9 +33,12 @@ volatile_collections = [
     "vnfi"
 ]
 
+BLUE_COLLECTION_V2 = "blue-inst-v2"
+
 
 class db_management:
     def backup_DB(self):
+        # TODO make possible to backupdb from APIs
         data = {}
         for c in persistent_collections:
             data[c] = []
@@ -92,3 +97,39 @@ class DB:
     def delete_DB(table, filter):
         db = OSSdb[table]
         return db.delete_many(filter)
+
+nfvcl_database: DB | None = None
+
+def _get_database():
+    global nfvcl_database
+    if nfvcl_database is None:
+        nfvcl_database = DB()
+    return nfvcl_database
+
+
+def get_ng_blue_by_id_filter(blueprint_id: str) -> dict | None:
+    blue_list = _get_database().find_DB(BLUE_COLLECTION_V2, {'id': blueprint_id})
+    for blue in blue_list:
+        return blue # Return the first match
+    return None
+
+def get_ng_blue_list(blueprint_type: str = None) -> List[dict]:
+    blue_filter = {}
+    if blueprint_type:
+        blue_filter = {'type': type}
+    blue_list = _get_database().find_DB(BLUE_COLLECTION_V2, blue_filter)
+    return list(blue_list)
+
+def get_cursor_ng_by_id_filter(blueprint_id: str) -> Cursor[dict]:
+    return _get_database().find_DB(BLUE_COLLECTION_V2, {'id': blueprint_id})
+
+
+def save_ng_blue(blueprint_id: str, dict_blue: dict):
+    database_instance = _get_database()
+    if database_instance.exists_DB(BLUE_COLLECTION_V2, {'id': blueprint_id}):
+        return database_instance.update_DB(BLUE_COLLECTION_V2, dict_blue,{'id': blueprint_id})
+    else:
+        return database_instance.insert_DB(BLUE_COLLECTION_V2, dict_blue)
+
+def destroy_ng_blue(blueprint_id: str):
+    return _get_database().delete_DB(BLUE_COLLECTION_V2, {'id': blueprint_id})

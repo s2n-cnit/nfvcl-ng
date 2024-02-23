@@ -1,7 +1,6 @@
 from typing import List
 from keystoneauth1.exceptions import Unauthorized
 from openstack.network.v2.network import Network
-
 from config_templates.openstack.image_manager import get_nfvcl_image_list
 from models.openstack.images import ImageRepo
 from models.vim import VimModel
@@ -45,6 +44,7 @@ def check_images(vim: VimModel) -> bool:
     Returns:
         True if the VIM contains all the required images by the NFVCL.
     """
+    logger.debug(f"Checking presence of required images on OPENSTACK >{vim.name}<")
     required_images = get_nfvcl_image_list() # Get required images by the nfvcl.
 
     open_stack_client = OpenStackClient(vim)

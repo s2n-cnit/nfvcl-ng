@@ -10,7 +10,7 @@ from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils import persistency
 from utils.log import create_logger
 from utils.util import get_nfvcl_config, NFVCLConfigModel
-from utils.util import deprecated
+from utils.decorators import deprecated
 
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 nbiUtil = get_osm_nbi_utils()

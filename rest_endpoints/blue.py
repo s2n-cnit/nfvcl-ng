@@ -17,7 +17,7 @@ from models.blueprint.blue_types import blueprint_types
 from topology.topology import Topology
 from models.k8s.topology_k8s_model import K8sModel
 from .blue_models import *
-from main import old_workers, db, persistency, id_generator, nbiUtil, topology_lock, workers
+from main import old_workers, db, persistency, generate_id, nbiUtil, topology_lock, workers
 from utils.k8s import get_pods_for_k8s_namespace, get_k8s_config_from_file_content
 from utils.log import create_logger
 from .rest_description import *
@@ -36,8 +36,9 @@ logger = create_logger("BLUE")
 
 def initialize_blueprints_routers():
     """
-    Load Blueprint specific routers into the general blue router. This method must be called to enable
-    blueprint-specific APIs
+    Load the blueprints module from the blueprints_ng folder
+    Load Blueprint specific routers into the blueprint NG router.
+    This method must be called to enable blueprint-specific APIs
     """
     # !! VERY IMPORTANT
     # This piece of code is adding Blueprint specific POST and PUT methods to the router
@@ -208,7 +209,7 @@ async def get_blueprint(blue_id: str, detailed: bool = Query(default=False, desc
                   callbacks=callback_router.routes)
 def create_blueprint(msg: blue_create_models):
     # Generate random ID for the blueprint
-    blue_id = id_generator()
+    blue_id = generate_id()
 
     if msg.type not in blueprint_types:
         data = {'status': 'error', 'resource': 'blueprint',
@@ -232,7 +233,7 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
     It receives the message and create a thread for the relative plueprint (if it does exist) to handle the request.
     """
     # assign a session id
-    session_id = id_generator()
+    session_id = generate_id()
     try:
         # Looking if blueprint is version 1 or 2
         _db = persistency.DB()
@@ -270,7 +271,7 @@ def modify_blueprint(msg: blue_day2_models, blue_id: str):
 @blue_router.delete('/{blue_id}', response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED,
                     callbacks=callback_router.routes)
 def delete(blue_id: str):
-    session_id = id_generator()
+    session_id = generate_id()
     try:
         blue = get_blueprint_by_id(blue_id)
         if not blue:
@@ -363,7 +364,7 @@ def get_pods(blue_id: str):
         The list of pods
     """
     # TODO replace all common code with a static method
-    local_session_id = id_generator()
+    local_session_id = generate_id()
     try:
         blue = get_blueprint_by_id(blue_id)
         if not blue:

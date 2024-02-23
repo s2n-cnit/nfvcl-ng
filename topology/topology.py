@@ -21,7 +21,7 @@ import typing
 import json
 import traceback
 from multiprocessing import RLock
-from utils.util import obj_multiprocess_lock
+from utils.decorators import obj_multiprocess_lock
 from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from utils.redis_utils.topic_list import TOPOLOGY_TOPIC
 

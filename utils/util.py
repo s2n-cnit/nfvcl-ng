@@ -23,7 +23,6 @@ def is_config_loaded() -> bool:
 
 
 from utils.log import create_logger
-
 pre_config_logger = create_logger("PreConfig")
 logger: Logger | None = None
 
@@ -74,47 +73,26 @@ def _load_nfvcl_config() -> NFVCLConfigModel:
         return config
 
 
-def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
-    return ''.join(random.choice(chars) for _ in range(size))
-
-
-def obj_multiprocess_lock(func):
+def generate_id(length: int = 6, character_set: str = string.ascii_uppercase + string.digits) -> str:
     """
-    Class decorator for locking methods that edit topology information
-    Semaphore for topology. Locks the topology such that only ONE operation is made at the same time.
+    Generate random ID given the length and the character set.
+    Args:
+        length: The length of the generated ID
+        character_set: The character set to be used.
+
+    Returns:
+        The random ID (str)
     """
-    def wrapper(self, *args, **kwargs):
-        logger.debug("Acquiring lock")
-        self.lock.acquire()
-        logger.debug("Acquired lock")
+    return ''.join(random.choice(character_set) for _ in range(length))
 
-        # In case of crash, we still need to unlock the semaphore -> TRY
-        try:
-            #
-            response = func(self, *args, **kwargs)
-            logger.debug("Releasing lock")
-            self.lock.release()
-            logger.debug("Released lock")
-            return response
-        except Exception as excep:
-            # In case of crash, we still need to unlock the semaphore
-            self.lock.release()
-            raise excep
-
-    return wrapper
-
-
-def deprecated(func):
+def generate_blueprint_id() -> str:
     """
-    Deprecated decorator. When a function is tagged with this decorator, every time the function is called, it prints
-    that the function is deprecated.
+    Generate blueprint random ID (6 digits) using characters in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.
+
+    Returns:
+        The random 6-digit ID (str)
     """
-
-    def wrapper(*args, **kwargs):
-        logger.warning(f"Function {func.__name__} is deprecated.")
-        return func(*args, **kwargs)
-
-    return wrapper
+    return generate_id(6, string.ascii_uppercase + string.digits)
 
 
 def render_file_from_template(path: str, render_dict: dict, prefix_to_name: str = "") -> str:
@@ -286,3 +264,5 @@ def copytree(src, dst, symlinks=False, ignore=None):
             shutil.copytree(s, d, symlinks, ignore)
         else:
             shutil.copy2(s, d)
+
+

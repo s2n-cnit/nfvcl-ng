@@ -55,6 +55,31 @@ def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
         raise HTTPException(status_code=404, detail="K8s cluster {} not found".format(cluster_id))
 
 
+def get_k8s_cluster_by_area(area_id: int) -> K8sModel:
+    """
+    Get the k8s cluster from the topology. This method could be duplicated but in this case handle HTTP exceptions
+    that give API user an idea of what is going wrong.
+
+    Args:
+
+        area_id: the area id in of the cluster to get.
+
+    Returns:
+
+        The matching k8s cluster or Throw HTTPException if NOT found.
+    """
+    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
+    match = next((x for x in k8s_clusters if area_id in x.areas), None)
+
+    if match:
+        return match
+    else:
+        error_msg = f"K8s cluster not found in area {area_id}"
+        logger.error(error_msg)
+        raise HTTPException(status_code=404, detail=error_msg)
+
+
 @k8s_router.get("/{cluster_id}/plugins", response_model=List[K8sPluginName], summary="", description="")
 async def get_k8s_installed_plugins(cluster_id: str):
     """

@@ -1,4 +1,6 @@
-from typing import Optional, List, Any, Dict
+import abc
+from pathlib import Path
+from typing import Optional, List, Dict, Union
 
 from pydantic import Field
 from typing_extensions import Literal
@@ -94,32 +96,46 @@ class VmResourceConfiguration(ResourceConfiguration):
 
 
 class VmResourceAnsibleConfiguration(VmResourceConfiguration):
-
     def dump_playbook(self) -> str:
         print("Esegue dump ansible playbook....")
         return "[[DUMPED PLAYBOOK]]"
 
-    def build_configuration(self, configuration_values: Any):
-        print("Costruisco ansible playbook....")
-
 
 class VmResourceNativeConfiguration(VmResourceConfiguration):
+    @abc.abstractmethod
     def run_code(self):
-        print("Esegue codice...")
-
+        pass
 
 class HelmChartResource(ResourceDeployable):
     chart: str = Field()
+    chart_as_path: bool = Field(default=False)
     repo: Optional[str] = Field(default=None)
+    version: Optional[str] = Field(default=None)
     namespace: str = Field()
-    additional_params: Dict[str, Any] = Field()
+    # additional_params: Dict[str, Any] = Field()
 
     created: bool = Field(default=False)
     created_services: Optional[List[K8sService]] = Field(default=None)
 
+    def get_chart_converted(self) -> Union[str, Path]:
+        if self.chart_as_path:
+            return Path(self.chart)
+        else:
+            return self.chart
 
-class K8SResourceConfiguration(ResourceConfiguration):
-    def __init__(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
-        super().__init__()
-        self.helm_chart_resource = helm_chart_resource
-        self.values = values
+
+class HardwareResource(Resource):
+    ip: str = Field()
+    username: str = Field()
+    password: str = Field()
+    become_password: Optional[str] = Field(default=None)
+
+
+class HardwareResourceConfiguration(ResourceConfiguration):
+    hardware_resource: HardwareResource = Field()
+
+
+class HardwareResourceAnsibleConfiguration(HardwareResourceConfiguration):
+    @abc.abstractmethod
+    def dump_playbook(self) -> str:
+        pass

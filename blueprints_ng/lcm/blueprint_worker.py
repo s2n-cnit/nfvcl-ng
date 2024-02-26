@@ -6,7 +6,6 @@ from blueprints_ng.blueprint_ng import BlueprintNG
 from blueprints_ng.lcm.blueprint_route_manager import get_function_to_be_called
 from models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage
 from utils.log import create_logger
-logger: Logger = create_logger('BLUELCMWORKER_BETA')
 
 
 class BlueprintWorker:
@@ -16,6 +15,7 @@ class BlueprintWorker:
 
     def __init__(self, blueprint: BlueprintNG):
         self.blueprint = blueprint
+        self.logger: Logger = create_logger('BLUELCMWORKER_BETA', blueprintid=blueprint.id)
         self.message_queue = multiprocessing.Queue()
 
     def start_listening(self):
@@ -47,10 +47,10 @@ class BlueprintWorker:
         self.message_queue.put(worker_message)  # Thread safe
 
     def _listen(self):
-        logger.debug(f"Worker for blueprint: {self.blueprint.base_model.id} is listening.")
+        self.logger.debug(f"Worker for blueprint: {self.blueprint.base_model.id} is listening.")
         while True:
             received_message: WorkerMessage = self.message_queue.get() # Thread safe
-            logger.debug(f"MSG for blueprint {self.blueprint.base_model.id}: {received_message.message}")
+            self.logger.debug(f"MSG for blueprint {self.blueprint.base_model.id}: {received_message.message}")
             match received_message.message_type:
                 case WorkerMessageType.DAY0:
                     # This is the case of blueprint creation (create and start VMs, Dockers, ...)
@@ -61,12 +61,15 @@ class BlueprintWorker:
                     # Starting processing the request.
                     result = getattr(self.blueprint, function)(received_message.message)
                 case WorkerMessageType.STOP:
+                    self.logger.info(f"Destroying blueprint {self.blueprint.base_model.id}")
                     self.blueprint.destroy()
-                    self.stop_listening()
+                    self.logger.info(f"Blueprint {self.blueprint.base_model.id} destroyed")
+                    break
                 case _:
                     raise ValueError("Worker message type not recognized")
 
-            logger.debug(f"Received message for blue {self.blueprint.base_model.id}: {received_message}")
+            self.logger.debug(f"Received message for blue {self.blueprint.base_model.id}: {received_message}")
+        self.stop_listening()
 
     def __eq__(self, __value):
         """

@@ -1,5 +1,3 @@
-from typing import Dict
-
 from blueprints_ng.providers.blueprint_ng_provider_interface import *
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResourceNetworkInterfaceAddress, VmResourceNetworkInterface
 
@@ -44,11 +42,16 @@ class BlueprintsNgProviderDemo(BlueprintNGProviderInterface):
     def destroy_vm(self, vm_resource: VmResource):
         print("destroy_vm")
 
-    def install_helm_chart(self):
-        print("install_helm_chart")
+    def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
+        pass
 
-    def update_values_helm_chart(self):
-        print("update_values_helm_chart")
+    def update_values_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
+        pass
 
-    def uninstall_helm_chart(self):
-        print("uninstall_helm_chart")
+    def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
+        pass
+
+    def configure_hardware(self, hardware_resource_configuration: HardwareResourceConfiguration):
+        pass
+
+

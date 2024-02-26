@@ -3,20 +3,27 @@ import abc
 import sys
 import copy
 import importlib
+import json
+import random
+import string
 import uuid
 from datetime import datetime
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
 from fastapi import APIRouter, Request
+from models.prometheus.prometheus_model import PrometheusTargetModel
 from pydantic import SerializeAsAny, Field
+from utils.log import create_logger
+
 from blueprints_ng.lcm.blueprint_route_manager import get_routes
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
-from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource
+from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource
 from models.base_model import NFVCLBaseModel
 from utils.persistency import save_ng_blue, destroy_ng_blue
 
 StateTypeVar = TypeVar("StateTypeVar")
 ProviderDataTypeVar = TypeVar("ProviderDataTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
+
 
 def get_class_from_path(class_path: str) -> Any:
     """
@@ -71,15 +78,14 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTyp
     create_config: Optional[CreateConfigTypeVar] = Field(default=None)
 
     # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
-    provider_type: str = Field()
-    provider_data_type: str = Field()
-    provider_data: ProviderDataTypeVar = Field()
+    provider_type: Optional[str] = Field(default=None)
+    provider_data_type: Optional[str] = Field(default=None)
+    provider_data: Optional[ProviderDataTypeVar] = Field(default=None)
 
     created: Optional[datetime] = Field(default=None)
     status: BlueprintNGStatus = Field(default=BlueprintNGStatus())
 
-    # TODO il tipo dovrebbe essere PrometheusTargetModel
-    node_exporters: List[str] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
+    node_exporters: List[PrometheusTargetModel] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**self.fix_types(["state", "provider_data", "create_config"], **kwargs))
@@ -118,19 +124,29 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
     api_day2_function: Callable
 
     def __init__(self, blueprint_id: str, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = None):
+        """
+        Initialize the blueprint, state_type appear to be optional to trick Python type system (see from_db), when overriding this class
+        it is required.
+
+        Args:
+            provider_type:
+            state_type:
+        """
         super().__init__()
-        self.provider = provider_type()
+        self.logger = create_logger(self.__class__.__name__, blueprintid=blueprint_id)
+
         self.state_type = state_type
         state = state_type()
         self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar](
             id=blueprint_id,
             type=get_class_path_str_from_obj(self),
             state_type=get_class_path_str_from_obj(state),
-            state=state,
-            provider_type=get_class_path_str_from_obj(self.provider),
-            provider_data_type=get_class_path_str_from_obj(self.provider.data),
-            provider_data=self.provider.data
+            state=state
         )
+        self.provider = provider_type(self)
+        self.base_model.provider_type = get_class_path_str_from_obj(self.provider)
+        self.base_model.provider_data_type = get_class_path_str_from_obj(self.provider.data)
+        self.base_model.provider_data = self.provider.data
 
     def register_resource(self, resource: Resource):
         """
@@ -152,11 +168,17 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         for key, value in self.base_model.registered_resources.items():
             if isinstance(value.value, VmResource):
                 self.provider.destroy_vm(value.value)
+            elif isinstance(value.value, HelmChartResource):
+                self.provider.uninstall_helm_chart(value.value)
         destroy_ng_blue(blueprint_id=self.base_model.id)
 
     @property
     def state(self) -> StateTypeVar:
         return self.base_model.state
+
+    @property
+    def id(self) -> str:
+        return self.base_model.id
 
     @property
     def create_config(self) -> CreateConfigTypeVar:
@@ -222,7 +244,6 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
                 current = current[key]
             current[path[-1]] = registered_resource[current[path[-1]].split("REF=")[1]].value
 
-
     def __serialize_content(self) -> dict:
         serialized_dict = self.base_model.model_dump()
 
@@ -252,7 +273,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         provider_type = get_class_from_path(provider_type_str)
 
         BlueSavedClass = get_class_from_path(deserialized_dict['type'])
-        instance = BlueSavedClass(deserialized_dict['id'], provider_type) # Had to add a state type
+        instance = BlueSavedClass(deserialized_dict['id'], provider_type)  # Had to add a state type
 
         # Remove fields that need to be manually deserialized from the input and validate
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)
@@ -294,7 +315,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         if detailed:
             return self.__serialize_content()
         else:
-            return {"SUMMARY": f"TO BE IMPLEMENTED: {self.base_model.id}"} # TODO
+            return {"SUMMARY": f"TO BE IMPLEMENTED: {self.base_model.id}"}  # TODO
 
     @classmethod
     @abc.abstractmethod
@@ -302,7 +323,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         pass
 
     @classmethod
-    def init_router(cls,_day0_func: Callable, _day2_func: Callable, prefix: str) -> APIRouter:
+    def init_router(cls, _day0_func: Callable, _day2_func: Callable, prefix: str) -> APIRouter:
         cls.api_day0_function = _day0_func
         cls.api_day2_function = _day2_func
         cls.api_router = APIRouter(
@@ -321,6 +342,5 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
             bound_method = getattr(class_obj, func_name)
 
             cls.api_router.add_api_route(day2_route.final_path, bound_method, methods=day2_route.get_methods_str())
-
 
         return cls.api_router

@@ -1,12 +1,16 @@
+from pathlib import Path
 from typing import Optional, List, Dict
 
 from pydantic import Field
 
+from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from blueprints_ng.blueprint_ng import BlueprintNGCreateModel, BlueprintNGState, BlueprintNG
-from blueprints_ng.providers.blueprint_ng_provider_demo import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
+from blueprints_ng.providers.blueprint_ng_provider_demo import BlueprintNGProviderDataDemo
+from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 from blueprints_ng.providers.blueprint_ng_provider_native import BlueprintsNgProviderNative
-
-from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResource, VmResourceImage, VmResourceFlavor
+from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResource, \
+    VmResourceImage, VmResourceFlavor, HelmChartResource
+from blueprints_ng.utils import rel_path
 from models.base_model import NFVCLBaseModel
 
 
@@ -16,23 +20,21 @@ class DemoCreateModel(BlueprintNGCreateModel):
 
 class UbuntuVmResourceConfiguration(VmResourceAnsibleConfiguration):
     file_content: str = Field(default="")
-    def build_configuration(self, configuration_values: DemoCreateModel):
-        return f"""
-- hosts: all
-  tasks:
-    - name: Writing file
-      shell: |
-        echo '{self.file_content}' > /home/ubuntu/fileprova
-"""
 
     def dump_playbook(self) -> str:
-        return f"""
-- hosts: all
-  tasks:
-    - name: Writing file
-      shell: |
-        echo '{self.file_content}' > /home/ubuntu/fileprova
-"""
+        ansible_builder = AnsiblePlaybookBuilder("Playbook UbuntuVmResourceConfiguration")
+        ansible_builder.add_tasks_from_file(rel_path("play.yaml"))
+
+        ansible_builder.set_var("file_content", self.file_content)
+        ansible_builder.set_var("lb_ipaddresses", ["ADDR1", ["ADDR2"]])
+        ansible_builder.set_var("lb_pools", "ESEEEEE")
+
+        ansible_builder.add_template_task(rel_path("conffile.jinja2"), "/confffff")
+
+        print("#####################################")
+        print(f"{ansible_builder.build()}")
+        print("#####################################")
+        return ansible_builder.build()
 
 
 class FedoraVmResourceConfiguration(VmResourceNativeConfiguration):
@@ -53,6 +55,7 @@ class Pippo(NFVCLBaseModel):
 
 class DemoBlueprintNGState(BlueprintNGState):
     areas: List[str] = Field(default_factory=list)
+    helm_chart: Optional[HelmChartResource] = Field(default=None)
     core_vm: Optional[VmResource] = Field(default=None)
     vm_ubuntu: Optional[VmResource] = Field(default=None)
     vm_fedora: Optional[VmResource] = Field(default=None)
@@ -62,10 +65,26 @@ class DemoBlueprintNGState(BlueprintNGState):
 
 
 class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataDemo, DemoCreateModel]):
+    def __init__(self, provider_type: type[BlueprintNGProviderInterface]):
+        super().__init__(provider_type, DemoBlueprintNGState)
+
     def create(self, create_model: DemoCreateModel):
+        self.state.helm_chart = HelmChartResource(
+            area=0,
+            name=f"prova",
+            # repo="https://mysql.github.io/mysql-operator/",
+            chart="helm_charts/charts/mqttbroker-0.0.3.tgz",
+            chart_as_path=True,
+            # version="9.19.1",
+            namespace=self.id
+        )
+        self.provider.install_helm_chart(self.state.helm_chart, {})
+
+        self.register_resource(self.state.helm_chart)
+
         self.state.vm_ubuntu = VmResource(
             area=0,
-            name="VM Ubuntu",
+            name=f"{self.id}_VM_Ubuntu",
             image=VmResourceImage(name="ubuntu2204"),
             flavor=VmResourceFlavor(),
             username="ubuntu",
@@ -76,7 +95,7 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
 
         self.state.vm_fedora = VmResource(
             area=0,
-            name="VM Fedora",
+            name=f"{self.id}_VM_Fedora",
             image=VmResourceImage(name="Fedora38"),
             flavor=VmResourceFlavor(),
             username="fedora",
@@ -120,7 +139,7 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
     def add_area(self):
         new_vm = VmResource(
             area=1,
-            name="VM Fedora in area 1",
+            name=f"{self.id}_VM Fedora in area 1",
             image=VmResourceImage(name="Fedora38"),
             flavor=VmResourceFlavor(),
             username="fedora",
@@ -143,16 +162,20 @@ class NGDemoBlueprint(BlueprintNG[DemoBlueprintNGState, BlueprintNGProviderDataD
         self.state.vm_ubuntu_configurator.file_content = self.state.vm_fedora.access_ip
         self.provider.configure_vm(self.state.vm_ubuntu_configurator)
 
+    def edit_values(self):
+        self.provider.update_values_helm_chart(self.state.helm_chart, {"prova": "pino"})
+
 
 if __name__ == "__main__":
-    prova = NGDemoBlueprint(BlueprintsNgProviderNative, DemoBlueprintNGState)
+    prova = NGDemoBlueprint(BlueprintsNgProviderNative)
     prova.create(DemoCreateModel(var="CIAOOOO"))
     serializzato = prova.to_db()
     print(serializzato)
     reistanza = NGDemoBlueprint.from_db(serializzato)
-    reistanza.add_area()
-    reistanza.change_file_content_ubuntu()
-    print("PAUSA")
+    reistanza.edit_values()
+    # reistanza.add_area()
+    # reistanza.change_file_content_ubuntu()
+    # print("PAUSA")
     reistanza.destroy()
-    # prova.destroy()
-    print("PAUSA2")
+    # # prova.destroy()
+    # print("PAUSA2")

@@ -1,15 +1,24 @@
+import asyncio
 import tempfile
-from typing import Dict, List
+import time
+from pathlib import Path
+from typing import List
 
 import ansible_runner
-import openstack
+import paramiko
 from openstack.compute.v2.server import Server
+from openstack.connection import Connection
 from openstack.network.v2.port import Port
+from pyhelm3 import Client
 
 from blueprints_ng.providers.blueprint_ng_provider_interface import *
-from blueprints_ng.providers.utils import create_ansible_inventory, wait_for_ssh_to_be_ready
+from blueprints_ng.providers.utils import create_ansible_inventory
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress
+from models.k8s.topology_k8s_model import K8sModel
+from rest_endpoints.k8s import get_k8s_cluster_by_area
+from topology.topology import build_topology
+from utils.openstack.openstack_client import OpenStackClient
 
 
 class BlueprintNGProviderDataNative(BlueprintNGProviderData):
@@ -20,24 +29,51 @@ class BlueprintsNgProviderNativeException(BlueprintNGProviderException):
     pass
 
 
+os_connections_dict: Dict[int, Connection] = {}
+helm_client_dict: Dict[int, Client] = {}
+
+
 class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
-
-    def __init__(self):
-        super().__init__()
+    def __init__(self, blueprint):
+        super().__init__(blueprint)
         self.data: BlueprintNGProviderDataNative = BlueprintNGProviderDataNative()
-        # Initialize and turn on debug logging
-        openstack.enable_logging(debug=False)
+        self.topology = build_topology()
 
-        # Initialize connection
-        self.conn = openstack.connect(cloud='oslab')
+    def __get_os_connection_by_area(self, area: int):
+        global os_connections_dict
+
+        if area in os_connections_dict:
+            return os_connections_dict[area]
+
+        # TODO it only work with one OpenStack instance
+        conn: Connection = OpenStackClient(self.topology.get_vim_from_area_id_model(area)).client
+        os_connections_dict[area] = conn
+        return conn
+
+    def __get_helm_client_by_area(self, area: int):
+        global helm_client_dict
+
+        if area in helm_client_dict:
+            return helm_client_dict[area]
+
+        k8s_cluster: K8sModel = get_k8s_cluster_by_area(area)
+        k8s_credential_file_path = Path(tempfile.gettempdir(), f"k8s_credential_{k8s_cluster.name}")
+        with open(k8s_credential_file_path, mode="w") as k8s_credential_file:
+            k8s_credential_file.write(k8s_cluster.credentials)
+
+        helm_client = Client(kubeconfig=k8s_credential_file_path)
+        helm_client_dict[area] = helm_client
+        return helm_client
 
     def create_vm(self, vm_resource: VmResource):
-        print("create_vm begin")
+        os_conn = self.__get_os_connection_by_area(vm_resource.area)
+
+        self.logger.info(f"Creating VM {vm_resource.name}")
         # Get the image to use for the instance, TODO download it from url if not on server (see OS utils)
-        image = self.conn.get_image(vm_resource.image.name)
+        image = os_conn.get_image(vm_resource.image.name)
 
         # TODO create a new flavor
-        flavor = self.conn.get_flavor("big")
+        flavor = os_conn.get_flavor("big")
 
         # TODO build the cloudinit config, create a generic builder
         cloudin = """
@@ -53,9 +89,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         networks.extend(vm_resource.additional_networks)
 
         # Create the VM and wait for completion
-        server_obj: Server = self.conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=vm_resource.require_floating_ip, network=networks, userdata=cloudin)
-        print("######################################################################")
-        print(server_obj.access_ipv4)
+        server_obj: Server = os_conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=vm_resource.require_floating_ip, network=networks, userdata=cloudin)
 
         # Parse the OS output and create a structured network_interfaces dictionary
         self.__parse_os_addresses(vm_resource, server_obj.addresses)
@@ -67,11 +101,11 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
             vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network].fixed.ip
 
         # Disable port security on very port
-        server_ports: List[Port] = self.conn.list_ports(filters={"device_id": server_obj.id})
+        server_ports: List[Port] = os_conn.list_ports(filters={"device_id": server_obj.id})
         if len(server_ports) != len(networks):
             raise BlueprintsNgProviderNativeException(f"Mismatch in number of request network interface and ports, query: device_id={server_obj.id}")
         for port in server_ports:
-            self.__disable_port_security(port.id)
+            self.__disable_port_security(os_conn, port.id)
 
         # The VM is now created
         vm_resource.created = True
@@ -79,18 +113,41 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         # Register the VM in the provider data, this is needed to be able to delete it using only the vm_resource id
         self.data.os_dict[vm_resource.id] = server_obj.id
 
-        print("create_vm end")
+        self.logger.success(f"Creating VM {vm_resource.name} finished")
 
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration):
         # The parent method checks if the resource is created and throw an exception if not
         super().configure_vm(vm_resource_configuration)
-        print("configure_vm begin")
+        self.logger.info(f"Configuring VM {vm_resource_configuration.vm_resource.name}")
 
         # Different handlers for different configuration types
-        if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  #VmResourceNativeConfiguration
+        if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
             self.__configure_vm_ansible(vm_resource_configuration)
 
-        print("configure_vm end")
+        self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
+
+    def __wait_for_ssh_to_be_ready(self, host: str, port: int, user: str, passwd: str, timeout: int, retry_interval: float) -> bool:
+        self.logger.debug(f"Starting SSH connection to {host}:{port} as user <{user}> and passwd <{passwd}>. Timeout is {timeout}, retry interval is {retry_interval}")
+        client = paramiko.client.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        timeout_start = time.time()
+        while time.time() < timeout_start + timeout:
+            try:
+                client.connect(host, port, username=user, password=passwd, allow_agent=False, look_for_keys=False)
+                self.logger.debug('SSH transport is available!')
+                client.close()
+                return True
+            except paramiko.ssh_exception.SSHException as e:
+                # socket is open, but not SSH service responded
+                self.logger.debug(f"Socket is open, but not SSH service responded: {e}")
+                time.sleep(retry_interval)
+                continue
+
+            except paramiko.ssh_exception.NoValidConnectionsError as e:
+                self.logger.debug('SSH transport is not ready...')
+                time.sleep(retry_interval)
+                continue
+        return False
 
     def __configure_vm_ansible(self, vm_resource_configuration: VmResourceAnsibleConfiguration):
         tmp_playbook = tempfile.NamedTemporaryFile(mode="w")
@@ -110,7 +167,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         # ]
 
         # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections
-        wait_for_ssh_to_be_ready(
+        self.__wait_for_ssh_to_be_ready(
             vm_resource_configuration.vm_resource.access_ip,
             22,
             vm_resource_configuration.vm_resource.username,
@@ -135,18 +192,86 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         tmp_private_data_dir.cleanup()
 
     def destroy_vm(self, vm_resource: VmResource):
-        print("start destroy_vm")
-        self.conn.delete_server(self.data.os_dict[vm_resource.id], wait=True)
-        print("end destroy_vm")
+        os_conn = self.__get_os_connection_by_area(vm_resource.area)
 
-    def install_helm_chart(self):
-        print("install_helm_chart")
+        self.logger.info(f"Destroying VM {vm_resource.name}")
+        os_conn.delete_server(self.data.os_dict[vm_resource.id], wait=True)
+        self.logger.success(f"Destroying VM {vm_resource.name} finished")
 
-    def update_values_helm_chart(self):
-        print("update_values_helm_chart")
+    def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
+        helm_client = self.__get_helm_client_by_area(helm_chart_resource.area)
 
-    def uninstall_helm_chart(self):
-        print("uninstall_helm_chart")
+        self.logger.info(f"Installing Helm chart {helm_chart_resource.name}")
+
+        chart = asyncio.run(helm_client.get_chart(
+            helm_chart_resource.get_chart_converted(),
+            repo=helm_chart_resource.repo,
+            version=helm_chart_resource.version
+        ))
+        print(chart.metadata.name, chart.metadata.version)
+        # print(asyncio.run(chart.readme()))
+
+        # Install or upgrade a release
+        revision = asyncio.run(helm_client.install_or_upgrade_release(
+            helm_chart_resource.name.lower(),
+            chart,
+            values,
+            namespace=helm_chart_resource.namespace.lower(),
+            atomic=True,
+            wait=True
+        ))
+        print(
+            revision.release.name,
+            revision.release.namespace,
+            revision.revision,
+            str(revision.status)
+        )
+        releases = asyncio.run(helm_client.list_releases(all=True, all_namespaces=True))
+        for release in releases:
+            revision = asyncio.run(release.current_revision())
+            print(release.name, release.namespace, revision.revision, str(revision.status))
+
+        self.logger.success(f"Installing Helm chart {helm_chart_resource.name} finished")
+
+    def update_values_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
+        helm_client = self.__get_helm_client_by_area(helm_chart_resource.area)
+
+        chart = asyncio.run(helm_client.get_chart(
+            helm_chart_resource.get_chart_converted(),
+            repo=helm_chart_resource.repo,
+            version=helm_chart_resource.version
+        ))
+        print(chart.metadata.name, chart.metadata.version)
+        # print(asyncio.run(chart.readme()))
+
+        # Install or upgrade a release
+        revision = asyncio.run(helm_client.install_or_upgrade_release(
+            helm_chart_resource.name.lower(),
+            chart,
+            values,
+            namespace=helm_chart_resource.namespace.lower(),
+            atomic=True,
+            wait=True
+        ))
+        print(
+            revision.release.name,
+            revision.release.namespace,
+            revision.revision,
+            str(revision.status)
+        )
+
+    def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
+        helm_client = self.__get_helm_client_by_area(helm_chart_resource.area)
+
+        asyncio.run(helm_client.uninstall_release(
+            helm_chart_resource.name.lower(),
+            namespace=helm_chart_resource.namespace.lower(),
+            wait=True
+        ))
+
+    def configure_hardware(self, hardware_resource_configuration: HardwareResourceConfiguration):
+        print("start configure_hardware")
+        print("end configure_hardware")
 
     def __parse_os_addresses(self, vm_resource: VmResource, addresses):
         for network_name, network_info in addresses.items():
@@ -159,8 +284,8 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
                     floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"])
             vm_resource.network_interfaces[network_name] = VmResourceNetworkInterface(fixed=fixed, floating=floating)
 
-    def __disable_port_security(self, port_id):
+    def __disable_port_security(self, conn: Connection, port_id):
         try:
-            return self.conn.update_port(port_id, port_security_enabled=False, security_groups=[])
+            return conn.update_port(port_id, port_security_enabled=False, security_groups=[])
         except Exception as e:
             raise e

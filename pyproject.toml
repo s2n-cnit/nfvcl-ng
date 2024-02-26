@@ -26,6 +26,7 @@ colorama = "^0.4.6"
 verboselogs = "^1.7"
 ansible-runner = "^2.3.5"
 ansible = "^9.2.0"
+pyhelm3 = "^0.2.0"
 
 
 [build-system]

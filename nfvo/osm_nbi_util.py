@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List
 
 from pydantic import TypeAdapter
+from ruamel.yaml import YAML
 from urllib3.exceptions import InsecureRequestWarning
 from models.k8s.topology_k8s_model import K8sModel
 from models.osm.osm_vnfi_model import VNFiModelOSM
@@ -22,6 +23,11 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 # create logger
 logger = create_logger('OSM NBI')
 
+ruamel_yaml = YAML(typ='unsafe', pure=True)
+ruamel_yaml.preserve_quotes = True
+ruamel_yaml.allow_unicode = True
+ruamel_yaml.default_flow_style = False
+
 
 def nsd_build_package(name, nsd):
     # checking if nsd_packages folder is existing
@@ -34,9 +40,8 @@ def nsd_build_package(name, nsd):
         os.mkdir(path, 0o755)
         Path(path + name + '.yaml').touch()
     with open(path + name + '.yaml', "w+") as nsd_file:
-        content = ruamel.yaml.dump(
-            nsd, Dumper=ruamel.yaml.RoundTripDumper, allow_unicode=True, default_flow_style=False)
-        nsd_file.write(content)
+        ruamel_yaml.dump(nsd, nsd_file)
+        # nsd_file.write(content)
     nsd_file.close()
     if os.path.isfile('/tmp/nsd_packages/' + name + '.tar.gz') is True:
         os.remove('/tmp/nsd_packages/' + name + '.tar.gz')

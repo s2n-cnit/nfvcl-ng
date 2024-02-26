@@ -1,9 +1,14 @@
 import ruamel.yaml
+from ruamel.yaml import YAML
 
 endpoint = []
+
+yaml = YAML(typ='safe', pure=True)
+
+# TODO FIX
 with open("config.yaml", 'r') as stream:
     try:
-        nfvcl_conf = ruamel.yaml.safe_load(stream)
+        nfvcl_conf = yaml.load(stream)
     except ruamel.yaml.YAMLError as exc:
         print(exc)
 

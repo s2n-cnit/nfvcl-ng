@@ -1,5 +1,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
+from typing import Dict
+
 from redis import Redis
 import coloredlogs
 import verboselogs
@@ -19,7 +21,7 @@ def set_log_level(level):
     _log_level = level
 
 
-coloredlog_format_string = "%(asctime)s [%(name)-20.20s][%(threadName)-10.10s] [%(levelname)8s] %(message)s"
+coloredlog_format_string = "%(asctime)s [%(name)-20.20s][%(threadName)-10.10s] [%(levelname)8s] [%(blueprintid)s] %(message)s"
 
 level_styles = {
     'spam': {'color': 'green', 'faint': True},
@@ -52,7 +54,32 @@ ROOT_LOGGER_NAME = "RootLogger"
 formatter = logging.Formatter(coloredlog_format_string)
 
 
-def create_logger(name: str, ov_log_level: int = None) -> logging.Logger:
+class BlueprintIDFilter(logging.Filter):
+    """
+    Class used to add a field for the device name to the logger
+    """
+
+    def __init__(self, blueprintid=None):
+        super().__init__()
+        self.blueprintid = blueprintid
+
+    @classmethod
+    def install(cls, handler, fmt, blueprintid=None, style=coloredlogs.DEFAULT_FORMAT_STYLE):
+        if fmt:
+            parser = coloredlogs.FormatStringParser(style=style)
+            if not parser.contains_field(fmt, 'blueprintid'):
+                return
+        handler.addFilter(cls(blueprintid))
+
+    def filter(self, record):
+        record.blueprintid = self.blueprintid
+        return 1
+
+
+logger_dict: Dict[str, verboselogs.VerboseLogger] = {}
+
+
+def create_logger(name: str, ov_log_level: int = None, blueprintid='SYSTEM') -> verboselogs.VerboseLogger:
     """
     Creates a logger outputting on: console, redis, and on file.
     In this way, an external entity to the NFVCL is able to observe what is going on.
@@ -61,11 +88,18 @@ def create_logger(name: str, ov_log_level: int = None) -> logging.Logger:
     Args:
         name: The name of the logger to be displayed in logs.
         ov_log_level: Can be used to override global log level
+        blueprintid: Blueprint ID to add to the log message
 
     Returns:
 
         The created logger
     """
+    global logger_dict
+    dict_key = f"{name}_{blueprintid}"
+
+    if dict_key in logger_dict:
+        return logger_dict[dict_key]
+
     # If defined use override log level, otherwise the global.
     if ov_log_level is not None:
         local_log_level = ov_log_level
@@ -93,28 +127,31 @@ def create_logger(name: str, ov_log_level: int = None) -> logging.Logger:
         redis_handler.setFormatter(formatter)
         logger.addHandler(redis_handler)
 
-    coloredlogs.install(
-        level=local_log_level,
-        logger=logger,
-        fmt=coloredlog_format_string,
-        field_styles=field_styles,
-        level_styles=level_styles
-    )
+    mod_logger(logger, blueprintid=blueprintid, log_level=local_log_level)
+
+    logger_dict[dict_key] = logger
 
     return logger
 
 
-def mod_logger(logger: logging.Logger):
+def mod_logger(logger: logging.Logger, blueprintid='SYSTEM', log_level=_log_level):
     """
     This method takes an existing logger and mod it.
     """
     coloredlogs.install(
-        level=_log_level,
+        level=log_level,
         logger=logger,
         fmt=coloredlog_format_string,
         field_styles=field_styles,
         level_styles=level_styles
     )
+
+    for handler in logger.handlers:
+        BlueprintIDFilter.install(
+            fmt=coloredlog_format_string,
+            handler=handler,
+            blueprintid=blueprintid
+        )
 
 
 class RedisLoggingHandler(logging.Handler):

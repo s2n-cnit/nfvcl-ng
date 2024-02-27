@@ -106,6 +106,7 @@ class VmResourceNativeConfiguration(VmResourceConfiguration):
     def run_code(self):
         pass
 
+
 class HelmChartResource(ResourceDeployable):
     chart: str = Field()
     chart_as_path: bool = Field(default=False)

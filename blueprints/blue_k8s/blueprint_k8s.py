@@ -700,9 +700,9 @@ class K8sBlue(BlueprintBaseBeta):
                 vld_names = ["mgt"]
                 for pool in self.k8s_model.config.network_endpoints.data_nets:
                     # If the net is not the management one
-                    if pool.net_name != self.k8s_model.config.network_endpoints.mgt:
+                    #if pool.net_name != self.k8s_model.config.network_endpoints.mgt:
                         # Then append the net to virtual link descriptors
-                        vld_names.append('data_{}'.format(pool.net_name))
+                    vld_names.append('data_{}'.format(pool.net_name))
 
                 # Retrieve the complete virtual link descriptors for every link of the network service (k8s WORKER)!
                 vlds: dict[str, List[VirtLinkDescr]] = get_ns_vld_model(nsd.nsi_id, vld_names)

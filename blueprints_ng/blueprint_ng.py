@@ -3,9 +3,6 @@ import abc
 import sys
 import copy
 import importlib
-import json
-import random
-import string
 import uuid
 from datetime import datetime
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
@@ -14,7 +11,7 @@ from models.prometheus.prometheus_model import PrometheusTargetModel
 from pydantic import SerializeAsAny, Field
 from utils.log import create_logger
 
-from blueprints_ng.lcm.blueprint_route_manager import get_routes
+from blueprints_ng.lcm.blueprint_route_manager import get_module_routes
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
 from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource
 from models.base_model import NFVCLBaseModel
@@ -326,6 +323,16 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
     @classmethod
     def init_router(cls, _day0_func: Callable, _day2_func: Callable, prefix: str) -> APIRouter:
+        """
+        Initialize the blueprint router and register apis to it.
+        Args:
+            _day0_func: The function to be pointed for blueprint creation
+            _day2_func: The function that will handle all day-2 operations
+            prefix: The prefix that all the APIs declared in the blueprint will have.
+
+        Returns:
+            The created and configured router.
+        """
         cls.api_day0_function = _day0_func
         cls.api_day2_function = _day2_func
         cls.api_router = APIRouter(
@@ -335,7 +342,8 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         )
         cls.api_router.add_api_route("", cls.rest_create, methods=["POST"])
 
-        for day2_route in get_routes():
+        # The prefix is the base path of the module, e.g., 'api_common_url/vyos/create' -> prefix = 'vyos'
+        for day2_route in get_module_routes(prefix):
             fake_endpoint = day2_route.fake_endpoint
             module_location = fake_endpoint.__module__
             module = sys.modules[module_location]

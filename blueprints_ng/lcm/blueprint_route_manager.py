@@ -95,6 +95,19 @@ def get_route(path: str) -> BlueprintDay2Route:
         raise ValueError(f"There is not function for path {path}")
 
 
+def get_module_routes(module_name: str) -> List[BlueprintDay2Route]:
+    """
+        Returns all the routes that belong to a module.
+
+        Returns:
+            All the routes that start with the module name.
+        """
+    module_routes = []
+    for key in path_function_mapping.keys():
+        if key.startswith(module_name):
+            module_routes.append(path_function_mapping[key])
+    return module_routes
+
 def get_routes() -> List[BlueprintDay2Route]:
     """
         Returns all the routes, used to load all the routes in the blueprint.

@@ -1,44 +1,12 @@
 from pathlib import Path
-from typing import List, Any, Dict, Optional, Union, Text
+from typing import List, Any, Dict, Optional
 
 from jinja2 import Environment, FileSystemLoader
 from pydantic import Field
-from ruamel.yaml import YAML, StringIO
 from typing_extensions import deprecated
 
+from blueprints_ng.utils import get_yaml_parser, get_yaml_parser_jinja2
 from models.base_model import NFVCLBaseModel
-
-
-class MyYAML(YAML):
-    """
-    Custom override of the YAML class to allow the dump method to return a string instead of writing to file
-    """
-
-    def __init__(self: Any, *, typ: Optional[Union[List[Text], Text]] = None, pure: Any = False, output: Any = None, plug_ins: Any = None) -> None:
-        super().__init__(typ=typ, pure=pure, output=output, plug_ins=plug_ins)
-        self.preserve_quotes = True
-
-    def dump(self, data, stream=None, **kw):
-        """
-        This override allow to return a string if no stream is provided
-        Args:
-            data: Data to serialize in yaml
-            stream: Output stream for the serialized data
-            **kw:
-
-        Returns: YAML string if no stream is provided
-        """
-        inefficient = False
-        if stream is None:
-            inefficient = True
-            stream = StringIO()
-        YAML.dump(self, data, stream, **kw)
-        if inefficient:
-            return stream.getvalue()
-
-
-yaml = MyYAML()
-yaml_jinja = MyYAML(typ='jinja2')
 
 
 class AnsiblePlaybook(NFVCLBaseModel):
@@ -57,7 +25,7 @@ class AnsibleTask(NFVCLBaseModel):
 class AnsibleTemplateTask(AnsibleTask):
     src: str = Field()
     dest: str = Field()
-    mode: int = Field(default=664)
+    mode: int = Field(default=777)
     force: str = Field(default="yes")
     backup: str = Field(default="yes")
 
@@ -118,7 +86,7 @@ class AnsiblePlaybookBuilder:
             playbook_file: Path of the playbook file
         """
         with open(playbook_file, 'r+') as stream_:
-            plays_ = yaml.load(stream_)
+            plays_ = get_yaml_parser().load(stream_)
             for task in plays_[0]["tasks"]:
                 self.playbook.tasks.append(task)
 
@@ -126,7 +94,7 @@ class AnsiblePlaybookBuilder:
     def add_tasks_from_file_jinja2(self, playbook_file: Path, confvar):
         env = Environment(loader=FileSystemLoader(playbook_file.parent), extensions=['jinja2_ansible_filters.AnsibleCoreFiltersExtension'])
         template = env.get_template(playbook_file.name)
-        plays_ = yaml_jinja.load(template.render(confvar=confvar))
+        plays_ = get_yaml_parser_jinja2().load(template.render(confvar=confvar))
         for task in plays_[0]["tasks"]:
             self.playbook.tasks.append(task)
 
@@ -165,4 +133,4 @@ class AnsiblePlaybookBuilder:
         Build the playbook and return it as a yaml string
         Returns: YAML string of the playbook
         """
-        return yaml.dump([self.playbook.model_dump()])
+        return get_yaml_parser().dump([self.playbook.model_dump()])

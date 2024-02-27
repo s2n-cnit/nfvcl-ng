@@ -96,9 +96,9 @@ class VmResourceConfiguration(ResourceConfiguration):
 
 
 class VmResourceAnsibleConfiguration(VmResourceConfiguration):
+    @abc.abstractmethod
     def dump_playbook(self) -> str:
-        print("Esegue dump ansible playbook....")
-        return "[[DUMPED PLAYBOOK]]"
+        pass
 
 
 class VmResourceNativeConfiguration(VmResourceConfiguration):

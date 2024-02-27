@@ -1,6 +1,12 @@
 from __future__ import annotations
 from typing import List, Optional
 
+from models.base_model import NFVCLBaseModel
+
+from models.http_models import HttpRequestType
+
+from blueprints_ng.lcm.blueprint_route_manager import add_route
+
 from blueprints_ng.utils import rel_path
 
 from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
@@ -26,6 +32,15 @@ class ExampleCreateModel(BlueprintNGCreateModel):
     chart_value: str = Field()
 
 
+class ExampleAddVMModel(NFVCLBaseModel):
+    """
+    This class represent the model for add request
+    """
+    mgmt_net: str = Field()
+    data_net: str = Field()
+    num: int = Field()
+
+
 class ExampleBlueprintNGState(BlueprintNGState):
     """
     This class represent the current state of the blueprint, the data contained in this class will be saved to the DB
@@ -40,6 +55,9 @@ class ExampleBlueprintNGState(BlueprintNGState):
     vm_ubuntu2: Optional[VmResource] = Field(default=None)
     vm_ubuntu1_configurator: Optional[ExampleVmUbuntuConfigurator] = Field(default=None)
     vm_ubuntu2_configurator: Optional[ExampleVmUbuntuConfigurator] = Field(default=None)
+
+    additional_vms: List[VmResource] = Field(default=[])
+    additional_vms_configurators: List[ExampleVmUbuntuConfigurator] = Field(default=[])
 
     mqtt_helm_chart: Optional[HelmChartResource] = Field(default=None)
 
@@ -170,3 +188,36 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
         This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
         """
         return cls.api_day0_function(msg, request)
+
+    @classmethod
+    def add_vm_endpoint(cls, msg: ExampleAddVMModel, blue_id: str, request: Request):
+        """
+        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
+        """
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @add_route(EXAMPLE_BLUE_TYPE, "/add_vm", [HttpRequestType.POST], add_vm_endpoint)
+    def add_vm(self, model: ExampleAddVMModel):
+        new_vm = VmResource(
+            area=0,
+            name=f"{self.id}_VM_Ubuntu_{model.num}",
+            image=VmResourceImage(name="ubuntu2204"),
+            flavor=VmResourceFlavor(),
+            username="ubuntu",
+            password="ubuntu",
+            management_network=model.mgmt_net,
+            additional_networks=[model.data_net]
+        )
+        self.register_resource(new_vm)
+
+        new_vm_configurator = ExampleVmUbuntuConfigurator(vm_resource=new_vm, file_content="This file is in VM 3", value1=self.state.vm_ubuntu1.access_ip, value_list=["TTest1", "TTest2"])
+        self.register_resource(new_vm_configurator)
+
+        self.state.additional_vms.append(new_vm)
+        self.state.additional_vms_configurators.append(new_vm_configurator)
+
+        self.provider.create_vm(new_vm)
+        self.provider.configure_vm(new_vm_configurator)
+
+        self.state.vm_ubuntu2_configurator.file_content = "Edited by add_vm function"
+        self.provider.configure_vm(self.state.vm_ubuntu2_configurator)

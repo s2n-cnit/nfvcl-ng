@@ -85,7 +85,7 @@ VYOS_BLUE_TYPE = "vyos"
 
 
 @declare_blue_type(VYOS_BLUE_TYPE)
-class VyosBlueprintNG(BlueprintNG[TestBlueprintNGState, BlueprintNGProviderDataDemo, TestCreateModel]):
+class VyosBlueprintNG(BlueprintNG[TestBlueprintNGState, TestCreateModel]):
     def __init__(self, blueprint_id: str, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = TestBlueprintNGState):
         super().__init__(blueprint_id, provider_type, state_type)
 

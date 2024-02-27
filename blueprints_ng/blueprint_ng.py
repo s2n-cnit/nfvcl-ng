@@ -15,7 +15,7 @@ from pydantic import SerializeAsAny, Field
 from utils.log import create_logger
 
 from blueprints_ng.lcm.blueprint_route_manager import get_routes
-from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
+from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
 from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource
 from models.base_model import NFVCLBaseModel
 from utils.persistency import save_ng_blue, destroy_ng_blue
@@ -62,7 +62,7 @@ class RegisteredResource(NFVCLBaseModel):
     value: SerializeAsAny[Resource] = Field()
 
 
-class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar]):
+class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTypeVar]):
     id: str = Field()
     type: str = Field()
 
@@ -80,7 +80,7 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, ProviderDataTyp
     # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
     provider_type: Optional[str] = Field(default=None)
     provider_data_type: Optional[str] = Field(default=None)
-    provider_data: Optional[ProviderDataTypeVar] = Field(default=None)
+    provider_data: Optional[SerializeAsAny[BlueprintNGProviderData]] = Field(default=None)
 
     created: Optional[datetime] = Field(default=None)
     status: BlueprintNGStatus = Field(default=BlueprintNGStatus())
@@ -116,8 +116,8 @@ class BlueprintNGException(Exception):
     pass
 
 
-class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar]):
-    base_model: BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar]
+class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
+    base_model: BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar]
     api_router: APIRouter
     provider: BlueprintNGProviderInterface
     api_day0_function: Callable
@@ -137,7 +137,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
 
         self.state_type = state_type
         state = state_type()
-        self.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar](
+        self.base_model = BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar](
             id=blueprint_id,
             type=get_class_path_str_from_obj(self),
             state_type=get_class_path_str_from_obj(state),
@@ -170,6 +170,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
                 self.provider.destroy_vm(value.value)
             elif isinstance(value.value, HelmChartResource):
                 self.provider.uninstall_helm_chart(value.value)
+        self.provider.final_cleanup()
         destroy_ng_blue(blueprint_id=self.base_model.id)
 
     @property
@@ -261,6 +262,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         """
         Generates the blueprint serialized representation and save it in the database.
         """
+        self.logger.debug("to_db")
         serialized_dict = self.__serialize_content()
         save_ng_blue(self.base_model.id, serialized_dict)
 
@@ -279,7 +281,7 @@ class BlueprintNG(Generic[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)
         del deserialized_dict_edited["registered_resources"]
         deserialized_dict_edited["state"] = instance.state_type().model_dump()
-        instance.base_model = BlueprintNGBaseModel[StateTypeVar, ProviderDataTypeVar, CreateConfigTypeVar].model_validate(deserialized_dict_edited)
+        instance.base_model = BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar].model_validate(deserialized_dict_edited)
 
         # Register the reloaded resources of type ResourceDeployable
         for resource_id, resource in deserialized_dict["registered_resources"].items():

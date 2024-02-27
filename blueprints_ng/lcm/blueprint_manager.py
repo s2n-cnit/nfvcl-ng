@@ -127,6 +127,8 @@ class BlueprintManager:
             BlueClass = get_blueprint_class(path)
             # Instantiate the object (creation of services is done by the worker)
             created_blue: BlueprintNG = BlueClass(blue_id, BlueprintsNgProviderNative)
+            # Saving the new blueprint to db
+            created_blue.to_db()
             # Creating and starting the worker
             worker = BlueprintWorker(created_blue)
             worker.start_listening() # Start another PROCESS

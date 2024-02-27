@@ -1,42 +1,22 @@
 version: '3.8'
 services:
-    oai-spgwu:
-        container_name: "oai-spgwu"
-        image: oaisoftwarealliance/oai-spgwu-tiny:v1.5.1
-        network_mode: "host"
-        ports:
-            - "2152/udp"
-            - "8805/udp"
-            - "8080/tcp"
+    oai-upf{{ confvar.upf_id }}:
+        container_name: "oai-upf{{ confvar.upf_id }}"
+        image: oaisoftwarealliance/oai-upf:v2.0.0
+        expose:
+            - 2152/udp
+            - 8805/udp
+            - 8080/tcp
+        volumes:
+            - ./conf/basic_nrf_config.yaml:/openair-upf/etc/config.yaml
         environment:
             - TZ=Europe/Paris
-            - SGW_INTERFACE_NAME_FOR_S1U_S12_S4_UP={{ confvar.interface }}
-            - SGW_INTERFACE_NAME_FOR_SX={{ confvar.interface }}
-            - PGW_INTERFACE_NAME_FOR_SGI=ens3
-            - NETWORK_UE_NAT_OPTION=yes
-            - NETWORK_UE_IP=12.1.1.0/24
-            - ENABLE_5G_FEATURES=yes
-            - REGISTER_NRF=yes
-            - USE_FQDN_NRF=no
-            - UPF_FQDN_5G=spgwu.external
-            - NRF_IPV4_ADDRESS={{ confvar.ip }}
-            #- NRF_FQDN=oai-nrf
-            # Mandatory to set the NRF PORT to 8080 (it is set to default to 80 otherwise)
-            - HTTP_VERSION=2
-            - NRF_PORT=8080
-            # Slice 0 (1, 0xFFFFFF)
-            - NSSAI_SST_0=1
-            - DNN_0=oai
-            # Slice 1 (1, 1)
-            - NSSAI_SST_1=1
-            - DNN_1=ims
-            # Slice 2 (222, 123)
-#            - NSSAI_SST_2=222
-#            - NSSAI_SD_2=123
-#            - DNN_2=default
         cap_add:
             - NET_ADMIN
             - SYS_ADMIN
         cap_drop:
             - ALL
         privileged: true
+        network_mode: host
+        extra_hosts:
+            - "oai-nrf:{{ confvar.nrf_ipv4_address }}"

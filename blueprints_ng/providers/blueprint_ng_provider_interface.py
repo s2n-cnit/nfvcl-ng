@@ -22,7 +22,8 @@ class BlueprintNGProviderInterface(abc.ABC):
 
     def __init__(self, blueprint):
         super().__init__()
-        self.logger = create_logger(self.__class__.__name__, blueprintid=blueprint.id)
+        self.blueprint = blueprint
+        self.logger = create_logger(self.__class__.__name__, blueprintid=self.blueprint.id)
 
     @abc.abstractmethod
     def create_vm(self, vm_resource: VmResource):
@@ -55,3 +56,7 @@ class BlueprintNGProviderInterface(abc.ABC):
         # TODO check if not in use?
         # if not hardware_resource_configuration.vm_resource.created:
         #     raise BlueprintNGProviderException("VM Resource not created")
+
+    @abc.abstractmethod
+    def final_cleanup(self):
+        pass

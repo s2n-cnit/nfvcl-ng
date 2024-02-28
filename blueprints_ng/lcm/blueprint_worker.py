@@ -49,23 +49,29 @@ class BlueprintWorker:
     def _listen(self):
         self.logger.debug(f"Worker listening")
         while True:
-            received_message: WorkerMessage = self.message_queue.get() # Thread safe
+            received_message: WorkerMessage = self.message_queue.get()  # Thread safe
             self.logger.debug(f"Received message: {received_message.message}")
             match received_message.message_type:
                 case WorkerMessageType.DAY0:
                     # This is the case of blueprint creation (create and start VMs, Dockers, ...)
                     self.logger.info(f"Creating blueprint")
-                    self.blueprint.create(received_message.message)
+                    try:
+                        self.blueprint.create(received_message.message)
+                        self.logger.success(f"Blueprint created")
+                    except Exception as e:
+                        self.logger.error(f"Error creating blueprint", exc_info=e)
                     self.blueprint.to_db()
-                    self.logger.success(f"Blueprint created")
                 case WorkerMessageType.DAY2:
                     self.logger.info(f"Calling function on blueprint")
                     # This is the DAY2 message, getting the function to be called
-                    function = get_function_to_be_called(received_message.path)
-                    # Starting processing the request.
-                    result = getattr(self.blueprint, function)(received_message.message)
+                    try:
+                        function = get_function_to_be_called(received_message.path)
+                        # Starting processing the request.
+                        result = getattr(self.blueprint, function)(received_message.message)
+                        self.logger.success(f"Function called on blueprint")
+                    except Exception as e:
+                        self.logger.error(f"Error calling function on blueprint", exc_info=e)
                     self.blueprint.to_db()
-                    self.logger.success(f"Function called on blueprint")
                 case WorkerMessageType.STOP:
                     self.logger.info(f"Destroying blueprint")
                     self.blueprint.destroy()

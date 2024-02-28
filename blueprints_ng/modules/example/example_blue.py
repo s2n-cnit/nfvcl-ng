@@ -221,3 +221,7 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
 
         self.state.vm_ubuntu2_configurator.file_content = "Edited by add_vm function"
         self.provider.configure_vm(self.state.vm_ubuntu2_configurator)
+
+        self.provider.update_values_helm_chart(self.state.mqtt_helm_chart, {
+            "test": "updated"
+        })

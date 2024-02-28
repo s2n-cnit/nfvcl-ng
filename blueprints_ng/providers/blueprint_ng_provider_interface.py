@@ -25,6 +25,7 @@ class BlueprintNGProviderInterface(abc.ABC):
         self.blueprint = blueprint
         self.logger = create_logger(self.__class__.__name__, blueprintid=self.blueprint.id)
 
+    # ###################################### VMs #########################################
     @abc.abstractmethod
     def create_vm(self, vm_resource: VmResource):
         pass
@@ -38,6 +39,7 @@ class BlueprintNGProviderInterface(abc.ABC):
     def destroy_vm(self, vm_resource: VmResource):
         pass
 
+    # ###################################### K8S #########################################
     @abc.abstractmethod
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         pass
@@ -50,6 +52,7 @@ class BlueprintNGProviderInterface(abc.ABC):
     def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
         pass
 
+    # ###################################### PDU #########################################
     @abc.abstractmethod
     def configure_hardware(self, hardware_resource_configuration: HardwareResourceConfiguration):
         pass
@@ -57,6 +60,7 @@ class BlueprintNGProviderInterface(abc.ABC):
         # if not hardware_resource_configuration.vm_resource.created:
         #     raise BlueprintNGProviderException("VM Resource not created")
 
+    # ###################################### General #########################################
     @abc.abstractmethod
     def final_cleanup(self):
         pass

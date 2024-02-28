@@ -22,18 +22,18 @@ class ConfiguratorK8sBeta(Configurator_Flex):
 
         self.role = role
 
-        ansible_vars = []
+        ansible_vars = {}
 
         if self.role == 'worker':
-            ansible_vars = [{'master_key': master_key}]
+            ansible_vars = {'master_key': master_key}
 
         if self.role == 'master':
-            ansible_vars = [
-                {'pod_network_cidr': config_model.config.pod_network_cidr},
-                {'k8s_master_ip': config_model.config.controller_internal_ip},
-                {'k8s_master_external_ip': config_model.config.controller_ip}
+            ansible_vars = {
+                'pod_network_cidr': config_model.config.pod_network_cidr,
+                'k8s_master_ip': config_model.config.controller_internal_ip,
+                'k8s_master_external_ip': config_model.config.controller_ip
                 # ^-- They are used as ansible vars in playbook_kubernetes_master.yml
-            ]
+            }
 
         self.addPlaybook('blueprints/blue_k8s/config_scripts/playbook_kubernetes_common.yaml', vars_=ansible_vars)
 

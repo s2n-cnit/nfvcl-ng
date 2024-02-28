@@ -190,11 +190,10 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         )
 
         def my_status_handler(data, runner_config):
-            # Do something here
-            # print(data)
-            pass
+            self.logger.info(f"[ANSIBLE] Current status: {data['status']}")
 
         def my_event_handler(data):
+            # TODO change logging type if error
             block = data["stdout"].strip()
             if len(block) > 0:
                 lines = block.split("\n")
@@ -208,7 +207,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         # https://github.com/ansible/ansible-runner/issues/398#issuecomment-948885921
 
         # Run the playbook, TODO better integration, error checking, logging, ...
-        r = ansible_runner.run(
+        ansible_runner_result = ansible_runner.run(
             playbook=tmp_playbook.name,
             inventory=tmp_inventory.name,
             private_data_dir=tmp_private_data_dir.name,
@@ -221,6 +220,9 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         tmp_playbook.close()
         tmp_inventory.close()
         tmp_private_data_dir.cleanup()
+
+        if ansible_runner_result.status == "failed":
+            raise BlueprintsNgProviderNativeException("Error running ansible configurator")
 
     def destroy_vm(self, vm_resource: VmResource):
         os_conn = self.__get_os_connection_by_area(vm_resource.area)

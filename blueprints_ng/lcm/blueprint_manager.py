@@ -126,7 +126,7 @@ class BlueprintManager:
             # Get the class, based on the blue type.
             BlueClass = get_blueprint_class(path)
             # Instantiate the object (creation of services is done by the worker)
-            created_blue: BlueprintNG = BlueClass(blue_id, BlueprintsNgProviderNative)
+            created_blue: BlueprintNG = BlueClass(blue_id, BlueprintsNgProviderNative) # TODO give the possibility to select the provider type
             # Saving the new blueprint to db
             created_blue.to_db()
             # Creating and starting the worker
@@ -156,9 +156,10 @@ class BlueprintManager:
         """
         Deletes all blueprints in the NFVCL (DB+worker).
         """
-        for key, worker in self.worker_collection.items():
-            worker.destroy_blueprint()
-            self.worker_collection.pop(key)
+        blue_list: List[dict] = self._load_all_blue_dict_from_db()
+
+        for blue in blue_list:
+            self.delete_blueprint(blueprint_id=blue['id'])
 
     def get_blueprint_summary_by_id(self, blueprint_id: str, detailed: bool = False) -> dict:
         """

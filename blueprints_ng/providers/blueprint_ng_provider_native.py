@@ -10,6 +10,8 @@ from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.connection import Connection
 from openstack.network.v2.port import Port
+from openstack.network.v2.network import Network
+from openstack.network.v2.subnet import Subnet
 from pyhelm3 import Client
 
 from blueprints_ng.cloudinit_builder import CloudInit
@@ -78,6 +80,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         self.logger.info(f"Creating VM {vm_resource.name}")
         # Get the image to use for the instance, TODO download it from url if not on server (see OS utils)
         image = os_conn.get_image(vm_resource.image.name)
+        if image is None: raise BlueprintsNgProviderNativeException(f"Image >{vm_resource.image.name}< not found")
 
         flavor_str = f"{vm_resource.flavor.memory_mb}-{vm_resource.flavor.vcpu_count}-{vm_resource.flavor.storage_gb}"
         if flavor_str in self.data.flavors:
@@ -102,8 +105,10 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         # Create the VM and wait for completion
         server_obj: Server = os_conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=vm_resource.require_floating_ip, network=networks, userdata=cloudin)
 
+        # Getting detailed info about the networks attached to the machine
+        subnet_detailed = self.__get_network_details(os_conn, networks)
         # Parse the OS output and create a structured network_interfaces dictionary
-        self.__parse_os_addresses(vm_resource, server_obj.addresses)
+        self.__parse_os_addresses(vm_resource, server_obj.addresses, subnet_detailed)
 
         # Find the IP to use for configuring the VM, floating if present or the fixed one from the management interface if not
         if server_obj.access_ipv4 and len(server_obj.access_ipv4) > 0:
@@ -317,15 +322,15 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
             for flavor_str, flavor_name in self.data.flavors.items():
                 os_conn.delete_flavor(flavor_name)
 
-    def __parse_os_addresses(self, vm_resource: VmResource, addresses):
+    def __parse_os_addresses(self, vm_resource: VmResource, addresses, subnet_details: Dict[str, Subnet]):
         for network_name, network_info in addresses.items():
             fixed = None
             floating = None
             for address in network_info:
                 if address["OS-EXT-IPS:type"] == "fixed":
-                    fixed = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"])
+                    fixed = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"], cidr=subnet_details[network_name].cidr)
                 if address["OS-EXT-IPS:type"] == "floating":
-                    floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"])
+                    floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"], cidr=subnet_details[network_name].cidr)
             vm_resource.network_interfaces[network_name] = VmResourceNetworkInterface(fixed=fixed, floating=floating)
 
     def __disable_port_security(self, conn: Connection, port_id):
@@ -333,3 +338,19 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
             return conn.update_port(port_id, port_security_enabled=False, security_groups=[])
         except Exception as e:
             raise e
+
+    def __get_network_details(self, connection: Connection, network_names: List[str]) -> Dict[str, Subnet]:
+        """
+        Given the network names, it retrieves the details of the first subnet of every network
+        Args:
+            connection: The connection to openstack
+            network_names: The network names
+
+        Returns:
+            A list containing the details of every FIRST subnet of the netowrk
+        """
+        subnet_detail_list = {}
+        for network_name in network_names:
+            network_detail: Network = connection.get_network(network_name)
+            subnet_detail_list[network_name] = connection.get_subnet(network_detail.subnet_ids[0])
+        return subnet_detail_list

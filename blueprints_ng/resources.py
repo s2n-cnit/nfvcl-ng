@@ -51,6 +51,10 @@ class VmResourceFlavor(NFVCLBaseModel):
 class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):
     mac: str = Field()
     ip: str = Field()
+    cidr: str = Field()
+
+    def get_prefix(self) -> str:
+        return self.cidr.split('/')[-1]
 
 
 class VmResourceNetworkInterface(NFVCLBaseModel):
@@ -71,7 +75,7 @@ class VmResource(ResourceDeployable):
         become_password (str): The password to be used in the VM to get admin power
         management_network (str): name of the management network attached to VM (like OS network)
         additional_networks (List[str]): name list of network attached to VM (like OS network)
-        network_interfaces (List[Any]): list of network interfaces attached to the VM that includes IP, MAC, port sec, ...
+        network_interfaces (Dict[str, VmResourceNetworkInterface]): list of network interfaces attached to the VM indexed by vim network name.
         state (str): running, stopped, initializated,
     """
     image: VmResourceImage = Field()

@@ -1,1 +1,1 @@
-from .vyos_demo_blue import VyosBlueprintNG
+from .vyos_blueprint import VyOSBlueprint

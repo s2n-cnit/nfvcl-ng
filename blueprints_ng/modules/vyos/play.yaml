@@ -1,5 +1,0 @@
-- hosts: all
-  tasks:
-    - name: Writing file
-      shell: |
-        echo '{{ file_content }}' > /home/ubuntu/fileprova

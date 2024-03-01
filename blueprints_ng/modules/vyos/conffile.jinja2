@@ -1,8 +1,0 @@
-{% for ipa in lb_ipaddresses %}
-  - {{ ipa }}/32
-{% endfor %}
-  autoAssign: false
-
-{% if lb_pools %}
-    lb_pools SETTATO
-{% endif %}

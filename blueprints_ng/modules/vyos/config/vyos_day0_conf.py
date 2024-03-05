@@ -1,19 +1,10 @@
 from __future__ import annotations
-
-from typing import List
-
-from pydantic import Field
-
+from models.blueprint_ng.vyos.vyos_models import AnsibleVyOSConfigTask, AnsibleVyOSStateGather
 from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTask
 from blueprints_ng.resources import VmResourceAnsibleConfiguration
-from blueprints_ng.utils import rel_path
-
-class AnsibleVyOSConfigTask(AnsibleTask):
-    lines: List[str] = Field(default=[])
-    save: str = Field(default='yes')
 
 
-class VmVyOSConfigurator(VmResourceAnsibleConfiguration):
+class VmVyOSDay0Configurator(VmResourceAnsibleConfiguration):
     """
     This class is an example for an Ansible configurator for a VM
 
@@ -41,36 +32,40 @@ class VmVyOSConfigurator(VmResourceAnsibleConfiguration):
 
         loopback_ipaddr = "10.200." + str(self.vm_resource.area%256) + ".1/32"
         config_loopback_task = AnsibleVyOSConfigTask(lines=[f"set interfaces loopback lo address {loopback_ipaddr}"])
-        ansible_builder.add_task('Loopbback int setup', 'vyos.vyos.vyos_config', config_loopback_task)
+        ansible_builder.add_task('Loopback int setup', 'vyos.vyos.vyos_config', config_loopback_task)
+
+        ansible_builder.add_task('Retrieving L1-L2-L3 info form vyos', 'vyos.vyos.vyos_config', AnsibleVyOSStateGather())
+        # TODO how do we andle this?
 
         # Build the playbook and return it
         return ansible_builder.build()
 
     def setup_data_int_task(self) -> AnsibleTask:
+        """
+        Creates a task to configure data interfaces (not the management one)
+        Returns:
+            The ansible task to configure vyos data interfaces.
+        """
         data_int_task: AnsibleVyOSConfigTask
         lines = []
 
         interface_index = 1  # STARTING From 1 because management interface is always present and called eth0
         # This code works because vyos create sequential interfaces starting from eth0, eth1, eth2, ..., ethN
-
-
         for network_name, interface in self.vm_resource.network_interfaces.items():
             if self.vm_resource.management_network == network_name:
                 continue
-            # Getting prefix length
+            # Getting prefix length of the net
             prefix_length = interface.fixed.get_prefix()
+            # Get the IP assigned to the interface
             interface_address = interface.fixed.ip
-
-            # NOTE: the ip address is got by get IP address, but OSM is not reporting netmask! setting /24 as default
             if interface_address is None:
                 lines.append("set interfaces ethernet eth{} address dhcp".format(interface_index))
             else:
-                lines.append("set interfaces ethernet eth{} address {}/{}".format(interface_index, interface_address,
-                                                                                  prefix_length))
+                lines.append("set interfaces ethernet eth{} address {}/{}".format(interface_index, interface_address,prefix_length))
             lines.append("set interfaces ethernet eth{} description \'{}\'".format(interface_index, self.vm_resource.id))
             lines.append("set interfaces ethernet eth{} duplex auto".format(interface_index))
             lines.append("set interfaces ethernet eth{} speed auto".format(interface_index))
-            # MAX supported MTU is 1450 by OPENSTACK
+            # MAX supported MTU is 1450 by OPENSTACK !!!!!
             lines.append("set interfaces ethernet eth{} mtu 1450".format(interface_index))
             interface_index = interface_index + 1
 

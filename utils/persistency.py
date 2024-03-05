@@ -12,6 +12,7 @@ nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 mongo_client: MongoClient = MongoClient("mongodb://{}:{}/".format(nfvcl_config.mongodb.host, nfvcl_config.mongodb.port))
 OSSdb = mongo_client[nfvcl_config.mongodb.db]
 
+# TODO delete this file and use database.py
 persistent_collections = [
     "blueprints",
     "license",
@@ -78,9 +79,11 @@ class DB:
         return db.count_documents(data) > 0
 
     @staticmethod
-    def find_DB(collection, data):
+    def find_DB(collection, data, exclude=None):
+        if exclude is None:
+            exclude = {'_id': False}
         db = OSSdb[collection]
-        return db.find(data)
+        return db.find(data, projection=exclude)
 
     @staticmethod
     def findone_DB(collection, data):

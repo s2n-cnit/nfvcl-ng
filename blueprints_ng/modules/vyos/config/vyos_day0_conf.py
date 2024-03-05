@@ -34,7 +34,8 @@ class VmVyOSDay0Configurator(VmResourceAnsibleConfiguration):
         config_loopback_task = AnsibleVyOSConfigTask(lines=[f"set interfaces loopback lo address {loopback_ipaddr}"])
         ansible_builder.add_task('Loopback int setup', 'vyos.vyos.vyos_config', config_loopback_task)
 
-        ansible_builder.add_task('Retrieving L1-L2-L3 info form vyos', 'vyos.vyos.vyos_config', AnsibleVyOSStateGather())
+        ansible_builder.add_task('Retrieving L1 info form vyos', 'vyos.vyos.vyos_interfaces', AnsibleVyOSStateGather())
+        ansible_builder.add_task('Retrieving L3 info form vyos', 'vyos.vyos.vyos_l3_interfaces', AnsibleVyOSStateGather())
         # TODO how do we andle this?
 
         # Build the playbook and return it

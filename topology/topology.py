@@ -202,7 +202,7 @@ class Topology:
         vim_dict['config']['use_floating_ip'] = use_floating_ip
 
         # Adding the VIM on OSM
-        data = self.osm_nbi_util.add_vim(vim_dict)
+        data = get_osm_nbi_utils().add_vim(vim_dict)
         if not data:
             raise ValueError("failed to onboard VIM {} onto OSM".format(vim_model.name))
 
@@ -215,12 +215,12 @@ class Topology:
         # In every case (of terraform) we need to delete VIM account from OSM.
         try:
             # Check that VIM is present on OSM -> Raise error if not
-            osm_vim = self.osm_nbi_util.get_vim_by_tenant_and_name(vim_model.name, vim_model.vim_tenant_name)
+            osm_vim = get_osm_nbi_utils().get_vim_by_tenant_and_name(vim_model.name, vim_model.vim_tenant_name)
 
             logger.info('Removing VIM {} from osm'.format(vim_model.name))
             try:
                 # Remote deletion from OSM
-                self.osm_nbi_util.del_vim(osm_vim['_id'])
+                get_osm_nbi_utils().del_vim(osm_vim['_id'])
             except ValueError as error:
                 logger.error(f"VIM >{vim_name}< has not been deleted from OSM: {error}")
                 return  # In case of error, stop here and does not delete from the topology
@@ -816,7 +816,7 @@ class Topology:
 
             # Create vim accounts list to be uploaded into OSM
             vim_accounts = []
-            for vim in self.osm_nbi_util.get_vims():
+            for vim in get_osm_nbi_utils().get_vims():
                 vim_accounts.append(vim['_id'])
 
             # Upload the PDU into OSM
@@ -856,7 +856,7 @@ class Topology:
         pdu = self._model.get_pdu(pdu_name)
 
         if pdu.nfvo_onboarded:
-            res = self.osm_nbi_util.delete_pdu(pdu_name)
+            res = get_osm_nbi_utils().delete_pdu(pdu_name)
             logger.info("Deleting pdu from OSM, result: {}".format(res))
 
             if res:
@@ -918,7 +918,7 @@ class Topology:
             data: the k8s cluster to be adde
         """
         # Delegate add operation to the model. Registering the cluster on OSM if requested
-        self._model.add_k8s_cluster(data, self.osm_nbi_util)
+        self._model.add_k8s_cluster(data, get_osm_nbi_utils())
 
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_CREATE_K8S, data.model_dump())
@@ -931,7 +931,7 @@ class Topology:
         Args:
             cluster_id: The id (or name) of the cluster to be removed
         """
-        k8s_deleted_cluster = self._model.del_k8s_cluster(cluster_id, self.osm_nbi_util)
+        k8s_deleted_cluster = self._model.del_k8s_cluster(cluster_id, get_osm_nbi_utils())
 
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_deleted_cluster.model_dump())
@@ -943,7 +943,7 @@ class Topology:
         Args:
             cluster: The k8s cluster to be added in the topology
         """
-        updated_cluster = self._model.upd_k8s_cluster(cluster, self.osm_nbi_util)
+        updated_cluster = self._model.upd_k8s_cluster(cluster, get_osm_nbi_utils())
 
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_UPDATE_K8S, updated_cluster.model_dump())

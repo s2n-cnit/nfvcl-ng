@@ -30,7 +30,7 @@ from rest_endpoints.openstack import openstack_router
 swagger_parameters={"syntaxHighlight.theme": "obsidian", "tryItOutEnabled": True, "deepLinking": True}
 app = FastAPI(
     title="NFVCL",
-    # description=description,
+    description="CNIT/UniGe S2N Lab NFVCL",
     version=_nfvcl_config.nfvcl.version,
     license_info={
         "name": "Apache 2.0",

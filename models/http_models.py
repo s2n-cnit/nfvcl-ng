@@ -7,9 +7,6 @@ from fastapi import HTTPException, status, Header
 
 
 ############### EXCEPTIONS ###############################
-class BlueprintNGException(Exception):
-    pass
-
 class BlueprintNotFoundException(HTTPException):
     def __init__(self, blueprint_id: str) -> None:
         super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=f"Blueprint {blueprint_id} not found", headers=None)

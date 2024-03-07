@@ -3,12 +3,17 @@ echo "Adding MongoDB GPG keys..."
 curl -fsSL https://www.mongodb.org/static/pgp/server-6.0.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/mongodb-6.gpg
 echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
 
-echo "Adding Python 3.11 repo"
+echo "Adding Python 3.11 and ansible repo"
 sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt-add-repository --yes --update ppa:ansible/ansible
 sudo apt update
 
 echo "Installing python3.11"
 sudo apt install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils
+
+echo "Installing Ansible"
+sudo apt install -y ansible
+sudo echo -e "[defaults]\nhost_key_checking = False" >> /etc/ansible/ansible.cfg
 
 echo "Installing Poetry"
 curl -sSL https://install.python-poetry.org | python3 -
@@ -36,7 +41,12 @@ kubectl set env deployment -n osm lcm OSMLCM_VCA_EEGRPC_POD_ADMISSION_POLICY=pri
 
 # Needed by some python packages (netifaces)
 echo "Installing build essential tools"
-sudo apt install build-essential
+sudo apt install -y build-essential
 
 echo "Installing Python project dependencies"
 /home/ubuntu/.local/bin/poetry install
+
+echo "Installing Ansible Collections"
+sudo ansible-galaxy collection install vyos.vyos
+sudo ansible-galaxy collection install prometheus.prometheus
+sudo ansible-galaxy collection install git+https://github.com/s2n-cnit/nfvcl-ansible-collection.git,v0.0.1

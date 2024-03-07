@@ -16,7 +16,7 @@ class NfvoStatus(Enum):
 
 class K8sVersion(str, Enum):
     """
-    This class represent a k8s version. This should represent supported versions of k8s clusters by k8s manager.
+    This class represents a k8s version. This should represent supported versions of k8s clusters by k8s manager.
     It has the utilities for checking if the version is present and to compare versions.
     """
     V1_24 = 'v1.24'
@@ -24,6 +24,8 @@ class K8sVersion(str, Enum):
     V1_26 = 'v1.26'
     V1_27 = 'v1.27'
     V1_28 = 'v1.28'
+    V1_29 = 'v1.29'
+    V1_30 = 'v1.30'
 
     @classmethod
     def has_value(cls, value):

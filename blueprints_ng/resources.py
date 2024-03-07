@@ -49,15 +49,36 @@ class VmResourceFlavor(NFVCLBaseModel):
 
 
 class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):
+    """
+    Represent a VM network interface.
+
+    Attributes:
+        interface_name (str): The name of the network interface inside the VM
+        mac (str): The MAC address of the interface inside the VM
+        ip (str): The IP address of the interface inside the VM
+        cidr (str): The IP network attached to the interface
+    """
+    interface_name: str = Field(default="")
     mac: str = Field()
     ip: str = Field()
     cidr: str = Field()
 
     def get_prefix(self) -> str:
+        """
+        Retrieve the prefix of the network attached to the interface
+        Returns:
+            The prefix of the network attached to the interface (8,16,24, ...)
+        """
         return self.cidr.split('/')[-1]
 
 
 class VmResourceNetworkInterface(NFVCLBaseModel):
+    """
+
+    Attributes:
+        fixed (VmResourceNetworkInterfaceAddress): The IP address of the network interface
+        floating (VmResourceNetworkInterfaceAddress): The floating IP assigned to the interface
+    """
     fixed: VmResourceNetworkInterfaceAddress = Field()
     floating: Optional[VmResourceNetworkInterfaceAddress] = Field(default=None)
 

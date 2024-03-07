@@ -14,6 +14,9 @@ class VmVyOSDay0Configurator(VmResourceAnsibleConfiguration):
     def dump_playbook(self) -> str:
         """
         This method need to be implemented, it should return the Ansible playbook as a string
+
+        References:
+            https://galaxy.ansible.com/ui/repo/published/vyos/vyos/docs/
         """
 
         # While not mandatory it is recommended to use AnsiblePlaybookBuilder to create the playbook

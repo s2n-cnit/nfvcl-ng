@@ -47,18 +47,26 @@
          - gnupg2
          - vim
          - software-properties-common
+         - gpg
        state: present
        update_cache: yes
+   - name: Create folder
+     shell: install -m 0755 -d /etc/apt/keyrings
    - name: Adding docker GPG keys
-     shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmour -o /etc/apt/trusted.gpg.d/docker.gpg
-   - name: Add the repository to Apt sources
-     shell: sudo add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+     shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+   - name: Adjusting Docker keyring permission
+     shell: chmod a+r /etc/apt/keyrings/docker.asc
+   - name: Add docker repo
+     shell: echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+   - name: Update repos after docker
+     apt:
+       update_cache: yes
    - name: Install containerd.
      apt: 
        name:
-         - containerd.io=1.6.27-1
-         - docker-ce=5:25.0.0-1~ubuntu.22.04~jammy
-         - docker-ce-cli=5:25.0.0-1~ubuntu.22.04~jammy
+         - containerd.io=1.6.28-1
+         - docker-ce=5:25.0.3-1~ubuntu.22.04~jammy
+         - docker-ce-cli=5:25.0.3-1~ubuntu.22.04~jammy
        state: present
        update_cache: yes
    - name: Hold containerd
@@ -98,15 +106,18 @@
        enabled: yes
        daemon-reload: yes
    - name: Add Google official GPG key
-     shell: curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmour -o /etc/apt/trusted.gpg.d/kubernetes-xenial.gpg
+     shell: curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
    - name: Add Kubernetes Repository
-     shell: apt-add-repository -y "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+     shell: echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+   - name: Update repos after kubernetes keys
+     apt:
+       update_cache: yes
    - name: Installing Kubernetes Cluster Packages.
      apt: 
        name:
-         - kubeadm=1.28.2-00
-         - kubectl=1.28.2-00
-         - kubelet=1.28.2-00
+         - kubeadm=1.29.2-1.1
+         - kubectl=1.29.2-1.1
+         - kubelet=1.29.2-1.1
        state: present
    - name: Hold kubeadm
      ansible.builtin.dpkg_selections:
@@ -124,11 +135,4 @@
      service: 
        name: kubelet
        enabled: yes
-   - name: Reboot all the kubernetes nodes.
-     reboot:
-       post_reboot_delay: 20
-       reboot_timeout: 60
-       connect_timeout: 180
-       test_command: uptime
-   - pause: seconds=20
 ...

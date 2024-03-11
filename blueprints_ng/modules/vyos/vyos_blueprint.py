@@ -63,7 +63,7 @@ class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
             area=create_model.area,
             name=f"{self.id}_VM_VyOS",
             image=VmResourceImage(name="VyOS"),
-            flavor=VmResourceFlavor(),
+            flavor=VmResourceFlavor(memory_mb="4096", storage_gb='16', vcpu_count='2'),
             username="vyos",
             password="vyos",
             management_network=create_model.mgmt_net,

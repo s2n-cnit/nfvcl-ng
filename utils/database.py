@@ -13,6 +13,7 @@ nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 NFVCL_DB_BACKUP_PATH: Path = Path("db_backup.json")
 BLUE_COLLECTION_V2 = "blue-inst-v2"
+TOPOLOGY_COLLECTION = "topology"
 
 class NFVCLDatabase(object, metaclass=Singleton):
 
@@ -33,6 +34,12 @@ class NFVCLDatabase(object, metaclass=Singleton):
         # dictionary specifying the query to be performed
         collection = self.mongo_database[collection]
         return collection.find(data)
+
+
+    def exists_in_collection(self, collection, data):
+        collection = self.mongo_database[collection]
+
+        return collection.count_documents(data) > 0
 
     def update_in_collection(self, collection, data, filter):
         db = self.mongo_database[collection]
@@ -73,3 +80,73 @@ def get_ng_blue_list(blueprint_type: str = None) -> List[dict]:
         blue_filter = {'type': type}
     blue_list = NFVCLDatabase().find_collection(BLUE_COLLECTION_V2, blue_filter)
     return list(blue_list)
+
+def get_ng_blue_by_id_filter(blueprint_id: str) -> dict | None:
+    """
+    Retrieve a blueprint from the database, given the blueprint ID.
+
+    Args:
+        blueprint_id: The blueprint ID
+
+    Returns:
+        The FIRST MATCH of blueprint (dict) if found, None otherwise.
+    """
+    blue_list = NFVCLDatabase().find_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id})
+    for blue in blue_list:
+        return blue # Return the first match
+    return None
+
+
+def save_ng_blue(blueprint_id: str, dict_blue: dict):
+    """
+    Save a blueprint to the database. IF already existing it updates the object, otherwise it creates a new one.
+
+    Args:
+        blueprint_id: The blueprint ID, used to look for blueprints in the database.
+        dict_blue: The object to be saved/updated.
+
+    Returns:
+        The result of the operation (saved object)
+    """
+    database_instance = NFVCLDatabase()
+    if database_instance.exists_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id}):
+        return database_instance.update_in_collection(BLUE_COLLECTION_V2, dict_blue,{'id': blueprint_id})
+    else:
+        return database_instance.insert_in_collection(BLUE_COLLECTION_V2, dict_blue)
+
+def destroy_ng_blue(blueprint_id: str):
+    """
+    Destroy a blueprint in the database if it exists.
+    Args:
+        blueprint_id: The blueprint ID
+
+    Returns:
+        The destroyed blueprint.
+    """
+    return NFVCLDatabase().delete_from_collection(BLUE_COLLECTION_V2, {'id': blueprint_id})
+
+
+def save_topology(dict_topo: dict):
+    """
+    Save a blueprint to the database. If it is already existing, it updates the object, otherwise it creates a new one.
+
+    Args:
+        dict_topo: The dict of topology to be saved.
+
+    Returns:
+        The result of the operation (saved object)
+    """
+    database_instance = NFVCLDatabase()
+    if database_instance.exists_in_collection(TOPOLOGY_COLLECTION, {'id': 'topology'}): # TOPO is unique, fixed ID
+        return database_instance.update_in_collection(TOPOLOGY_COLLECTION, dict_topo, {'id': 'topology'})
+    else:
+        return database_instance.insert_in_collection(TOPOLOGY_COLLECTION, dict_topo)
+
+def delete_topology():
+    """
+    Destroy the topology in the database if it exists.
+
+    Returns:
+        The destroyed topology.
+    """
+    return NFVCLDatabase().delete_from_collection(BLUE_COLLECTION_V2, {'id': 'topology'})

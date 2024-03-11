@@ -9,7 +9,6 @@ from models.blueprint.common import BluePrometheus
 from models.blueprint.rest_blue import BlueGetDataModel, ShortBlueModel
 from models.network import NetworkModel, PduModel
 from nfvo import nsd_build_package, NbiUtil
-from utils.prometheus_manager import PrometheusMan
 from models.blueprint.blue_types import blueprint_types
 from typing import List, Dict, Union, Callable
 from fastapi import APIRouter, HTTPException, status
@@ -556,47 +555,6 @@ class BlueprintBaseBeta(abc.ABC):
             for configurator in self.base_model.vnf_configurator:
                 res.append(configurator.enable_elk(args)[-1])
 
-        return res
-
-    def enable_prometheus(self, args):
-        # TODO check if it is used and working
-        # global PrometheusMan
-        # NOTE check if the Blue is in "day2" status
-        res = []
-        if "vnf_type" in args:
-            for configurator in self.base_model.vnf_configurator:
-                if configurator.blue_type() == args["vnf_type"]:
-                    res.append(configurator.enable_prometheus(args)[-1])
-            return res
-        elif "ns_type" in args:
-            for nsd in self.base_model.nsd_:
-                if nsd.type == args["ns_type"]:
-                    for configurator in self.base_model.vnf_configurator:
-                        if configurator.nsd_id == nsd.nsd_id:
-                            res.append(configurator.enable_prometheus(args)[-1])
-            return res
-        elif "nsi_id" in args:
-            for nsd in self.base_model.nsd_:
-                if nsd.nsi_id == args["nsi_id"]:
-                    for configurator in self.base_model.vnf_configurator:
-                        if configurator.nsd_id == nsd.nsd_id:
-                            res.append(configurator.enable_prometheus(args)[-1])
-            return res
-        elif "nsd_id" in args:
-            for nsd in self.base_model.nsd_:
-                if nsd.nsd_id == args["nsd_id"]:
-                    for configurator in self.base_model.vnf_configurator:
-                        if configurator.nsd_id == nsd.nsd_id:
-                            if "vnfd_id" in args:
-                                if configurator.nsd['member-vnfd-id'] == args["vnfd_id"]:
-                                    res.append(configurator.enable_prometheus(args)[-1])
-                            else:
-                                res.append(configurator.enable_prometheus(args)[-1])
-        else:
-            for configurator in self.base_model.vnf_configurator:
-                res.append(configurator.enable_prometheus(args)[-1])
-        PrometheusMan.transferFile()
-        logger.info("prometheus instrumenting ended")
         return res
 
     def store_primitives(self, primitive_report):

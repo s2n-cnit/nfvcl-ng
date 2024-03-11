@@ -1,5 +1,7 @@
 from logging import Logger
 from redis.client import Redis
+from utils.database import save_topology, delete_topology
+
 from models.event import Event
 from models.k8s.common_k8s_model import LBPool
 from models.k8s.topology_k8s_model import K8sModel
@@ -47,9 +49,8 @@ def trigger_event(event_name: TopologyEventType, data: dict):
 class Topology:
     _model: TopologyModel | None
 
-    def __init__(self, topo: Union[dict, None], db: OSSdb, osmnbiutil: NbiUtil, lock: RLock):
+    def __init__(self, topo: Union[dict, None], db: OSSdb, lock: RLock):
         self.db = db
-        self.osm_nbi_util = osmnbiutil
         self.lock = lock
         self._os_terraformer = {}
         if topo:
@@ -89,7 +90,7 @@ class Topology:
             data = TopologyModel.model_validate(topo).model_dump()
         else:
             data = None
-        return cls(data, db, nbiutil, lock)
+        return cls(data, db, lock)
 
     def _save_topology(self) -> None:
         """
@@ -98,7 +99,7 @@ class Topology:
         content = TopologyModel.model_validate(self._data)
         self._model = content
         plain_dict = json.loads(content.model_dump_json())
-        self.db.update_DB("topology", plain_dict, {'id': 'topology'})
+        save_topology(plain_dict)
 
     def _save_topology_from_model(self) -> None:
         """
@@ -107,7 +108,7 @@ class Topology:
         content = self._model
         self._data = content.model_dump()
         plain_dict = json.loads(content.model_dump_json())
-        self.db.update_DB("topology", plain_dict, {'id': 'topology'})
+        save_topology(plain_dict)
 
     # **************************** Topology ***********************
     def get(self) -> dict:
@@ -161,8 +162,8 @@ class Topology:
 
         self._os_terraformer = {}
 
+        delete_topology()
         self._model = None
-        self.db.delete_DB('topology', {'id': 'topology'})
         trigger_event(TopologyEventType.TOPO_DELETE, deleted_topology.model_dump())
 
     # **************************** VIMs ****************************
@@ -1026,5 +1027,5 @@ def build_topology() -> Topology:
         A topology object ready to operate on the topology.
     """
     nbiUtil = get_osm_nbi_utils()
-    db = persistency.DB()
+    db = persistency.DB() # TODO remove
     return Topology.from_db(db,nbiUtil,topology_lock)

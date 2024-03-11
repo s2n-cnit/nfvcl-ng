@@ -6,7 +6,6 @@ from models.k8s.topology_k8s_model import K8sModel
 from models.network import PduModel
 from models.network.network_models import IPv4ReservedRange
 from nfvo import nsd_build_package, NbiUtil
-from utils.prometheus_manager import PrometheusMan
 from .db_blue_model import DbBlue
 from models.blueprint.blue_types import blueprint_types
 from typing import List, Dict, Union, Callable
@@ -542,46 +541,6 @@ class BlueprintBase(abc.ABC):
             for c in self.vnf_configurator:
                 res.append(c.enable_elk(args)[-1])
 
-        return res
-
-    def enable_prometheus(self, args):
-        # global PrometheusMan
-        # NOTE check if the Blue is in "day2" status
-        res = []
-        if "vnf_type" in args:
-            for c in self.vnf_configurator:
-                if c.blue_type() == args["vnf_type"]:
-                    res.append(c.enable_prometheus(args)[-1])
-            return res
-        elif "ns_type" in args:
-            for s in self.nsd_:
-                if s["type"] == args["ns_type"]:
-                    for c in self.vnf_configurator:
-                        if c.nsd_id == s.nsd_id:
-                            res.append(c.enable_prometheus(args)[-1])
-            return res
-        elif "nsi_id" in args:
-            for s in self.nsd_:
-                if s["nsi_id"] == args["nsi_id"]:
-                    for c in self.vnf_configurator:
-                        if c.nsd_id == s.nsd_id:
-                            res.append(c.enable_prometheus(args)[-1])
-            return res
-        elif "nsd_id" in args:
-            for s in self.nsd_:
-                if s["nsd_id"] == args["nsd_id"]:
-                    for c in self.vnf_configurator:
-                        if c.nsd_id == s.nsd_id:
-                            if "vnfd_id" in args:
-                                if c.nsd['member-vnfd-id'] == args["vnfd_id"]:
-                                    res.append(c.enable_prometheus(args)[-1])
-                            else:
-                                res.append(c.enable_prometheus(args)[-1])
-        else:
-            for c in self.vnf_configurator:
-                res.append(c.enable_prometheus(args)[-1])
-        PrometheusMan.transferFile()
-        logger.info("prometheus instrumenting ended")
         return res
 
     def store_primitives(self, primitive_report):

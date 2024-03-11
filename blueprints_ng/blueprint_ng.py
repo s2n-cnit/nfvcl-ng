@@ -15,7 +15,7 @@ from blueprints_ng.lcm.blueprint_route_manager import get_module_routes
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
 from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource
 from models.base_model import NFVCLBaseModel
-from utils.persistency import save_ng_blue, destroy_ng_blue
+from utils.database import save_ng_blue, destroy_ng_blue
 
 StateTypeVar = TypeVar("StateTypeVar")
 ProviderDataTypeVar = TypeVar("ProviderDataTypeVar")

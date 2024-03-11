@@ -7,10 +7,9 @@ from fastapi import APIRouter
 from blueprints_ng.blueprint_ng import BlueprintNG
 from blueprints_ng.lcm.blueprint_type_manager import get_blueprint_class, get_registered_modules
 from blueprints_ng.lcm.blueprint_worker import BlueprintWorker
-from blueprints_ng.providers.blueprint_ng_provider_demo import BlueprintsNgProviderDemo
 from models.blueprint_ng.worker_message import WorkerMessageType
 from models.http_models import BlueprintNotFoundException, BlueprintAlreadyExisting
-from utils.persistency import get_ng_blue_by_id_filter, get_ng_blue_list
+from utils.database import get_ng_blue_by_id_filter, get_ng_blue_list
 from utils.log import create_logger
 from utils.util import generate_blueprint_id
 

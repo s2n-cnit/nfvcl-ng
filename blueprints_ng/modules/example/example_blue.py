@@ -91,6 +91,12 @@ class ExampleVmUbuntuConfigurator(VmResourceAnsibleConfiguration):
         # This will compile the 'example_conf_file.jinja2' file using jinja2 and save the result in the '/example_conf.cfg' file on the server
         ansible_builder.add_template_task(rel_path("example_conf_file.jinja2"), "/example_conf.cfg")
 
+        # This adds a task to gather a variable present in Ansible and return it to NFVCL
+        ansible_builder.add_gather_var_task("kernel_version")
+
+        # Add a simple task that run a command and return the output to NFVCL in a variable
+        ansible_builder.add_run_command_and_gather_output_tasks("lsb_release -a", "ubuntu_version")
+
         # Build the playbook and return it
         return ansible_builder.build()
 
@@ -156,7 +162,12 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
         self.register_resource(self.state.vm_ubuntu2_configurator)
 
         # The same need to be done to apply the configuration to the VMs
-        self.provider.configure_vm(self.state.vm_ubuntu1_configurator)
+        ubuntu1_facts = self.provider.configure_vm(self.state.vm_ubuntu1_configurator)
+
+        # ubuntu1_facts contains every fact present in the Ansible fact cache
+        self.logger.warning(f"Ubuntu1 Kernel: {ubuntu1_facts['kernel_version']['stdout']}")
+        self.logger.warning(f"Ubuntu1 Version: {ubuntu1_facts['ubuntu_version']}")
+
         self.provider.configure_vm(self.state.vm_ubuntu2_configurator)
 
         # ################################# K8S Example #####################################

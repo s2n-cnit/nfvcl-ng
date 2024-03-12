@@ -3,3 +3,11 @@
     - name: Writing file
       shell: |
         echo '{{ file_content }}' > /home/ubuntu/example_file
+
+    - name: Example set fact from playbook file
+      ansible.builtin.set_fact:
+        cacheable : true # Needed to be able to read this fact in NFVCL
+        fact_test: "FACT TEST VALUE"
+
+    - shell: uname -a
+      register: kernel_version # This is not enough to read it from NFVCL, a set_fact is still needed

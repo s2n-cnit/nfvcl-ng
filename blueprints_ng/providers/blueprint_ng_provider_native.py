@@ -116,7 +116,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         else:
             vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network].fixed.ip
 
-        # Disable port security on very port
+        # Disable port security on every port
         server_ports: List[Port] = os_conn.list_ports(filters={"device_id": server_obj.id})
         if len(server_ports) != len(networks):
             raise BlueprintsNgProviderNativeException(f"Mismatch in number of request network interface and ports, query: device_id={server_obj.id}")
@@ -132,17 +132,21 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         self.logger.success(f"Creating VM {vm_resource.name} finished")
         self.blueprint.to_db()
 
-    def configure_vm(self, vm_resource_configuration: VmResourceConfiguration):
+    def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         # The parent method checks if the resource is created and throw an exception if not
         super().configure_vm(vm_resource_configuration)
         self.logger.info(f"Configuring VM {vm_resource_configuration.vm_resource.name}")
 
+        configurator_facts = None
+
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            self.__configure_vm_ansible(vm_resource_configuration)
+            configurator_facts = self.__configure_vm_ansible(vm_resource_configuration)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
         self.blueprint.to_db()
+
+        return configurator_facts
 
     def __wait_for_ssh_to_be_ready(self, host: str, port: int, user: str, passwd: str, timeout: int, retry_interval: float) -> bool:
         self.logger.debug(f"Starting SSH connection to {host}:{port} as user <{user}> and passwd <{passwd}>. Timeout is {timeout}, retry interval is {retry_interval}")
@@ -167,7 +171,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
                 continue
         return False
 
-    def __configure_vm_ansible(self, vm_resource_configuration: VmResourceAnsibleConfiguration):
+    def __configure_vm_ansible(self, vm_resource_configuration: VmResourceAnsibleConfiguration) -> dict:
         tmp_playbook = tempfile.NamedTemporaryFile(mode="w")
         tmp_inventory = tempfile.NamedTemporaryFile(mode="w")
         tmp_private_data_dir = tempfile.TemporaryDirectory()
@@ -177,12 +181,6 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         tmp_playbook.write(vm_resource_configuration.dump_playbook())
         tmp_playbook.flush()
         tmp_inventory.flush()
-
-        # container_volume_mounts = [
-        #     f"{tmp_playbook.name}:{tmp_playbook.name}",
-        #     f"{tmp_inventory.name}:{tmp_inventory.name}",
-        #     f"{tmp_private_data_dir.name}:{tmp_private_data_dir.name}",
-        # ]
 
         # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections
         self.__wait_for_ssh_to_be_ready(
@@ -221,6 +219,9 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
             quiet=True
         )
 
+        # Save the fact cache to a variable before deleting tmp_private_data_dir
+        fact_cache = ansible_runner_result.get_fact_cache("host")
+
         # Close the tmp files, this will delete them
         tmp_playbook.close()
         tmp_inventory.close()
@@ -228,6 +229,8 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
 
         if ansible_runner_result.status == "failed":
             raise BlueprintsNgProviderNativeException("Error running ansible configurator")
+
+        return fact_cache
 
     def destroy_vm(self, vm_resource: VmResource):
         os_conn = self.__get_os_connection_by_area(vm_resource.area)

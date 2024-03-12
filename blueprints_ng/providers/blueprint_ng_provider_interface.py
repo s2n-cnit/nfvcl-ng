@@ -31,7 +31,7 @@ class BlueprintNGProviderInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def configure_vm(self, vm_resource_configuration: VmResourceConfiguration):
+    def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         if not vm_resource_configuration.vm_resource.created:
             raise BlueprintNGProviderException("VM Resource not created")
 

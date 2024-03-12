@@ -30,6 +30,10 @@ class AnsibleTemplateTask(AnsibleTask):
     backup: str = Field(default="yes")
 
 
+class AnsibleShellTask(AnsibleTask):
+    cmd: str = Field()
+
+
 class AnsiblePlaybookBuilder:
     def __init__(self, name, become=True, gather_facts=False):
         """
@@ -98,18 +102,23 @@ class AnsiblePlaybookBuilder:
         for task in plays_[0]["tasks"]:
             self.playbook.tasks.append(task)
 
-    def add_task(self, name: str, task_module: str, task_content: AnsibleTask):
+    def add_task(self, name: str, task_module: str, task_content: AnsibleTask, register_output_as: str | None = None):
         """
         Add a single task to the playbook
         Args:
             name: Name of the task
             task_module: Ansible module of the task
             task_content: Content of the task
+            register_output_as: If set the output of the task will be registered to be used by other tasks
         """
-        self.playbook.tasks.append({
+        dictionary = {
             "name": name,
             task_module: task_content
-        })
+        }
+        if register_output_as:
+            dictionary["register"] = register_output_as
+
+        self.playbook.tasks.append(dictionary)
 
     def add_template_task(self, src: Path, dest: str):
         """
@@ -128,9 +137,50 @@ class AnsiblePlaybookBuilder:
             )
         )
 
+    def add_gather_template_result_task(self, var_name: str, value_template: str):
+        """
+        Add a task to gather a variable from the host using Ansible
+        Args:
+            var_name: Name of the Ansible variable
+            value_template: Template that will be executed by Ansible and that will become the value of the variable
+        """
+        # We need to append the task manually to have variable names in the root structure of the module
+        self.playbook.tasks.append({
+            "name": f"Gather {var_name} value",
+            "ansible.builtin.set_fact": {
+                "cacheable": True,
+                var_name: value_template
+            }
+        })
+
+    def add_gather_var_task(self, var_name):
+        """
+        Simpler version of add_fact_gatherer_task, need only the variable name that will be returned to NFVCL
+        Args:
+            var_name: Name of the Ansible variable
+        """
+        self.add_gather_template_result_task(var_name, "{{ " + var_name + " }}")
+
+    def add_run_command_and_gather_output_tasks(self, command, output_var_name):
+        """
+        Add a simple shell task to run a command and gather the stdout to a variable
+        Args:
+            command: Command to run
+            output_var_name: Variable name to store the stdout of the command
+        """
+        self.add_task("Task", "ansible.builtin.shell", AnsibleShellTask(cmd=command), register_output_as="tmp_reg")
+        self.add_gather_template_result_task(output_var_name, "{{ tmp_reg.stdout }}")
+
     def build(self) -> str:
         """
         Build the playbook and return it as a yaml string
         Returns: YAML string of the playbook
         """
         return get_yaml_parser().dump([self.playbook.model_dump()])
+
+
+# def ansible_run_command(command, output_var_name):
+#     builder = AnsiblePlaybookBuilder(f"Running command '{command}'")
+#     builder.add_task("Task", "ansible.builtin.shell", AnsibleShellTask(cmd=command), register_output_as="tmp_reg")
+#     builder.add_gather_template_result_task(output_var_name, "{{ tmp_reg.stdout }}")
+#     return builder.build()

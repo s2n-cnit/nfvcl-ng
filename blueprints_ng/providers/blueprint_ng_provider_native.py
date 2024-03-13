@@ -40,6 +40,7 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
     """
     This configurator is used to gather information about the VM
     """
+
     def dump_playbook(self) -> str:
         ansible_playbook_builder = AnsiblePlaybookBuilder("Info gathering")
 
@@ -126,8 +127,28 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         # The floating IP should be requested if the VIM require it or if explicitly requested in the blueprint
         auto_ip = vim_need_floating_ip or vm_resource.require_floating_ip
 
+        # Get the floating ip network name
+        floating_ip_net = None
+        if auto_ip:
+            float_ip_nets: List[Network] = os_conn.get_external_ipv4_floating_networks()
+            if len(float_ip_nets) == 1:
+                floating_ip_net = float_ip_nets[0].name
+            else:
+                # TODO instead of raising an exception we should add a way to set the floating ip net in the vim
+                raise BlueprintsNgProviderNativeException("Multiple floating ip networks found")
+
         # Create the VM and wait for completion
-        server_obj: Server = os_conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=auto_ip, network=networks, userdata=cloudin)
+        server_obj: Server = os_conn.create_server(
+            vm_resource.name,
+            image=image,
+            flavor=flavor,
+            wait=True,
+            auto_ip=auto_ip,
+            nat_destination=vm_resource.management_network,
+            ip_pool=floating_ip_net,
+            network=networks,
+            userdata=cloudin
+        )
 
         # Don't put code that may crash here, we first need to register the vm_resource server_obj id correlation in the DB
         # This allows to delete a blueprint that crash during the create_vm execution

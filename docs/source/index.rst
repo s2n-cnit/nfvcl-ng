@@ -111,6 +111,7 @@ Documentation contents
    topology/topology
    topology/topology_creation
    topology/topology_mgt
+   topology/topology_nfvcl_k8s_onboarding.md
 
 .. toctree::
    :caption: Blueprints
@@ -130,6 +131,13 @@ Documentation contents
    :hidden:
 
    osm/osm_utility
+
+.. toctree::
+   :caption: K8s Management
+   :maxdepth: 2
+   :hidden:
+
+   kubernetes/k8s_man_index
 
 .. toctree::
    :caption: Data Analytics

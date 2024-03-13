@@ -43,9 +43,9 @@ class VmResourceImage(NFVCLBaseModel):
 
 
 class VmResourceFlavor(NFVCLBaseModel):
-    memory_mb: str = Field(default="8192", alias='memory-mb', description="Should be a multiple of 1024")
-    storage_gb: str = Field(default="32", alias='storage-gb')
-    vcpu_count: str = Field(default="4", alias='vcpu-count')
+    memory_mb: str = Field(default="8192", description="Should be a multiple of 1024")
+    storage_gb: str = Field(default="32")
+    vcpu_count: str = Field(default="4")
 
 
 class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):

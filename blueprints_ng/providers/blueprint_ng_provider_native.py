@@ -76,11 +76,13 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
 
     def create_vm(self, vm_resource: VmResource):
         os_conn = self.__get_os_connection_by_area(vm_resource.area)
+        vim_need_floating_ip = self.topology.get_vim_from_area_id_model(vm_resource.area).config.use_floating_ip
 
         self.logger.info(f"Creating VM {vm_resource.name}")
         # Get the image to use for the instance, TODO download it from url if not on server (see OS utils)
         image = os_conn.get_image(vm_resource.image.name)
-        if image is None: raise BlueprintsNgProviderNativeException(f"Image >{vm_resource.image.name}< not found")
+        if image is None:
+            raise BlueprintsNgProviderNativeException(f"Image >{vm_resource.image.name}< not found")
 
         flavor_str = f"{vm_resource.flavor.memory_mb}-{vm_resource.flavor.vcpu_count}-{vm_resource.flavor.storage_gb}"
         if flavor_str in self.data.flavors:
@@ -92,6 +94,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
                 vm_resource.flavor.memory_mb,
                 vm_resource.flavor.vcpu_count,
                 vm_resource.flavor.storage_gb,
+                is_public=False
             )
             self.data.flavors[flavor_str] = flavor_name
 
@@ -102,8 +105,11 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         networks = [vm_resource.management_network]
         networks.extend(vm_resource.additional_networks)
 
+        # The floating IP should be requested if the VIM require it or if explicitly requested in the blueprint
+        auto_ip = vim_need_floating_ip or vm_resource.require_floating_ip
+
         # Create the VM and wait for completion
-        server_obj: Server = os_conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=vm_resource.require_floating_ip, network=networks, userdata=cloudin)
+        server_obj: Server = os_conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=auto_ip, network=networks, userdata=cloudin)
 
         # Getting detailed info about the networks attached to the machine
         subnet_detailed = self.__get_network_details(os_conn, networks)

@@ -34,6 +34,7 @@ class BlueprintNGProviderInterface(abc.ABC):
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         if not vm_resource_configuration.vm_resource.created:
             raise BlueprintNGProviderException("VM Resource not created")
+        return {}
 
     @abc.abstractmethod
     def destroy_vm(self, vm_resource: VmResource):

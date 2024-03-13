@@ -6,6 +6,7 @@ from typing import List
 
 import ansible_runner
 import paramiko
+from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.connection import Connection
@@ -33,6 +34,23 @@ class BlueprintNGProviderDataNative(BlueprintNGProviderData):
 
 class BlueprintsNgProviderNativeException(BlueprintNGProviderException):
     pass
+
+
+class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
+    """
+    This configurator is used to gather information about the VM
+    """
+    def dump_playbook(self) -> str:
+        ansible_playbook_builder = AnsiblePlaybookBuilder("Info gathering")
+
+        # Get interface name -> mac address correlation
+        # https://unix.stackexchange.com/a/445913
+        ansible_playbook_builder.add_run_command_and_gather_output_tasks(
+            R"""find /sys/class/net -mindepth 1 -maxdepth 1 ! -name lo -printf "%P: " -execdir cat {}/address \;""",
+            "interfaces_mac"
+        )
+
+        return ansible_playbook_builder.build()
 
 
 os_connections_dict: Dict[int, Connection] = {}
@@ -111,6 +129,13 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         # Create the VM and wait for completion
         server_obj: Server = os_conn.create_server(vm_resource.name, image=image, flavor=flavor, wait=True, auto_ip=auto_ip, network=networks, userdata=cloudin)
 
+        # Don't put code that may crash here, we first need to register the vm_resource server_obj id correlation in the DB
+        # This allows to delete a blueprint that crash during the create_vm execution
+
+        # Register the VM in the provider data, this is needed to be able to delete it using only the vm_resource
+        self.data.os_dict[vm_resource.id] = server_obj.id
+        self.blueprint.to_db()
+
         # Getting detailed info about the networks attached to the machine
         subnet_detailed = self.__get_network_details(os_conn, networks)
         # Parse the OS output and create a structured network_interfaces dictionary
@@ -129,14 +154,35 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         for port in server_ports:
             self.__disable_port_security(os_conn, port.id)
 
+        # Run an Ansible playbook to gather information about the newly created VM
+        self.__gather_info_from_vm(vm_resource)
+
         # The VM is now created
         vm_resource.created = True
 
-        # Register the VM in the provider data, this is needed to be able to delete it using only the vm_resource id
-        self.data.os_dict[vm_resource.id] = server_obj.id
-
         self.logger.success(f"Creating VM {vm_resource.name} finished")
         self.blueprint.to_db()
+
+    def __gather_info_from_vm(self, vm_resource: VmResource):
+        self.logger.info(f"Starting VM info gathering")
+
+        facts = self.__configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource))
+
+        mac_name_dict = {}
+
+        interfaces_mac: str = facts["interfaces_mac"]
+        for interface_line in interfaces_mac.strip().splitlines():
+            interface_line_splitted = interface_line.split(": ")
+            name = interface_line_splitted[0].strip()
+            mac = interface_line_splitted[1].strip()
+            mac_name_dict[mac] = name
+
+        for value in vm_resource.network_interfaces.values():
+            value.fixed.interface_name = mac_name_dict[value.fixed.mac]
+            if value.floating:
+                value.floating.interface_name = mac_name_dict[value.floating.mac]
+
+        self.logger.info(f"Ended VM info gathering")
 
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         # The parent method checks if the resource is created and throw an exception if not

@@ -242,7 +242,10 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         os_conn = self.__get_os_connection_by_area(vm_resource.area)
 
         self.logger.info(f"Destroying VM {vm_resource.name}")
-        os_conn.delete_server(self.data.os_dict[vm_resource.id], wait=True)
+        if vm_resource.id in self.data.os_dict:
+            os_conn.delete_server(self.data.os_dict[vm_resource.id], wait=True)
+        else:
+            self.logger.warning(f"Unable to find VM id for resource '{vm_resource.id}' with name '{vm_resource.name}', manually check on VIM")
         self.logger.success(f"Destroying VM {vm_resource.name} finished")
         self.blueprint.to_db()
 

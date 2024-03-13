@@ -1,5 +1,6 @@
 from __future__ import annotations
 import abc
+import enum
 import sys
 import copy
 import importlib
@@ -8,7 +9,7 @@ from datetime import datetime
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
 from fastapi import APIRouter, Request
 from models.prometheus.prometheus_model import PrometheusTargetModel
-from pydantic import SerializeAsAny, Field
+from pydantic import SerializeAsAny, Field, ConfigDict
 from utils.log import create_logger
 
 from blueprints_ng.lcm.blueprint_route_manager import get_module_routes
@@ -106,6 +107,11 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
 
 
 class BlueprintNGState(NFVCLBaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
+        use_enum_values=True,   # Needed to be able to save the state to the mongo DB
+        validate_default=True
+    )
     last_update: Optional[datetime] = Field(default=None)
 
 

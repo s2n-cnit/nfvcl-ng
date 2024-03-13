@@ -2,7 +2,7 @@ import json
 from logging import Logger
 from fastapi import APIRouter, HTTPException, Body, status
 from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
-    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota
+    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota, V1ClusterRoleBinding
 
 from models.event import Event
 from models.k8s.blueprint_k8s_model import K8sModel
@@ -17,8 +17,8 @@ from utils.k8s import get_k8s_config_from_file_content, get_installed_plugins, \
     get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
 from utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
-    k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_to_user, \
-    k8s_delete_namespace, k8s_add_quota_to_namespace
+    k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_over_namespace, \
+    k8s_delete_namespace, k8s_add_quota_to_namespace, k8s_cluster_admin
 from utils.log import create_logger
 from utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 
@@ -417,10 +417,10 @@ async def give_admin_rights_to_sa(cluster_id: str, namespace: str, s_account: st
 
 
 @k8s_router.post("/{cluster_id}/roles/admin/{namespace}/{user}", response_model=dict)
-async def give_admin_rights_to_user(cluster_id: str, namespace: str, user: str, role_binding_name: str):
+async def give_admin_rights_to_user_namespaced(cluster_id: str, namespace: str, user: str, role_binding_name: str):
     """
     Give admin rights to a user (not necessarily existing) in a namespace. This call should be used, after a certificate
-    signing request (CSR) has been issued and approved, for a user in order to make him administrator (Note that this
+    signing request (CSR) has been issued and approved, for a user, to make him administrator (Note that this
     user won't exist in any namespace).
 
     Args:
@@ -442,8 +442,39 @@ async def give_admin_rights_to_user(cluster_id: str, namespace: str, user: str, 
 
     try:
         # Retrieving service account list filtered by username and namespace
-        role_bind_res: V1RoleBinding = k8s_admin_role_to_user(kube_client_config=k8s_config, namespace=namespace,
-                                                              username=user, role_binding_name=role_binding_name)
+        role_bind_res: V1RoleBinding = k8s_admin_role_over_namespace(kube_client_config=k8s_config, namespace=namespace,
+                                                                     username=user, role_binding_name=role_binding_name)
+
+    except (ValueError, ApiException) as val_err:
+        logger.error(val_err)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(val_err))
+
+    return role_bind_res.to_dict()
+
+
+@k8s_router.post("/{cluster_id}/roles/cluster-admin/{user}", response_model=dict, summary="Give cluster admin rights to a user")
+async def give_cluster_admin_rights(cluster_id: str, user: str, cluster_role_binding_name: str):
+    """
+    Give cluster admin rights to a user. This call should be used, after a certificate
+    signing request (CSR) has been issued and approved, for a user, to make him administrator of the cluster
+
+    Args:
+        cluster_id: The target k8s cluster id
+
+        user: The user that will become administrator for the cluster
+
+        cluster_role_binding_name: The name that will be given to the ClusterRoleBinding
+
+    Returns:
+        The created role binding (V1RoleBinding)
+    """
+
+    # Get k8s cluster and k8s config for client
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+
+    try:
+        role_bind_res: V1ClusterRoleBinding = k8s_cluster_admin(kube_client_config=k8s_config, username=user, role_binding_name=cluster_role_binding_name)
 
     except (ValueError, ApiException) as val_err:
         logger.error(val_err)
@@ -552,8 +583,8 @@ async def get_secrets(cluster_id: str, namespace: str = "", secret_name: str = "
     return auth_response.to_dict()
 
 
-@k8s_router.post("/{cluster_id}/sa/{namespace}/{username}", response_model=dict)
-async def create_admin_for_namespace(cluster_id: str, namespace: str, username: str):
+@k8s_router.post("/{cluster_id}/sa/{namespace}/{username}", response_model=dict, summary="Create SA with admin right on the namespace")
+async def create_admin_sa_for_namespace(cluster_id: str, namespace: str, username: str):
     """
     Create a Service Account in the target namespace, with admin rights.
     1 - Create the user
@@ -603,7 +634,7 @@ async def create_admin_for_namespace(cluster_id: str, namespace: str, username: 
     return result
 
 
-@k8s_router.post("/{cluster_id}/user/{username}", response_model=dict)
+@k8s_router.post("/{cluster_id}/user/{username}", response_model=dict, summary="Create (the user) and retrieve info for a new kubectl user")
 async def create_k8s_kubectl_user(cluster_id: str, username: str, expire_seconds: int = 31536000):
     """
     Create user credentials for kubectl. This function will generate a private key and a certificate to use for talking with the
@@ -617,7 +648,7 @@ async def create_k8s_kubectl_user(cluster_id: str, username: str, expire_seconds
         expire_seconds: The validity of the user in seconds (default 1 Year = 365 days = 31536000 seconds)
 
     Returns:
-        a dictionary containing private_key and certificate in BASE 64 format to be used in kubectl after being
+        a dictionary containing: server certificate, user private key and user certificate in BASE 64 format to be used in kubectl after being
         converted from base64.
     """
 

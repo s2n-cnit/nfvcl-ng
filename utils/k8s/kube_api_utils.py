@@ -6,7 +6,7 @@ from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccou
     V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, V1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1PodSpec, V1Container, V1ResourceQuota, \
-    V1ResourceQuotaSpec
+    V1ResourceQuotaSpec, V1ClusterRoleBinding
 from models.k8s.topology_k8s_model import K8sQuota
 from utils.log import create_logger
 from utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
@@ -301,8 +301,8 @@ def k8s_admin_role_to_sa(kube_client_config: kubernetes.client.Configuration, na
         return role_bind_res
 
 
-def k8s_admin_role_to_user(kube_client_config: kubernetes.client.Configuration, namespace: str, username: str,
-                           role_binding_name: str) -> V1RoleBinding:
+def k8s_admin_role_over_namespace(kube_client_config: kubernetes.client.Configuration, namespace: str, username: str,
+                                  role_binding_name: str) -> V1RoleBinding:
     """
     This function is specific to give admin rights on a user that is not present explicitly inside a k8s cluster.
     For example, when new certificates are created for k8s API, the user does not exist in namespaces, it is not a
@@ -340,6 +340,41 @@ def k8s_admin_role_to_user(kube_client_config: kubernetes.client.Configuration, 
                                                                                             body=role_bind)
         except ApiException as error:
             logger.error("Exception when calling RbacAuthorizationV1Api in k8s_admin_role_to_user: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return role_bind_res
+
+def k8s_cluster_admin(kube_client_config: kubernetes.client.Configuration, username: str,
+                                  role_binding_name: str) -> V1ClusterRoleBinding:
+    """
+    This function is specific to give CLUSTER admin rights on a user.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+
+        username: the name of the user that will become cluster administrator
+
+        role_binding_name: the name that will be given to the cluister role binding.
+
+    Returns:
+        The created cluster role binding for administrator.
+    """
+
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the RBAC API
+        api_instance_rbac = kubernetes.client.RbacAuthorizationV1Api(api_client)
+        try:
+            metadata: V1ObjectMeta = V1ObjectMeta(name=role_binding_name)
+
+            subjects = [V1Subject(kind='User', name=username)]
+            role_ref = V1RoleRef(kind='ClusterRole', name='cluster-admin', api_group='rbac.authorization.k8s.io')
+
+            role_bind = V1ClusterRoleBinding(subjects=subjects, role_ref=role_ref, metadata=metadata)
+            role_bind_res: V1ClusterRoleBinding = api_instance_rbac.create_cluster_role_binding(body=role_bind)
+        except ApiException as error:
+            logger.error("Exception when calling RbacAuthorizationV1Api in k8s_cluster_admin: {}\n".format(error))
             raise error
         finally:
             api_client.close()
@@ -437,7 +472,16 @@ def k8s_get_secrets(kube_client_config: kubernetes.client.Configuration, namespa
 
 def k8s_cert_sign_req(kube_client_config: kubernetes.client.Configuration, username: str,
                       expiration_sec: int = 63072000) -> dict:
-    """"""
+    """
+    TODO comment
+    Args:
+        kube_client_config:
+        username:
+        expiration_sec:
+
+    Returns:
+
+    """
     key, private_key = generate_rsa_key()
     # IMPORTANT the username inside cert will be the username arriving at API server!
     # When giving permissions with binding roles, this is the subject!
@@ -447,7 +491,9 @@ def k8s_cert_sign_req(kube_client_config: kubernetes.client.Configuration, usern
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         # Create an instance of the CORE API
         api_instance_core = kubernetes.client.CertificatesV1Api(api_client)
+        api_instance_secrets = kubernetes.client.CoreV1Api(api_client)
         try:
+            # CSR
             usages = ["client auth"]
             csr_spec = V1CertificateSigningRequestSpec(request=cert_sign_req_base64,
                                                        signer_name='kubernetes.io/kube-apiserver-client',
@@ -458,18 +504,26 @@ def k8s_cert_sign_req(kube_client_config: kubernetes.client.Configuration, usern
             csr_result: V1CertificateSigningRequest = api_instance_core.create_certificate_signing_request(body=v1csr)
 
             condition = V1CertificateSigningRequestCondition(message="This CSR was approved by NFVCL",
-                                                             reason="NFVCLApprove",
+                                                             reason="NFVCL Kubectl user",
                                                              status="True",
                                                              type="Approved")
             conditions = [condition]
             status = V1CertificateSigningRequestStatus(conditions=conditions)
             csr_result.status = status
-            csr_approve: V1CertificateSigningRequest = api_instance_core.patch_certificate_signing_request_approval(
+            csr_approbation: V1CertificateSigningRequest = api_instance_core.patch_certificate_signing_request_approval(
                 name=username, body=csr_result)
             # Need to sleep otherwise the cert is still not ready
-            time.sleep(0.05)
+            time.sleep(0.10)
             csr_result: V1CertificateSigningRequest = api_instance_core.read_certificate_signing_request(
                 name=username)
+
+            ############ GET cluster certificate ##########
+            cm_list = api_instance_secrets.list_namespaced_config_map(namespace="default")
+            ca_root = [item for item in cm_list.items if item.metadata.name=='kube-root-ca.crt']
+            if len(ca_root) <= 0:
+                logger.error("No kube-root-ca.crt found in the cluster")
+
+            ca_root_data = ca_root[0].data['ca.crt']
         except (ValueError, ApiException) as error:
             logger.error("Exception when calling CertificatesV1Api in k8s_cert_sign_req: {}\n".format(error))
             raise error
@@ -478,9 +532,11 @@ def k8s_cert_sign_req(kube_client_config: kubernetes.client.Configuration, usern
 
         # Making private key clean from PEM embedding and '\n'
         private_key_base64 = convert_to_base64(private_key)
+        ca_root_data_b64 = convert_to_base64(str.encode(ca_root_data))
 
-        to_return = {"kubectl_priv_key_b64": private_key_base64,
-                     "kubectl_priv_cert_b64": csr_result.status.certificate,
+        to_return = {"cluster_cert": ca_root_data_b64,
+                     "user_key_b64": private_key_base64,
+                     "user_priv_cert_b64": csr_result.status.certificate,
                      "csr_approved": csr_result.to_dict()}
 
         return to_return

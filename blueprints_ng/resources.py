@@ -71,6 +71,12 @@ class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):
         """
         return self.cidr.split('/')[-1]
 
+    def get_ip_prefix(self) -> str:
+        """
+        Retrieve the IP with the prefix of the network attached to the interface
+        """
+        return f"{self.ip}/{self.get_prefix()}"
+
 
 class VmResourceNetworkInterface(NFVCLBaseModel):
     """
@@ -115,6 +121,61 @@ class VmResource(ResourceDeployable):
     # TODO accesa, spenta, in inizializzazione..., cambiare tipo con enum
     state: Optional[str] = Field(default=None)
 
+    def is_management_interface(self, interface: VmResourceNetworkInterface) -> bool:
+        """
+        Checks if the interface is the management one.
+        Args:
+            interface: The interface to be checked
+
+        Returns:
+            True if it is the management one.
+        """
+        if interface.floating is not None:
+            if interface.floating.ip == self.vm_resource.access_ip:  # If it is the management interface
+                return True
+        elif interface.fixed == self.vm_resource.access_ip:  # If it is the management interface
+            return True
+        return False
+
+    def get_network_interface_by_name(self, name: str) -> VmResourceNetworkInterface | None:
+        """
+        Search for a network interface with the given name in the VM.
+        Args:
+            name: The name of the interface.
+
+        Returns:
+            If found, returns the interface instance, otherwise None
+        """
+        for net_interface in self.network_interfaces.values():
+            if net_interface.fixed.interface_name == name:
+                return net_interface
+        return None
+
+    def check_if_network_connected_by_name(self, network_name: str) -> bool:
+        """
+        Check if the network is connected to the VM
+        Args:
+            network_name: The name of the network (on the VIM)
+
+        Returns:
+            True if it connected, False otherwise
+        """
+        if network_name in self.network_interfaces.keys():
+            return True
+
+    def check_if_network_connected_by_cidr(self, cidr: str) -> bool:
+        """
+        Check if the network is connected to the VM
+        Args:
+            cidr: The CIDR of the network (on the VIM)
+
+        Returns:
+            True if it connected, False otherwise
+        """
+        for net_interface in self.network_interfaces.values():
+            if net_interface.fixed.cidr == cidr:
+                return True
+        return False
 
 class VmResourceConfiguration(ResourceConfiguration):
     vm_resource: VmResource = Field()

@@ -21,6 +21,15 @@ class AnsiblePlaybook(NFVCLBaseModel):
 class AnsibleTask(NFVCLBaseModel):
     pass
 
+class AnsibleTaskDescription(NFVCLBaseModel):
+    tasks_name: str
+    tasks_module: str
+    task: AnsibleTask
+    register_name: Optional[str] = Field(default=None, description="The name to be given at the variable containing the desired information")
+
+    @classmethod
+    def build(cls, tasks_name:str, tasks_module:str, task: AnsibleTask, register_name: str | None = None):
+        return AnsibleTaskDescription(tasks_name=tasks_name, tasks_module=tasks_module, task=task, register_name=register_name)
 
 class AnsibleTemplateTask(AnsibleTask):
     src: str = Field()
@@ -119,6 +128,15 @@ class AnsiblePlaybookBuilder:
             dictionary["register"] = register_output_as
 
         self.playbook.tasks.append(dictionary)
+
+    def add_task_embedded(self, task_descr: AnsibleTaskDescription):
+        """
+        Add a single task to the playbook
+        Args:
+            task_descr: Ansible task description containing name, module and task to be executed
+            register_output_as: If set the output of the task will be registered to be used by other tasks
+        """
+        self.add_task(task_descr.tasks_name, task_descr.tasks_module, task_descr.task, task_descr.register_name)
 
     def add_template_task(self, src: Path, dest: str):
         """

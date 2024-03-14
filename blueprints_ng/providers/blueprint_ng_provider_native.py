@@ -194,6 +194,8 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         interfaces_mac: str = facts["interfaces_mac"]
         for interface_line in interfaces_mac.strip().splitlines():
             interface_line_splitted = interface_line.split(": ")
+            if len(interface_line_splitted) != 2:
+                continue
             name = interface_line_splitted[0].strip()
             mac = interface_line_splitted[1].strip()
             mac_name_dict[mac] = name

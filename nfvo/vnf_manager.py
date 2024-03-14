@@ -266,13 +266,6 @@ class sol006_VNFbuilder:
                 with open(self.base_path + "/cloud_init/" + cloudi['filename'], 'w') as stream_:
                     print("{}".format(cloudi['content']), file=stream_)
 
-        # juju-based VNF-Manager
-        if self.charm_name and self.charm_name in ['flexcharm', 'flexcharm2', 'flexcharmvyos']:
-            os.makedirs(self.base_path + '/charms')
-            os.makedirs(self.base_path + '/charms/' + self.charm_name)
-            # copytree('vnfd_templates/charms_v2/' + self.charm_name , self.base_path + '/charms/' + self.charm_name)
-            copytree('vnf_charms/' + self.charm_name, self.base_path + '/charms/' + self.charm_name)
-
         if self.charm_name and self.charm_name in ['helmflexvnfm']:
             os.makedirs(self.base_path + '/helm-charts')
             os.makedirs(self.base_path + '/helm-charts/' + self.charm_name)

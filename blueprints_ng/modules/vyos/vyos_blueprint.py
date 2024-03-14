@@ -2,12 +2,11 @@ from __future__ import annotations
 from typing import Optional, List
 
 from topology.topology import build_topology
-from blueprints_ng.ansible_builder import AnsibleTask
 from blueprints_ng.modules.vyos.config.vyos_nat_conf import VmVyOSNatConfigurator
 from models.http_models import HttpRequestType
 from blueprints_ng.lcm.blueprint_route_manager import add_route
 from starlette.requests import Request
-from blueprints.blue_vyos import VyOSDestNATRule, VyOS1to1NATRule, VyOSSourceNATRule
+from blueprints.blue_vyos import VyOSDestNATRule, VyOSSourceNATRule
 from blueprints_ng.modules.vyos.config.vyos_day0_conf import VmVyOSDay0Configurator
 from models.blueprint_ng.vyos.vyos_rest_models import VyOSCreateModel, VyOSBlueprintSNATCreate
 from pydantic import Field
@@ -38,7 +37,6 @@ class VyOSBlueprintNGState(BlueprintNGState):
     nat_rules: List[int] = []
     applied_snat_rules: List[VyOSSourceNATRule] = []
     applied_dnat_rules: List[VyOSDestNATRule] = []
-    task_list: dict[str, AnsibleTask] = {}
 
 
 # This decorator is needed to declare a new blueprint type
@@ -88,8 +86,11 @@ class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
         self.state.vm_vyos_nat_configurator = VmVyOSNatConfigurator(vm_resource=self.state.vm_vyos)
         self.register_resource(self.state.vm_vyos_nat_configurator)
 
-        # The same need to be done to apply the configuration to the VMs
+        self.state.vm_vyos_configurator.initial_setup()
         self.provider.configure_vm(self.state.vm_vyos_configurator)
+
+        # We could add a check that everything is configured.
+        # self.state.vm_vyos_configurator.vyos_l1interfaces_collect_info()
 
     @classmethod
     def rest_create(cls, msg: VyOSCreateModel, request: Request):

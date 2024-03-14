@@ -1,10 +1,17 @@
 from __future__ import annotations
-from models.blueprint_ng.vyos.vyos_models import AnsibleVyOSConfigTask, AnsibleVyOSStateGather
-from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTask
-from blueprints_ng.resources import VmResourceAnsibleConfiguration
+
+from typing import List
+
+from blueprints_ng.utils import rel_path
+
+from models.blueprint_ng.vyos.vyos_models import AnsibleVyOSConfigTask, AnsibleVyOSInterface, AnsibleVyOSL3Interface
+from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTask, AnsibleTaskDescription
+from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, VmResourceNetworkInterfaceAddress
 
 
 class VmVyOSDay0Configurator(VmResourceAnsibleConfiguration):
+    task_list: List[AnsibleTaskDescription] = []
+    vars_to_be_collected: List[str] = []
     """
     This class is an example for an Ansible configurator for a VM
 
@@ -27,50 +34,40 @@ class VmVyOSDay0Configurator(VmResourceAnsibleConfiguration):
         ansible_builder.set_var("ansible_network_os", "vyos")
         ansible_builder.set_var("ansible_connection", "network_cli")
 
-        config_task = AnsibleVyOSConfigTask(lines=["set interface ethernet eth0 description 'Management Network'"])
-        ansible_builder.add_task('Description of eth0', 'vyos.vyos.vyos_config', config_task)
+        for task_description in self.task_list:
+            ansible_builder.add_task_embedded(task_descr=task_description)
+        self.task_list = []
 
-        data_config_task = self.setup_data_int_task()
-        ansible_builder.add_task('Setup Data interfaces', 'vyos.vyos.vyos_config', data_config_task)
-
-        loopback_ipaddr = "10.200." + str(self.vm_resource.area%256) + ".1/32"
-        config_loopback_task = AnsibleVyOSConfigTask(lines=[f"set interfaces loopback lo address {loopback_ipaddr}"])
-        ansible_builder.add_task('Loopback int setup', 'vyos.vyos.vyos_config', config_loopback_task)
-
-        ansible_builder.add_task('Retrieving L1 info form vyos', 'vyos.vyos.vyos_interfaces', AnsibleVyOSStateGather())
-        ansible_builder.add_task('Retrieving L3 info form vyos', 'vyos.vyos.vyos_l3_interfaces', AnsibleVyOSStateGather())
-        # TODO how do we andle this?
+        for var_to_collect in self.vars_to_be_collected:
+            ansible_builder.add_gather_template_result_task(var_to_collect, "{{ " + var_to_collect + " }}")
+        self.vars_to_be_collected = []
 
         # Build the playbook and return it
         return ansible_builder.build()
 
-    def setup_data_int_task(self) -> AnsibleTask:
-        """
-        Creates a task to configure data interfaces (not the management one)
-        Returns:
-            The ansible task to configure vyos data interfaces.
-        """
-        data_int_task: AnsibleVyOSConfigTask
-        lines = []
+    def vyos_l1interfaces_collect_info(self):
+        self.task_list.append(AnsibleTaskDescription.build("Collect L1 Info", 'vyos.vyos.vyos_interfaces', AnsibleVyOSInterface.retrieve_info(), register_name="l1info"))
+        self.vars_to_be_collected.append("l1info")
 
-        interface_index = 1  # STARTING From 1 because management interface is always present and called eth0
-        # This code works because vyos create sequential interfaces starting from eth0, eth1, eth2, ..., ethN
-        for network_name, interface in self.vm_resource.network_interfaces.items():
-            if self.vm_resource.management_network == network_name:
-                continue
-            # Getting prefix length of the net
-            prefix_length = interface.fixed.get_prefix()
-            # Get the IP assigned to the interface
-            interface_address = interface.fixed.ip
-            if interface_address is None:
-                lines.append("set interfaces ethernet eth{} address dhcp".format(interface_index))
-            else:
-                lines.append("set interfaces ethernet eth{} address {}/{}".format(interface_index, interface_address,prefix_length))
-            lines.append("set interfaces ethernet eth{} description \'{}\'".format(interface_index, self.vm_resource.id))
-            lines.append("set interfaces ethernet eth{} duplex auto".format(interface_index))
-            lines.append("set interfaces ethernet eth{} speed auto".format(interface_index))
-            # MAX supported MTU is 1450 by OPENSTACK !!!!!
-            lines.append("set interfaces ethernet eth{} mtu 1450".format(interface_index))
-            interface_index = interface_index + 1
+    def initial_setup(self):
+        config_task = AnsibleVyOSInterface.set_description_and_enable("eth0","Management Network", True)
+        self.task_list.append(AnsibleTaskDescription.build("ETH0 set description", 'vyos.vyos.vyos_interfaces', task=config_task))
 
-        return AnsibleVyOSConfigTask(lines=lines)
+        for interface in self.vm_resource.network_interfaces.values():
+            if self.vm_resource.is_management_interface(interface):
+                continue # Skip to next iteration
+            internal_int = interface.fixed
+            self.__setup_data_int_task(internal_int)
+
+        config_task = AnsibleVyOSInterface.set_loopback()
+        self.task_list.append(AnsibleTaskDescription.build("Loopback set description", 'vyos.vyos.vyos_interfaces', task=config_task))
+        data_config_task = AnsibleVyOSL3Interface.set_loopback()
+        self.task_list.append(AnsibleTaskDescription.build(f"Loopback set IP 10.200.200.200/32", 'vyos.vyos.vyos_l3_interfaces', task=data_config_task))
+
+    def __setup_data_int_task(self, interface: VmResourceNetworkInterfaceAddress):
+        """
+        """
+        config_task = AnsibleVyOSInterface.set_description_mtu_and_enable(interface.interface_name, f"Data int - net {interface.cidr}", True)
+        self.task_list.append(AnsibleTaskDescription.build(f"{interface.interface_name} set description", 'vyos.vyos.vyos_interfaces', task=config_task))
+        data_config_task = AnsibleVyOSL3Interface.set_address(interface.interface_name, interface.get_ip_prefix())
+        self.task_list.append(AnsibleTaskDescription.build(f"{interface.interface_name} set IP", 'vyos.vyos.vyos_l3_interfaces', task=data_config_task))

@@ -1,7 +1,10 @@
 from __future__ import annotations
+
+from typing import List
+
 from blueprints.blue_vyos import VyOSDestNATRule, VyOSSourceNATRule, VyOS1to1NATRule
 from models.blueprint_ng.vyos.vyos_models import AnsibleVyOSConfigTask, VyOSNATRuleAlreadyPresent, VyOSNATRuleNotFound
-from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTask
+from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTask, AnsibleTaskDescription
 from blueprints_ng.resources import VmResourceAnsibleConfiguration
 
 
@@ -11,6 +14,8 @@ class VmVyOSNatConfigurator(VmResourceAnsibleConfiguration):
 
     The fields in this class will be saved to the DB and can be used to customize the configuration at runtime
     """
+
+    task_list: List[AnsibleTaskDescription] = []
 
     def dump_playbook(self) -> str:
         """
@@ -25,9 +30,9 @@ class VmVyOSNatConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.set_var("ansible_network_os", "vyos")
         ansible_builder.set_var("ansible_connection", "network_cli")
 
-        for name, task in self._task_list.items():
-            ansible_builder.add_task(name, 'vyos.vyos.vyos_config', task)
-        self.vm_resource.task_list = {}
+        for task_description in self._task_list.items():
+            ansible_builder.add_task_embedded(task_descr=task_description)
+        self.task_list = []
 
         # Build the playbook and return it
         return ansible_builder.build()
@@ -53,7 +58,8 @@ class VmVyOSNatConfigurator(VmResourceAnsibleConfiguration):
 
         self.vm_resource.nat_rules.append(rule.rule_number)
         self.vm_resource.applied_dnat_rules.append(rule)
-        self.vm_resource.task_list.append(("DNAT rule {} creation", AnsibleVyOSConfigTask(lines=lines)))
+        self.task_list.append(AnsibleTaskDescription.build(f"DNAT rule {rule.rule_number} creation", 'vyos.vyos.vyos_config',AnsibleVyOSConfigTask(lines=lines)))
+
 
     def add_snat_rule(self, rule: VyOSSourceNATRule):
         if rule.rule_number in self._nat_rules:
@@ -74,7 +80,7 @@ class VmVyOSNatConfigurator(VmResourceAnsibleConfiguration):
         lines.append(f"set nat source rule {rule.rule_number} translation address {rule.virtual_ip}")
 
         self.vm_resource.applied_snat_rules.append(rule)
-        self.vm_resource.task_list.append((f"SNAT rule {rule.rule_number} creation", AnsibleVyOSConfigTask(lines=lines)))
+        self.task_list.append(AnsibleTaskDescription.build(f"SNAT rule {rule.rule_number} creation", 'vyos.vyos.vyos_config',AnsibleVyOSConfigTask(lines=lines)))
 
     def add_1to1_rule(self, rule: VyOS1to1NATRule):
         if rule.rule_number in self._nat_rules:
@@ -102,15 +108,13 @@ class VmVyOSNatConfigurator(VmResourceAnsibleConfiguration):
                 self.vm_resource.applied_dnat_rules.remove(dnat_rule)
 
     def _delete_snat_rule(self, rule: VyOSSourceNATRule):
-        lines = []
+        lines = [f"del nat source rule {rule.rule_number}"]
 
-        lines.append(f"del nat source rule {rule.rule_number}")
         self.vm_resource.applied_snat_rules.append(rule)
-        self.vm_resource.task_list.append((f"SNAT rule {rule.rule_number} deletion", AnsibleVyOSConfigTask(lines=lines)))
+        self.task_list.append(AnsibleTaskDescription.build(f"SNAT rule {rule.rule_number} deletion", 'vyos.vyos.vyos_config',AnsibleVyOSConfigTask(lines=lines)))
 
     def _delete_dnat_rule(self, rule: VyOSSourceNATRule):
-        lines = []
+        lines = [f"del nat destination rule {rule.rule_number}"]
 
-        lines.append(f"del nat destination rule {rule.rule_number}")
         self.vm_resource.applied_snat_rules.append(rule)
-        self.vm_resource.ask_list.append((f"DNAT rule {rule.rule_number} deletion", AnsibleVyOSConfigTask(lines=lines)))
+        self.task_list.append(AnsibleTaskDescription.build(f"DNAT rule {rule.rule_number} deletion", 'vyos.vyos.vyos_config',AnsibleVyOSConfigTask(lines=lines)))

@@ -1,0 +1,7 @@
+- hosts: all
+  tasks:
+    - name: Collect L1 interface info
+      vyos.vyos.vyos_interfaces:
+        config:
+        state: gathered
+      register: {{ register_name }}

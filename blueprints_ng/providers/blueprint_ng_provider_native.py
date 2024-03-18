@@ -266,7 +266,10 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         return False
 
     def __configure_vm_ansible(self, vm_resource_configuration: VmResourceAnsibleConfiguration) -> dict:
-        tmp_playbook = tempfile.NamedTemporaryFile(mode="w")
+        nfvcl_tmp_dir = Path("/tmp/nfvcl/playbook")
+        nfvcl_tmp_dir.mkdir(exist_ok=True, parents=True)
+
+        tmp_playbook = open(Path(nfvcl_tmp_dir, f"{self.blueprint.id}_{vm_resource_configuration.vm_resource.name}.yml"), "w+")  # tempfile.NamedTemporaryFile(mode="w")
         tmp_inventory = tempfile.NamedTemporaryFile(mode="w")
         tmp_private_data_dir = tempfile.TemporaryDirectory()
 

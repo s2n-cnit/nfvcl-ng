@@ -104,7 +104,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         }
         image = os_conn.image.create_image(**image_attrs)
         os_conn.image.import_image(image, method="web-download", uri=vm_resource.image.url)
-
+        os_conn.wait_for_image(image)
         return image
 
     def create_vm(self, vm_resource: VmResource):

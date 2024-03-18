@@ -6,15 +6,15 @@ from typing import List
 
 import ansible_runner
 import paramiko
-from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.connection import Connection
-from openstack.network.v2.port import Port
 from openstack.network.v2.network import Network
+from openstack.network.v2.port import Port
 from openstack.network.v2.subnet import Subnet
 from pyhelm3 import Client
 
+from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from blueprints_ng.cloudinit_builder import CloudInit
 from blueprints_ng.providers.blueprint_ng_provider_interface import *
 from blueprints_ng.providers.utils import create_ansible_inventory
@@ -93,15 +93,33 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         helm_client_dict[area] = helm_client
         return helm_client
 
+    def __create_image_from_url(self, vm_resource: VmResource):
+        os_conn = self.__get_os_connection_by_area(vm_resource.area)
+
+        image_attrs = {
+            'name': vm_resource.image.name,
+            'disk_format': 'qcow2',
+            'container_format': 'bare',
+            'visibility': 'public',
+        }
+        image = os_conn.image.create_image(**image_attrs)
+        os_conn.image.import_image(image, method="web-download", uri=vm_resource.image.url)
+
+        return image
+
     def create_vm(self, vm_resource: VmResource):
         os_conn = self.__get_os_connection_by_area(vm_resource.area)
         vim_need_floating_ip = self.topology.get_vim_from_area_id_model(vm_resource.area).config.use_floating_ip
 
         self.logger.info(f"Creating VM {vm_resource.name}")
-        # Get the image to use for the instance, TODO download it from url if not on server (see OS utils)
         image = os_conn.get_image(vm_resource.image.name)
         if image is None:
-            raise BlueprintsNgProviderNativeException(f"Image >{vm_resource.image.name}< not found")
+            if vm_resource.image.url:
+                self.logger.info(f"Image {vm_resource.image.name} not found on VIM, downloading from {vm_resource.image.url}")
+                image = self.__create_image_from_url(vm_resource)
+                self.logger.info(f"Image {vm_resource.image.name} download completed")
+            else:
+                raise BlueprintsNgProviderNativeException(f"Image >{vm_resource.image.name}< not found")
 
         flavor_str = f"{vm_resource.flavor.memory_mb}-{vm_resource.flavor.vcpu_count}-{vm_resource.flavor.storage_gb}"
         if flavor_str in self.data.flavors:
@@ -194,6 +212,7 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
         interfaces_mac: str = facts["interfaces_mac"]
         for interface_line in interfaces_mac.strip().splitlines():
             interface_line_splitted = interface_line.split(": ")
+            # Skip if the interface doesn't have a mac address
             if len(interface_line_splitted) != 2:
                 continue
             name = interface_line_splitted[0].strip()

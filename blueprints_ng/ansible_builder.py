@@ -1,12 +1,18 @@
+import textwrap
 from pathlib import Path
 from typing import List, Any, Dict, Optional
 
 from jinja2 import Environment, FileSystemLoader
 from pydantic import Field
+from ruamel.yaml.scalarstring import LiteralScalarString
 from typing_extensions import deprecated
 
 from blueprints_ng.utils import get_yaml_parser, get_yaml_parser_jinja2
 from models.base_model import NFVCLBaseModel
+
+
+def LS(s):
+    return LiteralScalarString(textwrap.dedent(s))
 
 
 class AnsiblePlaybook(NFVCLBaseModel):
@@ -21,6 +27,7 @@ class AnsiblePlaybook(NFVCLBaseModel):
 class AnsibleTask(NFVCLBaseModel):
     pass
 
+
 class AnsibleTaskDescription(NFVCLBaseModel):
     tasks_name: str
     tasks_module: str
@@ -28,8 +35,9 @@ class AnsibleTaskDescription(NFVCLBaseModel):
     register_name: Optional[str] = Field(default=None, description="The name to be given at the variable containing the desired information")
 
     @classmethod
-    def build(cls, tasks_name:str, tasks_module:str, task: AnsibleTask, register_name: str | None = None):
+    def build(cls, tasks_name: str, tasks_module: str, task: AnsibleTask, register_name: str | None = None):
         return AnsibleTaskDescription(tasks_name=tasks_name, tasks_module=tasks_module, task=task, register_name=register_name)
+
 
 class AnsibleTemplateTask(AnsibleTask):
     src: str = Field()
@@ -77,6 +85,8 @@ class AnsiblePlaybookBuilder:
             key: Key of the variable
             value: Value of the variable
         """
+        if isinstance(value, str):
+            value = LS(value)
         self.playbook.vars[key] = value
 
     def unset_var(self, key: str):
@@ -134,7 +144,6 @@ class AnsiblePlaybookBuilder:
         Add a single task to the playbook
         Args:
             task_descr: Ansible task description containing name, module and task to be executed
-            register_output_as: If set the output of the task will be registered to be used by other tasks
         """
         self.add_task(task_descr.tasks_name, task_descr.tasks_module, task_descr.task, task_descr.register_name)
 
@@ -196,6 +205,11 @@ class AnsiblePlaybookBuilder:
         """
         return get_yaml_parser().dump([self.playbook.model_dump()])
 
+
+# if __name__ == "__main__":
+#     ansible_builder = AnsiblePlaybookBuilder("Prova")
+#     ansible_builder.set_var("test", LS("LINE:\n\tvalue"))
+#     print(ansible_builder.build())
 
 # def ansible_run_command(command, output_var_name):
 #     builder = AnsiblePlaybookBuilder(f"Running command '{command}'")

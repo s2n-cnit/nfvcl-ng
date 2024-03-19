@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Optional, List
 
+from models.blueprint_ng.vyos.vyos_models import VyOSNetworkNotConnectedToVM, VyOSInterfaceNotExisting
 from topology.topology import build_topology
 from blueprints_ng.modules.vyos.config.vyos_nat_conf import VmVyOSNatConfigurator
 from models.http_models import HttpRequestType
@@ -8,7 +9,7 @@ from blueprints_ng.lcm.blueprint_route_manager import add_route
 from starlette.requests import Request
 from blueprints.blue_vyos import VyOSDestNATRule, VyOSSourceNATRule
 from blueprints_ng.modules.vyos.config.vyos_day0_conf import VmVyOSDay0Configurator
-from models.blueprint_ng.vyos.vyos_rest_models import VyOSCreateModel, VyOSBlueprintSNATCreate
+from models.blueprint_ng.vyos.vyos_rest_models import VyOSCreateModel
 from pydantic import Field
 from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
@@ -34,9 +35,6 @@ class VyOSBlueprintNGState(BlueprintNGState):
     vm_vyos_configurator: Optional[VmVyOSDay0Configurator] = Field(default=None)
 
     vm_vyos_nat_configurator: Optional[VmVyOSNatConfigurator] = Field(default=None)
-    nat_rules: List[int] = []
-    applied_snat_rules: List[VyOSSourceNATRule] = []
-    applied_dnat_rules: List[VyOSDestNATRule] = []
 
 
 # This decorator is needed to declare a new blueprint type
@@ -89,9 +87,6 @@ class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
         self.state.vm_vyos_configurator.initial_setup()
         self.provider.configure_vm(self.state.vm_vyos_configurator)
 
-        # We could add a check that everything is configured.
-        # self.state.vm_vyos_configurator.vyos_l1interfaces_collect_info()
-
     @classmethod
     def rest_create(cls, msg: VyOSCreateModel, request: Request):
         """
@@ -101,18 +96,19 @@ class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
 
 
     @classmethod
-    def add_snat_rule_rest(cls, msg: VyOSBlueprintSNATCreate, blue_id: str, request: Request):
+    def add_snat_rule_rest(cls, msg: VyOSSourceNATRule, blue_id: str, request: Request):
         """
         This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
         """
         return cls.api_day2_function(msg, blue_id, request)
 
     @add_route(VYOS_BLUE_TYPE, "/snat", [HttpRequestType.POST], add_snat_rule_rest)
-    def add_snat_rule(self, model: VyOSBlueprintSNATCreate):
-        _topology = build_topology()
-        network = _topology.get_network(model.rule.outbound_network)
+    def add_snat_rule(self, model: VyOSSourceNATRule):
+        # Checks
+        if self.state.vm_vyos.get_network_interface_by_name(model.outbound_interface) is None:
+            raise VyOSInterfaceNotExisting(model.outbound_interface)
+        if not self.state.vm_vyos.check_if_network_connected_by_cidr(model.source_address):
+            raise VyOSNetworkNotConnectedToVM(model.source_address)
 
-        # TODO need to obtain data from ansible before this function can work
-
-        self.state.vm_vyos_nat_configurator.add_snat_rule(model.rule)
-        self.provider.configure_vm(self.state.vm_vyos_configurator)
+        self.state.vm_vyos_nat_configurator.add_snat_rule(model)
+        self.provider.configure_vm(self.state.vm_vyos_nat_configurator)

@@ -1,0 +1,40 @@
+---
+- hosts: workers
+  gather_facts: no
+  tasks:
+   - name: Download the certificate of the testbed docker registry
+     shell: openssl s_client -showcerts -cipher DEFAULT@SECLEVEL=1 -connect docker-registry.maas:5000 < /dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /usr/local/share/ca-certificates/ca.crt
+   - name: Add the certificate of the testbed docker registry
+     shell: update-ca-certificates
+   - name: Join the Worker nodes with master.
+     command: "{{ join_command }}"
+     register: joined_or_not
+   - name: Create directory for root kube config.
+     file:
+       path: /root/.kube
+       state: directory
+       owner: root
+       group: root
+       mode: 0755
+   - name: Create directory for ubuntu kube config.
+     file:
+       path: /home/ubuntu/.kube
+       state: directory
+       owner: ubuntu
+       group: ubuntu
+       mode: 0755
+   - name: Copy kube config to root user
+     copy:
+       content: "{{ credentials_file }}"
+       dest: /root/.kube/config
+       owner: root
+       group: root
+       mode: '0644'
+   - name: Copy kube config to ubuntu user
+     copy:
+       content: "{{ credentials_file }}"
+       dest: /home/ubuntu/.kube/config
+       owner: ubuntu
+       group: ubuntu
+       mode: '0644'
+

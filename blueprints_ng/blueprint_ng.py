@@ -52,7 +52,11 @@ class BlueprintNGStatus(NFVCLBaseModel):
 
 
 class BlueprintNGCreateModel(NFVCLBaseModel):
-    pass
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
+        use_enum_values=True,   # Needed to be able to save the state to the mongo DB
+        validate_default=True
+    )
 
 
 class RegisteredResource(NFVCLBaseModel):

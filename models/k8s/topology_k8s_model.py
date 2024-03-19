@@ -1,8 +1,6 @@
 from enum import Enum
 from typing import Optional, List
-
 from pydantic import Field
-
 from models.base_model import NFVCLBaseModel
 from models.k8s.plugin_k8s_model import K8sOperationType
 
@@ -49,14 +47,14 @@ class K8sVersion(str, Enum):
 
 
 class K8sModel(NFVCLBaseModel):
-    name: str = Field(title="Name of k8s cluster. It must be unique for each k8s cluster")
-    provided_by: str
-    blueprint_ref: str = Field(default="", title="Reference blueprint, empty if k8s cluster is external")
+    name: str = Field(title="Name of k8s cluster", description="It must be unique for each k8s cluster")
+    provided_by: str = Field(default="NFVCL", description="The provider of the cluster")
+    blueprint_ref: str = Field(default="", description="Reference blueprint, empty if k8s cluster is external")
     credentials: str = Field(title="Content of k8s crediential file (example admin.conf)")
-    vim_name: Optional[str] = Field(default=None, title="Reference VIM, where k8s cluster is deployed.")
+    vim_name: Optional[str] = Field(default=None, description="Reference VIM, where k8s cluster is deployed.")
     k8s_version: K8sVersion = Field(default=K8sVersion.V1_24)
-    networks: List[str] = Field(title="List of attached networks", min_items=1)
-    areas: List[int] = Field(title="Competence areas", min_items=1)
+    networks: List[str] = Field(description="List of attached networks", min_items=1)
+    areas: List[int] = Field(description="Competence areas", min_items=1)
     cni: Optional[str] = Field(default=None)
     nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED)
     nfvo_onboard: bool = Field(default=False)

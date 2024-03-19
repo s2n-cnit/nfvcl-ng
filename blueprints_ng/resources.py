@@ -121,21 +121,17 @@ class VmResource(ResourceDeployable):
     # TODO accesa, spenta, in inizializzazione..., cambiare tipo con enum
     state: Optional[str] = Field(default=None)
 
-    def is_management_interface(self, interface: VmResourceNetworkInterface) -> bool:
+    def get_management_interface(self) -> VmResourceNetworkInterface:
         """
-        Checks if the interface is the management one.
-        Args:
-            interface: The interface to be checked
+        Retrieves the management network interface
+        """
+        return self.network_interfaces[self.management_network]
 
-        Returns:
-            True if it is the management one.
+    def get_additional_interfaces(self) -> List[VmResourceNetworkInterface]:
         """
-        if interface.floating is not None:
-            if interface.floating.ip == self.vm_resource.access_ip:  # If it is the management interface
-                return True
-        elif interface.fixed == self.vm_resource.access_ip:  # If it is the management interface
-            return True
-        return False
+        Retrieves the additional network interfaces
+        """
+        return [self.network_interfaces[key] for key in self.additional_networks]
 
     def get_network_interface_by_name(self, name: str) -> VmResourceNetworkInterface | None:
         """

@@ -1,5 +1,4 @@
 import multiprocessing
-from logging import Logger
 from multiprocessing import Process
 from typing import Any
 from blueprints_ng.blueprint_ng import BlueprintNG
@@ -15,7 +14,7 @@ class BlueprintWorker:
 
     def __init__(self, blueprint: BlueprintNG):
         self.blueprint = blueprint
-        self.logger = create_logger('BLUELCMWORKER_BETA', blueprintid=blueprint.id)
+        self.logger = create_logger('BLUEV2_WORKER', blueprintid=blueprint.id)
         self.message_queue = multiprocessing.Queue()
 
     def start_listening(self):

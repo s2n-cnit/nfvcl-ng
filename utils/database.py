@@ -26,14 +26,19 @@ class NFVCLDatabase(object, metaclass=Singleton):
         collection = self.mongo_database[collection_name]
         return collection.insert_one(data)
 
-    def find_collection(self, collection, data):
-        collection = self.mongo_database[collection]
-        return collection.find(data)
+    def find_collection(self, collection, data, exclude=None):
+        if exclude is None:
+            exclude = {}
 
-    def find_in_collection(self, collection, data):
+        collection = self.mongo_database[collection]
+        return collection.find(data, exclude)
+
+    def find_in_collection(self, collection, data, exclude=None):
+        if exclude is None:
+            exclude = {}
         # dictionary specifying the query to be performed
         collection = self.mongo_database[collection]
-        return collection.find(data)
+        return collection.find(data, exclude)
 
 
     def exists_in_collection(self, collection, data):
@@ -77,8 +82,8 @@ def get_ng_blue_list(blueprint_type: str = None) -> List[dict]:
     """
     blue_filter = {}
     if blueprint_type:
-        blue_filter = {'type': type}
-    blue_list = NFVCLDatabase().find_collection(BLUE_COLLECTION_V2, blue_filter)
+        blue_filter = {'type': blueprint_type}
+    blue_list = NFVCLDatabase().find_collection(BLUE_COLLECTION_V2, blue_filter, {"_id": False})
     return list(blue_list)
 
 def get_ng_blue_by_id_filter(blueprint_id: str) -> dict | None:
@@ -91,7 +96,7 @@ def get_ng_blue_by_id_filter(blueprint_id: str) -> dict | None:
     Returns:
         The FIRST MATCH of blueprint (dict) if found, None otherwise.
     """
-    blue_list = NFVCLDatabase().find_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id})
+    blue_list = NFVCLDatabase().find_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id}, {"_id": False})
     for blue in blue_list:
         return blue # Return the first match
     return None

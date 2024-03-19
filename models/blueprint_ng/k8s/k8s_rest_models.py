@@ -1,10 +1,8 @@
 from __future__ import annotations
-
 from typing import List
-
+from models.k8s.common_k8s_model import Cni
 from blueprints_ng.resources import VmResourceFlavor
 from pydantic import Field, field_validator, PositiveInt
-
 from blueprints.blue_vyos import VyOSSourceNATRule
 from blueprints_ng.blueprint_ng import BlueprintNGCreateModel
 from models.base_model import NFVCLBaseModel
@@ -23,9 +21,11 @@ class K8sCreateModel(BlueprintNGCreateModel):
     """
     This class represents the model for the creation request
     """
-    cni: str # TODO validate
+    cni: Cni = Field(default=Cni.flannel.value)
     pod_network_cidr: str = Field(default="10.254.0.0/16", description='K8s Pod network IPv4 cidr to init the cluster') # TODO validate
+    service_cidr: str = Field(default="10.200.0.0/16", description='Network used to deploy services') # TODO validate
     topology_onboard: bool = True
+    password: str = Field(default="ubuntu", description="The password to be set, in every vm, for user ubuntu", pattern=r'^[a-zA-Z0-9_.-]*$')
 
     master_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="2048", storage_gb='16', vcpu_count='2')
     areas: List[K8sAreaDeployment] = Field(min_items=1, description="List of areas in witch deployment is made (with requirements)")

@@ -1,5 +1,7 @@
 from typing import List
 from pydantic import TypeAdapter
+from typing_extensions import deprecated
+
 from models.blueprint.blueprint_base_model import BlueNSD, BlueDescrNsdItem, BlueVNFD, BlueVNFProfile, BlueDescrVLD, \
     BlueKDUConf, BlueVNFAdditionalParams, BlueDeployConfig, BlueVLD
 from models.k8s.k8s_objects import K8sService
@@ -10,7 +12,6 @@ from nfvo.osm_nbi_util import get_osm_nbi_utils
 from utils import persistency
 from utils.log import create_logger
 from utils.util import get_nfvcl_config, NFVCLConfigModel
-from utils.decorators import deprecated
 
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 nbiUtil = get_osm_nbi_utils()

@@ -17,7 +17,6 @@ from models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName, K8sP
 from models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from utils.k8s.k8s_client_extension import create_from_yaml_custom
 from utils.log import create_logger
-from utils.decorators import deprecated
 
 TIMEOUT_SECONDS = 10
 logger: Logger = create_logger("K8S UTILS")

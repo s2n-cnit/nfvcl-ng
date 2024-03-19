@@ -53,9 +53,7 @@ class VmVyOSDay0Configurator(VmResourceAnsibleConfiguration):
         config_task = AnsibleVyOSInterface.set_description_and_enable("eth0","Management Network", True)
         self.task_list.append(AnsibleTaskDescription.build("ETH0 set description", 'vyos.vyos.vyos_interfaces', task=config_task))
 
-        for interface in self.vm_resource.network_interfaces.values():
-            if self.vm_resource.is_management_interface(interface):
-                continue # Skip to next iteration
+        for interface in self.vm_resource.get_additional_interfaces(): # Only int that are not the management one
             internal_int = interface.fixed
             self.__setup_data_int_task(internal_int)
 

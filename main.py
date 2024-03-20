@@ -16,6 +16,10 @@ from utils.helm_repository import setup_helm_repo
 import signal
 import atexit
 
+if __name__ == '__main__':
+    # https://stackoverflow.com/a/322317
+    os.setpgrp()
+
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 logger = utils.log.create_logger('Main')
 nbiUtil = get_osm_nbi_utils()
@@ -41,26 +45,25 @@ setup_helm_repo()
 # Retrieving the list of spawned child (subscribers to nfvcl messages/events, e.g. K8S manager)
 spawned_children_list = multiprocessing.active_children()
 
+
 def handle_exit(*args):
     """
     Handler for exit. Set all managers to be closed, sending them a SIGTERM signal.
     """
-    try:
-        logger.info("Closing all subscribers endpoints processes")
-        for child in spawned_children_list:
-            os.kill(child.pid, signal.SIGTERM)
-        logger.info("Successfully closed all subscriber endpoints processes")
-        os.kill(os.getpid(), signal.SIGTERM)
-    except BaseException as err:
-        logger.error("Error while closing subscriber endpoints!!!")
-        logger.error(err)
+    # https://stackoverflow.com/a/322317
+    logger.info("Closing all subscribers endpoints processes")
+    os.killpg(0, signal.SIGKILL)
+    # Main process also get killed, no more code can be run
+
 
 # Setup on close handler for the MAIN process.
 # It does NOT work with Pycharm stop button! Only with CTRL+C or SIGTERM or SIGINT!!!!
 # Pycharm terminates the process such that handle_exit is not called.
+# TODO maybe this need to be moved above
 atexit.register(handle_exit)
 signal.signal(signal.SIGTERM, handle_exit)
 signal.signal(signal.SIGINT, handle_exit)
+
 
 # ----------------------- CHECKS --------------------
 
@@ -74,5 +77,6 @@ def starting_async_checks():
         err_list = check_openstack_instances(vim_list)
     else:
         logger.warning("Cannot perform initial checks. Topology still need to be initialized.")
+
 
 Process(target=starting_async_checks, args=()).start()

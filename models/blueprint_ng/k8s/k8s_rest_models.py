@@ -17,6 +17,14 @@ class K8sAreaDeployment(NFVCLBaseModel):
     worker_replicas: PositiveInt = Field(default=1, description="Number of workers in this area")
     worker_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="8192", storage_gb='32', vcpu_count='6')
 
+    def __eq__(self, other):
+        """
+        Two areas are identical if they have the same ID
+        """
+        if isinstance(other, K8sAreaDeployment):
+            return self.area_id == other.area_id
+        return False
+
 class K8sCreateModel(BlueprintNGCreateModel):
     """
     This class represents the model for the creation request
@@ -34,14 +42,23 @@ class K8sCreateModel(BlueprintNGCreateModel):
     @classmethod
     def check_areas(cls, areas: List[K8sAreaDeployment]) -> List[K8sAreaDeployment]:
         if isinstance(areas, list):
-            if len([area for area in areas if area.is_master_area == True]) < 1:
+            master_areas = [area for area in areas if area.is_master_area == True]
+            if len(master_areas) < 1:
                 raise ValueError("There must be a master area to be deployed. Please set is_master_area to true at least in one area.")
-            if len([area for area in areas if area.is_master_area == True]) > 1:
+            if len(master_areas) > 1:
                 raise ValueError("There must be ONLY a master area to be deployed. Please check area list")
 
         return areas
 
 
+class K8sAddNodeModel(BlueprintNGCreateModel):
+    areas: List[K8sAreaDeployment] = Field(min_items=1, description="List of areas in witch deployment is made (with requirements)")
 
-class VyOSBlueprintSNATCreate(NFVCLBaseModel):
-    rule: VyOSSourceNATRule
+    @field_validator('areas')
+    @classmethod
+    def check_areas(cls, areas: List[K8sAreaDeployment]) -> List[K8sAreaDeployment]:
+        if isinstance(areas, list):
+            if len([area for area in areas if area.is_master_area == True]) >= 1:
+                raise ValueError("It is not possible to add CORE areas in day2 request. Only upon cluster creation.")
+
+        return areas

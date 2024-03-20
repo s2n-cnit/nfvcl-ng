@@ -121,9 +121,12 @@ class BlueprintsNgProviderNative(BlueprintNGProviderInterface):
             else:
                 raise BlueprintsNgProviderNativeException(f"Image >{vm_resource.image.name}< not found")
 
-        flavor_str = f"{vm_resource.flavor.memory_mb}-{vm_resource.flavor.vcpu_count}-{vm_resource.flavor.storage_gb}"
+        flavor_str = f"{vm_resource.area}-{vm_resource.flavor.memory_mb}-{vm_resource.flavor.vcpu_count}-{vm_resource.flavor.storage_gb}"
         if flavor_str in self.data.flavors:
             flavor = os_conn.get_flavor(self.data.flavors[flavor_str])
+            if flavor is None:
+                # This error may be caused by the flavor caching done by NFVCL
+                raise BlueprintsNgProviderNativeException(f"Flavor '{flavor_str}' not found on VIM")
         else:
             flavor_name = f"{self.blueprint.id}_flavor_{len(self.data.flavors) + 1}"
             flavor: Flavor = os_conn.create_flavor(

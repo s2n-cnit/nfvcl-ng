@@ -1,5 +1,10 @@
 from typing import Optional, List
 import re
+
+from blueprints_ng.lcm.blueprint_route_manager import add_route
+
+from models.http_models import HttpRequestType
+
 from models.k8s.common_k8s_model import Cni, LBPool
 from models.k8s.plugin_k8s_model import K8sPluginName, K8sTemplateFillData
 from utils.k8s import get_k8s_config_from_file_content, install_plugins_to_cluster, get_k8s_cidr_info
@@ -9,7 +14,7 @@ from topology.topology import Topology, build_topology
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
 from blueprints_ng.modules.k8s.config.day0_configurator import VmK8sDay0Configurator
-from models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment
+from models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel
 from blueprints_ng.resources import VmResource, VmResourceImage
 from pydantic import Field
 from blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
@@ -32,6 +37,8 @@ class K8sBlueprintNGState(BlueprintNGState):
     expose_service_nets: List[str] = Field(default=[])
     progressive_worker_number: int = 0
     master_area: Optional[K8sAreaDeployment] = Field(default=None)
+    password: str = Field(default="ubuntu")
+    topology_onboarded: bool = Field(default=False)
     area_list: List[K8sAreaDeployment] = []
     attached_networks: List[str] = []
 
@@ -42,6 +49,7 @@ class K8sBlueprintNGState(BlueprintNGState):
 
     day_0_master_configurator: Optional[VmK8sDay0Configurator] = Field(default=None)
     day_0_workers_configurators: List[VmK8sDay0Configurator] = []
+    day_0_workers_configurators_tobe_exec: List[VmK8sDay0Configurator] = []
 
     master_key_add_worker: str = Field(default="", description="The master key to be used by a worker to join the k8s cluster")
     master_credentials: str = Field(default="", description="The certificate of the admin, to allow k8s administration")
@@ -60,6 +68,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.state.pod_network_cidr = create_model.pod_network_cidr
         self.state.service_cidr = create_model.service_cidr
         self.state.cni = create_model.cni
+        self.state.password = create_model.password
 
         area: K8sAreaDeployment
         for area in create_model.areas:     # In each area we deploy workers and in the core area also the master (there is always a core area containing the master)
@@ -105,6 +114,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
                 configurator = VmK8sDay0Configurator(vm_resource=vm)
                 self.state.day_0_workers_configurators.append(configurator)
+                self.state.day_0_workers_configurators_tobe_exec.append(configurator)
                 self.register_resource(configurator)
 
             # For each area, we add the service net to be used to expose services (can differ between areas)
@@ -115,7 +125,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             if area.service_net not in self.state.attached_networks:
                 self.state.attached_networks.append(area.service_net)
             self.state.area_list.append(area)
-        self.day0conf(create_model.pod_network_cidr, create_model.service_cidr, create_model.topology_onboard)
+        self.day0conf(self.state.pod_network_cidr, self.state.service_cidr, create_model.topology_onboard, configure_master=True)
 
         self.install_plugins()
 
@@ -128,30 +138,33 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         return cls.api_day0_function(msg, request)
 
 
-    def day0conf(self, pod_net_cidr, service_cidr, topology_onboard: bool):
-        # Configuring the master node
-        master_conf = self.state.day_0_master_configurator
-        master_conf.configure_master(self.state.vm_master.get_management_interface().fixed.ip, self.state.vm_master.access_ip, pod_net_cidr, service_cidr)
-        master_result = self.provider.configure_vm(master_conf)
+    def day0conf(self, pod_net_cidr, service_cidr, topology_onboard: bool, configure_master: bool = False):
+        if configure_master:
+            # Configuring the master node
+            master_conf = self.state.day_0_master_configurator
+            master_conf.configure_master(self.state.vm_master.get_management_interface().fixed.ip, self.state.vm_master.access_ip, pod_net_cidr, service_cidr)
+            master_result = self.provider.configure_vm(master_conf)
 
-        # REGISTERING GENERATED VALUES FROM MASTER CONFIGURATION
-        self.state.master_key_add_worker = master_result['kubernetes_join_command']['stdout'] #
-        # If there is a floating IP, we need to use this one in the k8s config file (instead of the internal one)
-        self.state.master_credentials = re.sub("https:\/\/(.*):6443", f"https://{self.state.vm_master.access_ip}:6443", master_result['credentials_file']['stdout'])
+            # REGISTERING GENERATED VALUES FROM MASTER CONFIGURATION
+            self.state.master_key_add_worker = re.sub("[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:6443", f"{self.state.vm_master.access_ip}:6443", master_result['kubernetes_join_command']['stdout']) #
+            # If there is a floating IP, we need to use this one in the k8s config file (instead of the internal one)
+            self.state.master_credentials = re.sub("https:\/\/(.*):6443", f"https://{self.state.vm_master.access_ip}:6443", master_result['credentials_file']['stdout'])
 
-        # Configuring worker nodes
-        for configurator in self.state.day_0_workers_configurators:
+        # Configuring ONLY worker nodes that has not yet been configured and then removing from the list
+        for configurator in self.state.day_0_workers_configurators_tobe_exec:
             configurator.configure_worker(self.state.master_key_add_worker, self.state.master_credentials)
             worker_result = self.provider.configure_vm(configurator)
+            self.state.day_0_workers_configurators_tobe_exec.remove(configurator)
 
         # If required, onboarding the cluster in the topology
         if topology_onboard:
-             topo: Topology = build_topology()
-             area_list = [item.area_id for item in self.state.area_list]
+            topo: Topology = build_topology()
+            area_list = [item.area_id for item in self.state.area_list]
 
-             k8s_cluster = K8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id, credentials="", vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id), # For the constraint on the model, there is always a master area.
+            k8s_cluster = K8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id, credentials="", vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id), # For the constraint on the model, there is always a master area.
                       k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list, cni="")
-             topo.add_k8scluster(k8s_cluster)
+            topo.add_k8scluster(k8s_cluster)
+            self.state.topology_onboarded = topology_onboard
 
 
     def install_plugins(self):
@@ -195,3 +208,58 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
 
     # TODO implement destroy
+
+    @classmethod
+    def add_k8s_worker(cls, msg: K8sAddNodeModel, blue_id: str, request: Request):
+        """
+        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
+        """
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @add_route(K8S_BLUE_TYPE, "/add_node", [HttpRequestType.POST], add_k8s_worker)
+    def add_worker(self, model: K8sAddNodeModel):
+        area: K8sAreaDeployment
+        for area in model.areas:
+            # THERE ARE NO MASTER AREAS -> THERE IS A CONSTRAINT IN THE REQUEST MODEL
+            for worker_replica_num in range(0,area.worker_replicas):
+                # Workers of area X
+                self.state.progressive_worker_number += 1
+                vm = VmResource(
+                    area=area.area_id,
+                    name=f"{self.id}_VM_W_{self.state.progressive_worker_number}",
+                    image=VmResourceImage(name=BASE_IMAGE_WORKER, url=BASE_IMAGE_URL),
+                    flavor=area.worker_flavors,
+                    username="ubuntu",
+                    password=self.state.password,
+                    management_network=area.mgmt_net,
+                    additional_networks=[area.service_net]
+                )
+                self.state.vm_workers.append(vm)
+                # Registering master node
+                self.register_resource(vm)
+                # Creating the VM
+                self.provider.create_vm(vm)
+
+                configurator = VmK8sDay0Configurator(vm_resource=vm)
+                self.state.day_0_workers_configurators.append(configurator)
+                self.state.day_0_workers_configurators_tobe_exec.append(configurator)
+                self.register_resource(configurator)
+
+
+            if area.mgmt_net not in self.state.attached_networks:
+                self.state.attached_networks.append(area.mgmt_net)
+            if area.service_net not in self.state.attached_networks:
+                self.state.attached_networks.append(area.service_net)
+            if area not in self.state.area_list:
+                self.state.area_list.append(area)
+
+        self.day0conf(self.state.pod_network_cidr, self.state.service_cidr, False, False)
+
+    def destroy(self):
+        super().destroy()
+
+        if self.state.topology_onboarded:
+            try:
+                build_topology().del_k8scluster(self.id)
+            except ValueError:
+                self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")

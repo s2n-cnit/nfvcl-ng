@@ -129,3 +129,9 @@ class VyOSNATRuleAlreadyPresent(Exception):
 
 class VyOSNATRuleNotFound(Exception):
     pass
+
+class VyOSNetworkNotConnectedToVM(Exception):
+    pass
+
+class VyOSInterfaceNotExisting(Exception):
+    pass

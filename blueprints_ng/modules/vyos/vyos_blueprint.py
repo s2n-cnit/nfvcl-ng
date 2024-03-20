@@ -2,12 +2,11 @@ from __future__ import annotations
 from typing import Optional, List
 
 from models.blueprint_ng.vyos.vyos_models import VyOSNetworkNotConnectedToVM, VyOSInterfaceNotExisting
-from topology.topology import build_topology
 from blueprints_ng.modules.vyos.config.vyos_nat_conf import VmVyOSNatConfigurator
 from models.http_models import HttpRequestType
 from blueprints_ng.lcm.blueprint_route_manager import add_route
 from starlette.requests import Request
-from blueprints.blue_vyos import VyOSDestNATRule, VyOSSourceNATRule
+from blueprints.blue_vyos import VyOSSourceNATRule
 from blueprints_ng.modules.vyos.config.vyos_day0_conf import VmVyOSDay0Configurator
 from models.blueprint_ng.vyos.vyos_rest_models import VyOSCreateModel
 from pydantic import Field
@@ -19,6 +18,8 @@ from blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavo
 # Use a global variable to define the blueprint type, this will be used in the decorator for the requests supported
 # by this blueprint
 VYOS_BLUE_TYPE = "vyos"
+VYOS_BASE_NAME = "VyOS"
+VYOS_BASE_IMAGE_URL = "http://images.tnt-lab.unige.it/k8s/k8s-v0.0.1.qcow2"
 
 
 class VyOSBlueprintNGState(BlueprintNGState):
@@ -58,7 +59,7 @@ class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
         self.state.vm_vyos = VmResource(
             area=create_model.area,
             name=f"{self.id}_VM_VyOS",
-            image=VmResourceImage(name="VyOS"),
+            image=VmResourceImage(name=VYOS_BASE_NAME, url=VYOS_BASE_IMAGE_URL),
             flavor=VmResourceFlavor(memory_mb="4096", storage_gb='16', vcpu_count='2'),
             username="vyos",
             password="vyos",

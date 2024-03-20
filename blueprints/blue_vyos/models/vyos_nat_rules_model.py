@@ -9,7 +9,7 @@ class VyOSSourceNATRule(BaseModel):
      - being part of a determined IP range (source IP)
     into the desired ip
     """
-    outbound_network: str = Field(title="The network to which the source IP translation is applied. Example 10.0.0.0/16")
+    outbound_network: str = Field(title="The network to which the source IP translation is applied. Example 10.0.0.0/16") # TODO remove not used by SNAT RULE
     outbound_interface: Optional[str] = Field(default=None)
     source_address: str = Field(title="The source IP or ip range to witch the rule is applied. Example 10.170.2.0/24")
     virtual_ip: str = Field(default="masquerade",title="The desired new IP of packets exiting the interface. This value"

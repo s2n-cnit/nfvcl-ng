@@ -16,9 +16,27 @@ from utils.helm_repository import setup_helm_repo
 import signal
 import atexit
 
+
+def handle_exit(*args):
+    """
+    Handler for exit. Set all managers to be closed, sending them a SIGTERM signal.
+    """
+    # https://stackoverflow.com/a/322317
+    print("Killing all NFVCL processes")
+    os.killpg(0, signal.SIGKILL)
+    # Main process also get killed, no more code can be run
+
+
 if __name__ == '__main__':
     # https://stackoverflow.com/a/322317
     os.setpgrp()
+
+# Setup on close handler for the MAIN process.
+# It does NOT work with Pycharm stop button! Only with CTRL+C or SIGTERM or SIGINT!!!!
+# Pycharm terminates the process such that handle_exit is not called.
+atexit.register(handle_exit)
+signal.signal(signal.SIGTERM, handle_exit)
+signal.signal(signal.SIGINT, handle_exit)
 
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 logger = utils.log.create_logger('Main')
@@ -40,29 +58,6 @@ initialize_k8s_man_subscriber(db, nbiUtil, topology_lock)
 
 # ----------------------- HELM REPO --------------------
 setup_helm_repo()
-
-# ----------------------- ON CLOSE SECTION --------------------
-# Retrieving the list of spawned child (subscribers to nfvcl messages/events, e.g. K8S manager)
-spawned_children_list = multiprocessing.active_children()
-
-
-def handle_exit(*args):
-    """
-    Handler for exit. Set all managers to be closed, sending them a SIGTERM signal.
-    """
-    # https://stackoverflow.com/a/322317
-    logger.info("Closing all subscribers endpoints processes")
-    os.killpg(0, signal.SIGKILL)
-    # Main process also get killed, no more code can be run
-
-
-# Setup on close handler for the MAIN process.
-# It does NOT work with Pycharm stop button! Only with CTRL+C or SIGTERM or SIGINT!!!!
-# Pycharm terminates the process such that handle_exit is not called.
-# TODO maybe this need to be moved above
-atexit.register(handle_exit)
-signal.signal(signal.SIGTERM, handle_exit)
-signal.signal(signal.SIGINT, handle_exit)
 
 
 # ----------------------- CHECKS --------------------

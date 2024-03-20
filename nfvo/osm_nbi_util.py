@@ -115,7 +115,6 @@ class NbiUtil:
         self.vnf_descriptors_url = "{0}/vnfpkgm/v1/vnf_packages".format(self.base_url)
 
         self.headers = {"Accept": "application/json"}
-        self.new_token()
 
     def new_token(self):
         """
@@ -252,6 +251,7 @@ class NbiUtil:
             time.sleep(5)
         # end_time = datetime.datetime.now()
         return ns_id, 200
+
 
     def ns_delete(self, ns_id: str, force: bool = False) -> dict:
         res = self.delete_x("/nslcm/v1/ns_instances_content/{}".format(ns_id), force)

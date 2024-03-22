@@ -23,31 +23,29 @@ class K8SProviderNativeException(K8SProviderException):
 helm_client_dict: Dict[int, Client] = {}
 
 
-class K8SProviderNative(K8SProviderInterface):
-    def init(self):
-        self.data: K8SProviderDataNative = K8SProviderDataNative()
+def get_helm_client_by_area(area: int):
+    global helm_client_dict
 
-    def __get_helm_client_by_area(self, area: int):
-        global helm_client_dict
-
-        if area in helm_client_dict:
-            return helm_client_dict[area]
-
+    if area not in helm_client_dict:
         k8s_cluster: K8sModel = get_k8s_cluster_by_area(area)
         k8s_credential_file_path = Path(tempfile.gettempdir(), f"k8s_credential_{k8s_cluster.name}")
         with open(k8s_credential_file_path, mode="w") as k8s_credential_file:
             k8s_credential_file.write(k8s_cluster.credentials)
 
-        helm_client = Client(kubeconfig=k8s_credential_file_path)
-        helm_client_dict[area] = helm_client
-        return helm_client
+        helm_client_dict[area] = Client(kubeconfig=k8s_credential_file_path)
+
+    return helm_client_dict[area]
+
+
+class K8SProviderNative(K8SProviderInterface):
+    def init(self):
+        self.data: K8SProviderDataNative = K8SProviderDataNative()
+        self.helm_client = get_helm_client_by_area(self.area)
 
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
-        helm_client = self.__get_helm_client_by_area(helm_chart_resource.area)
-
         self.logger.info(f"Installing Helm chart {helm_chart_resource.name}")
 
-        chart = asyncio.run(helm_client.get_chart(
+        chart = asyncio.run(self.helm_client.get_chart(
             helm_chart_resource.get_chart_converted(),
             repo=helm_chart_resource.repo,
             version=helm_chart_resource.version
@@ -56,7 +54,7 @@ class K8SProviderNative(K8SProviderInterface):
         # print(asyncio.run(chart.readme()))
 
         # Install or upgrade a release
-        revision = asyncio.run(helm_client.install_or_upgrade_release(
+        revision = asyncio.run(self.helm_client.install_or_upgrade_release(
             helm_chart_resource.name.lower(),
             chart,
             values,
@@ -70,7 +68,7 @@ class K8SProviderNative(K8SProviderInterface):
             revision.revision,
             str(revision.status)
         )
-        releases = asyncio.run(helm_client.list_releases(all=True, all_namespaces=True))
+        releases = asyncio.run(self.helm_client.list_releases(all=True, all_namespaces=True))
         for release in releases:
             revision = asyncio.run(release.current_revision())
             print(release.name, release.namespace, revision.revision, str(revision.status))
@@ -79,9 +77,7 @@ class K8SProviderNative(K8SProviderInterface):
         self.blueprint.to_db()
 
     def update_values_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
-        helm_client = self.__get_helm_client_by_area(helm_chart_resource.area)
-
-        chart = asyncio.run(helm_client.get_chart(
+        chart = asyncio.run(self.helm_client.get_chart(
             helm_chart_resource.get_chart_converted(),
             repo=helm_chart_resource.repo,
             version=helm_chart_resource.version
@@ -90,7 +86,7 @@ class K8SProviderNative(K8SProviderInterface):
         # print(asyncio.run(chart.readme()))
 
         # Install or upgrade a release
-        revision = asyncio.run(helm_client.install_or_upgrade_release(
+        revision = asyncio.run(self.helm_client.install_or_upgrade_release(
             helm_chart_resource.name.lower(),
             chart,
             values,
@@ -107,9 +103,7 @@ class K8SProviderNative(K8SProviderInterface):
         self.blueprint.to_db()
 
     def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
-        helm_client = self.__get_helm_client_by_area(helm_chart_resource.area)
-
-        asyncio.run(helm_client.uninstall_release(
+        asyncio.run(self.helm_client.uninstall_release(
             helm_chart_resource.name.lower(),
             namespace=helm_chart_resource.namespace.lower(),
             wait=True
@@ -118,5 +112,3 @@ class K8SProviderNative(K8SProviderInterface):
 
     def final_cleanup(self):
         pass
-
-

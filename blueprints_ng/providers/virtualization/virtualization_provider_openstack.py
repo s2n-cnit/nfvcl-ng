@@ -5,6 +5,7 @@ from typing import List, Dict
 
 import ansible_runner
 import paramiko
+from models.vim import VimModel
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.connection import Connection
@@ -49,11 +50,23 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
         return ansible_playbook_builder.build()
 
 
+os_clients_dict: Dict[int, OpenStackClient] = {}
+
+
+def get_os_client_from_vim(vim: VimModel, area: int):
+    global os_clients_dict
+
+    if area not in os_clients_dict:
+        os_clients_dict[area] = OpenStackClient(vim)
+
+    return os_clients_dict[area].client
+
+
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def init(self):
         self.data: VirtualizationProviderDataOpenstack = VirtualizationProviderDataOpenstack()
         vim = self.topology.get_vim_from_area_id_model(self.area)
-        self.conn = OpenStackClient(vim).client
+        self.conn = get_os_client_from_vim(vim, self.area)
         self.vim_need_floating_ip = vim.config.use_floating_ip
 
     def __create_image_from_url(self, vm_resource: VmResource):

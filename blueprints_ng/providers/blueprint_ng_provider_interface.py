@@ -29,6 +29,7 @@ class BlueprintNGProviderInterface(abc.ABC):
         self.blueprint = blueprint
         self.logger = create_logger(self.__class__.__name__, blueprintid=self.blueprint.id)
         self.topology = global_topology
+        self.logger.debug(f"Creating {self.__class__.__name__} for area {self.area}")
         self.init()
 
     @abc.abstractmethod

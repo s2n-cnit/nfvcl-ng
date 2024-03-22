@@ -2,7 +2,6 @@ import importlib
 from logging import Logger
 from typing import Callable, Any, List
 
-from blueprints_ng.providers.blueprint_ng_provider_native import BlueprintsNgProviderNative
 from fastapi import APIRouter
 from blueprints_ng.blueprint_ng import BlueprintNG
 from blueprints_ng.lcm.blueprint_type_manager import get_blueprint_class, get_registered_modules
@@ -125,7 +124,7 @@ class BlueprintManager:
             # Get the class, based on the blue type.
             BlueClass = get_blueprint_class(path)
             # Instantiate the object (creation of services is done by the worker)
-            created_blue: BlueprintNG = BlueClass(blue_id, BlueprintsNgProviderNative) # TODO give the possibility to select the provider type
+            created_blue: BlueprintNG = BlueClass(blue_id)
             # Saving the new blueprint to db
             created_blue.to_db()
             # Creating and starting the worker

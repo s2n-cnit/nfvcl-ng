@@ -1,25 +1,32 @@
 from __future__ import annotations
+
 import abc
-import enum
-import sys
 import copy
 import importlib
+import sys
 import uuid
 from datetime import datetime
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
+
+from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from fastapi import APIRouter, Request
-from models.prometheus.prometheus_model import PrometheusTargetModel
 from pydantic import SerializeAsAny, Field, ConfigDict
-from utils.log import create_logger
 
 from blueprints_ng.lcm.blueprint_route_manager import get_module_routes
-from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
-from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource
+from blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface
+from blueprints_ng.providers.kubernetes.k8s_provider_native import K8SProviderNative
+from blueprints_ng.providers.virtualization import VirtualizationProviderOpenstack, VirtualizationProviderProxmox
+from blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderInterface, VirtualizationProviderData
+from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource, \
+    VmResourceConfiguration
 from models.base_model import NFVCLBaseModel
+from models.prometheus.prometheus_model import PrometheusTargetModel
+from models.vim import VimTypeEnum
+from topology.topology import build_topology
 from utils.database import save_ng_blue, destroy_ng_blue
+from utils.log import create_logger
 
 StateTypeVar = TypeVar("StateTypeVar")
-ProviderDataTypeVar = TypeVar("ProviderDataTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
 
 
@@ -54,7 +61,7 @@ class BlueprintNGStatus(NFVCLBaseModel):
 class BlueprintNGCreateModel(NFVCLBaseModel):
     model_config = ConfigDict(
         populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        use_enum_values=True,   # Needed to be able to save the state to the mongo DB
+        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
         validate_default=True
     )
 
@@ -62,6 +69,13 @@ class BlueprintNGCreateModel(NFVCLBaseModel):
 class RegisteredResource(NFVCLBaseModel):
     type: str = Field()
     value: SerializeAsAny[Resource] = Field()
+
+
+class BlueprintNGProviderModel(NFVCLBaseModel):
+    provider_type: Optional[str] = Field(default=None)
+    provider_data_type: Optional[str] = Field(default=None)
+    # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
+    provider_data: Optional[SerializeAsAny[BlueprintNGProviderData]] = Field(default=None)
 
 
 class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTypeVar]):
@@ -79,10 +93,9 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
     create_config_type: Optional[str] = Field(default=None)
     create_config: Optional[CreateConfigTypeVar] = Field(default=None)
 
-    # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
-    provider_type: Optional[str] = Field(default=None)
-    provider_data_type: Optional[str] = Field(default=None)
-    provider_data: Optional[SerializeAsAny[BlueprintNGProviderData]] = Field(default=None)
+    # Providers (the key is str because MongoDB doesn't support int as key for dictionary)
+    virt_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
+    k8s_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
 
     created: Optional[datetime] = Field(default=None)
     status: BlueprintNGStatus = Field(default=BlueprintNGStatus())
@@ -113,7 +126,7 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
 class BlueprintNGState(NFVCLBaseModel):
     model_config = ConfigDict(
         populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        use_enum_values=True,   # Needed to be able to save the state to the mongo DB
+        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
         validate_default=True
     )
     last_update: Optional[datetime] = Field(default=None)
@@ -123,21 +136,87 @@ class BlueprintNGException(Exception):
     pass
 
 
+global_topology = build_topology()
+
+
+class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface):
+    def init(self):
+        pass
+
+    def __init__(self, blueprint):
+        super().__init__(-1, blueprint)
+
+        self.virt_providers_impl: Dict[int, VirtualizationProviderInterface] = {}
+        self.k8s_providers_impl: Dict[int, K8SProviderInterface] = {}
+
+    def get_virt_provider(self, area: int):
+        vim = global_topology.get_vim_from_area_id_model(area)
+        if area not in self.virt_providers_impl:
+            if vim.vim_type is VimTypeEnum.OPENSTACK:
+                self.virt_providers_impl[area] = VirtualizationProviderOpenstack(area, self.blueprint)
+            elif vim.vim_type is VimTypeEnum.PROXMOX:
+                self.virt_providers_impl[area] = VirtualizationProviderProxmox(area, self.blueprint)
+
+            self.blueprint.base_model.virt_providers[str(area)] = BlueprintNGProviderModel(
+                provider_type=get_class_path_str_from_obj(self.virt_providers_impl[area]),
+                provider_data_type=get_class_path_str_from_obj(self.virt_providers_impl[area].data),
+                provider_data=self.virt_providers_impl[area].data
+            )
+
+        return self.virt_providers_impl[area]
+
+    def get_k8s_provider(self, area: int):
+        if area not in self.k8s_providers_impl:
+            self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint)
+
+            self.blueprint.base_model.k8s_providers[str(area)] = BlueprintNGProviderModel(
+                provider_type=get_class_path_str_from_obj(self.k8s_providers_impl[area]),
+                provider_data_type=get_class_path_str_from_obj(self.k8s_providers_impl[area].data),
+                provider_data=self.k8s_providers_impl[area].data
+            )
+
+        return self.k8s_providers_impl[area]
+
+    def create_vm(self, vm_resource: VmResource):
+        return self.get_virt_provider(vm_resource.area).create_vm(vm_resource)
+
+    def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
+        return self.get_virt_provider(vm_resource_configuration.vm_resource.area).configure_vm(vm_resource_configuration)
+
+    def destroy_vm(self, vm_resource: VmResource):
+        return self.get_virt_provider(vm_resource.area).destroy_vm(vm_resource)
+
+    def final_cleanup(self):
+        for virt_provider_impl in self.virt_providers_impl.values():
+            virt_provider_impl.final_cleanup()
+        for k8s_provider_impl in self.k8s_providers_impl.values():
+            k8s_provider_impl.final_cleanup()
+
+    def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
+        return self.get_k8s_provider(helm_chart_resource.area).install_helm_chart(helm_chart_resource, values)
+
+    def update_values_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
+        return self.get_k8s_provider(helm_chart_resource.area).update_values_helm_chart(helm_chart_resource, values)
+
+    def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
+        return self.get_k8s_provider(helm_chart_resource.area).uninstall_helm_chart(helm_chart_resource)
+
+
 class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
     base_model: BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar]
     api_router: APIRouter
-    provider: BlueprintNGProviderInterface
+    provider: ProvidersAggregator
     api_day0_function: Callable
     api_day2_function: Callable
 
-    def __init__(self, blueprint_id: str, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = None):
+    def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = None):
         """
         Initialize the blueprint, state_type appear to be optional to trick Python type system (see from_db), when overriding this class
         it is required.
 
         Args:
-            provider_type:
-            state_type:
+            blueprint_id: The ID of the blueprint instance
+            state_type: The type of state for the blueprint type
         """
         super().__init__()
         self.logger = create_logger(self.__class__.__name__, blueprintid=blueprint_id)
@@ -150,10 +229,8 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             state_type=get_class_path_str_from_obj(state),
             state=state
         )
-        self.provider = provider_type(self)
-        self.base_model.provider_type = get_class_path_str_from_obj(self.provider)
-        self.base_model.provider_data_type = get_class_path_str_from_obj(self.provider.data)
-        self.base_model.provider_data = self.provider.data
+
+        self.provider = ProvidersAggregator(self)
 
     def register_resource(self, resource: Resource):
         """
@@ -191,10 +268,6 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
     @property
     def create_config(self) -> CreateConfigTypeVar:
         return self.base_model.create_config
-
-    @property
-    def provider_data(self) -> ProviderDataTypeVar:
-        return self.base_model.provider_data
 
     def __find_field_occurrences(self, obj, type_to_find, path=(), check_fun=lambda x: True):
         """
@@ -275,14 +348,8 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
     @classmethod
     def from_db(cls, deserialized_dict: dict):
-        # Manually load state and provider classes
-        state_type_str = deserialized_dict["state_type"]
-        provider_type_str = deserialized_dict["provider_type"]
-        state_type = get_class_from_path(state_type_str)
-        provider_type = get_class_from_path(provider_type_str)
-
         BlueSavedClass = get_class_from_path(deserialized_dict['type'])
-        instance = BlueSavedClass(deserialized_dict['id'], provider_type)  # Had to add a state type
+        instance = BlueSavedClass(deserialized_dict['id'])
 
         # Remove fields that need to be manually deserialized from the input and validate
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)
@@ -308,7 +375,15 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
         # Deserialized remaining fields in the state and override the field in base_model
         instance.base_model.state = instance.state_type.model_validate(deserialized_dict["state"])
-        instance.provider.data = instance.provider_data.model_validate(deserialized_dict["provider_data"])
+
+        # Loading the providers data
+        # get_virt_provider is used to create a new instance of the provider for the area
+        for area, virt_provider in deserialized_dict["virt_providers"].items():
+            instance.provider.get_virt_provider(int(area)).data = instance.provider.get_virt_provider(int(area)).data.model_validate(virt_provider["provider_data"])
+
+        for area, k8s_provider in deserialized_dict["k8s_providers"].items():
+            instance.provider.get_k8s_provider(int(area)).data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
+
         return instance
 
     def to_dict(self, detailed: bool) -> dict:

@@ -43,11 +43,11 @@ class VyOSBlueprintNGState(BlueprintNGState):
 # for type hinting to work
 @declare_blue_type(VYOS_BLUE_TYPE)
 class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
-    def __init__(self, blueprint_id: str, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = VyOSBlueprintNGState):
+    def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = VyOSBlueprintNGState):
         """
         Don't write code in the init method, this will be called every time the blueprint is loaded from the DB
         """
-        super().__init__(blueprint_id, provider_type, state_type)
+        super().__init__(blueprint_id, state_type)
 
     def create(self, create_model: VyOSCreateModel):
         super().create(create_model)

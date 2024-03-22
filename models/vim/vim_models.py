@@ -11,7 +11,8 @@ logger: Logger = create_logger('Vim model')
 
 
 class VimTypeEnum(str, Enum):
-    openstack: str = 'openstack'
+    OPENSTACK: str = 'openstack'
+    PROXMOX: str = 'openstack'
 
 
 class VimModel(NFVCLBaseModel):
@@ -28,7 +29,7 @@ class VimModel(NFVCLBaseModel):
         use_floating_ip: bool = False
 
     name: str
-    vim_type: VimTypeEnum = 'openstack'
+    vim_type: VimTypeEnum = VimTypeEnum.OPENSTACK
     schema_version: str = '1.3'
     vim_url: str
     vim_tenant_name: str = 'admin'

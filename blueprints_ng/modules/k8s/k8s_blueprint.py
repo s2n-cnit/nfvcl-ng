@@ -56,11 +56,11 @@ class K8sBlueprintNGState(BlueprintNGState):
 
 @declare_blue_type(K8S_BLUE_TYPE)
 class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
-    def __init__(self, blueprint_id: str, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = K8sBlueprintNGState):
+    def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = K8sBlueprintNGState):
         """
         Don't write code in the init method, this will be called every time the blueprint is loaded from the DB
         """
-        super().__init__(blueprint_id, provider_type, state_type)
+        super().__init__(blueprint_id, state_type)
 
     def create(self, create_model: K8sCreateModel):
         super().create(create_model)

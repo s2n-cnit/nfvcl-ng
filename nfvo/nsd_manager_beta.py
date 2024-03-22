@@ -27,7 +27,7 @@ def get_nsd_name(nsd_descr: dict) -> str:
     else:
         return nsd_descr['nsd:nsd-catalog']['nsd'][0]['name']
 
-@deprecated
+@deprecated("TODO DEPRECATED MESSAGE")
 def get_ns_vld_ip(ns_id: str, ns_vlds: list) -> dict:
     """
 
@@ -67,7 +67,7 @@ def get_ns_vld_model(ns_id: str, ns_vlds_ids: list) -> dict[str, List[VirtLinkDe
 def get_kdu_services(ns_id: str, kdu_name: str) -> List[K8sService]:
     return TypeAdapter(List[K8sService]).validate_python(nbiUtil.get_kdu_services(ns_id, kdu_name))
 
-@deprecated
+@deprecated("TODO DEPRECATED MESSAGE")
 def get_vnf_ip(vnfi_list: list, ns_vld_id: str) -> list:
     addr_list = []
     # logger.debug(vnfi_list)

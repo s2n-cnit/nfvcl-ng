@@ -1,22 +1,19 @@
 from __future__ import annotations
+
 from typing import List, Optional
 
-from models.base_model import NFVCLBaseModel
-
-from models.http_models import HttpRequestType
-
-from blueprints_ng.lcm.blueprint_route_manager import add_route
-
-from blueprints_ng.utils import rel_path
-
-from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from pydantic import Field
 from starlette.requests import Request
 
+from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGCreateModel, BlueprintNGState
+from blueprints_ng.lcm.blueprint_route_manager import add_route
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
-from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
-from blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, HelmChartResource
+from blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
+    HelmChartResource
+from blueprints_ng.utils import rel_path
+from models.base_model import NFVCLBaseModel
+from models.http_models import HttpRequestType
 
 # Use a global variable to define the blueprint type, this will be used in the decorator for the requests supported
 # by this blueprint
@@ -106,11 +103,11 @@ class ExampleVmUbuntuConfigurator(VmResourceAnsibleConfiguration):
 # for type hinting to work
 @declare_blue_type(EXAMPLE_BLUE_TYPE)
 class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel]):
-    def __init__(self, blueprint_id: str, provider_type: type[BlueprintNGProviderInterface], state_type: type[BlueprintNGState] = ExampleBlueprintNGState):
+    def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = ExampleBlueprintNGState):
         """
         Don't write code in the init method, this will be called every time the blueprint is loaded from the DB
         """
-        super().__init__(blueprint_id, provider_type, state_type)
+        super().__init__(blueprint_id, state_type)
 
     def create(self, create_model: ExampleCreateModel):
         super().create(create_model)

@@ -8,21 +8,20 @@ import uuid
 from datetime import datetime
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
 
-from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from fastapi import APIRouter, Request
 from pydantic import SerializeAsAny, Field, ConfigDict
 
 from blueprints_ng.lcm.blueprint_route_manager import get_module_routes
+from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
+from blueprints_ng.providers.kubernetes import K8SProviderNative
 from blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface
-from blueprints_ng.providers.kubernetes.k8s_provider_native import K8SProviderNative
 from blueprints_ng.providers.virtualization import VirtualizationProviderOpenstack, VirtualizationProviderProxmox
-from blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderInterface, VirtualizationProviderData
+from blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderInterface
 from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource, \
     VmResourceConfiguration
 from models.base_model import NFVCLBaseModel
 from models.prometheus.prometheus_model import PrometheusTargetModel
 from models.vim import VimTypeEnum
-from topology.topology import build_topology
 from utils.database import save_ng_blue, destroy_ng_blue
 from utils.log import create_logger
 
@@ -136,9 +135,6 @@ class BlueprintNGException(Exception):
     pass
 
 
-global_topology = build_topology()
-
-
 class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface):
     def init(self):
         pass
@@ -150,7 +146,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
         self.k8s_providers_impl: Dict[int, K8SProviderInterface] = {}
 
     def get_virt_provider(self, area: int):
-        vim = global_topology.get_vim_from_area_id_model(area)
+        vim = self.topology.get_vim_from_area_id_model(area)
         if area not in self.virt_providers_impl:
             if vim.vim_type is VimTypeEnum.OPENSTACK:
                 self.virt_providers_impl[area] = VirtualizationProviderOpenstack(area, self.blueprint)

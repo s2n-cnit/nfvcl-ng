@@ -11,7 +11,6 @@ from openstack.connection import Connection
 from openstack.network.v2.network import Network
 from openstack.network.v2.port import Port
 from openstack.network.v2.subnet import Subnet
-from topology.topology import build_topology
 
 from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from blueprints_ng.cloudinit_builder import CloudInit
@@ -21,8 +20,6 @@ from blueprints_ng.providers.virtualization.virtualization_provider_interface im
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration
 from utils.openstack.openstack_client import OpenStackClient
-
-global_topology = build_topology()
 
 
 class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
@@ -55,7 +52,7 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def init(self):
         self.data: VirtualizationProviderDataOpenstack = VirtualizationProviderDataOpenstack()
-        vim = global_topology.get_vim_from_area_id_model(self.area)
+        vim = self.topology.get_vim_from_area_id_model(self.area)
         self.conn = OpenStackClient(vim).client
         self.vim_need_floating_ip = vim.config.use_floating_ip
 

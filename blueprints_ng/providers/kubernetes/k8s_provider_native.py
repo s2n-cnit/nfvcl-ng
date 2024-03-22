@@ -10,7 +10,6 @@ from blueprints_ng.providers.blueprint_ng_provider_interface import *
 from blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface, K8SProviderException
 from models.k8s.topology_k8s_model import K8sModel
 from rest_endpoints.k8s import get_k8s_cluster_by_area
-from topology.topology import build_topology
 
 
 class K8SProviderDataNative(BlueprintNGProviderData):
@@ -22,8 +21,6 @@ class K8SProviderNativeException(K8SProviderException):
 
 
 helm_client_dict: Dict[int, Client] = {}
-# # TODO find a better way
-global_topology = build_topology()
 
 
 class K8SProviderNative(K8SProviderInterface):

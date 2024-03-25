@@ -57,7 +57,7 @@ logger.info("Starting subscribers")
 initialize_k8s_man_subscriber(db, nbiUtil, topology_lock)
 
 # ----------------------- HELM REPO --------------------
-setup_helm_repo()
+# setup_helm_repo()
 
 
 # ----------------------- CHECKS --------------------

@@ -10,19 +10,22 @@ This README content:
 <!-- TOC -->
 * [NFVCL-NG](#nfvcl-ng)
   * [External Architecture](#external-architecture)
-  * [Requirements](#requirements)
-  * [Installation](#installation)
+  * [Docker](#docker)
+  * [Docker compose](#docker-compose)
+  * [Helm](#helm)
+  * [Installation (Bare-Metal/VM)](#installation-bare-metalvm)
+    * [Requirements](#requirements)
     * [Step 0 - Cloning and downloading required files/dependencies](#step-0---cloning-and-downloading-required-filesdependencies)
-    * [Step 1 - Install OSM](#step-1---install-osm)
-    * [Step 2 - Install Redis, Uvicorn, MongoDB and requirements](#step-2---install-redis-uvicorn-mongodb-and-requirements)
-    * [Step 3 - Configure NFVCL, Redis and MongoDB](#step-3---configure-nfvcl-redis-and-mongodb)
+    * [Step 1 - Install OSM 14](#step-1---install-osm-14)
+    * [Step 2 - Install Python 3.11, Redis, Uvicorn, Poetry, MongoDB and requirements (using poetry)](#step-2---install-python-311-redis-uvicorn-poetry-mongodb-and-requirements-using-poetry)
+    * [Step 3 - NFVCL, Redis and MongoDB configuration](#step-3---nfvcl-redis-and-mongodb-configuration)
   * [Run and Test NFVCL](#run-and-test-nfvcl)
     * [Using Screen](#using-screen)
     * [Create a service](#create-a-service)
   * [Usage](#usage)
   * [Debug](#debug)
     * [Log file](#log-file)
-    * [Redis **NFVCL_LOG** topic](#redis-nfvcllog-topic)
+    * [Redis **NFVCL_LOG** topic](#redis-nfvcl_log-topic)
   * [Report Issues](#report-issues)
 <!-- TOC -->
 
@@ -33,7 +36,16 @@ This README content:
 Usually we install NFVCL, Redis, MongoDB and OSM on the same machine, but throght configuration it is possible to locate these services as you desire.
 In this guide they will be installed on the same location.
 
-## Requirements
+## Docker
+
+## Docker compose
+
+## Helm
+
+## Installation (Bare-Metal/VM)
+This section describe the installation on bare-metal/VM.
+
+### Requirements
  - An OpenStack instance (you can use all-in-one installation [here](https://docs.openstack.org/devstack/rocky/guides/single-machine.html))
  - An Ubuntu (22.04 LTS) instance where the NFVCL will be installed and run.
  - Having OSM 14 running on a reachable machine, in the following installation procedure,
@@ -45,9 +57,9 @@ In this guide they will be installed on the same location.
    - **MINIMUM**: 
           2 CPUs, 8 GB RAM, 50GB disk and a single interface with Internet access
 
-## Installation (OSM+NFVCL)
-On the Ubuntu 22.04 instance perform the following steps.
+     
 ### Step 0 - Cloning and downloading required files/dependencies
+On the Ubuntu 22.04 instance perform the following steps.
 1. Download OSM 14
 ``` bash
 wget https://osm-download.etsi.org/ftp/osm-14.0-fourteen/install_osm.sh
@@ -195,9 +207,13 @@ You can find request examples in the [wiki](https://nfvcl-ng.readthedocs.io/en/l
 ## Debug
 The NFVCL main output is contained in the **console output**, but additionally it is possible to observe it's output in:
 ### Log file
-The file can be found in the logs folder of NFVCL, it's called nfvcl.log. 
+The file can be found in the `logs` folder of NFVCL, it's called `nfvcl.log`. 
 It is a rotating log with 4 backup files that are rotated when the main one reach 50Kbytes.
 In case of NFVCL **crash** it is the only place where you can observe it's output.
+To follow the console output you can use:
+```bash
+tail -f logs/nfvcl.log
+```
 
 ### Redis **NFVCL_LOG** topic
 You can attach on the Redis pub-sub system to subscribe at the NFVCL log, the topic that must be observed is **NFVCL_LOG**.

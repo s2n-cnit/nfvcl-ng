@@ -112,7 +112,7 @@ class TopologyModel(BaseModel):
         k8s_cluster = self.kubernetes[k8s_index]
 
         if k8s_cluster.nfvo_status == NfvoStatus.ONBOARDED:
-            self._k8s_cluster_deonboard(k8s_cluster, osm_nbi_util)
+            osm_nbi_util.delete_k8s_cluster(k8s_cluster.name)
 
         k8s_deleted = self.kubernetes.pop(k8s_index)
 
@@ -135,8 +135,6 @@ class TopologyModel(BaseModel):
 
         return k8s_cluster
 
-    def _k8s_cluster_deonboard(self, k8s_cluster: K8sModel, osm_nbi_util: NbiUtil):
-        osm_nbi_util.delete_k8s_cluster(k8s_cluster.name)
 
     # -------------------------------------------------------------------------
     def add_pdu(self, pdu: PduModel) -> PduModel:

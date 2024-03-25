@@ -35,6 +35,7 @@ class VimModel(NFVCLBaseModel):
     vim_tenant_name: str = 'admin'
     vim_user: str = 'admin'
     vim_password: str = 'admin'
+    osm_onboard: Optional[bool] = Field(default=False)
     config: VimConfigModel = Field(default=VimConfigModel())
     networks: List[str] = []
     routers: List[str] = []

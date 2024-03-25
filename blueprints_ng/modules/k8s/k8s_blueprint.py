@@ -161,8 +161,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             topo: Topology = build_topology()
             area_list = [item.area_id for item in self.state.area_list]
 
-            k8s_cluster = K8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id, credentials="", vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id), # For the constraint on the model, there is always a master area.
-                      k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list, cni="")
+            k8s_cluster = K8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id, credentials=self.state.master_credentials, vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id), # For the constraint on the model, there is always a master area.
+                      k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list, cni="", nfvo_onboard=False)
             topo.add_k8scluster(k8s_cluster)
             self.state.topology_onboarded = topology_onboard
 

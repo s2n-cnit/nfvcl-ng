@@ -2,7 +2,12 @@
 name = "nfvcl"
 version = "0.2.0"
 description = ""
-authors = ["CNIT/UniGe S2N Lab"]
+authors = ["TNT LAB <staff@tnt-lab.unige.it>"]
+maintainers = [
+    "Paolo Bono <paolob@tnt-lab.unige.it>",
+    "Alderico Gallo <aldericog@tnt-lab.unige.it>",
+    "Davide Freggiaro <davidef@tnt-lab.unige.it>",
+]
 license = "n\b"
 readme = "README.md"
 

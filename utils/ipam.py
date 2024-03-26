@@ -18,10 +18,18 @@ def is_ip_in_range(ip: Union[ipaddress.IPv4Address, str],
     return ip_min <= ip <= ip_max
 
 
-def check_range_in_cidr(
-        ip_min: Union[ipaddress.IPv4Address, str],
-        ip_max: Union[ipaddress.IPv4Address, str],
-        cidr: Union[ipaddress.IPv4Network, str]) -> bool:
+def check_range_in_cidr(ip_min: Union[ipaddress.IPv4Address, str], ip_max: Union[ipaddress.IPv4Address, str], cidr: Union[ipaddress.IPv4Network, str]) -> bool:
+    """
+    Checks if the IP range <ip_min> and <ip_max> is contained in the CIDR range.
+
+    Args:
+        ip_min: The lower IP of the range
+        ip_max: The higher IP of the range
+        cidr: CIDR
+
+    Returns:
+        True if the range is contained in CIDR.
+    """
     if type(cidr) is str:
         cidr = ipaddress.IPv4Network(cidr)
     if type(ip_min) is str:
@@ -30,6 +38,20 @@ def check_range_in_cidr(
         ip_max = ipaddress.IPv4Address(ip_max)
     return ip_min in cidr and ip_max in cidr
 
+def check_ipv4_valid(ipv4: str) -> bool:
+    """
+    Check if the IPv4 is a valid address
+    Args:
+        ipv4: The IP (string) to be checked
+
+    Returns:
+        True if it is a valid IPv4 address.
+    """
+    try:
+        ipv4_model = ipaddress.IPv4Address(ipv4)
+        return True
+    except ipaddress.AddressValueError:
+        return False
 
 def get_available_network_ip(cidr: ipaddress.IPv4Network, reserved_ranges: List[IPv4Pool]) -> List[IPv4Pool]:
     """

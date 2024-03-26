@@ -41,7 +41,7 @@ kubectl set env deployment -n osm lcm OSMLCM_VCA_EEGRPC_POD_ADMISSION_POLICY=pri
 
 # Needed by some python packages (netifaces)
 echo "Installing build essential tools"
-sudo apt install -y build-essential
+sudo apt install -y build-essential sshpass
 
 echo "Installing Python project dependencies"
 /home/ubuntu/.local/bin/poetry install

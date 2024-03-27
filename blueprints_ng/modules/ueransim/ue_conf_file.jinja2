@@ -1,0 +1,74 @@
+# IMSI number of the UE. IMSI = [MCC|MNC|MSISDN] (In total 15 digits)
+supi: 'imsi-{{ sim.imsi }}'
+# Mobile Country Code value of HPLMN
+mcc: '{{ sim.plmn[:3] }}'
+# Mobile Network Code value of HPLMN (2 or 3 digits)
+mnc: '{{ sim.plmn[3:] }}'
+# SUCI Protection Scheme : 0 for Null-scheme, 1 for Profile A and 2 for Profile B
+protectionScheme: 0
+# Home Network Public Key for protecting with SUCI Profile A
+homeNetworkPublicKey: '5a8d38864820197c3394b92613b20b91633cbd897119273bf8e4a6f4eec0a650'
+# Home Network Public Key ID for protecting with SUCI Profile A
+homeNetworkPublicKeyId: 1
+# Routing Indicator
+routingIndicator: '0000'
+
+# Permanent subscription key
+key: '{{ sim.key }}'
+# Operator code (OP or OPC) of the UE
+op: '{{ sim.op }}'
+# This value specifies the OP type and it can be either 'OP' or 'OPC'
+opType: '{{ sim.opType }}'
+# Authentication Management Field (AMF) value
+amf: '{{ sim.amf }}'
+# IMEI number of the device. It is used if no SUPI is provided
+imei: '356938035643803'
+# IMEISV number of the device. It is used if no SUPI and IMEI is provided
+imeiSv: '4370816125816151'
+
+# List of gNB IP addresses for Radio Link Simulation
+gnbSearchList:
+{{ gnbSearchList | to_yaml(indent=2, default_flow_style=False) }}
+
+# UAC Access Identities Configuration
+uacAic:
+  mps: false
+  mcs: false
+
+# UAC Access Control Class
+uacAcc:
+  normalClass: 0
+  class11: false
+  class12: false
+  class13: false
+  class14: false
+  class15: false
+
+# Initial PDU sessions to be established
+sessions:
+{{ sim.sessions | to_yaml(indent=2, default_flow_style=False) }}
+
+# Configured NSSAI for this UE by HPLMN
+configured-nssai:
+{{ sim.configured_nssai | to_yaml(indent=2, default_flow_style=False) }}
+
+# Default Configured NSSAI for this UE
+default-nssai:
+{{ sim.default_nssai | to_yaml(indent=2, default_flow_style=False) }}
+
+# Supported integrity algorithms by this UE
+integrity:
+  IA1: true
+  IA2: true
+  IA3: true
+
+# Supported encryption algorithms by this UE
+ciphering:
+  EA1: true
+  EA2: true
+  EA3: true
+
+# Integrity protection maximum data rate for user plane
+integrityMaxRate:
+  uplink: 'full'
+  downlink: 'full'

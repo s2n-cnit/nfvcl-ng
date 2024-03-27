@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Any
 
-from pydantic import Field, constr
+from pydantic import Field, constr, ConfigDict
 
 from models.base_model import NFVCLBaseModel
 from models.vim.vim_models import VimNetMap
@@ -35,6 +35,12 @@ class PDUSessionType(Enum):
 
 
 class UeransimSession(NFVCLBaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
+        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
+        validate_default=True
+    )
+
     type: PDUSessionType
     apn: str
     slice: UeransimSlice
@@ -43,6 +49,12 @@ class OpType(Enum):
     OPC = 'OPC'
 
 class UeransimSim(NFVCLBaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
+        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
+        validate_default=True
+    )
+
     imsi: constr(pattern=r'^[0-9]*$', min_length=15, max_length=15)
     plmn: constr(pattern=r'^[0-9]*$', min_length=5, max_length=5)
     key: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)

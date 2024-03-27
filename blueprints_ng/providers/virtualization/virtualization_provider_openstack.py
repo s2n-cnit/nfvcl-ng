@@ -1,11 +1,8 @@
-import tempfile
 import time
 from pathlib import Path
 from typing import List, Dict
 
-import ansible_runner
 import paramiko
-from models.vim import VimModel
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.connection import Connection
@@ -15,11 +12,12 @@ from openstack.network.v2.subnet import Subnet
 
 from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from blueprints_ng.cloudinit_builder import CloudInit
-from blueprints_ng.providers.utils import create_ansible_inventory
+from blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
 from blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource
+from models.vim import VimModel
 from utils.openstack.openstack_client import OpenStackClient
 
 
@@ -264,15 +262,10 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         nfvcl_tmp_dir = Path("/tmp/nfvcl/playbook")
         nfvcl_tmp_dir.mkdir(exist_ok=True, parents=True)
 
-        tmp_playbook = open(Path(nfvcl_tmp_dir, f"{self.blueprint.id}_{vm_resource_configuration.vm_resource.name}.yml"), "w+")  # tempfile.NamedTemporaryFile(mode="w")
-        tmp_inventory = tempfile.NamedTemporaryFile(mode="w")
-        tmp_private_data_dir = tempfile.TemporaryDirectory()
+        playbook_str = vm_resource_configuration.dump_playbook()
 
-        # Write the inventory and playbook to files
-        tmp_inventory.write(create_ansible_inventory(vm_resource_configuration.vm_resource.access_ip, vm_resource_configuration.vm_resource.username, vm_resource_configuration.vm_resource.password))
-        tmp_playbook.write(vm_resource_configuration.dump_playbook())
-        tmp_playbook.flush()
-        tmp_inventory.flush()
+        with open(Path(nfvcl_tmp_dir, f"{self.blueprint.id}_{vm_resource_configuration.vm_resource.name}.yml"), "w+") as f:
+            f.write(playbook_str)
 
         # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections
         self.__wait_for_ssh_to_be_ready(
@@ -284,40 +277,13 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             5
         )
 
-        def my_status_handler(data, runner_config):
-            self.logger.info(f"[ANSIBLE] Current status: {data['status']}")
-
-        def my_event_handler(data):
-            # TODO change logging type if error
-            block = data["stdout"].strip()
-            if len(block) > 0:
-                lines = block.split("\n")
-                for line in lines:
-                    self.logger.debug(f"[ANSIBLE] {line.strip()}")
-
-        # Delete known_hosts to prevent error, nothing else seems working
-        # TODO find a better way
-        Path(Path.home(), ".ssh/known_hosts").unlink(missing_ok=True)
-
-        # https://github.com/ansible/ansible-runner/issues/398#issuecomment-948885921
-
-        # Run the playbook, TODO better integration, error checking, logging, ...
-        ansible_runner_result = ansible_runner.run(
-            playbook=tmp_playbook.name,
-            inventory=tmp_inventory.name,
-            private_data_dir=tmp_private_data_dir.name,
-            status_handler=my_status_handler,
-            event_handler=my_event_handler,
-            quiet=True
+        ansible_runner_result, fact_cache = run_ansible_playbook(
+            vm_resource_configuration.vm_resource.access_ip,
+            vm_resource_configuration.vm_resource.username,
+            vm_resource_configuration.vm_resource.password,
+            playbook_str,
+            self.logger
         )
-
-        # Save the fact cache to a variable before deleting tmp_private_data_dir
-        fact_cache = ansible_runner_result.get_fact_cache("host")
-
-        # Close the tmp files, this will delete them
-        tmp_playbook.close()
-        tmp_inventory.close()
-        tmp_private_data_dir.cleanup()
 
         if ansible_runner_result.status == "failed":
             raise VirtualizationProviderOpenstackException("Error running ansible configurator")

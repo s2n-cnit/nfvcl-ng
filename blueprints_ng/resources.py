@@ -22,6 +22,12 @@ class ResourceDeployable(Resource):
     area: int = Field()
     name: str = Field()
 
+    def get_name_k8s_format(self):
+        """
+        Returns the name of the node given by k8s to the node
+        """
+        return self.name.lower().replace('_','-')
+
 
 class ResourceConfiguration(Resource):
     """

@@ -221,6 +221,19 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             resource.id = str(uuid.uuid4())
         self.base_model.registered_resources[resource.id] = RegisteredResource(type=get_class_path_str_from_obj(resource), value=resource)
 
+    def deregister_resource(self, resource: Resource):
+        """
+        Remove a resource in the blueprint registered resources
+        Args:
+            resource: the resource to be deregistered
+        """
+        if not resource.id:
+            raise BlueprintNGException(f"The ID of the resource to be deleted is None")
+        if resource.id in self.base_model.registered_resources:
+            self.base_model.registered_resources.pop(resource.id)
+        else:
+            raise BlueprintNGException(f"The resource to be deleted is not present in registered resources")
+
     def create(self, model: CreateConfigTypeVar):
         self.base_model.create_config = model
         self.base_model.create_config_type = get_class_path_str_from_obj(model)

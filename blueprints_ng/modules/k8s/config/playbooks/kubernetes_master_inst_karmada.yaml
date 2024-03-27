@@ -1,0 +1,14 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+   - name: Installing Submariner
+     command: curl -Ls https://get.submariner.io | bash
+   - name: Installing Karmada
+     command: curl -s https://raw.githubusercontent.com/karmada-io/karmada/master/hack/install-cli.sh | sudo bash
+   - name: Configuring Submariner
+     command: ~/.local/bin/subctl join --kubeconfig {{ kube_config_location }} <(echo {{ submariner_broker }}) --clusterid {{ cluster_id }}
+   - name: Configuring Karmada
+     command: sudo karmadactl register {{ karmada_control_plane }} --token {{ karmada_token }} --discovery-token-ca-cert-hash {{ discovery_token_hash }} --cluster-name {{ cluster_id }} --kubeconfig {{ kube_config_location }}
+

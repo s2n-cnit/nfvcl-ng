@@ -34,7 +34,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     service_cidr: str = Field(default="10.200.0.0/16", description='Network used to deploy services') # TODO validate
     topology_onboard: bool = True
     password: str = Field(default="ubuntu", description="The password to be set, in every vm, for user ubuntu", pattern=r'^[a-zA-Z0-9_.-]*$')
-
+    install_plugins: bool = Field(default=True, description="Whether to install default plugin list on blueprint deployment (Flannel, MetalLb, OpenEBS)")
     master_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="2048", storage_gb='16', vcpu_count='2')
     areas: List[K8sAreaDeployment] = Field(min_items=1, description="List of areas in witch deployment is made (with requirements)")
 
@@ -62,3 +62,17 @@ class K8sAddNodeModel(BlueprintNGCreateModel):
                 raise ValueError("It is not possible to add CORE areas in day2 request. Only upon cluster creation.")
 
         return areas
+
+class K8sDelNodeModel(BlueprintNGCreateModel):
+    node_names: List[str] = Field(min_items=1, description="List of nodes names (1VSVPN_VM_K8S_C) to be removed from the cluster")
+
+class KarmadaInstallModel(BlueprintNGCreateModel):
+    """
+    Model for Karmada and Submarine installation and configuration. It contains required parameters for the configuration.
+    """
+    cluster_id: str = Field(description="Name of the current cluster Submariner and Karmada. Must be unique")
+    kube_config_location: str = Field(default="~/.kube/config",description="Path to local kubeconfig (on the master node)")
+    submariner_broker: str = Field(description="Content of the submariner broker file (.subm file extension)")
+    karmada_control_plane: str = Field(description="The IP and port of Karmada")
+    karmada_token: str = Field(description="The Karmada token")
+    discovery_token_hash: str = Field(description="Discovery token hash")

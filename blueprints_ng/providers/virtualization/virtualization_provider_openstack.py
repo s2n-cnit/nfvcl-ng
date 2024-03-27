@@ -19,13 +19,15 @@ from blueprints_ng.providers.utils import create_ansible_inventory
 from blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
-    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration
+    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource
 from utils.openstack.openstack_client import OpenStackClient
 
 
 class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
     os_dict: Dict[str, str] = {}
-    flavors: Dict[str, str] = {}
+    flavors: List[str] = []
+    networks: List[str] = []
+    subnets: List[str] = []
 
 
 class VirtualizationProviderOpenstackException(VirtualizationProviderException):
@@ -92,11 +94,12 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             else:
                 raise VirtualizationProviderOpenstackException(f"Image >{vm_resource.image.name}< not found")
 
-        flavor_str = f"{vm_resource.flavor.memory_mb}-{vm_resource.flavor.vcpu_count}-{vm_resource.flavor.storage_gb}"
-        if flavor_str in self.data.flavors:
-            flavor = self.conn.get_flavor(self.data.flavors[flavor_str])
+        flavor_name = f"Flavor_{vm_resource.name}"
+        if flavor_name in self.data.flavors:
+            flavor = self.conn.get_flavor(flavor_name)
+            if flavor is None:
+                raise VirtualizationProviderOpenstackException(f"Flavor '{flavor_name}' should be present but is None")
         else:
-            flavor_name = f"{self.blueprint.id}_flavor_{len(self.data.flavors) + 1}"
             flavor: Flavor = self.conn.create_flavor(
                 flavor_name,
                 vm_resource.flavor.memory_mb,
@@ -104,7 +107,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                 vm_resource.flavor.storage_gb,
                 is_public=False
             )
-            self.data.flavors[flavor_str] = flavor_name
+            self.data.flavors.append(flavor_name)
 
         cloudin = CloudInit(password=vm_resource.password).build_cloud_config()
         self.logger.debug(f"Cloud config:\n{cloudin}")
@@ -172,6 +175,27 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         self.logger.success(f"Creating VM {vm_resource.name} finished")
         self.blueprint.to_db()
+
+    def create_net(self, net_resource: NetResource):
+        self.logger.info(f"Creating NET {net_resource.name}")
+
+        if self.conn.get_network(net_resource.name):
+            raise VirtualizationProviderOpenstackException(f"Network {net_resource.name} already exist")
+        if self.conn.list_subnets(filters={"cidr": net_resource.cidr}):
+            raise VirtualizationProviderOpenstackException(f"Subnet with cidr {net_resource.cidr} already exist")
+
+        network: Network = self.conn.create_network(net_resource.name, port_security_enabled=False)
+        subnet: Subnet = self.conn.create_subnet(
+            network.id,
+            cidr=net_resource.cidr,
+            enable_dhcp=True,
+            disable_gateway_ip=True
+        )
+
+        self.data.subnets.append(subnet.id)
+        self.data.networks.append(network.id)
+
+        self.logger.success(f"Creating NET {net_resource.name} finished")
 
     def __gather_info_from_vm(self, vm_resource: VmResource):
         self.logger.info(f"Starting VM info gathering")
@@ -311,8 +335,14 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
     def final_cleanup(self):
         # Delete flavors
-        for flavor_str, flavor_name in self.data.flavors.items():
+        for flavor_name in self.data.flavors:
             self.conn.delete_flavor(flavor_name)
+        # Delete subnets
+        for subnet_id in self.data.subnets:
+            self.conn.delete_subnet(subnet_id)
+        # Delete networks
+        for network_id in self.data.networks:
+            self.conn.delete_network(network_id)
 
     def __parse_os_addresses(self, vm_resource: VmResource, addresses, subnet_details: Dict[str, Subnet]):
         for network_name, network_info in addresses.items():

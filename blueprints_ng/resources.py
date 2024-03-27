@@ -43,9 +43,9 @@ class VmResourceImage(NFVCLBaseModel):
 
 
 class VmResourceFlavor(NFVCLBaseModel):
+    vcpu_count: str = Field(default="4")
     memory_mb: str = Field(default="8192", description="Should be a multiple of 1024")
     storage_gb: str = Field(default="32")
-    vcpu_count: str = Field(default="4")
 
 
 class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):
@@ -87,6 +87,10 @@ class VmResourceNetworkInterface(NFVCLBaseModel):
     """
     fixed: VmResourceNetworkInterfaceAddress = Field()
     floating: Optional[VmResourceNetworkInterfaceAddress] = Field(default=None)
+
+
+class NetResource(ResourceDeployable):
+    cidr: str = Field()
 
 
 class VmResource(ResourceDeployable):
@@ -172,6 +176,7 @@ class VmResource(ResourceDeployable):
             if net_interface.fixed.cidr == cidr:
                 return True
         return False
+
 
 class VmResourceConfiguration(ResourceConfiguration):
     vm_resource: VmResource = Field()

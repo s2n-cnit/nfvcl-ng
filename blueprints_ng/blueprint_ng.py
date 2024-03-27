@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 import copy
-import importlib
 import sys
 import uuid
 from datetime import datetime
@@ -18,7 +17,8 @@ from blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProvide
 from blueprints_ng.providers.virtualization import VirtualizationProviderOpenstack, VirtualizationProviderProxmox
 from blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderInterface
 from blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource, \
-    VmResourceConfiguration
+    VmResourceConfiguration, NetResource
+from blueprints_ng.utils import get_class_from_path, get_class_path_str_from_obj
 from models.base_model import NFVCLBaseModel
 from models.prometheus.prometheus_model import PrometheusTargetModel
 from models.vim import VimTypeEnum
@@ -27,28 +27,6 @@ from utils.log import create_logger
 
 StateTypeVar = TypeVar("StateTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
-
-
-def get_class_from_path(class_path: str) -> Any:
-    """
-    Get class from the give string module path
-    Args:
-        class_path: module path
-
-    Returns: The class found
-    """
-    field_type_split = class_path.split(".")
-
-    module_name = ".".join(field_type_split[:-1])
-    class_name = field_type_split[-1]
-
-    module = importlib.import_module(module_name)
-    found_class = getattr(module, class_name)
-    return found_class
-
-
-def get_class_path_str_from_obj(obj: Any) -> str:
-    return f"{obj.__class__.__module__}.{obj.__class__.__qualname__}"
 
 
 class BlueprintNGStatus(NFVCLBaseModel):
@@ -175,6 +153,9 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
 
     def create_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).create_vm(vm_resource)
+
+    def create_net(self, net_resource: NetResource):
+        return self.get_virt_provider(net_resource.area).create_net(net_resource)
 
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         return self.get_virt_provider(vm_resource_configuration.vm_resource.area).configure_vm(vm_resource_configuration)

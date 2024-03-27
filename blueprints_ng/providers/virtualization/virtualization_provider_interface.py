@@ -4,7 +4,7 @@ import abc
 
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, \
     BlueprintNGProviderData
-from blueprints_ng.resources import VmResource, VmResourceConfiguration
+from blueprints_ng.resources import VmResource, VmResourceConfiguration, NetResource
 
 
 class VirtualizationProviderData(BlueprintNGProviderData):
@@ -27,6 +27,10 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
         if not vm_resource_configuration.vm_resource.created:
             raise VirtualizationProviderException("VM Resource not created")
         return {}
+
+    @abc.abstractmethod
+    def create_net(self, net_resource: NetResource):
+        pass
 
     @abc.abstractmethod
     def destroy_vm(self, vm_resource: VmResource):

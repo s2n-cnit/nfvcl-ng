@@ -1,8 +1,31 @@
+import importlib
 import inspect
 from pathlib import Path
 from typing import Any, Optional, Union, List, Text
 
 from ruamel.yaml import YAML, StringIO
+
+
+def get_class_from_path(class_path: str) -> Any:
+    """
+    Get class from the give string module path
+    Args:
+        class_path: module path
+
+    Returns: The class found
+    """
+    field_type_split = class_path.split(".")
+
+    module_name = ".".join(field_type_split[:-1])
+    class_name = field_type_split[-1]
+
+    module = importlib.import_module(module_name)
+    found_class = getattr(module, class_name)
+    return found_class
+
+
+def get_class_path_str_from_obj(obj: Any) -> str:
+    return f"{obj.__class__.__module__}.{obj.__class__.__qualname__}"
 
 
 def rel_path(file: str) -> Path:

@@ -7,6 +7,8 @@ def create_ansible_inventory(host: str, username: str, password: str, become_pas
     if become_password:
         str_list.append(f"ansible_become_pass='{become_password}'")
 
+    str_list.append("ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'")
+
     return f"host {' '.join(str_list)}"
 
 

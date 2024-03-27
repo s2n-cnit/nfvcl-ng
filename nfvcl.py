@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # DO NOT MOVE THIS PIECE OF CODE -------
 # Log level must be set before loggers are created!
-
+from rest_endpoints.ansible import ansible_router
 from utils.log import mod_logger, set_log_level
 from utils.util import get_nfvcl_config
 
@@ -52,6 +52,7 @@ app.include_router(k8s_router)
 app.include_router(helm_router)
 app.include_router(osm_router)
 app.include_router(openstack_router)
+app.include_router(ansible_router)
 
 day2_files = "day2_files"
 

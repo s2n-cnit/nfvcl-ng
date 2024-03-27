@@ -2,6 +2,7 @@ from typing import Optional, List
 import re
 
 from blueprints_ng.lcm.blueprint_route_manager import add_route
+from blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
 
 from models.http_models import HttpRequestType
 
@@ -11,10 +12,9 @@ from utils.k8s import get_k8s_config_from_file_content, install_plugins_to_clust
 from models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from starlette.requests import Request
 from topology.topology import Topology, build_topology
-from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
 from blueprints_ng.modules.k8s.config.day0_configurator import VmK8sDay0Configurator
-from models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel
+from models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, KarmadaInstallModel, K8sDelNodeModel
 from blueprints_ng.resources import VmResource, VmResourceImage
 from pydantic import Field
 from blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
@@ -54,6 +54,17 @@ class K8sBlueprintNGState(BlueprintNGState):
     master_key_add_worker: str = Field(default="", description="The master key to be used by a worker to join the k8s cluster")
     master_credentials: str = Field(default="", description="The certificate of the admin, to allow k8s administration")
 
+    def remove_worker(self, worker_to_be_rem: VmResource):
+        """
+        Removes a worker and its configurators from the state.
+        Args:
+            worker_name: The worker name to be removed
+        """
+        self.vm_workers = [worker for worker in self.vm_workers if worker.name != worker_to_be_rem.name]
+        self.day_0_workers_configurators = [configur for configur in self.day_0_workers_configurators if configur.vm_resource.name != worker_to_be_rem.name]
+        self.day_0_workers_configurators_tobe_exec = [configur for configur in self.day_0_workers_configurators_tobe_exec if configur.vm_resource.name != worker_to_be_rem.name]
+
+
 @declare_blue_type(K8S_BLUE_TYPE)
 class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = K8sBlueprintNGState):
@@ -63,6 +74,12 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         super().__init__(blueprint_id, state_type)
 
     def create(self, create_model: K8sCreateModel):
+        """
+        Creates the master node in the master area.
+        Creates the desired number of worker nodes in the desired areas
+        Starts the DAY-0 configuration of master and worker nodes.
+        Installs default plugins to the cluster (if required, by default yes)
+        """
         super().create(create_model)
         self.logger.info(f"Starting creation of K8s blueprint")
         self.state.pod_network_cidr = create_model.pod_network_cidr
@@ -125,18 +142,18 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             if area.service_net not in self.state.attached_networks:
                 self.state.attached_networks.append(area.service_net)
             self.state.area_list.append(area)
+
         self.day0conf(self.state.pod_network_cidr, self.state.service_cidr, create_model.topology_onboard, configure_master=True)
-
-        self.install_plugins()
-
+        # Install K8s Plugins if required (default=yes)
+        if create_model.install_plugins:
+            self.install_default_plugins()
 
     @classmethod
     def rest_create(cls, msg: K8sCreateModel, request: Request):
         """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
+        Creates a K8S cluster using the NFVCL blueprint
         """
         return cls.api_day0_function(msg, request)
-
 
     def day0conf(self, pod_net_cidr, service_cidr, topology_onboard: bool, configure_master: bool = False):
         if configure_master:
@@ -166,10 +183,9 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             topo.add_k8scluster(k8s_cluster)
             self.state.topology_onboarded = topology_onboard
 
-
-    def install_plugins(self):
+    def install_default_plugins(self):
         """
-        Day 2 operation. Install k8s plugins after the cluster has been initialized.
+        Day 2 operation. Install k8s default plugins after the cluster has been initialized.
         Suppose that there is NO plugin installed.
         """
         client_config = get_k8s_config_from_file_content(self.state.master_credentials)
@@ -206,13 +222,10 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         install_plugins_to_cluster(kube_client_config=client_config, plugins_to_install=plug_list,
                                    template_fill_data=add_data, cluster_id=self.base_model.id)
 
-
-    # TODO implement destroy
-
     @classmethod
     def add_k8s_worker(cls, msg: K8sAddNodeModel, blue_id: str, request: Request):
         """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
+        Adds a kubernetes node to a blueprint generated K8S cluster.
         """
         return cls.api_day2_function(msg, blue_id, request)
 
@@ -255,8 +268,63 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         self.day0conf(self.state.pod_network_cidr, self.state.service_cidr, False, False)
 
+    @classmethod
+    def del_k8s_workers(cls, msg: K8sDelNodeModel, blue_id: str, request: Request):
+        """
+        Destroy a worker from a blueprint generated K8S cluster. The number of nodes (controller/master + workers) cannot be lower than 2.
+        """
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @add_route(K8S_BLUE_TYPE, "/del_workers", [HttpRequestType.DELETE], del_k8s_workers)
+    def del_workers(self, model: K8sDelNodeModel):
+        vm_to_be_destroyed = []
+        if self.state.vm_master.name in model.node_names:
+            # Removing the master node from the list and logging error
+            model.node_names.pop(model.node_names.index(self.state.vm_master.name))
+            self.logger.error(f"Master node {self.state.vm_master.id} cannot be deleted from cluster {self.id}. Moving to next nodes to be deleted")
+
+        if len(self.state.vm_workers) <= 1:
+            self.logger.error(f"The number of workers cannot be lower than 1. Pods are scheduled only on workers node, there will be no schedule.")
+            return
+
+        dayNconf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster is always performed on the master node.
+        for node in model.node_names:
+            target_vm = [vm for vm in self.state.vm_workers if vm.name == node]
+            if len(target_vm) >= 1:
+                dayNconf.delete_node(target_vm[0].get_name_k8s_format())
+                vm_to_be_destroyed.append(target_vm[0])
+            else:
+                self.logger.error(f"Node >{node}< has not been found, cannot be deleted from cluster {self.id}. Moving to next nodes to be deleted")
+        # Removing from the cluster every VM to be deleted before it will be destroyed
+        self.provider.configure_vm(dayNconf)
+        # Destroying every VM to be removed from the cluster
+        for vm in vm_to_be_destroyed:
+            # Delete the VM from the provider
+            self.provider.destroy_vm(vm)
+            # Delete from registered resources
+            self.deregister_resource(vm)
+            # Remove worker resources from the state
+            self.state.remove_worker(vm)
+
+    @classmethod
+    def configure_k8s_karmada(cls, msg: KarmadaInstallModel, blue_id: str, request: Request):
+        """
+        Install and configure submariner and Karmada on an existing blueprint generated K8S cluster.
+        """
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @add_route(K8S_BLUE_TYPE, "/install_karmada", [HttpRequestType.POST], configure_k8s_karmada)
+    def configure_karmada(self, model: KarmadaInstallModel):
+        """
+        Creates a configurator that installs and configures submarine and karmada.
+        """
+        master_conf = self.state.day_0_master_configurator
+        master_conf.install_karmada(model)
+        master_result = self.provider.configure_vm(master_conf)
+
     def destroy(self):
         super().destroy()
+        build_topology().release_ranges(self.id) # Remove all reserved ranges in the networks
 
         if self.state.topology_onboarded:
             try:

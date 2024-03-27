@@ -68,6 +68,9 @@ class AnsibleReplaceTask(AnsibleTask):
 class AnsibleShellTask(AnsibleTask):
     cmd: str = Field()
 
+class AnsiblePauseTask(AnsibleTask):
+    seconds: int = Field()
+
 
 class AnsiblePlaybookBuilder:
     def __init__(self, name, become=True, gather_facts=False):
@@ -255,6 +258,19 @@ class AnsiblePlaybookBuilder:
             AnsibleShellTask(cmd=command),
             register_output_as=register_output_as
         )
+
+    def add_pause_task(self, seconds: int):
+        """
+        Add a pause task to stop for N seconds
+        Args:
+            seconds: the number of seconds to stop the playbook
+        """
+        self.add_task(
+            f"Pause Task for '{seconds}' sec",
+            "ansible.builtin.pause",
+            AnsiblePauseTask(seconds=seconds)
+        )
+
 
     def add_run_command_and_gather_output_tasks(self, command, output_var_name):
         """

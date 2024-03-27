@@ -1,3 +1,5 @@
+from threading import Thread
+
 from fastapi import APIRouter, status, Body
 from pydantic import BaseModel
 
@@ -17,5 +19,6 @@ class AnsibleRestAnswer202(BaseModel):
 
 @ansible_router.post("/run_playbook", response_model=AnsibleRestAnswer202)
 async def run_playbook(host: str, username: str, password: str, payload: str = Body(None, media_type="application/yaml")):
-    run_ansible_playbook(host, username, password, payload)
+    thread = Thread(target=run_ansible_playbook, args=(host, username, password, payload))
+    thread.start()
     return AnsibleRestAnswer202()

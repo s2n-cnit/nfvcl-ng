@@ -42,9 +42,27 @@ class AnsibleTaskDescription(NFVCLBaseModel):
 class AnsibleTemplateTask(AnsibleTask):
     src: str = Field()
     dest: str = Field()
-    mode: int = Field(default=777)
+    mode: int = Field(default=0o777)
     force: str = Field(default="yes")
     backup: str = Field(default="yes")
+
+
+class AnsibleCopyTask(AnsibleTask):
+    src: str = Field()
+    dest: str = Field()
+    mode: int = Field(default=0o777)
+    force: str = Field(default="yes")
+    backup: str = Field(default="yes")
+    remote_src: bool = Field(default=False)
+
+
+class AnsibleReplaceTask(AnsibleTask):
+    """
+    https://docs.ansible.com/ansible/latest/collections/ansible/builtin/replace_module.html
+    """
+    path: str = Field()
+    regexp: str = Field()
+    replace: str = Field()
 
 
 class AnsibleShellTask(AnsibleTask):
@@ -164,6 +182,42 @@ class AnsiblePlaybookBuilder:
             )
         )
 
+    def add_copy_task(self, src: str | Path, dest: str, remote_src: bool = False):
+        """
+        Add a task of the 'ansible.builtin.copy' type, this will copy the file at the src path to the dest on the remote machine
+        Args:
+            src: Path of the source file
+            dest: Remote destination
+            remote_src: True if the source file is on the remote host, False if on the NFVCL machine
+        """
+        self.add_task(
+            f"Copy task for {dest}",
+            "ansible.builtin.copy",
+            AnsibleCopyTask(
+                src=str(src.absolute()) if isinstance(src, Path) else src,
+                dest=dest,
+                remote_src=remote_src
+            )
+        )
+
+    def add_replace_task(self, path: str, regexp: str, replace: str):
+        """
+        Add a task of the 'ansible.builtin.replace' type, this will replace every occurrence of a regexp in a file with a new string
+        Args:
+            path: Path of the file
+            regexp: Regexp to search in the file
+            replace: String used to replace the matches
+        """
+        self.add_task(
+            f"Replace task for {path}",
+            "ansible.builtin.replace",
+            AnsibleReplaceTask(
+                path=path,
+                regexp=regexp,
+                replace=replace
+            )
+        )
+
     def add_gather_template_result_task(self, var_name: str, value_template: str):
         """
         Add a task to gather a variable from the host using Ansible
@@ -188,6 +242,20 @@ class AnsiblePlaybookBuilder:
         """
         self.add_gather_template_result_task(var_name, "{{ " + var_name + " }}")
 
+    def add_shell_task(self, command: str, register_output_as=None):
+        """
+        Add a shell task to execute commands
+        Args:
+            command: The command to execute
+            register_output_as: The name of the variable in which to register the command output
+        """
+        self.add_task(
+            f"Shell Task '{command}'",
+            "ansible.builtin.shell",
+            AnsibleShellTask(cmd=command),
+            register_output_as=register_output_as
+        )
+
     def add_run_command_and_gather_output_tasks(self, command, output_var_name):
         """
         Add a simple shell task to run a command and gather the stdout to a variable
@@ -195,7 +263,7 @@ class AnsiblePlaybookBuilder:
             command: Command to run
             output_var_name: Variable name to store the stdout of the command
         """
-        self.add_task("Task", "ansible.builtin.shell", AnsibleShellTask(cmd=command), register_output_as="tmp_reg")
+        self.add_shell_task(command, register_output_as="tmp_reg")
         self.add_gather_template_result_task(output_var_name, "{{ tmp_reg.stdout }}")
 
     def build(self) -> str:
@@ -204,7 +272,6 @@ class AnsiblePlaybookBuilder:
         Returns: YAML string of the playbook
         """
         return get_yaml_parser().dump([self.playbook.model_dump()])
-
 
 # if __name__ == "__main__":
 #     ansible_builder = AnsiblePlaybookBuilder("Prova")

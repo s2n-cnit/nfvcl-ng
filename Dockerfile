@@ -5,7 +5,9 @@ ENV TZ=Europe/Rome
 
 RUN apt-get update && \
     apt-get -y dist-upgrade && \
-    apt-get -y install curl gnupg2 software-properties-common lsb-release git wget
+    apt-get -y install curl gnupg2 software-properties-common lsb-release git wget && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN apt-add-repository --yes ppa:ansible/ansible && \
     add-apt-repository --yes ppa:deadsnakes/ppa && \
     apt-get update && apt install -y ansible && \
@@ -18,10 +20,13 @@ RUN apt-add-repository --yes ppa:ansible/ansible && \
 RUN ansible-galaxy collection install vyos.vyos && \
     ansible-galaxy collection install prometheus.prometheus && \
     ansible-galaxy collection install git+https://github.com/s2n-cnit/nfvcl-ansible-collection.git,v0.0.1
-# Clone NFVCL
-WORKDIR /app
-RUN git clone https://gitlab.tnt-lab.unige.it/nfvcl/nfvcl-ng.git
+
+COPY . /app/nfvcl-ng
 
 WORKDIR /app/nfvcl-ng
-RUN /root/.local/bin/poetry install
+RUN /root/.local/bin/poetry install && \
+    rm -rf /root/.cache/pypoetry/cache && \
+    rm -rf /root/.cache/pypoetry/artifacts && \
+    rm -rf /root/.cache/pip
+
 CMD ["/root/.local/bin/poetry", "run", "python", "./run.py"]

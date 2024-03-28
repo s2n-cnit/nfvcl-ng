@@ -429,3 +429,21 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             cls.api_router.add_api_route(day2_route.final_path, bound_method, methods=day2_route.get_methods_str())
 
         return cls.api_router
+
+    def call_external_function(self, external_blue_id: str, function_name: str, *args, **kwargs):
+        """
+        Call a function on another blueprint
+        Args:
+            external_blue_id: Id of the blueprint to call on the function on
+            function_name: Name of the function to call
+            *args: args
+            **kwargs: kwargs
+
+        Returns: Result of the function call
+        """
+        from rest_endpoints.blue_ng_router import get_blueprint_manager
+
+        self.logger.debug(f"Calling external function '{function_name}' on blueprint '{external_blue_id}', args={args}, kwargs={kwargs}")
+        res = get_blueprint_manager().get_worker(external_blue_id).call_function_sync(function_name, *args, **kwargs)
+        self.logger.debug(f"Result of external function '{function_name}' on blueprint '{external_blue_id}' = {res}")
+        return res

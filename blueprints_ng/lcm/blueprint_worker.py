@@ -1,10 +1,19 @@
 import multiprocessing
+from functools import partial
 from multiprocessing import Process
 from typing import Any
+
 from blueprints_ng.blueprint_ng import BlueprintNG
 from blueprints_ng.lcm.blueprint_route_manager import get_function_to_be_called
 from models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage
 from utils.log import create_logger
+
+multiprocessing_manager = multiprocessing.Manager()
+
+
+def callback_function(event, namespace, msg):
+    namespace.msg = msg
+    event.set()
 
 
 class BlueprintWorker:
@@ -25,7 +34,27 @@ class BlueprintWorker:
         # TODO check stop from outside
         self.process.close()
 
-    def put_message(self, msg_type: WorkerMessageType, path: str, message: Any):
+    def call_function_sync(self, function_name, *args, **kwargs):
+        """
+        Call a function synchronously
+        Args:
+            function_name: Name of the function to call
+            *args: args
+            **kwargs: kwargs
+
+        Returns: return value of the function
+        """
+        # used to wait for the call to be completed
+        event = multiprocessing_manager.Event()
+        # used to receive the return data from the function
+        namespace = multiprocessing_manager.Namespace()
+
+        self.put_message(WorkerMessageType.DAY2_BY_NAME, function_name, (args, kwargs), callback=partial(callback_function, event, namespace))
+        event.wait()
+
+        return namespace.msg
+
+    def put_message(self, msg_type: WorkerMessageType, path: str, message: Any, callback: callable = None):
         """
         Insert the worker message into the queue. This function should be called by an external process to the worker.
         THREAD SAFE.
@@ -34,8 +63,9 @@ class BlueprintWorker:
             msg_type: The type of the message (DAY0 (creation), DAY2, STOP)
             path: The path of the request.
             message: The message of the request.
+            callback: Function to be called after the message is processed
         """
-        worker_message = WorkerMessage(message_type=msg_type, message=message, path=path)
+        worker_message = WorkerMessage(message_type=msg_type, message=message, path=path, callback=callback)
         self.message_queue.put(worker_message)  # Thread safe
 
     def destroy_blueprint(self):
@@ -60,13 +90,19 @@ class BlueprintWorker:
                     except Exception as e:
                         self.logger.error(f"Error creating blueprint", exc_info=e)
                     self.blueprint.to_db()
-                case WorkerMessageType.DAY2:
+                case WorkerMessageType.DAY2 | WorkerMessageType.DAY2_BY_NAME:
                     self.logger.info(f"Calling function on blueprint")
                     # This is the DAY2 message, getting the function to be called
                     try:
-                        function = get_function_to_be_called(received_message.path)
+                        if received_message.message_type == WorkerMessageType.DAY2:
+                            function = get_function_to_be_called(received_message.path)
+                            result = getattr(self.blueprint, function)(received_message.message)
+                        else:
+                            result = getattr(self.blueprint, received_message.path)(*received_message.message[0], **received_message.message[1])
+
                         # Starting processing the request.
-                        result = getattr(self.blueprint, function)(received_message.message)
+                        if received_message.callback:
+                            received_message.callback(result)
                         self.logger.success(f"Function called on blueprint")
                     except Exception as e:
                         self.logger.error(f"Error calling function on blueprint", exc_info=e)
@@ -92,4 +128,3 @@ class BlueprintWorker:
             if self.blueprint.base_model.id == __value.blueprint.base_model.id:
                 return True
         return False
-

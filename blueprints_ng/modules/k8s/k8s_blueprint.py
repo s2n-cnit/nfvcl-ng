@@ -3,9 +3,7 @@ import re
 
 from blueprints_ng.lcm.blueprint_route_manager import add_route
 from blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
-
 from models.http_models import HttpRequestType
-
 from models.k8s.common_k8s_model import Cni, LBPool
 from models.k8s.plugin_k8s_model import K8sPluginName, K8sTemplateFillData
 from utils.k8s import get_k8s_config_from_file_content, install_plugins_to_cluster, get_k8s_cidr_info

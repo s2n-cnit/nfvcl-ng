@@ -8,7 +8,7 @@ services:
     ports:
       - 5002:5002
     volumes:
-      - ./config.yaml:/app/nfvcl-ng/config.yaml
+      - ./config_compose.yaml:/app/nfvcl-ng/config.yaml
       - ./logs/:/app/nfvcl-ng/logs/
 
   redis:

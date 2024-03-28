@@ -1,0 +1,25 @@
+{
+  'log_level': 20, # 10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0
+  'nfvcl': {
+    'version': "0.2.1",
+    'port': 5002,
+    'ip': ''
+  },
+  'osm': {
+    'host': '127.0.0.1',
+    'port': '9999',
+    'username':'admin',
+    'password':'admin',
+    'project': 'admin',
+    'version': 12
+  },
+  'mongodb': {
+    'host': 'mongo',
+    'port': 27017,
+    'db': 'nfvcl'
+  },
+  'redis': {
+    'host': 'redis',
+    'port': 6379
+  }
+}

@@ -1,51 +1,56 @@
-# NFVCL-NG
-[![Documentation Status](https://readthedocs.org/projects/nfvcl-ng/badge/?version=latest)](https://nfvcl-ng.readthedocs.io/en/latest/?badge=latest)
+<a name="readme-top"></a>
+
+<!-- TABLE OF CONTENTS -->
+
+# 📗 Table of Contents
+
+- [📖 About the Project](#-nfvcl)
+  - [Key Features](#key-features)
+- [💻 Getting Started](#-getting-started)
+  - [Setup](#setup)
+  - [Prerequisites](#prerequisites)
+  - [Install](#install)
+  - [Usage](#usage)
+  - [Deployment](#deployment)
+- [👥 Authors](#-authors)
+- [🤝 Contributing](#-contributing)
+- [⭐️ Show your support](#-show-your-support)
+- [📝 License](#-license)
+
+<!-- PROJECT DESCRIPTION -->
+
+# 📖 NFVCL
 
 The NFVCL is a network-oriented meta-orchestrator, specifically designed for zeroOps and continuous automation. 
 It can create, deploy and manage the lifecycle of different network ecosystems by consistently coordinating multiple 
 artefacts at any programmability levels (from physical devices to cloud-native microservices).
 A more detailed description of the NFVCL will be added to the [Wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html).
 
-This README content:
-<!-- TOC -->
-* [NFVCL-NG](#nfvcl-ng)
-  * [External Architecture](#external-architecture)
-  * [Docker](#docker)
-  * [Docker compose](#docker-compose)
-  * [Helm](#helm)
-  * [Installation (Bare-Metal/VM)](#installation-bare-metalvm)
-    * [Requirements](#requirements)
-    * [Step 0 - Cloning and downloading required files/dependencies](#step-0---cloning-and-downloading-required-filesdependencies)
-    * [Step 1 - Install OSM 14](#step-1---install-osm-14)
-    * [Step 2 - Install Python 3.11, Redis, Uvicorn, Poetry, MongoDB and requirements (using poetry)](#step-2---install-python-311-redis-uvicorn-poetry-mongodb-and-requirements-using-poetry)
-    * [Step 3 - NFVCL, Redis and MongoDB configuration](#step-3---nfvcl-redis-and-mongodb-configuration)
-  * [Run and Test NFVCL](#run-and-test-nfvcl)
-    * [Using Screen](#using-screen)
-    * [Create a service](#create-a-service)
-  * [Usage](#usage)
-  * [Debug](#debug)
-    * [Log file](#log-file)
-    * [Redis **NFVCL_LOG** topic](#redis-nfvcl_log-topic)
-  * [Report Issues](#report-issues)
-<!-- TOC -->
+![General scheme](https://raw.githubusercontent.com/s2n-cnit/nfvcl-ng/master/docs/images/NVFCL-diagrams-General-Scheme.drawio.svg)
 
-## External Architecture
+## Key Features
 
-![alt text](https://raw.githubusercontent.com/s2n-cnit/nfvcl-ng/master/docs/images/nfvcl-Context.svg)
+- **Deploy Blueprints that build 5G, Kubernetes, VyOS .... services**
+- **Manage the lifecicle of blueprints**
+- **Manage K8S cluster and Machines/VMs**
 
-Usually we install NFVCL, Redis, MongoDB and OSM on the same machine, but throght configuration it is possible to locate these services as you desire.
-In this guide they will be installed on the same location.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Docker
+<!-- GETTING STARTED -->
 
-## Docker compose
+## 💻 Getting Started
+To run the NFVCL you have several possible alternatives:
+ 1. [RECOMMENDED] Use the provided docker compose (skip to [Deployment](#deployment) part)
+ 2. Install requirements and run on your machine (follow next instructions)
+ 3. Use the provided helm chart (STILL TO BE UPLOADED)
 
-## Helm
+> [!IMPORTANT]  
+> If you are using the provided docker compose, skip to [Usage](#usage) part.
 
-## Installation (Bare-Metal/VM)
-This section describe the installation on bare-metal/VM.
+To get a local copy up and running (point 2), follow these steps.
 
-### Requirements
+### Prerequisites
+
  - An OpenStack instance (you can use all-in-one installation [here](https://docs.openstack.org/devstack/rocky/guides/single-machine.html))
  - An Ubuntu (22.04 LTS) instance where the NFVCL will be installed and run.
  - Having OSM 14 running on a reachable machine, in the following installation procedure,
@@ -56,47 +61,17 @@ This section describe the installation on bare-metal/VM.
           4 CPUs, 16 GB RAM, 80GB disk and a single interface with Internet access
    - **MINIMUM**: 
           2 CPUs, 8 GB RAM, 50GB disk and a single interface with Internet access
+### Setup
+> [!WARNING]  
+> The instruction for OSM installation is not anymore provided from this project.
 
-     
-### Step 0 - Cloning and downloading required files/dependencies
-On the Ubuntu 22.04 instance perform the following steps.
-1. Download OSM 14
-``` bash
-wget https://osm-download.etsi.org/ftp/osm-14.0-fourteen/install_osm.sh
-```
-2. Download NFVCL software
+Clone this repository to your desired folder:
 ``` bash
 git clone --depth 1 https://github.com/s2n-cnit/nfvcl-ng
 ```
-### Step 1 - Install OSM 14
-> :warning::warning::warning: At the moment OSM installation is broken and need to be fixed.
-> 
-> Edit _install_osm.sh_ and add before the last line the following:
-> 
-> ```
-> sudo sed -i 's@.*juju deploy ch:mongodb-k8s.*@juju deploy ch:mongodb-k8s -m $OSM_NAMESPACE --channel latest/stable@' /usr/share/osm-devops/installers/full_install_osm.sh
-> ```
-> The resulting **three** last lines should be:
-> ``` bash
-> ...
-> sudo DEBIAN_FRONTEND=noninteractive apt-get -y install osm-devops
-> sudo sed -i 's@.*juju deploy ch:mongodb-k8s.*@juju deploy ch:mongodb-k8s -m $OSM_NAMESPACE --channel latest/stable@' /usr/share/osm-devops/installers/full_install_osm.sh
-> $DEVOPS_PATH/installers/full_install_osm.sh -R $RELEASE -r $REPOSITORY -u $REPOSITORY_BASE -D $DEVOPS_PATH -t $DOCKER_TAG "$@"
-> ```
 
 
-The OSM installation is automatic, it's sufficient to run a shell script. It takes a lot of time, **more than 20 minutes**.
-1. Start osm installation
-``` bash
-chmod +x install_osm.sh
-./install_osm.sh -y
-```
-From OSM 14 on, we will need to execute also the following instruction
-``` bash
-kubectl set env deployment -n osm lcm OSMLCM_VCA_EEGRPC_POD_ADMISSION_POLICY=privileged
-```
-
-### Step 2 - Install Python 3.11, Redis, Uvicorn, Poetry, MongoDB and requirements (using poetry)
+### Install
 
 Enter NFVCL folder and run setup.sh, this script will:
 - Install uvicorn, Poetry, Redis and MongoDB.
@@ -111,19 +86,22 @@ chmod +x ./setup.sh
 ./setup.sh
 ```
 
-### Step 3 - NFVCL, Redis and MongoDB configuration
-The last step is the NFVCL configuration, in production it is raccomanded to change values in **config.yaml**, while, for developing you can create a copy of the default configuration and call it **config_dev.yaml**. 
+### Configuration
+The last step is the NFVCL configuration. 
+In production it is raccomanded to change values in **config.yaml**, while, for developing you can create a copy of the default configuration and call it **config_dev.yaml**. 
 When the NFVCL starts, it loads the cofiguration from *config_dev.yaml* if present, otherwise the configuration is loaded from the default file.
 
-```bash
-nano config.yaml
-```
+> [!TIP]
+> The IP of the NFVCL is not mandatory, use it to bind on a specific interface.
+> OSM and Redis **IPs** sould be 127.0.0.1 if they are running on the same machine of NFVCL.
+
 ```
 {
   'log_level': 20, # 10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0
   'nfvcl': {
+    'version': "0.2.1",
     'port': 5002,
-    'ip': 'X.Y.Z.K' !!! Must be changed !!!
+    'ip': '' # CAN BE LEFT EMPTY
   },
   'osm': {
     'host': '127.0.0.1',
@@ -138,23 +116,19 @@ nano config.yaml
     'port': 27017,
     'db': 'nfvcl'
   },
-  'prometheus': [],
   'redis': {
     'host': '127.0.0.1',
     'port': 6379
   }
-  
-  ...
 }
 ```
 
-The NFVCL's **IP** must concide with the one of the machine on witch it is installed and running.
-OSM and Redis **IPs** sould be 127.0.0.1 if they are running on the same machine of NFVCL.
 
+### Usage
 
-## Run and Test NFVCL
-You can use _screen_ or create a service to run the NFVCL in the background
-### Using Screen
+You can use `screen` or create a service to run the NFVCL in the background
+
+#### Using Screen
 Once configuration is done you can run the NFVCL in the background using **screen**.
 > :warning: It may be necessary to use the absolute path '/home/ubuntu/.local/bin/poetry' for running the NFVCL.
 ``` 
@@ -164,7 +138,7 @@ poetry run python ./run.py
 > :warning: To deatach from screen press **CTRL+a** then **d**.
 > To resume the screen run `screen -r nfvcl`.
 
-### Create a service
+#### Create a service
 Create a service file: `sudo nano /etc/systemd/system/nfvcl.service` with the following content
 >:warning: Change the values in case you performed a custom installation
 ```
@@ -194,62 +168,73 @@ sudo systemctl status nfvcl.service
 sudo systemctl enable nfvcl.service
 ```
 
+### Deployment
 
-## Usage
-To interact with the NFVCL you must use REST APIs, a full list is available at:
-`http://NFVCL_IP:5002/docs`
+You can deploy this project using Doker or Kubernetes
 
-> :warning: Before you begin you will need to define the topology using the appropriate APIs.
+#### Docker
+![Docker compose scheme](https://raw.githubusercontent.com/s2n-cnit/nfvcl-ng/master/docs/images/NVFCL-diagrams-DockerCompose.drawio.svg)
 
-You can find request examples in the [wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html)
-
-
-## Debug
-The NFVCL main output is contained in the **console output**, but additionally it is possible to observe it's output in:
-### Log file
-The file can be found in the `logs` folder of NFVCL, it's called `nfvcl.log`. 
-It is a rotating log with 4 backup files that are rotated when the main one reach 50Kbytes.
-In case of NFVCL **crash** it is the only place where you can observe it's output.
-To follow the console output you can use:
-```bash
-tail -f logs/nfvcl.log
+Clone the repo:
+``` bash
+git clone --depth 1 https://github.com/s2n-cnit/nfvcl-ng
+```
+Then run docker compose
+``` bash
+docker compose up
 ```
 
-### Redis **NFVCL_LOG** topic
-You can attach on the Redis pub-sub system to subscribe at the NFVCL log, the topic that must be observed is **NFVCL_LOG**.
-This is useful when you don't have access to the console output.
-In order to attach at the NFVCL output it is required to have the Redis IP and port.
+#### Kubernetes
+Still to be implemented
 
+## 👥 Authors
+### Original Authors
 
-You can use the following Python script as example:
+👤 **Roberto Bruschi**
 
-> :warning: **Change the IP and Redis port!!!**
+- GitHub: [@robertobru](https://github.com/robertobru)
 
-```python
-import redis
+### Mantainers
+👤 **Paolo Bono**
 
-redis_instance = redis.Redis(host='192.168.X.X', port=XYZC, db=0)
+- GitHub: [@PaoloB98](https://github.com/PaoloB98)
+- LinkedIn: [Paolo Bono](https://www.linkedin.com/in/paolo-bono-2576a3132/)
 
-redis_pub_sub = redis_instance.pubsub()
+👤 **Alderico Gallo**
 
-redis_pub_sub.subscribe("NFVCL_LOG")
-redis_pub_sub.subscribe("TOPOLOGY")
+- GitHub: [@AldericoGallo](https://github.com/AldericoGallo)
 
-for message in redis_pub_sub.listen():
-    # When you subscribe to a topic a message is returned from redis to indicate if the
-    # subscription have succeeded.
-    # The confirmation message['data'] contains a 'int' while NFVCL output contains 'bytes'
-    if isinstance(message['data'], bytes):
-        print(message['data'].decode())
-    else:
-        print(message['data'])
-```
+👤 **Davide Freggiaro**
 
-## Report Issues
-Report issues [Here](https://github.com/s2n-cnit/nfvcl-ng/issues) and provide:
-- What API call has been called
-- The URL and body of the request
-- The Topology status
-- The output of the NFVCL (can be obtained through Redis)
-- The status of related resources on OpenStack
-- If needed, any optional info and a description of what you were doing.
+- GitHub: [@DavideFreggiaro](https://github.com/DavideFreggiaro)
+
+### Contributors
+👤 **Guerino Lamanna**
+
+- GitHub: [@guerol](https://github.com/guerol)
+
+👤 **Alireza Mohammadpour**
+
+- GitHub: [@AlirezaMohammadpour85](https://github.com/AlirezaMohammadpour85)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!
+
+Feel free to check the [issues page](../../issues/).
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- SUPPORT -->
+
+## ⭐️ Show your support
+
+If you like this project hit the star button!
+
+<!-- LICENSE -->
+
+## 📝 License
+
+This project is [GPL3](./LICENSE) licensed.

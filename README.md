@@ -26,7 +26,7 @@ It can create, deploy and manage the lifecycle of different network ecosystems b
 artefacts at any programmability levels (from physical devices to cloud-native microservices).
 A more detailed description of the NFVCL will be added to the [Wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html).
 
-![General scheme](https://raw.githubusercontent.com/s2n-cnit/nfvcl-ng/master/docs/images/NVFCL-diagrams-General-Scheme.drawio.svg)
+![General scheme](docs/images/NVFCL-diagrams-General-Scheme.drawio.svg)
 
 ## Key Features
 
@@ -173,7 +173,7 @@ sudo systemctl enable nfvcl.service
 You can deploy this project using Doker or Kubernetes
 
 #### Docker
-![Docker compose scheme](https://raw.githubusercontent.com/s2n-cnit/nfvcl-ng/master/docs/images/NVFCL-diagrams-DockerCompose.drawio.svg)
+![Docker compose scheme](docs/images/NVFCL-diagrams-DockerCompose.drawio.svg)
 
 Clone the repo:
 ``` bash

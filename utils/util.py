@@ -95,7 +95,8 @@ def generate_blueprint_id() -> str:
     return generate_id(6, string.ascii_uppercase + string.digits)
 
 
-def render_file_from_template(path: str, render_dict: dict, prefix_to_name: str = "") -> str:
+# TODO move to Path, not use str
+def render_file_from_template_to_file(path: str, render_dict: dict, prefix_to_name: str = "") -> str:
     """
     Render a template file using the render_dict dictionary. Use the keys and their values to give a value at the
     variables present in the template file.
@@ -132,6 +133,21 @@ def render_file_from_template(path: str, render_dict: dict, prefix_to_name: str 
 
     return file.name
 
+def render_file_jinja2_to_str(file_to_render: Path, confvar: dict):
+    """
+    Takes a file and renders it using values in the dictionary
+    Args:
+        playbook_file: The file to be rendered containing '{{ variable123 }}' references
+        confvar: A dictionary containing the variables to be rendered. { 'variable123': 'desiredvalue' }
+
+    Returns:
+        The rendered file
+    """
+    env = Environment(loader=FileSystemLoader(file_to_render.parent))
+    template = env.get_template(file_to_render.name)
+
+    return template.render(**confvar)
+
 
 def render_files_from_template(paths: List[str], render_dict, files_name_prefix: str = "TEST") -> List[str]:
     """
@@ -151,8 +167,8 @@ def render_files_from_template(paths: List[str], render_dict, files_name_prefix:
     """
     to_return: List[str] = []
     for file_path in paths:
-        to_return.append(render_file_from_template(path=file_path, render_dict=render_dict,
-                                                   prefix_to_name=files_name_prefix))
+        to_return.append(render_file_from_template_to_file(path=file_path, render_dict=render_dict,
+                                                           prefix_to_name=files_name_prefix))
     return to_return
 
 
@@ -264,5 +280,6 @@ def copytree(src, dst, symlinks=False, ignore=None):
             shutil.copytree(s, d, symlinks, ignore)
         else:
             shutil.copy2(s, d)
+
 
 

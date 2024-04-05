@@ -8,7 +8,7 @@ from utils.log import create_logger
 import openstack
 import os
 from openstack.connection import Connection
-from utils.util import render_file_from_template
+from utils.util import render_file_from_template_to_file
 
 # Logger
 logger = create_logger("OpenStack Client")
@@ -47,7 +47,7 @@ class OpenStackClient:
         Args:
             vim: the vim on witch the client is build.
         """
-        filepath = render_file_from_template("config_templates/openstack/clouds.yaml", vim.model_dump(), prefix_to_name=vim.name)
+        filepath = render_file_from_template_to_file("config_templates/openstack/clouds.yaml", vim.model_dump(), prefix_to_name=vim.name)
         os.environ["OS_CLIENT_CONFIG_FILE"] = filepath
         # Get the client using a singleton pattern
         self.client = _get_client(vim.name)

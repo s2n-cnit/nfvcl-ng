@@ -18,8 +18,6 @@ from blueprints_ng.utils import rel_path
 from models.base_model import NFVCLBaseModel
 from models.ueransim.blueprint_ueransim_model import UeransimSim
 
-# Use a global variable to define the blueprint type, this will be used in the decorator for the requests supported
-# by this blueprint
 UERANSIM_BLUE_TYPE = "ueransim"
 
 
@@ -45,11 +43,8 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
     def dump_playbook(self) -> str:
         ansible_builder = AnsiblePlaybookBuilder("Playbook UeransimGNBConfigurator")
 
-        ansible_builder.add_template_task(rel_path("gnb_conf_file.jinja2"), "/opt/UERANSIM/gnb.conf")
-
-        for field_name in self.configuration.model_fields.keys():
-            field_value = getattr(self.configuration, field_name)
-            ansible_builder.set_var(field_name, field_value)
+        ansible_builder.add_template_task(rel_path("config/gnb_conf_file.jinja2"), "/opt/UERANSIM/gnb.conf")
+        ansible_builder.set_vars_from_fields(self.configuration)
 
         return ansible_builder.build()
 
@@ -64,7 +59,7 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
 
         ue_sim_config_path = f"/opt/UERANSIM/ue-sim-{self.sim_num}.conf"
 
-        ansible_builder.add_template_task(rel_path("ue_conf_file.jinja2"), ue_sim_config_path)
+        ansible_builder.add_template_task(rel_path("config/ue_conf_file.jinja2"), ue_sim_config_path)
 
         ansible_builder.set_var("sim", self.sim)
         ansible_builder.set_var("gnbSearchList", self.gnbSearchList)
@@ -89,9 +84,6 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
         return ansible_builder.build()
 
 
-# This decorator is needed to declare a new blueprint type
-# The blueprint class need to extend BlueprintNG, the type of the state and create model need to be explicitly passed
-# for type hinting to work
 @declare_blue_type(UERANSIM_BLUE_TYPE)
 class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprintRequestInstance]):
     # RADIO_NET_CIDR = '10.168.0.0/16'
@@ -102,9 +94,6 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     ueransim_flavor = VmResourceFlavor(vcpu_count='2', memory_mb='4096', storage_gb='10')
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = UeransimBlueprintNGState):
-        """
-        Don't write code in the init method, this will be called every time the blueprint is loaded from the DB
-        """
         super().__init__(blueprint_id, state_type)
 
     def create(self, create_model: UeransimBlueprintRequestInstance):
@@ -170,16 +159,10 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
     @classmethod
     def rest_create(cls, msg: UeransimBlueprintRequestInstance, request: Request):
-        """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
-        """
         return cls.api_day0_function(msg, request)
 
     @classmethod
     def configure_gnb_endpoint(cls, msg: UeransimBlueprintRequestConfigureGNB, blue_id: str, request: Request):
-        """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
-        """
         return cls.api_day2_function(msg, blue_id, request)
 
     @add_route(UERANSIM_BLUE_TYPE, "/configure_gnb", [HttpRequestType.POST], configure_gnb_endpoint)

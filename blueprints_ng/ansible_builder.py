@@ -1,4 +1,5 @@
 import textwrap
+from enum import Enum
 from pathlib import Path
 from typing import List, Any, Dict, Optional
 
@@ -71,6 +72,17 @@ class AnsibleShellTask(AnsibleTask):
 class AnsiblePauseTask(AnsibleTask):
     seconds: int = Field()
 
+class ServiceState(Enum):
+    STARTED = "started"
+    STOPPED = "stopped"
+    RESTARTED = "restarted"
+    RELOADED = "reloaded"
+
+class AnsibleServiceTask(AnsibleTask):
+    name: str
+    state: str
+    enabled: str = Field(default='true')
+
 
 class AnsiblePlaybookBuilder:
     def __init__(self, name, become=True, gather_facts=False):
@@ -134,14 +146,6 @@ class AnsiblePlaybookBuilder:
             for task in plays_[0]["tasks"]:
                 self.playbook.tasks.append(task)
 
-    @deprecated("This function shouldn't be used, use add_tasks_from_file instead and set the vars in the playbook.")
-    def add_tasks_from_file_jinja2(self, playbook_file: Path, confvar):
-        env = Environment(loader=FileSystemLoader(playbook_file.parent), extensions=['jinja2_ansible_filters.AnsibleCoreFiltersExtension'])
-        template = env.get_template(playbook_file.name)
-        plays_ = get_yaml_parser_jinja2().load(template.render(confvar=confvar))
-        for task in plays_[0]["tasks"]:
-            self.playbook.tasks.append(task)
-
     def add_task(self, name: str, task_module: str, task_content: AnsibleTask, register_output_as: str | None = None):
         """
         Add a single task to the playbook
@@ -185,13 +189,14 @@ class AnsiblePlaybookBuilder:
             )
         )
 
-    def add_copy_task(self, src: str | Path, dest: str, remote_src: bool = False):
+    def add_copy_task(self, src: str | Path, dest: str, remote_src: bool = False, mode: int = 0o777):
         """
         Add a task of the 'ansible.builtin.copy' type, this will copy the file at the src path to the dest on the remote machine
         Args:
             src: Path of the source file
             dest: Remote destination
             remote_src: True if the source file is on the remote host, False if on the NFVCL machine
+            mode: The file permission (default = 0o777)
         """
         self.add_task(
             f"Copy task for {dest}",
@@ -199,7 +204,8 @@ class AnsiblePlaybookBuilder:
             AnsibleCopyTask(
                 src=str(src.absolute()) if isinstance(src, Path) else src,
                 dest=dest,
-                remote_src=remote_src
+                remote_src=remote_src,
+                mode=mode
             )
         )
 
@@ -258,6 +264,18 @@ class AnsiblePlaybookBuilder:
             AnsibleShellTask(cmd=command),
             register_output_as=register_output_as
         )
+
+    def add_service_task(self, service_name: str, service_state: ServiceState, enabled: str = 'true'):
+        """
+        Add a service task to start, stop, reload, restart services.
+        Args:
+            command: The command to execute
+            register_output_as: The name of the variable in which to register the command output
+        """
+        self.add_task(
+            f"Service Task '{service_name}': state=<{service_state}>, enabled=<{enabled}>",
+            "ansible.builtin.service",
+            AnsibleServiceTask(name=service_name, state=service_state.value, enabled=enabled))
 
     def add_pause_task(self, seconds: int):
         """

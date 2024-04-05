@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 from models.base_model import NFVCLBaseModel
 
 
-class K8sServiceType(Enum):
+class K8sServiceType(str, Enum):
     """
     https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
     """
@@ -16,7 +16,7 @@ class K8sServiceType(Enum):
     ExternalName = "ExternalName"
 
 
-class K8sServicePortProtocol(Enum):
+class K8sServicePortProtocol(str, Enum):
     """
     https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#serviceport-v1-core
     """
@@ -29,7 +29,7 @@ class K8sServicePort(NFVCLBaseModel):
     """
     https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#serviceport-v1-core
     """
-    name: str = Field()
+    name: Optional[str] = Field(default=None)
     port: int = Field()
     protocol: K8sServicePortProtocol = Field()
     targetPort: int | str = Field()

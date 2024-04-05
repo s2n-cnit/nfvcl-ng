@@ -1,16 +1,18 @@
 import tempfile
 import time
 import traceback
-import yaml
 from logging import Logger
 from typing import List
+
 import kubernetes.client
 import kubernetes.utils
+import yaml
 from kubernetes import config
 from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, VersionInfo, V1ConfigMap, \
-    V1Namespace, V1ObjectMeta, V1alpha1ClusterCIDRList
+    V1Namespace, V1ObjectMeta, V1ServiceList
 from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError
+
 import utils.util
 from config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
 from models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName, K8sPluginType
@@ -208,6 +210,37 @@ def get_deployments(kube_client_config: kubernetes.client.Configuration, namespa
 
         return deploy_list
 
+
+def get_services(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
+                    label_selector: str = None) -> V1ServiceList:
+    """
+    Search for all Deployments of a namespace. If a namespace is not specified, it will work on
+    all namespaces.
+
+    Args:
+        namespace: the optional namespace. If None the search is done on all namespaces.
+        kube_client_config: the configuration of K8s on which the client is built.
+        label_selector: The selector with witch is possible to filter the list of daemon set
+        (example 'k8s-app=metrics-server')
+
+    Returns: an object V1DaemonSetList containing a list of DaemonSets
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the apps API
+        api_instance_coreV1 = kubernetes.client.CoreV1Api(api_client)
+        try:
+            if namespace:
+                service_list = api_instance_coreV1.list_namespaced_service(namespace=namespace, label_selector=label_selector)
+            else:
+                service_list: V1ServiceList = api_instance_coreV1.list_service_for_all_namespaces(timeout_seconds=TIMEOUT_SECONDS, label_selector=label_selector)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1->list_namespaced_service: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return service_list
 
 def get_installed_plugins(kube_client_config: kubernetes.client.Configuration) -> List[K8sPluginName]:
     """

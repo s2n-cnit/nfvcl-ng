@@ -5,6 +5,7 @@ import copy
 import sys
 import uuid
 from datetime import datetime
+from enum import Enum
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
 
 from fastapi import APIRouter, Request
@@ -276,7 +277,9 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         if isinstance(obj, type_to_find) and check_fun(obj):
             occurrences.append(path)
 
-        if isinstance(obj, dict):
+        if isinstance(obj, Enum):
+            pass
+        elif isinstance(obj, dict):
             for key, value in obj.items():
                 occurrences.extend(self.__find_field_occurrences(value, type_to_find, path=(path + (key,)), check_fun=check_fun))
         elif isinstance(obj, list):

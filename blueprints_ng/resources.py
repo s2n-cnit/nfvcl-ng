@@ -2,11 +2,12 @@ import abc
 from pathlib import Path
 from typing import Optional, List, Dict, Union
 
+from kubernetes.client import V1ServiceList
 from pydantic import Field
 from typing_extensions import Literal
 
 from models.base_model import NFVCLBaseModel
-from models.k8s.k8s_objects import K8sService
+from models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType
 
 
 class Resource(NFVCLBaseModel):
@@ -206,10 +207,33 @@ class HelmChartResource(ResourceDeployable):
     repo: Optional[str] = Field(default=None)
     version: Optional[str] = Field(default=None)
     namespace: str = Field()
-    # additional_params: Dict[str, Any] = Field()
 
     created: bool = Field(default=False)
-    created_services: Optional[List[K8sService]] = Field(default=None)
+    services: Optional[Dict[str, K8sService]] = Field(default=None)
+
+    def set_services_from_k8s_api(self, k8s_services: V1ServiceList):
+        self.services = {}
+
+        for k8s_service in k8s_services.items:
+            external_ips: List[str] = []
+            ports: List[K8sServicePort] = []
+
+            for port in k8s_service.spec.ports:
+                ports.append(K8sServicePort(name=port.name, port=port.port, protocol=port.protocol, targetPort=port.target_port))
+
+            if k8s_service.spec.type == K8sServiceType.LoadBalancer.value:
+                for external_ip in k8s_service.status.load_balancer.ingress:
+                    external_ips.append(external_ip.ip)
+
+            service = K8sService(
+                type=k8s_service.spec.type,
+                name=k8s_service.metadata.name,
+                cluster_ip=k8s_service.spec.cluster_ip,
+                external_ip=external_ips,
+                ports=ports
+            )
+
+            self.services[service.name] = service
 
     def get_chart_converted(self) -> Union[str, Path]:
         if self.chart_as_path:

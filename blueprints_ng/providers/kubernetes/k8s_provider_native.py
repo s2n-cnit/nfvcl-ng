@@ -3,13 +3,14 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Any
 
-from blueprints_ng.resources import HelmChartResource
 from pyhelm3 import Client
 
 from blueprints_ng.providers.blueprint_ng_provider_interface import *
 from blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface, K8SProviderException
+from blueprints_ng.resources import HelmChartResource
 from models.k8s.topology_k8s_model import K8sModel
 from rest_endpoints.k8s import get_k8s_cluster_by_area
+from utils.k8s import get_k8s_config_from_file_content, get_services
 
 
 class K8SProviderDataNative(BlueprintNGProviderData):
@@ -40,6 +41,7 @@ def get_helm_client_by_area(area: int):
 class K8SProviderNative(K8SProviderInterface):
     def init(self):
         self.data: K8SProviderDataNative = K8SProviderDataNative()
+        self.k8s_cluster: K8sModel = get_k8s_cluster_by_area(self.area)
         self.helm_client = get_helm_client_by_area(self.area)
 
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
@@ -72,6 +74,12 @@ class K8SProviderNative(K8SProviderInterface):
         for release in releases:
             revision = asyncio.run(release.current_revision())
             print(release.name, release.namespace, revision.revision, str(revision.status))
+
+        self.blueprint.to_db()
+
+        k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
+        services = get_services(kube_client_config=k8s_config, namespace=helm_chart_resource.namespace.lower())
+        helm_chart_resource.set_services_from_k8s_api(services)
 
         self.logger.success(f"Installing Helm chart {helm_chart_resource.name} finished")
         self.blueprint.to_db()

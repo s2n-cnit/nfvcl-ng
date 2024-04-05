@@ -122,6 +122,17 @@ class AnsiblePlaybookBuilder:
             value = LS(value)
         self.playbook.vars[key] = value
 
+    def set_vars_from_fields(self, model: NFVCLBaseModel):
+        """
+        Set Ansible vars from a Pydantic model fields
+        Args:
+            model: Model to get the fields from
+        """
+
+        for field_name in model.model_fields.keys():
+            field_value = getattr(model, field_name)
+            self.set_var(field_name, field_value)
+
     def unset_var(self, key: str):
         """
         Delete a variable from the playbook

@@ -204,7 +204,8 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             id=blueprint_id,
             type=get_class_path_str_from_obj(self),
             state_type=get_class_path_str_from_obj(state),
-            state=state
+            state=state,
+            created=datetime.now()
         )
 
         self.provider = ProvidersAggregator(self)
@@ -389,7 +390,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         if detailed:
             return self.__serialize_content()
         else:
-            return {"SUMMARY": f"TO BE IMPLEMENTED: {self.base_model.id}"}  # TODO
+            return {"id": self.base_model.id, "type": self.base_model.type, "status": self.base_model.status, "created": self.base_model.created}
 
     @classmethod
     @abc.abstractmethod

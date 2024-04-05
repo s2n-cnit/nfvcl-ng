@@ -29,6 +29,14 @@ def get_class_path_str_from_obj(obj: Any) -> str:
 
 
 def rel_path(file: str) -> Path:
+    """
+    Retrieve the abs path of the file from the function in witch this function is called.
+    Args:
+        file: The file relative location (e.g. 'service/test.yaml')
+
+    Returns:
+        the abs path of the file from the function in witch this function is called (e.g. /home/user/service/test.yaml)
+    """
     mod_path = Path(inspect.stack()[1].filename).parent
     return Path(mod_path, file)
 

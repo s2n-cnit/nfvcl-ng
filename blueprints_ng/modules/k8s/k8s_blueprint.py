@@ -2,6 +2,7 @@ from ipaddress import IPv4Address
 from typing import Optional, List
 import re
 
+from netaddr.ip import IPNetwork
 from blueprints_ng.lcm.blueprint_route_manager import add_route
 from blueprints_ng.modules.k8s.config.k8s_day2_configurator import VmK8sDay2Configurator
 from blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
@@ -13,12 +14,11 @@ from models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from starlette.requests import Request
 from topology.topology import Topology, build_topology
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
-from blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator, DUMMY_NET_POOL_START_IP
+from blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
 from models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, KarmadaInstallModel, K8sDelNodeModel, CreateVxLanModel
 from blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor
 from pydantic import Field
 from blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
-from fastapi.responses import PlainTextResponse
 
 K8S_BLUE_TYPE = "k8s"
 BASE_IMAGE_MASTER = "k8s-base"
@@ -28,6 +28,9 @@ DUMMY_NET_INT_NAME = "eth99"
 POD_NET_CIDR = "10.254.0.0/16"
 POD_SERVICE_CIDR = "10.200.0.0/16"
 K8S_DEFAULT_PASSWORD = "ubuntu"
+DUMMY_NET_CIDR= "10.252.252.0/24"
+DUMMY_NET_POOL_START_IP = str((IPNetwork(DUMMY_NET_CIDR))[20])
+DUMMY_NET_VM_START_IP = str((IPNetwork(DUMMY_NET_CIDR))[1])
 
 class K8sBlueprintNGState(BlueprintNGState):
     """
@@ -41,7 +44,7 @@ class K8sBlueprintNGState(BlueprintNGState):
     reserved_pools: List[LBPool] = Field(default=[], description="The IP pools dedicated for service exposure")
 
 
-    worker_numbers: List[int] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] # We can have at maximum 18 workers. This is used to reserve workers number.
+    worker_numbers: List[int] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] # We can have at maximum 18 workers. This is used to reserve the number of workers.
     master_area: Optional[K8sAreaDeployment] = Field(default=None)
     password: str = Field(default=K8S_DEFAULT_PASSWORD)
     topology_onboarded: bool = Field(default=False)
@@ -66,10 +69,16 @@ class K8sBlueprintNGState(BlueprintNGState):
         """
         Removes a worker and its configurators from the state.
         Args:
-            worker_name: The worker name to be removed
+            worker_to_be_rem: The worker name to be removed
         """
+        # Destroying configurator and releasing the worker number, Remove worker resources from the state
         self.vm_workers = [worker for worker in self.vm_workers if worker.name != worker_to_be_rem.name]
-        self.day_0_workers_configurators = [configur for configur in self.day_0_workers_configurators if configur.vm_resource.name != worker_to_be_rem.name]
+        # TODO check working
+        for configurator in self.day_0_workers_configurators:
+            if configurator.vm_resource.name == worker_to_be_rem.name:
+                self.release_worker_number(configurator.vm_number)
+                self.day_0_workers_configurators.remove(configurator)
+        #self.day_0_workers_configurators = [configur for configur in self.day_0_workers_configurators if configur.vm_resource.name != worker_to_be_rem.name]
         self.day_0_workers_configurators_tobe_exec = [configur for configur in self.day_0_workers_configurators_tobe_exec if configur.vm_resource.name != worker_to_be_rem.name]
 
     def get_reserved_ip_list(self) -> List[str]:
@@ -191,7 +200,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         # Reserve a range of IP in the service net
         reserved_pools = []
         if self.state.master_area.service_net:
-            # In this case the NET exist on OPENSTACK and we should work with the topology
+            # In this case, the NET exists on OPENSTACK, and we should work with the topology
             pool = LBPool(net_name=self.state.master_area.service_net, range_length=self.state.master_area.service_net_required_ip_number)
             res_range = build_topology().reserve_range_lb_pool(pool, self.id)  # TODO IP should be reserved in VIM
             # Building IPv4Addresses to validate. Then saving string because obj cannot be serialized.
@@ -199,7 +208,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             pool.ip_end = res_range.end.exploded
             reserved_pools.append(pool)
         else:
-            # In this case the net is a dummy net (present on all machines), created on day0 by the configurator, so we can do what we want
+            # In this case, the net is a dummy net (present on all machines), created on day0 by the configurator, so we can do what we want
             pool = LBPool(net_name=DUMMY_NET_INT_NAME, range_length=self.state.master_area.service_net_required_ip_number)
             ip_start_tmp = IPv4Address(DUMMY_NET_POOL_START_IP)
             pool.ip_start = ip_start_tmp.exploded
@@ -220,9 +229,10 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             # Configuring the master node
             master_conf = self.state.day_0_master_configurator
             if not self.state.master_area.service_net:
-                master_conf.configure_master(self.state.vm_master.get_management_interface().fixed.ip, self.state.vm_master.access_ip, self.state.pod_network_cidr, self.state.pod_service_cidr, self.state.get_reserved_ip_list())
+                # The master has the first IP (+0) == DUMMY_NET_VM_START_IP
+                master_conf.configure_master(self.state.vm_master.get_management_interface().fixed.ip, self.state.vm_master.access_ip, self.state.pod_network_cidr, self.state.pod_service_cidr, self.state.get_reserved_ip_list(), DUMMY_NET_VM_START_IP)
             else:
-                master_conf.configure_master(self.state.vm_master.get_management_interface().fixed.ip, self.state.vm_master.access_ip, self.state.pod_network_cidr, self.state.pod_service_cidr, [])
+                master_conf.configure_master(self.state.vm_master.get_management_interface().fixed.ip, self.state.vm_master.access_ip, self.state.pod_network_cidr, self.state.pod_service_cidr, [], DUMMY_NET_VM_START_IP)
             master_result = self.provider.configure_vm(master_conf)
 
             # REGISTERING GENERATED VALUES FROM MASTER CONFIGURATION
@@ -230,9 +240,9 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             # If there is a floating IP, we need to use this one in the k8s config file (instead of the internal one)
             self.state.master_credentials = re.sub("https:\/\/(.*):6443", f"https://{self.state.vm_master.access_ip}:6443", master_result['credentials_file']['stdout'])
 
-        # Configuring ONLY worker nodes that has not yet been configured and then removing from the list
+        # Configuring ONLY worker nodes that have not yet been configured and then removing from the list
         for configurator in self.state.day_0_workers_configurators_tobe_exec:
-            configurator.configure_worker(self.state.master_key_add_worker, self.state.master_credentials)
+            configurator.configure_worker(self.state.master_key_add_worker, self.state.master_credentials, DUMMY_NET_VM_START_IP)
             worker_result = self.provider.configure_vm(configurator)
             self.state.day_0_workers_configurators_tobe_exec.remove(configurator)
 
@@ -252,7 +262,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         Suppose that there is NO plugin installed.
         """
         client_config = get_k8s_config_from_file_content(self.state.master_credentials)
-        # Build plugin list
+        # It builds plugin list
         plug_list: List[K8sPluginName] = []
 
         if self.state.cni == Cni.flannel.value:
@@ -283,41 +293,60 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
     @add_route(K8S_BLUE_TYPE, "/add_node", [HttpRequestType.POST], add_k8s_worker)
     def add_worker(self, model: K8sAddNodeModel):
+        """
+        Elaborates the request to add WORKER nodes to (multiple) area(s).
+        First it deploys the workers, then it configures them.
+        Args:
+            model: The request containing information about workers to be added and in witch area
+        """
         area: K8sAreaDeployment
         for area in model.areas:
             # THERE ARE NO MASTER AREAS in the request -> THERE IS A CONSTRAINT IN THE REQUEST MODEL
             self.deploy_area(area)
 
-        self.day0conf(self.state.pod_network_cidr, self.state.pod_service_cidr, False, False)
+        self.day0conf(topology_onboard=False, configure_master=False)
 
     @classmethod
     def del_k8s_workers(cls, msg: K8sDelNodeModel, blue_id: str, request: Request):
         """
         Destroy a worker from a blueprint generated K8S cluster. The number of nodes (controller/master + workers) cannot be lower than 2.
+
+        Args:
+
+            msg: The list of VM names to be deleted from the K8S cluster
+            blue_id: The blueprint from witch the node is removed
+            request: The request details
         """
         return cls.api_day2_function(msg, blue_id, request)
 
     @add_route(K8S_BLUE_TYPE, "/del_workers", [HttpRequestType.DELETE], del_k8s_workers)
     def del_workers(self, model: K8sDelNodeModel):
-        vm_to_be_destroyed = []
+        """
+        Delete (multiple) workers from this blueprint generated K8S cluster
+        Args:
+            model: The list of VM names to be deleted from the K8S cluster
+
+        """
+        vm_to_be_destroyed = [] # The list of VM to be destroyed (After the check that exist)
+        # If one of the nodes to be removed is the MASTER, let's remove it
         if self.state.vm_master.name in model.node_names:
             # Removing the master node from the list and logging error
             model.node_names.pop(model.node_names.index(self.state.vm_master.name))
             self.logger.error(f"Master node {self.state.vm_master.id} cannot be deleted from cluster {self.id}. Moving to next nodes to be deleted")
-
+        # If the number of workers will be zero. STOP
         if len(self.state.vm_workers) <= 1:
             self.logger.error(f"The number of workers cannot be lower than 1. Pods are scheduled only on workers node, there will be no schedule.")
             return
 
-        dayNconf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster is always performed on the master node.
+        dayNconf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster requires actions performed on the master node.
         for node in model.node_names:
-            target_vm = [vm for vm in self.state.vm_workers if vm.name == node]
+            target_vm = [vm for vm in self.state.vm_workers if vm.name == node] # Checking that the node to be removed EXISTS
             if len(target_vm) >= 1:
-                dayNconf.delete_node(target_vm[0].get_name_k8s_format())
-                vm_to_be_destroyed.append(target_vm[0])
+                dayNconf.delete_node(target_vm[0].get_name_k8s_format()) # Adding the action to remove it from the cmaster/controller.
+                vm_to_be_destroyed.append(target_vm[0]) # Appending the VM to be deleted.
             else:
                 self.logger.error(f"Node >{node}< has not been found, cannot be deleted from cluster {self.id}. Moving to next nodes to be deleted")
-        # Removing from the cluster every VM to be deleted before it will be destroyed
+        # Removing from the cluster every VM to be deleted before it will be destroyed (Nodes is removed from k8s cluster by master configurator)
         self.provider.configure_vm(dayNconf)
         # Destroying every VM to be removed from the cluster
         for vm in vm_to_be_destroyed:
@@ -325,14 +354,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             self.provider.destroy_vm(vm)
             # Delete from registered resources
             self.deregister_resource(vm)
-
-            # Destroying configurator and releasing the worker number
-            for configurator in self.state.day_0_workers_configurators:
-                if configurator.vm_resource == vm:
-                    self.state.release_worker_number(configurator.vm_number)
-                    self.state.day_0_workers_configurators.remove(configurator)
-
-            # Remove worker resources from the state
+            # Destroying configurator and releasing the worker number, Remove worker resources from the state
             self.state.remove_worker(vm)
 
     @classmethod
@@ -361,15 +383,13 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
     @add_route(K8S_BLUE_TYPE, "/create_vx_lan", [HttpRequestType.POST], configure_vxlan)
     def setup_vxlan(self, model: CreateVxLanModel):
         """
-        Creates a configurator that installs and configures submarine and karmada.
+        Creates a vxlan interface on the k8s master node and configure it to be accessible from the given client IP in the request.
         """
+        # If the server IP is not specified in the request, it binds the vxlan on the management interface
         if not model.vx_server_ip:
             model.vx_server_ip = self.state.vm_master.get_management_interface().fixed.ip
             model.vx_server_ext_device = self.state.vm_master.get_management_interface().fixed.interface_name
 
-        if not self.state.day_2_master_configurator:
-            self.state.day_2_master_configurator = VmK8sDay2Configurator(vm_resource=self.state.vm_master)
-            self.register_resource(self.state.day_2_master_configurator)
         master_day2_conf = self.state.day_2_master_configurator
 
         # If the controller has a floating IP, the client config is built on that IP (the one seen by the client)
@@ -378,14 +398,20 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         else:
             client_commands: str = master_day2_conf.configure_vxlan(model)
 
+        # Prints the list of command to be executed on the vxlan client to connect at the master node
         self.logger.info(f"Client configuration: \n{client_commands}")
         master_result = self.provider.configure_vm(master_day2_conf)
 
     def destroy(self):
+        """
+        Destroy the blueprints. Calls super destroy that destroy VMs and configurators.
+        Then release all the reserved resources in the topology.
+        """
+        # TODO check if there is something deployed on the cluster -> MAKE IMPOSSIBLE TO REMOVE IT OR REQUIRE OVERRIDE.
         super().destroy()
         # Remove reserved IP range
         build_topology().release_ranges(self.id) # Remove all reserved ranges in the networks
-
+        # If it was onboarded on the topology (as a usable k8s cluster), remove it.
         if self.state.topology_onboarded:
             try:
                 build_topology().del_k8scluster(self.id)

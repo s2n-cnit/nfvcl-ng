@@ -10,13 +10,14 @@ from models.blueprint_ng.worker_message import WorkerMessageType
 from models.http_models import BlueprintNotFoundException, BlueprintAlreadyExisting
 from utils.database import get_ng_blue_by_id_filter, get_ng_blue_list
 from utils.log import create_logger
+from utils.patterns import Singleton
 from utils.util import generate_blueprint_id
 
 BLUEPRINTS_MODULE_FOLDER: str = "blueprints_ng.modules"
 logger: Logger = create_logger("BlueprintNGManager")
 
 
-class BlueprintManager:
+class BlueprintManager(metaclass=Singleton):
     """
     This class is responsible for managing blueprints. This class will manage all blueprints that have been created.
     When a request arrives at the NFVCL, the blueprint worker of the blueprint is returned.
@@ -161,7 +162,7 @@ class BlueprintManager:
 
     def get_blueprint_summary_by_id(self, blueprint_id: str, detailed: bool = False) -> dict:
         """
-        Retrieves the blueprint summary for the given blueprint ID.
+        Retrieves the blueprint summary for the given blueprint ID. If the blueprint is present in memory, returns it from there instead of DB.
         Args:
             blueprint_id: The blueprint to be retrieved.
             detailed: If true, return all the info saved in the database about the blueprints.
@@ -169,27 +170,36 @@ class BlueprintManager:
         Returns:
             The summary/details of a blueprint
         """
-        blueprint: BlueprintNG = self._load_blue_from_db(blueprint_id)
+        # If the blueprint is active and loaded in memory then use the one in memory
+        if blueprint_id in self.worker_collection:
+            blueprint: BlueprintNG = self.worker_collection[blueprint_id].blueprint
+        else:
+            # Otherwise load it from the database
+            blueprint: BlueprintNG = self._load_blue_from_db(blueprint_id)
         if blueprint is None:
             raise BlueprintNotFoundException(blueprint_id)
         return blueprint.to_dict(detailed)
 
     def get_blueprint_summary_list(self, blue_type: str, detailed: bool = False) -> List[dict]:
         """
-        Retrieves the blueprint summary for the given blueprint ID.
+        Retrieves the blueprint summary for all the blueprints. If a blueprint is present in memory, return it from there instead of DB.
         Args:
-            blue_type:The optional filter to be used to filter results on a type basis (e.g., 'vyos').
+            blue_type: The optional filter to be used to filter results on a type basis (e.g., 'vyos').
             detailed: If true, return all the info saved in the database about the blueprints.
 
         Returns:
             The summary/details of all blueprints that satisfy the given filter.
         """
+        blue_list = self._load_all_blue_from_db(blue_type)
+        blue_mem_id_list = self.worker_collection.keys()
+        # Replace blueprints from DB with the ones that are present in the memory.
+        for i in range(len(blue_list)):
+            if blue_list[i].id in blue_mem_id_list:
+                blue_list[i] = self.worker_collection[blue_list[i].id].blueprint
+
         if detailed:
-            # Avoid to parse to model and then to dict
-            return self._load_all_blue_dict_from_db()
+            return [blueprint.to_dict(detailed=True) for blueprint in blue_list]
         else:
-            # Parsing to model to get summary instead of detailed
-            blue_list = self._load_all_blue_from_db(blue_type)
             return [blueprint.to_dict(detailed=False) for blueprint in blue_list]
 
     def _load_modules(self):
@@ -202,4 +212,5 @@ class BlueprintManager:
 
         for module in get_registered_modules().values():
             BlueClass = getattr(importlib.import_module(module.module), module.class_name)
+            logger.debug(f"Loading BlueClass {BlueClass} from {module.class_name}")
             self.blue_router.include_router(BlueClass.init_router(self.create_endpoint, self.update_endpoint, module.path))

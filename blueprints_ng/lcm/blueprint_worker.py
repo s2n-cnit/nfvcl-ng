@@ -3,7 +3,7 @@ from functools import partial
 from multiprocessing import Process
 from typing import Any
 
-from blueprints_ng.blueprint_ng import BlueprintNG
+from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGStatus, CurrentOperation
 from blueprints_ng.lcm.blueprint_route_manager import get_function_to_be_called
 from models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage
 from utils.log import create_logger
@@ -85,37 +85,41 @@ class BlueprintWorker:
                     # This is the case of blueprint creation (create and start VMs, Dockers, ...)
                     self.logger.info(f"Creating blueprint")
                     try:
+                        self.blueprint.base_model.status = BlueprintNGStatus.deploying(self.blueprint.id)
                         self.blueprint.create(received_message.message)
                         self.logger.success(f"Blueprint created")
                     except Exception as e:
+                        self.blueprint.base_model.status.error = True
                         self.logger.error(f"Error creating blueprint", exc_info=e)
                     self.blueprint.to_db()
                 case WorkerMessageType.DAY2 | WorkerMessageType.DAY2_BY_NAME:
                     self.logger.info(f"Calling function on blueprint")
                     # This is the DAY2 message, getting the function to be called
+                    self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.RUNNING_DAY2_OP, detail=f"Calling function {received_message.path} on blueprint {self.blueprint.id}")
                     try:
                         if received_message.message_type == WorkerMessageType.DAY2:
                             function = get_function_to_be_called(received_message.path)
                             result = getattr(self.blueprint, function)(received_message.message)
                         else:
                             result = getattr(self.blueprint, received_message.path)(*received_message.message[0], **received_message.message[1])
-
                         # Starting processing the request.
                         if received_message.callback:
                             received_message.callback(result)
                         self.logger.success(f"Function called on blueprint")
                     except Exception as e:
+                        self.blueprint.base_model.status.error = True
                         self.logger.error(f"Error calling function on blueprint", exc_info=e)
                     self.blueprint.to_db()
                 case WorkerMessageType.STOP:
                     self.logger.info(f"Destroying blueprint")
+                    self.blueprint.base_model.status = BlueprintNGStatus.destroying(blue_id=self.blueprint.id)
                     self.blueprint.destroy()
                     self.logger.success(f"Blueprint destroyed")
                     break
                 case _:
                     raise ValueError("Worker message type not recognized")
+            self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
 
-            self.logger.debug(f"Received message 2: {received_message}")
         self.stop_listening()
 
     def __eq__(self, __value):

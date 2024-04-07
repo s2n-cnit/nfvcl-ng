@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import copy
+import enum
 import sys
 import uuid
 from datetime import datetime
@@ -29,12 +30,30 @@ from utils.log import create_logger
 StateTypeVar = TypeVar("StateTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
 
+class CurrentOperation(enum.Enum):
+    UNDEFINED=""
+    IDLE="idle"
+    DEPLOYING="deploying"
+    RUNNING_DAY2_OP="running-day2-op"
+    DESTROYING="destroying"
 
 class BlueprintNGStatus(NFVCLBaseModel):
     error: bool = Field(default=False)
-    current_operation: str = Field(default="")
+    current_operation: CurrentOperation = Field(CurrentOperation.IDLE)
     detail: str = Field(default="")
 
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
+        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
+        validate_default=True
+    )
+    @classmethod
+    def deploying(cls, blue_id) -> BlueprintNGStatus:
+        return BlueprintNGStatus(current_operation=CurrentOperation.DEPLOYING,detail=f"The blueprint {blue_id} is deploying")
+
+    @classmethod
+    def destroying(cls, blue_id) -> BlueprintNGStatus:
+        return BlueprintNGStatus(current_operation=CurrentOperation.DESTROYING, detail=f"The blueprint {blue_id} is being destroyed")
 
 class BlueprintNGCreateModel(NFVCLBaseModel):
     model_config = ConfigDict(

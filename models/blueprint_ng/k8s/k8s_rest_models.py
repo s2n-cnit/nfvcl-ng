@@ -35,7 +35,7 @@ class K8sAreaDeployment(NFVCLBaseModel):
         if self.service_net:
             # TODO check if net exist
             if self.is_master_area == False:
-                raise ValidationError("Service net should be only present in master area")
+                raise ValueError("Service net should be only present in master area")
             return self
 
 class K8sCreateModel(BlueprintNGCreateModel):

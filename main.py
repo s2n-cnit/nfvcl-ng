@@ -1,7 +1,6 @@
 from multiprocessing import Process
 
 import utils.log
-import multiprocessing
 from blueprints.blue_lcm_beta import LCMWorkersBeta
 from utils.openstack.openstack_utils import check_openstack_instances
 from utils.util import *

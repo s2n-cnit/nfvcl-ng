@@ -799,7 +799,7 @@ class Topology:
             removed_range = network.release_range(owner=owner, ip_range=ip_range)
 
         if removed_range is None:
-            msg_err = "The range has NOT been found and removed."
+            msg_err = f"The range owned by {owner} has NOT been found and removed."
             logger.error(msg_err)
         else:
             self._save_topology_from_model()

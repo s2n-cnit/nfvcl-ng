@@ -1,8 +1,11 @@
-Welcome to NFVCL-ng's documentation!
-====================================
+Home
+====
+
 .. note::
 
    This project is under active development.
+
+.. contents::
 
 
 The installation procedure is described in the main `README <https://github.com/s2n-cnit/nfvcl-ng>`_.
@@ -10,87 +13,61 @@ The installation procedure is described in the main `README <https://github.com/
 The NFVCL is working through REST API calls, you can see every available API in the swagger offered by the NFVCL.
 You can find the swagger at URL: http://NFVCL-IP:5002/docs
 
-Topology Creation and VIM onboarding
-************************************
+The NFVCL is deploying ecosystems instances using Blueprints. The deployment of a Blueprint can be done over a VIM and
+a Kubernetes cluster (some components may require to be VMs and others Containers).
+The Blueprint general description and list is available there :doc:`blueprints/blueprint`)
 
-What is the topology? You can find a general description here :doc:`topology/topology`
-Once the NFVCL is installed and running, the first operation that must be performed
-is the creation of :doc:`topology/topology_creation`.
+.. image:: ../images/NVFCL-diagrams-General-Scheme.drawio.svg
+  :width: 400
+  :alt: General Scheme
+  :align: center
 
-VIM setup
-*********
+An example of deployment by the NFVCL can be an interconnected mix between VMs and PODs in Kubernetes as follow
 
-The second step is to prepare VIMs: they should have images ready to be deployed. The images ready in a VIM should include
-(name - description - used by blueprint)
+.. image:: ../images/NVFCL-diagrams-NFVCL-example-NS.drawio.svg
+  :width: 400
+  :alt: Example deployment 1
+  :align: center
 
-.. list-table:: Images to be uploaded in every VIM
-   :widths: 25 25 50
-   :header-rows: 1
+Or maybe a Blueprint that creates only inter-connected Virtual Machines
 
-   * - Image name
-     - Image
-     - Used by blueprint
-   * - ubuntu2204
-     - Ubuntu 22.04 LTS
-     - K8s (v1)
-   * - k8s-base
-     - Ubuntu 22.04 LTS + K8S installed
-     - K8s (v2)
-   * - ubuntu2004
-     - Ubuntu 20.04 LTS
-     - Deprecated blueprints
-   * - ubuntu1804
-     - Ubuntu 18.04 LTS
-     - Deprecated blueprints
-   * - vyos
-     - VyOS (see build :doc:`blueprints/vyos/vyos_blue_creation`)
-     - VyOS
-   * - ...
-     - ...
-     - ...
+.. image:: ../images/NVFCL-diagrams-NFVCL-example-NS2.drawio.svg
+  :width: 400
+  :alt: Example deployment 2
+  :align: center
 
-For **Ubuntu** images you can use the API at (POST - /v1/openstack/update_images) to automatically **download/update**
-Ubuntu images, it takes several minutes.
 
-Blueprints
-**********
-To see the Blueprint general description you can go there :doc:`blueprints/blueprint`)
+Getting started
+***************
 
-The current version of NFVCL can deploy the following Blueprints:
+In order to be able to deploy Blueprints you will need to
 
-.. list-table:: Blueprint list
-   :widths: 25 50 50 25
-   :header-rows: 1
+#. Create the Topology information (You can find a general description here :doc:`topology/topology`, :doc:`topology/topology_creation`)
 
-   * - Blueprint name
-     - Type
-     - Requirements
-     - Blue Version
-   * - :doc:`blueprints/k8s/k8s_blue_index`
-     - Kubernetes cluster
-     - VIM(s) for VMs deployment
-     - 2
-   * - :doc:`blueprints/free5gc/free5gc_blue_index`
-     - 5G Core
-     - K8s cluster onboarded in OSM
-     - 1
-   * - :doc:`blueprints/openairinterface/openairinterface_blue_index`
-     - OpenAirInterface
-     - 5G Core
-     - K8s cluster onboarded in OSM + VIM
-     - 1
-   * - SDCore
-     - 5G Core
-     - K8s cluster onboarded in OSM + VIM
-     - 1
-   * - :doc:`blueprints/vyos/vyos_blue_index`
-     - Virtual Router
-     - VIM
-     - 1
-   * - :doc:`blueprints/ueransim/ueransim_blue_index`
-     - gNodeB and UE emulator
-     - VIM
-     - 1
+    A. Including at least 1 VIM where VMs are deployed
+
+    B. Including at least 1 K8S clusters where Helm Charts are deployed (The cluster can be generated and added later using the dedicated K8S blueprint)
+
+#. Set up the VIM :doc:`topology/topology_vim`
+
+#. Deploy the desired Blueprint from the available list :doc:`blueprints/blueprint`. You can use the dedicated Blueprint to create
+   and onboard a K8S cluster (over VMs) in the Topology.
+
+Creation of Virtual Machines
+****************************
+
+.. image:: ../images/NVFCL-diagrams-VM-Creation.drawio.svg
+  :width: 400
+  :alt: VM Creation
+  :align: center
+
+Configuration of Virtual Machines
+*********************************
+
+.. image:: ../images/NVFCL-diagrams-VM-Configuration.drawio.svg
+  :width: 400
+  :alt: VM Configuration
+  :align: center
 
 Prometheus scraping
 *******************
@@ -102,8 +79,11 @@ For more details you can go to :doc:`prometheus/prometheus`
 
 -------------
 
-Documentation contents
-**********************
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+
+   self
 
 .. toctree::
    :caption: Topology
@@ -114,6 +94,7 @@ Documentation contents
    topology/topology_creation
    topology/topology_mgt
    topology/topology_nfvcl_k8s_onboarding.md
+   topology/topology_vim
 
 .. toctree::
    :caption: Blueprints

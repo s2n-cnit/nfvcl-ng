@@ -9,13 +9,13 @@ there is a list of VIMs, you should add there at least valid one.
 .. warning::
     The VIM user must be administrator for the target project
 .. warning::
-    When adding a VIM, it is really important to use the correct value for the field use_floating_ip otherwise the VNF manager cannot talk to the VNF if the NFVCL instance is outside the openstack network.
+    When adding a VIM, it is really important to use the correct value for the field use_floating_ip, otherwise, the NFVCL cannot talk to the VNF(VM or Pod) if the NFVCL instance is outside the openstack network.
 
 With the next step the OpenStack server will be registered in OSM and NFVCL. The networks of the VIM must be appended to the
 network list. At least a management network should be present.
 ``POST /v1/topology/``
 
-Example request body:
+Example request body of a working Topology:
 
 .. code-block:: json
 
@@ -81,9 +81,13 @@ Example request body:
       "prometheus_srv": []
     }
 
+The Topology can also be initialized as empty and then it is possible to use the Management APIs to add required data
+to deploy Blueprints. You can find out more information in the dedicated :doc:`topology_creation.rst` page.
+
+
 The ``name`` field is the name of the topology.
 
-In the ``vims`` list in the object representing the OpenStack server this fields need to be changed to fit your configuration:
+In the ``vims`` list, the object representing the OpenStack/Proxmox server fields need to be changed to fit your configuration:
 
     - ``vim_url``: OpenStack API URL
     - ``vim_tenant_name``: OpenStack Project name

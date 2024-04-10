@@ -2,11 +2,14 @@
 Topology description
 ====================
 
-The topology is the representation of the real topology on witch the NVFCL is going to deploy the Blueprints witch are
+The Topology is the representation of the real topology on witch the NVFCL is going to deploy the Blueprints witch are
 templates for NSs.
+Everything that is contained in the Topology is used by the NFVCL to deploy Blueprints. For example, when a Blueprint is deploying
+VMs, the VIM to be used is identified using the VIM data saved in the Topology.
+
 The topology includes information about:
 
-    - VIMs: this is a list of OpenStack instances used to deploy VMs. This item list should include networks NAMES that are
+    - VIMs: this is a list of VIM used to deploy Virtual Machines. This item list should include networks NAMES that are
       present in the topology network list (VIM net are used to deploy VMs).
     - Networks: The list of networks available to the NFVCL. This list should include detailed information about networks
       included in every VIM in the topology collection.

@@ -1,7 +1,9 @@
 ====================
 Blueprint
 ====================
-This section is dedicated to generally describe what is a Blueprint and how it is managed by the NFVCL
+The NFVCL is deploying ecosystems instances using Blueprints. A network ecosystem is meant to be a complete functional
+network environment, such as a 5G system, an overlay system for network cybersecurity or a simple application service
+mesh.
 
 Blueprint System
 +++++++++++++++++
@@ -10,6 +12,42 @@ Here will be described how the blueprint system (v2) is working. Blue V1 is NO m
 * Providers
 * Configurators
 * ...
+
+Blueprint List
+++++++++++++++
+
+.. list-table:: Blueprint list
+   :widths: 25 50 50 25
+   :header-rows: 1
+
+   * - Blueprint name
+     - Type
+     - Requirements
+     - Blue Version
+   * - :doc:`k8s/k8s_blue_index`
+     - Kubernetes cluster
+     - VIM(s) for VMs deployment
+     - 2
+   * - :doc:`free5gc/free5gc_blue_index`
+     - 5G Core
+     - K8s cluster onboarded in OSM
+     - 1
+   * - :doc:`openairinterface/openairinterface_blue_index`
+     - 5G Core
+     - K8s cluster onboarded in OSM + VIM
+     - 1
+   * - SDCore
+     - 5G Core
+     - K8s cluster onboarded in OSM + VIM
+     - 1
+   * - :doc:`vyos/vyos_blue_index`
+     - Virtual Router
+     - VIM
+     - 2
+   * - :doc:`ueransim/ueransim_blue_index`
+     - gNodeB and UE emulator
+     - VIM
+     - 2
 
 Blueprint LCM Management
 ++++++++++++++++++++++++

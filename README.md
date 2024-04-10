@@ -10,8 +10,9 @@
   - [Setup](#setup)
   - [Prerequisites](#prerequisites)
   - [Install](#install)
-  - [Usage](#usage)
+  - [Running](#running)
   - [Deployment](#deployment)
+  - [Usage](#usage)
 - [👥 Authors](#-authors)
 - [🤝 Contributing](#-contributing)
 - [⭐️ Show your support](#-show-your-support)
@@ -43,9 +44,6 @@ To run the NFVCL you have several possible alternatives:
  1. [RECOMMENDED] Use the provided docker compose (skip to [Deployment](#deployment) part)
  2. Install requirements and run on your machine (follow next instructions)
  3. Use the provided helm chart (STILL TO BE UPLOADED)
-
-> [!IMPORTANT]  
-> If you are using the provided docker compose, skip to [Usage](#usage) part.
 
 To get a local copy up and running (point 2), follow these steps.
 
@@ -124,7 +122,7 @@ When the NFVCL starts, it loads the cofiguration from *config_dev.yaml* if prese
 ```
 
 
-### Usage
+### Running
 
 You can use `screen` or create a service to run the NFVCL in the background
 
@@ -138,7 +136,7 @@ poetry run python ./run.py
 > :warning: To deatach from screen press **CTRL+a** then **d**.
 > To resume the screen run `screen -r nfvcl`.
 
-#### Create a service
+#### Using a service
 Create a service file: `sudo nano /etc/systemd/system/nfvcl.service` with the following content
 >:warning: Change the values in case you performed a custom installation
 ```
@@ -168,6 +166,43 @@ sudo systemctl status nfvcl.service
 sudo systemctl enable nfvcl.service
 ```
 
+#### Debug
+The NFVCL main output is contained in the **console output**, but additionally it is possible to observe it's output in:
+##### Log file
+The file can be found in the logs folder of NFVCL, it's called nfvcl.log. 
+It is a rotating log with 4 backup files that are rotated when the main one reach 50Kbytes.
+In case of NFVCL **crash** it is the only place where you can observe it's output.
+
+##### Redis **NFVCL_LOG** topic
+You can attach on the Redis pub-sub system to subscribe at the NFVCL log, the topic that must be observed is **NFVCL_LOG**.
+This is useful when you don't have access to the console output.
+In order to attach at the NFVCL output it is required to have the Redis IP and port.
+
+
+You can use the following Python script as example:
+
+> :warning: **Change the IP and Redis port!!!**
+
+```python
+import redis
+
+redis_instance = redis.Redis(host='192.168.X.X', port=XYZC, db=0)
+
+redis_pub_sub = redis_instance.pubsub()
+
+redis_pub_sub.subscribe("NFVCL_LOG")
+redis_pub_sub.subscribe("TOPOLOGY")
+
+for message in redis_pub_sub.listen():
+    # When you subscribe to a topic a message is returned from redis to indicate if the
+    # subscription have succeeded.
+    # The confirmation message['data'] contains a 'int' while NFVCL output contains 'bytes'
+    if isinstance(message['data'], bytes):
+        print(message['data'].decode())
+    else:
+        print(message['data'])
+```
+
 ### Deployment
 
 You can deploy this project using Doker or Kubernetes
@@ -183,9 +218,13 @@ Then run docker compose
 ``` bash
 docker compose up
 ```
+For the Docker container, to visualize logs it is sufficient to use `docker logs` utility.
 
 #### Kubernetes
 Still to be implemented
+
+### Usage
+The NFVCL usage is described in the dedicated [Wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html) page.
 
 ## 👥 Authors
 ### Original Authors

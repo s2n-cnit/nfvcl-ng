@@ -9,7 +9,7 @@
 project = 'NFVCL-NG'
 copyright = '2024, CNIT'
 author = 'CNIT'
-release = '0.2'
+release = '0.2.2'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

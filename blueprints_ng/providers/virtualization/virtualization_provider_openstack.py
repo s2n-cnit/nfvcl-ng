@@ -65,9 +65,9 @@ def get_os_client_from_vim(vim: VimModel, area: int):
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def init(self):
         self.data: VirtualizationProviderDataOpenstack = VirtualizationProviderDataOpenstack()
-        vim = self.topology.get_vim_from_area_id_model(self.area)
-        self.conn = get_os_client_from_vim(vim, self.area)
-        self.vim_need_floating_ip = vim.config.use_floating_ip
+        self.vim = self.topology.get_vim_from_area_id_model(self.area)
+        self.conn = get_os_client_from_vim(self.vim, self.area)
+        self.vim_need_floating_ip = self.vim.config.use_floating_ip
 
     def __create_image_from_url(self, vm_resource: VmResource):
         image_attrs = {
@@ -107,7 +107,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             )
             self.data.flavors.append(flavor_name)
 
-        cloudin = CloudInit(password=vm_resource.password).build_cloud_config()
+        cloudin = CloudInit(password=vm_resource.password, ssh_authorized_keys=self.vim.ssh_keys).build_cloud_config()
         self.logger.debug(f"Cloud config:\n{cloudin}")
 
         # Create a list with all the network interfaces that need to be added to the new VM

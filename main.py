@@ -68,6 +68,7 @@ def starting_async_checks():
 
     if not (topo_model is None):
         vim_list = topology.get_model().get_vims()
+        vim_list=list(filter(lambda x : x.vim_type == "openstack", vim_list))
         err_list = check_openstack_instances(vim_list)
     else:
         logger.warning("Cannot perform initial checks. Topology still need to be initialized.")

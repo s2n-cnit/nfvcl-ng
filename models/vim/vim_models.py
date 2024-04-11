@@ -12,7 +12,7 @@ logger: Logger = create_logger('Vim model')
 
 class VimTypeEnum(str, Enum):
     OPENSTACK: str = 'openstack'
-    PROXMOX: str = 'openstack'
+    PROXMOX: str = 'proxmox'
 
 
 class VimModel(NFVCLBaseModel):
@@ -22,6 +22,7 @@ class VimModel(NFVCLBaseModel):
     References:
         https://osm.etsi.org/docs/user-guide/latest/04-vim-setup.html?highlight=floating#openstack
     """
+
     class VimConfigModel(NFVCLBaseModel):
         # https://osm.etsi.org/docs/user-guide/latest/04-vim-setup.html?highlight=floating#configuration-options-reference
         insecure: bool = True
@@ -35,6 +36,9 @@ class VimModel(NFVCLBaseModel):
     vim_tenant_name: str = 'admin'
     vim_user: str = 'admin'
     vim_password: str = 'admin'
+    ssh_keys: Optional[List[str]] = Field(default_factory=list)
+    vim_proxmox_storage_id: Optional[str] = Field(default='local')
+    vim_proxmox_storage_volume: Optional[str] = Field(default='local-lvm')
     osm_onboard: Optional[bool] = Field(default=False)
     config: VimConfigModel = Field(default=VimConfigModel())
     networks: List[str] = []
@@ -56,7 +60,7 @@ class VimModel(NFVCLBaseModel):
         # Removing uppercase
         new_name = name.lower()
         # Replacing - with _
-        new_name = new_name.replace("-","_")
+        new_name = new_name.replace("-", "_")
 
         return new_name
 
@@ -193,6 +197,7 @@ class UpdateVimModel(NFVCLBaseModel):
         description="List of served area identifiers declared in the topology to be added to the VIM"
     )
 
+
 class VimNetMap(NFVCLBaseModel):
     vld: str
     name: str
@@ -204,6 +209,7 @@ class VimNetMap(NFVCLBaseModel):
     @classmethod
     def build_vnm(cls, vld, name, vim_net, mgt, k8s_cluster_net='data_net'):
         return VimNetMap(vld=vld, name=name, vim_net=vim_net, mgt=mgt, k8s_cluster_net=k8s_cluster_net)
+
 
 class VimLink(NFVCLBaseModel):
     vld: str
@@ -281,7 +287,7 @@ class VirtualDeploymentUnit(NFVCLBaseModel):
 class PhysicalDeploymentUnit(NFVCLBaseModel):
     count: int = Field(default=1)
     id: str
-    interface: List[PduInterface] = Field(default=[]) # Should correspond to PduInterface in net models
+    interface: List[PduInterface] = Field(default=[])  # Should correspond to PduInterface in net models
 
     @classmethod
     def build_pdu(cls, count: int, id: str, interface: List[PduInterface]):

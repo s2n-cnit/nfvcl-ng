@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 from pydantic import Field
 
 from blueprints_ng.utils import get_yaml_parser
@@ -13,6 +15,9 @@ class CloudInit(NFVCLBaseModel):
     password: str = Field()
     chpasswd: CloudInitChpasswd = Field(default=CloudInitChpasswd())
     ssh_pwauth: bool = Field(default=True)
+    ssh_authorized_keys: Optional[List[str]] = Field(default=None)
+    packages: Optional[List[str]] = Field(default=None)
+    runcmd: Optional[List[str]] = Field(default=None)
 
     def build_cloud_config(self) -> str:
-        return f"#cloud-config\n{get_yaml_parser().dump(self.model_dump())}"
+        return f"#cloud-config\n{get_yaml_parser().dump(self.model_dump(exclude_none=True))}"

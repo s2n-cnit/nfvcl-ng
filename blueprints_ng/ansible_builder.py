@@ -69,14 +69,17 @@ class AnsibleReplaceTask(AnsibleTask):
 class AnsibleShellTask(AnsibleTask):
     cmd: str = Field()
 
+
 class AnsiblePauseTask(AnsibleTask):
     seconds: int = Field()
+
 
 class ServiceState(Enum):
     STARTED = "started"
     STOPPED = "stopped"
     RESTARTED = "restarted"
     RELOADED = "reloaded"
+
 
 class AnsibleServiceTask(AnsibleTask):
     name: str
@@ -157,7 +160,7 @@ class AnsiblePlaybookBuilder:
             for task in plays_[0]["tasks"]:
                 self.playbook.tasks.append(task)
 
-    def add_task(self, name: str, task_module: str, task_content: AnsibleTask, register_output_as: str | None = None):
+    def add_task(self, name: str, task_module: str, task_content: AnsibleTask, register_output_as: str | None = None, task_vars: Optional[Dict[str, Any]] = None):
         """
         Add a single task to the playbook
         Args:
@@ -168,11 +171,12 @@ class AnsiblePlaybookBuilder:
         """
         dictionary = {
             "name": name,
-            task_module: task_content
+            task_module: task_content,
         }
         if register_output_as:
             dictionary["register"] = register_output_as
-
+        if task_vars:
+            dictionary["vars"] = task_vars
         self.playbook.tasks.append(dictionary)
 
     def add_task_embedded(self, task_descr: AnsibleTaskDescription):
@@ -183,21 +187,23 @@ class AnsiblePlaybookBuilder:
         """
         self.add_task(task_descr.tasks_name, task_descr.tasks_module, task_descr.task, task_descr.register_name)
 
-    def add_template_task(self, src: Path, dest: str):
+    def add_template_task(self, src: Path, dest: str, task_vars: Optional[Dict[str, any]] = None):
         """
         Add a task of the 'ansible.builtin.template' type, this will copy the file at the src path on the NFVCL server to the dest on the remote machine
         This task will also resolve every jinja2 template in the file using the playbook vars, internal Ansible vars can also be used
         Args:
             src: Path of the source file
             dest: Remote destination
+            task_vars: Dict of variables
         """
         self.add_task(
             f"Template task for {dest}",
             "ansible.builtin.template",
             AnsibleTemplateTask(
                 src=str(src.absolute()),
-                dest=dest
-            )
+                dest=dest,
+            ),
+            task_vars=task_vars
         )
 
     def add_copy_task(self, src: str | Path, dest: str, remote_src: bool = False, mode: int = 0o777):
@@ -227,6 +233,7 @@ class AnsiblePlaybookBuilder:
             path: Path of the file
             regexp: Regexp to search in the file
             replace: String used to replace the matches
+            task_vars: Dict of variables
         """
         self.add_task(
             f"Replace task for {path}",
@@ -300,7 +307,6 @@ class AnsiblePlaybookBuilder:
             AnsiblePauseTask(seconds=seconds)
         )
 
-
     def add_run_command_and_gather_output_tasks(self, command, output_var_name):
         """
         Add a simple shell task to run a command and gather the stdout to a variable
@@ -316,7 +322,7 @@ class AnsiblePlaybookBuilder:
         Build the playbook and return it as a yaml string
         Returns: YAML string of the playbook
         """
-        return get_yaml_parser().dump([self.playbook.model_dump()])
+        return get_yaml_parser().dump([self.playbook.model_dump(exclude_none=True)])
 
 # if __name__ == "__main__":
 #     ansible_builder = AnsiblePlaybookBuilder("Prova")

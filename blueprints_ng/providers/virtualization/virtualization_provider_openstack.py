@@ -179,7 +179,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         if self.conn.get_network(net_resource.name):
             raise VirtualizationProviderOpenstackException(f"Network {net_resource.name} already exist")
-        if self.conn.list_subnets(filters={"cidr": net_resource.cidr}):
+        if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name}):
             raise VirtualizationProviderOpenstackException(f"Subnet with cidr {net_resource.cidr} already exist")
 
         network: Network = self.conn.create_network(net_resource.name, port_security_enabled=False)

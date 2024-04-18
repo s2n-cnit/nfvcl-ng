@@ -8,33 +8,34 @@ from blueprints_ng.lcm.blueprint_route_manager import add_route
 from pydantic import Field
 from starlette.requests import Request
 
-from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
-from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
+from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
-from blueprints_ng.modules.ueransim.ueransim_models import UeransimBlueprintRequestInstance, UeransimBlueprintRequestConfigureGNB
+from blueprints_ng.modules.ueransim.ueransim_models import UeransimBlueprintRequestInstance, UeransimBlueprintRequestConfigureGNB, UeransimBlueprintRequestAddUE, UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, UeransimBlueprintRequestAddDelGNB
 from blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
 from blueprints_ng.utils import rel_path
 from models.base_model import NFVCLBaseModel
-from models.ueransim.blueprint_ueransim_model import UeransimSim
+from models.ueransim.blueprint_ueransim_model import UeransimSim, UeransimUe
 
 UERANSIM_BLUE_TYPE = "ueransim"
 
 
-class UeransimUe(NFVCLBaseModel):
+class BlueUeransimUe(NFVCLBaseModel):
+    ue_id: str = Field()
     vm_ue: Optional[VmResource] = Field(default=None)
-    vm_ue_configurators: List[UeransimUEConfigurator] = Field(default_factory=list)
+    vm_ue_configurator: Optional[UeransimUEConfigurator] = Field(default=None)
 
 
-class UeransimArea(NFVCLBaseModel):
+class BlueUeransimArea(NFVCLBaseModel):
     vm_gnb: Optional[VmResource] = Field(default=None)
     vm_gnb_configurator: Optional[UeransimGNBConfigurator] = Field(default=None)
-    ues: List[UeransimUe] = Field(default_factory=list)
+    ues: List[BlueUeransimUe] = Field(default_factory=list)
     radio_net: Optional[NetResource] = Field(default=None)
 
 
 class UeransimBlueprintNGState(BlueprintNGState):
-    areas: Dict[str, UeransimArea] = Field(default_factory=dict)
+    areas: Dict[str, BlueUeransimArea] = Field(default_factory=dict)
 
 
 class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
@@ -42,7 +43,6 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
 
     def dump_playbook(self) -> str:
         ansible_builder = AnsiblePlaybookBuilder("Playbook UeransimGNBConfigurator")
-
         ansible_builder.add_template_task(rel_path("config/gnb_conf_file.jinja2"), "/opt/UERANSIM/gnb.conf")
         ansible_builder.set_vars_from_fields(self.configuration)
 
@@ -50,37 +50,45 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
 
 
 class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
-    sim_num: int = Field()
-    sim: UeransimSim = Field()
+    sims: List[UeransimSim] = Field()
     gnbSearchList: List[str] = Field()
+    sims_to_delete: List[UeransimSim] = Field(default_factory=list)
+
+    def update_sims(self, new_sims: List[UeransimSim]):
+        self.sims_to_delete = list(set(self.sims) - set(new_sims))
+        self.sims = new_sims
 
     def dump_playbook(self) -> str:
-        ansible_builder = AnsiblePlaybookBuilder(f"Playbook UeransimUEConfigurator for sim {self.sim_num}")
+        ansible_builder = AnsiblePlaybookBuilder(f"Playbook UeransimUEConfigurator")
 
-        ue_sim_config_path = f"/opt/UERANSIM/ue-sim-{self.sim_num}.conf"
+        for sim in self.sims_to_delete:
+            ue_sim_config_path = f"/opt/UERANSIM/ue-sim-{sim.imsi}.conf"
+            ue_sim_service_path = f"/etc/systemd/system/ueransim-ue-sim-{sim.imsi}.service"
+            ansible_builder.add_service_task(
+                service_name=f"ueransim-ue-sim-{sim.imsi}",
+                service_state=ServiceState.STOPPED,
+                enabled="false"
+            )
+            ansible_builder.add_shell_task(command=f"rm {ue_sim_config_path} {ue_sim_service_path}")
+        self.sims_to_delete.clear()
 
-        ansible_builder.add_template_task(rel_path("config/ue_conf_file.jinja2"), ue_sim_config_path)
+        for sim in self.sims:
+            ue_sim_config_path = f"/opt/UERANSIM/ue-sim-{sim.imsi}.conf"
+            ansible_builder.add_template_task(rel_path("config/ue_conf_file.jinja2"), ue_sim_config_path,
+                                              {"sim": sim, "gnbSearchList": self.gnbSearchList})
 
-        ansible_builder.set_var("sim", self.sim)
-        ansible_builder.set_var("gnbSearchList", self.gnbSearchList)
-
-        # Create a new service to start the UE with this SIM
-
-        ue_sim_service_path = f"/etc/systemd/system/ueransim-ue-sim-{self.sim_num}.service"
-
-        ansible_builder.add_copy_task(
-            "/etc/systemd/system/ueransim-ue.service",
-            ue_sim_service_path,
-            remote_src=True
-        )
-
-        ansible_builder.add_replace_task(ue_sim_service_path, "/opt/UERANSIM/ue.conf", ue_sim_config_path)
-        ansible_builder.add_replace_task(ue_sim_service_path, "UERANSIM UE", f"UERANSIM UE SIM {self.sim_num}")
+            # Create a new service to start the UE with this SIM
+            ue_sim_service_path = f"/etc/systemd/system/ueransim-ue-sim-{sim.imsi}.service"
+            ansible_builder.add_copy_task(
+                "/etc/systemd/system/ueransim-ue.service",
+                ue_sim_service_path,
+                remote_src=True
+            )
+            ansible_builder.add_replace_task(ue_sim_service_path, "/opt/UERANSIM/ue.conf", ue_sim_config_path)
+            ansible_builder.add_replace_task(ue_sim_service_path, "UERANSIM UE", f"UERANSIM UE SIM {sim.imsi}")
 
         # Reload services
-
         ansible_builder.add_shell_task("systemctl daemon-reload")
-
         return ansible_builder.build()
 
 
@@ -90,7 +98,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     # RADIO_NET_CIDR_START = '10.168.0.2'
     # RADIO_NET_CIDR_END = '10.168.255.253'
 
-    ueransim_image = VmResourceImage(name="ueransim-v3.2.6-dev", url="http://images.tnt-lab.unige.it/ueransim/ueransim-v3.2.6-dev.qcow2")
+    ueransim_image = VmResourceImage(name="ueransim-v3.2.6-dev", url="https://images.tnt-lab.unige.it/ueransim/ueransim-v3.2.6-dev.qcow2")
     ueransim_flavor = VmResourceFlavor(vcpu_count='2', memory_mb='4096', storage_gb='10')
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = UeransimBlueprintNGState):
@@ -98,78 +106,187 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
     def create(self, create_model: UeransimBlueprintRequestInstance):
         super().create(create_model)
-
         self.logger.info("Starting creation of UERANSIM blueprint")
-
         for area in create_model.areas:
-            # Using area id to build a unique CIDR
-            # TODO find a better way, what about areas with id > 255 ?
-            radio_network_name = f"radio_{self.id}_{area.id}"
-            network = NetResource(area=area.id, name=radio_network_name, cidr=f"10.168.{area.id}.0/24")
+            self._create_gnb(str(area.id))
+            for ue in area.ues:
+                self._create_ue(str(area.id), ue)
+
+    def _create_gnb(self, area_id: str):
+        if area_id not in self.state.areas:
+            radio_network_name = f"radio_{self.id}_{area_id}"
+            network = NetResource(area=area_id, name=radio_network_name, cidr=f"10.168.{area_id}.0/24")
             self.register_resource(network)
             self.provider.create_net(network)
 
             vm_gnb = VmResource(
-                area=area.id,
-                name=f"{self.id}_{area.id}_GNB",
+                area=area_id,
+                name=f"{self.id}_{area_id}_GNB",
                 image=self.ueransim_image,
                 flavor=self.ueransim_flavor,
                 username="ubuntu",
                 password="ubuntu",
-                management_network=create_model.config.network_endpoints.mgt,
-                additional_networks=[create_model.config.network_endpoints.wan, radio_network_name]
+                management_network=self.create_config.config.network_endpoints.mgt,
+                additional_networks=[self.create_config.config.network_endpoints.wan, radio_network_name]
             )
             self.register_resource(vm_gnb)
             self.provider.create_vm(vm_gnb)
+            self.state.areas[area_id] = BlueUeransimArea(vm_gnb=vm_gnb, ues=[], radio_net=network)
+        else:
+            raise BlueprintNGException(f"GnB already exists in area {area_id}")
 
-            ueransim_ue_list: List[UeransimUe] = []
+    def _create_ue(self, area_id: str, ue: UeransimUe):
+        if area_id in self.state.areas:
+            blue_ueransim_area = self.state.areas[area_id]
+            radio_network_name = f"radio_{self.id}_{area_id}"
+            vm_ue = VmResource(
+                area=area_id,
+                name=f"{self.id}_{area_id}_UE_{ue.id}",
+                image=self.ueransim_image,
+                flavor=self.ueransim_flavor,
+                username="ubuntu",
+                password="ubuntu",
+                management_network=self.create_config.config.network_endpoints.mgt,
+                additional_networks=[self.create_config.config.network_endpoints.wan, radio_network_name]
+            )
+            self.register_resource(vm_ue)
 
-            for ue in area.ues:
-                vm_ue = VmResource(
-                    area=area.id,
-                    name=f"{self.id}_{area.id}_UE_{ue.id}",
-                    image=self.ueransim_image,
-                    flavor=self.ueransim_flavor,
-                    username="ubuntu",
-                    password="ubuntu",
-                    management_network=create_model.config.network_endpoints.mgt,
-                    additional_networks=[create_model.config.network_endpoints.wan, radio_network_name]
-                )
-                self.register_resource(vm_ue)
+            self.provider.create_vm(vm_ue)
 
-                self.provider.create_vm(vm_ue)
+            vm_ue_configurator = UeransimUEConfigurator(
+                vm_resource=vm_ue,
+                sims=[],
+                gnbSearchList=[blue_ueransim_area.vm_gnb.network_interfaces[radio_network_name].fixed.ip]
+            )
+            for sim in ue.sims:
+                vm_ue_configurator.sims.append(sim)
 
-                vm_ue_configurators: List[UeransimUEConfigurator] = []
+            self.register_resource(vm_ue_configurator)
+            self.provider.configure_vm(vm_ue_configurator)
+            blue_ueransim_area.ues.append(BlueUeransimUe(vm_ue=vm_ue, vm_ue_configurator=vm_ue_configurator, ue_id=str(ue.id)))
 
-                for sim_num, sim in enumerate(ue.sims):
-                    vm_ue_configurator = UeransimUEConfigurator(
-                        vm_resource=vm_ue,
-                        sim_num=sim_num,
-                        sim=sim,
-                        gnbSearchList=[vm_gnb.network_interfaces[radio_network_name].fixed.ip]
-                    )
-                    self.register_resource(vm_ue_configurator)
-                    self.provider.configure_vm(vm_ue_configurator)
-                    vm_ue_configurators.append(vm_ue_configurator)
+            self.state.areas[area_id] = blue_ueransim_area
+        else:
+            raise BlueprintNGException(f"Gnb in area {area_id} not found")
 
-                ueransim_ue = UeransimUe(vm_ue=vm_ue, vm_ue_configurators=vm_ue_configurators)
-                ueransim_ue_list.append(ueransim_ue)
+    def _delete_gnb(self, area_id: str):
+        self.logger.info(f"Trying to delete GnB in area {area_id}")
+        if area_id in self.state.areas:
+            for ue in self.state.areas[area_id].ues:
+                self.provider.destroy_vm(ue.vm_ue)
+                self.deregister_resource(ue.vm_ue)
+                self.deregister_resource(ue.vm_ue_configurator)
 
-            self.state.areas[str(area.id)] = UeransimArea(vm_gnb=vm_gnb, ues=ueransim_ue_list, radio_net=network)
+            self.provider.net
+            self.provider.destroy_vm(self.state.areas[area_id].vm_gnb)
+            self.deregister_resource(self.state.areas[area_id].vm_gnb)
+            if self.state.areas[area_id].vm_gnb_configurator:
+                self.deregister_resource(self.state.areas[area_id].vm_gnb_configurator)
+            del self.state.areas[area_id]
+        else:
+            raise BlueprintNGException(f"No Gnb found in area {area_id}")
+
+    def _delete_ue(self, area_id: str, ue_id: int):
+        self.logger.info(f"Trying to delete UE {ue_id} in area {area_id}")
+        if area_id in self.state.areas:
+            temp = self.state.areas[area_id].ues.copy()
+            for ue in temp:
+                if ue.ue_id == str(ue_id):
+                    self.provider.destroy_vm(ue.vm_ue)
+                    self.deregister_resource(ue.vm_ue)
+                    self.deregister_resource(ue.vm_ue_configurator)
+                    self.state.areas[area_id].ues.remove(ue)
+                    self.logger.info(f"UE {ue_id} deleted")
+                else:
+                    raise BlueprintNGException(f"No UE found in area {area_id} with id {ue_id}")
+        else:
+            raise BlueprintNGException(f"No Gnb found in area {area_id}")
+
+    def _add_sim(self, area_id: str, ue_id: int, new_sim: UeransimSim):
+        self.logger.info(f"Trying to add Sim with imsi {new_sim.imsi}, in area {area_id}, ue {ue_id}")
+        for ue in self.state.areas[area_id].ues:
+            if ue.ue_id == str(ue_id):
+                for sim in ue.vm_ue_configurator.sims:
+                    if sim.imsi == new_sim.imsi:
+                        raise BlueprintNGException(f"Sim {new_sim.imsi} already exists")
+                ue.vm_ue_configurator.sims.append(new_sim)
+                self.provider.configure_vm(ue.vm_ue_configurator)
+                self.logger.info(f"Sim with imsi {new_sim.imsi} added")
+
+    def _del_sim(self, area_id: str, ue_id: int, imsi: str):
+        self.logger.info(f"Trying to delete Sim with imsi {imsi}, from area {area_id}, ue {ue_id}")
+        for ue in self.state.areas[area_id].ues:
+            if ue.ue_id == str(ue_id):
+                temp = ue.vm_ue_configurator.sims.copy()
+                for sim in temp:
+                    if sim.imsi == imsi:
+                        ue.vm_ue_configurator.sims_to_delete.append(sim)
+                        ue.vm_ue_configurator.sims.remove(sim)
+                        self.provider.configure_vm(ue.vm_ue_configurator)
+                        self.logger.info(f"Sim with imsi {imsi} deleted")
+                        return
+                raise BlueprintNGException(f"Sim with imsi {imsi} does not exist")
 
     @classmethod
     def rest_create(cls, msg: UeransimBlueprintRequestInstance, request: Request):
         return cls.api_day0_function(msg, request)
 
     @classmethod
+    def add_gnb_endpoint(cls, msg: UeransimBlueprintRequestAddDelGNB, blue_id: str, request: Request):
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @classmethod
     def configure_gnb_endpoint(cls, msg: UeransimBlueprintRequestConfigureGNB, blue_id: str, request: Request):
         return cls.api_day2_function(msg, blue_id, request)
+
+    @classmethod
+    def del_gnb_endpoint(cls, msg: UeransimBlueprintRequestAddDelGNB, blue_id: str, request: Request):
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @classmethod
+    def add_ue_endpoint(cls, msg: UeransimBlueprintRequestAddUE, blue_id: str, request: Request):
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @classmethod
+    def del_ue_endpoint(cls, msg: UeransimBlueprintRequestDelUE, blue_id: str, request: Request):
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @classmethod
+    def add_sim_endpoint(cls, msg: UeransimBlueprintRequestAddSim, blue_id: str, request: Request):
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @classmethod
+    def del_sim_endpoint(cls, msg: UeransimBlueprintRequestDelSim, blue_id: str, request: Request):
+        return cls.api_day2_function(msg, blue_id, request)
+
+    @add_route(UERANSIM_BLUE_TYPE, "/add_gnb", [HttpRequestType.POST], add_gnb_endpoint)
+    def add_gnb(self, model: UeransimBlueprintRequestAddDelGNB):
+        self._create_gnb(model.area_id)
 
     @add_route(UERANSIM_BLUE_TYPE, "/configure_gnb", [HttpRequestType.POST], configure_gnb_endpoint)
     def configure_gnb(self, model: UeransimBlueprintRequestConfigureGNB):
         area = self.state.areas[str(model.area)]
-
         area.vm_gnb_configurator = UeransimGNBConfigurator(vm_resource=area.vm_gnb, configuration=model)
-        self.register_resource(area.vm_gnb_configurator)
 
+        self.register_resource(area.vm_gnb_configurator)
         self.provider.configure_vm(area.vm_gnb_configurator)
+
+    @add_route(UERANSIM_BLUE_TYPE, "/del_gnb", [HttpRequestType.DELETE], del_gnb_endpoint)
+    def del_gnb(self, model: UeransimBlueprintRequestAddDelGNB):
+        self._delete_gnb(model.area_id)
+
+    @add_route(UERANSIM_BLUE_TYPE, "/add_ue", [HttpRequestType.POST], add_ue_endpoint)
+    def add_ue(self, model: UeransimBlueprintRequestAddUE):
+        self._create_ue(model.area_id, model.ue)
+
+    @add_route(UERANSIM_BLUE_TYPE, "/del_ue", [HttpRequestType.DELETE], del_ue_endpoint)
+    def del_ue(self, model: UeransimBlueprintRequestDelUE):
+        self._delete_ue(model.area_id, model.ue_id)
+
+    @add_route(UERANSIM_BLUE_TYPE, "/add_sim", [HttpRequestType.POST], add_sim_endpoint)
+    def add_sim(self, model: UeransimBlueprintRequestAddSim):
+        self._add_sim(model.area_id, model.ue_id, model.sim)
+
+    @add_route(UERANSIM_BLUE_TYPE, "/del_sim", [HttpRequestType.DELETE], del_sim_endpoint)
+    def del_sim(self, model: UeransimBlueprintRequestDelSim):
+        self._del_sim(model.area_id, model.ue_id, model.imsi)

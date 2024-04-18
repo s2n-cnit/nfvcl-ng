@@ -6,7 +6,7 @@ from pydantic import Field
 
 from blueprints_ng.blueprint_ng import BlueprintNGCreateModel
 from models.base_model import NFVCLBaseModel
-from models.ueransim.blueprint_ueransim_model import UeransimArea, UeransimConfig
+from models.ueransim.blueprint_ueransim_model import UeransimArea, UeransimConfig, UeransimUe, UeransimSim
 
 
 class UeransimBlueprintRequestInstance(BlueprintNGCreateModel):
@@ -84,6 +84,32 @@ class UeransimBlueprintRequestConfigureGNB(NFVCLBaseModel):
     amf_port: int = Field()
 
     nssai: List[UeransimSlice] = Field()
+
+
+class UeransimBlueprintRequestAddDelGNB(NFVCLBaseModel):
+    area_id: str = Field()
+
+
+class UeransimBlueprintRequestAddUE(NFVCLBaseModel):
+    area_id: str = Field()
+    ue: UeransimUe = Field()
+
+
+class UeransimBlueprintRequestDelUE(NFVCLBaseModel):
+    area_id: str = Field()
+    ue_id: int = Field()
+
+
+class UeransimBlueprintRequestAddSim(NFVCLBaseModel):
+    area_id: str = Field()
+    ue_id: int = Field()
+    sim: UeransimSim = Field()
+
+
+class UeransimBlueprintRequestDelSim(NFVCLBaseModel):
+    area_id: str = Field()
+    ue_id: int = Field()
+    imsi: str = Field()
 
 
 class UeransimBlueprintRequestAddDelUe(NFVCLBaseModel):

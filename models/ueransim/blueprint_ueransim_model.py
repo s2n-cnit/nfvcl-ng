@@ -9,7 +9,8 @@ from models.vim.vim_models import VimNetMap
 
 class UeransimNetworkEndpoints(NFVCLBaseModel):
     mgt: str = Field(..., description='name of the topology network to be used for management')
-    wan: str = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
+    n2: str = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
+    n3: str = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
 
 class UeransimConfig(NFVCLBaseModel):
     network_endpoints: UeransimNetworkEndpoints

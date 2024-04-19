@@ -40,11 +40,17 @@ class UeransimBlueprintNGState(BlueprintNGState):
 
 class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
     configuration: UeransimBlueprintRequestConfigureGNB = Field()
+    radio_addr: str = Field()
+    ngap_addr: str = Field()
+    gtp_addr: str = Field()
 
     def dump_playbook(self) -> str:
         ansible_builder = AnsiblePlaybookBuilder("Playbook UeransimGNBConfigurator")
         ansible_builder.add_template_task(rel_path("config/gnb_conf_file.jinja2"), "/opt/UERANSIM/gnb.conf")
         ansible_builder.set_vars_from_fields(self.configuration)
+        ansible_builder.set_var("radio_addr", self.radio_addr)
+        ansible_builder.set_var("ngap_addr", self.ngap_addr)
+        ansible_builder.set_var("gtp_addr", self.gtp_addr)
 
         return ansible_builder.build()
 
@@ -67,7 +73,7 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
             ansible_builder.add_service_task(
                 service_name=f"ueransim-ue-sim-{sim.imsi}",
                 service_state=ServiceState.STOPPED,
-                enabled="false"
+                enabled=False
             )
             ansible_builder.add_shell_task(command=f"rm {ue_sim_config_path} {ue_sim_service_path}")
         self.sims_to_delete.clear()
@@ -115,20 +121,24 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     def _create_gnb(self, area_id: str):
         if area_id not in self.state.areas:
             radio_network_name = f"radio_{self.id}_{area_id}"
-            network = NetResource(area=area_id, name=radio_network_name, cidr=f"10.168.{area_id}.0/24")
+            network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{area_id}.0/24")
             self.register_resource(network)
             self.provider.create_net(network)
 
             vm_gnb = VmResource(
-                area=area_id,
+                area=int(area_id),
                 name=f"{self.id}_{area_id}_GNB",
                 image=self.ueransim_image,
                 flavor=self.ueransim_flavor,
                 username="ubuntu",
                 password="ubuntu",
                 management_network=self.create_config.config.network_endpoints.mgt,
-                additional_networks=[self.create_config.config.network_endpoints.wan, radio_network_name]
+                additional_networks=[self.create_config.config.network_endpoints.n2, radio_network_name]
             )
+
+            if self.create_config.config.network_endpoints.n2 != self.create_config.config.network_endpoints.n3:
+                vm_gnb.additional_networks.append(self.create_config.config.network_endpoints.n3)
+
             self.register_resource(vm_gnb)
             self.provider.create_vm(vm_gnb)
             self.state.areas[area_id] = BlueUeransimArea(vm_gnb=vm_gnb, ues=[], radio_net=network)
@@ -140,14 +150,14 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             blue_ueransim_area = self.state.areas[area_id]
             radio_network_name = f"radio_{self.id}_{area_id}"
             vm_ue = VmResource(
-                area=area_id,
+                area=int(area_id),
                 name=f"{self.id}_{area_id}_UE_{ue.id}",
                 image=self.ueransim_image,
                 flavor=self.ueransim_flavor,
                 username="ubuntu",
                 password="ubuntu",
                 management_network=self.create_config.config.network_endpoints.mgt,
-                additional_networks=[self.create_config.config.network_endpoints.wan, radio_network_name]
+                additional_networks=[radio_network_name]
             )
             self.register_resource(vm_ue)
 
@@ -177,7 +187,6 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
                 self.deregister_resource(ue.vm_ue)
                 self.deregister_resource(ue.vm_ue_configurator)
 
-            self.provider.net
             self.provider.destroy_vm(self.state.areas[area_id].vm_gnb)
             self.deregister_resource(self.state.areas[area_id].vm_gnb)
             if self.state.areas[area_id].vm_gnb_configurator:
@@ -266,7 +275,13 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     @add_route(UERANSIM_BLUE_TYPE, "/configure_gnb", [HttpRequestType.POST], configure_gnb_endpoint)
     def configure_gnb(self, model: UeransimBlueprintRequestConfigureGNB):
         area = self.state.areas[str(model.area)]
-        area.vm_gnb_configurator = UeransimGNBConfigurator(vm_resource=area.vm_gnb, configuration=model)
+        area.vm_gnb_configurator = UeransimGNBConfigurator(
+            vm_resource=area.vm_gnb,
+            configuration=model,
+            radio_addr=area.vm_gnb.network_interfaces[area.radio_net.name].fixed.ip,
+            ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2].fixed.ip,
+            gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.ip,
+        )
 
         self.register_resource(area.vm_gnb_configurator)
         self.provider.configure_vm(area.vm_gnb_configurator)

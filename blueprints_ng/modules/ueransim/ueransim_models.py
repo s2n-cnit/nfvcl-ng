@@ -76,10 +76,6 @@ class UeransimBlueprintRequestConfigureGNB(NFVCLBaseModel):
     plmn: str = Field()
     tac: int = Field()
 
-    radio_addr: str = Field()
-    ngap_addr: str = Field()
-    gtp_addr: str = Field()
-
     amf_ip: str = Field()
     amf_port: int = Field()
 

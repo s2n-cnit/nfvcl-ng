@@ -168,6 +168,7 @@ class AnsiblePlaybookBuilder:
             task_module: Ansible module of the task
             task_content: Content of the task
             register_output_as: If set the output of the task will be registered to be used by other tasks
+            task_vars: Optional vars to pass directly to the task
         """
         dictionary = {
             "name": name,
@@ -233,7 +234,6 @@ class AnsiblePlaybookBuilder:
             path: Path of the file
             regexp: Regexp to search in the file
             replace: String used to replace the matches
-            task_vars: Dict of variables
         """
         self.add_task(
             f"Replace task for {path}",
@@ -283,17 +283,19 @@ class AnsiblePlaybookBuilder:
             register_output_as=register_output_as
         )
 
-    def add_service_task(self, service_name: str, service_state: ServiceState, enabled: str = 'true'):
+    def add_service_task(self, service_name: str, service_state: ServiceState, enabled: bool = True):
         """
         Add a service task to start, stop, reload, restart services.
         Args:
-            command: The command to execute
-            register_output_as: The name of the variable in which to register the command output
+            service_name: Name of the service
+            service_state: State in which the service will be put
+            enabled: True if the service need to start on boot, False otherwise
         """
         self.add_task(
             f"Service Task '{service_name}': state=<{service_state}>, enabled=<{enabled}>",
             "ansible.builtin.service",
-            AnsibleServiceTask(name=service_name, state=service_state.value, enabled=enabled))
+            AnsibleServiceTask(name=service_name, state=service_state.value, enabled='true' if enabled else 'false')
+        )
 
     def add_pause_task(self, seconds: int):
         """

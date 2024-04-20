@@ -358,7 +358,7 @@ class Topology:
         # Check that the required vim has the network
         if vim_name:
             vim = self._model.get_vim(vim_name)
-            vim.get_net(net_name)  # Raise error if the VIM does not have the network
+            vim.get_net_old(net_name)  # Raise error if the VIM does not have the network
 
         return net_model
 
@@ -538,7 +538,7 @@ class Topology:
             The created network if terraformed, None otherwise (even if it is added to the topology but not terraformed)
         """
         # Adding the net, raise ValueError if already present
-        vim.add_net(vim_net_name)
+        vim.add_net_old(vim_net_name)
 
         # Checking that the network is present in the topology and getting it
         topo_net = self._model.get_network(network_name=vim_net_name)
@@ -566,7 +566,7 @@ class Topology:
         Returns: the name of deleted network on the vim
         """
         vim_model: VimModel = self._model.get_vim(vim.name)
-        removed_net = vim_model.del_net(vim_net_name)
+        removed_net = vim_model.del_net_old(vim_net_name)
 
         if terraform:
             if not self._os_terraformer[vim.name].delNet(vim_net_name):

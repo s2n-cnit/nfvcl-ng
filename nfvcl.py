@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from rest_endpoints.osm_rest import osm_router
 from rest_endpoints.openstack import openstack_router
 
-swagger_parameters={"syntaxHighlight.theme": "obsidian", "tryItOutEnabled": True, "deepLinking": True}
+swagger_parameters={"syntaxHighlight.theme": "obsidian", "deepLinking": True}
 app = FastAPI(
     title="NFVCL",
     description="CNIT/UniGe S2N Lab NFVCL",

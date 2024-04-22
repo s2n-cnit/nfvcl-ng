@@ -140,11 +140,8 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
                 username="ubuntu",
                 password="ubuntu",
                 management_network=self.create_config.config.network_endpoints.mgt,
-                additional_networks=[self.create_config.config.network_endpoints.n2, radio_network_name]
+                additional_networks=[self.create_config.config.network_endpoints.n2, self.create_config.config.network_endpoints.n3, radio_network_name]
             )
-
-            if self.create_config.config.network_endpoints.n2 != self.create_config.config.network_endpoints.n3:
-                vm_gnb.additional_networks.append(self.create_config.config.network_endpoints.n3)
 
             self.register_resource(vm_gnb)
             self.provider.create_vm(vm_gnb)

@@ -114,6 +114,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         networks = [vm_resource.management_network]
         networks.extend(vm_resource.additional_networks)
 
+        # Deduplicate networks
+        networks = list(set(networks))
+
         # The floating IP should be requested if the VIM require it or if explicitly requested in the blueprint
         auto_ip = self.vim_need_floating_ip or vm_resource.require_floating_ip
 

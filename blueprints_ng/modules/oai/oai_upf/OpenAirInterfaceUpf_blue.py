@@ -87,7 +87,7 @@ class OpenAirInterfaceUpf(BlueprintNG[OAIUpfBlueprintNGState, UPFBlueCreateModel
         self.state.vm_upf = VmResource(
             area=create_model.area_id,
             name=f"{self.id}_VM_UPF",
-            image=VmResourceImage(name="UPF_OpenAirInterface5G_V2"),
+            image=VmResourceImage(name="OpenAirInterfaceUPF_NG", url="https://images.tnt-lab.unige.it/openairinterfaceupf/openairinterfaceupf-v2.0.0.qcow2"),
             flavor=VmResourceFlavor(),
             username="ubuntu",
             password="ubuntu",

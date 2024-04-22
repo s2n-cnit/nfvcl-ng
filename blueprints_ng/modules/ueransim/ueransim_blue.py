@@ -43,6 +43,7 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
     radio_addr: str = Field()
     ngap_addr: str = Field()
     gtp_addr: str = Field()
+    n3_nic_name: str = Field()
 
     def dump_playbook(self) -> str:
         ansible_builder = AnsiblePlaybookBuilder("Playbook UeransimGNBConfigurator")
@@ -51,6 +52,12 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.set_var("radio_addr", self.radio_addr)
         ansible_builder.set_var("ngap_addr", self.ngap_addr)
         ansible_builder.set_var("gtp_addr", self.gtp_addr)
+
+        ansible_builder.add_template_task(rel_path("config/config_network.sh.jinja2"), "/opt/config_network.sh")
+        ansible_builder.add_template_task(rel_path("config/config-network.service.jinja2"), "/etc/systemd/system/config-network.service")
+        ansible_builder.set_var("n3_if", self.n3_nic_name)
+        ansible_builder.add_shell_task("systemctl daemon-reload")
+        ansible_builder.add_service_task("config-network", ServiceState.STARTED, True)
 
         return ansible_builder.build()
 
@@ -281,6 +288,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             radio_addr=area.vm_gnb.network_interfaces[area.radio_net.name].fixed.ip,
             ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2].fixed.ip,
             gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.ip,
+            n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.interface_name
         )
 
         self.register_resource(area.vm_gnb_configurator)
@@ -305,3 +313,9 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     @add_route(UERANSIM_BLUE_TYPE, "/del_sim", [HttpRequestType.DELETE], del_sim_endpoint)
     def del_sim(self, model: UeransimBlueprintRequestDelSim):
         self._del_sim(model.area_id, model.ue_id, model.imsi)
+
+    def get_n3_info(self, area_id: int) -> dict:
+        return {
+            "gnb_n3_ip": self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.ip,
+            "gnb_n3_mac": self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.mac
+        }

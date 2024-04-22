@@ -154,4 +154,4 @@ def delete_topology():
     Returns:
         The destroyed topology.
     """
-    return NFVCLDatabase().delete_from_collection(BLUE_COLLECTION_V2, {'id': 'topology'})
+    return NFVCLDatabase().delete_from_collection(TOPOLOGY_COLLECTION, {'id': 'topology'})

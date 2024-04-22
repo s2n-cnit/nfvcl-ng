@@ -16,9 +16,6 @@ class BlueprintNGProviderException(Exception):
     pass
 
 
-global_topology = build_topology()
-
-
 class BlueprintNGProviderInterface(abc.ABC):
     area: int
     data: BlueprintNGProviderData
@@ -28,7 +25,7 @@ class BlueprintNGProviderInterface(abc.ABC):
         self.area = area
         self.blueprint = blueprint
         self.logger = create_logger(self.__class__.__name__, blueprintid=self.blueprint.id)
-        self.topology = global_topology
+        self.topology = build_topology()
         self.logger.debug(f"Creating {self.__class__.__name__} for area {self.area}")
         self.init()
 

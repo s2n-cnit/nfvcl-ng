@@ -1,6 +1,7 @@
 import multiprocessing
 from functools import partial
 from multiprocessing import Process
+from threading import Thread
 from typing import Any
 
 from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGStatus, CurrentOperation
@@ -19,7 +20,7 @@ def callback_function(event, namespace, msg):
 class BlueprintWorker:
     blueprint: BlueprintNG
     message_queue: multiprocessing.Queue
-    process: Process = None
+    thread: Thread = None
 
     def __init__(self, blueprint: BlueprintNG):
         self.blueprint = blueprint
@@ -27,12 +28,12 @@ class BlueprintWorker:
         self.message_queue = multiprocessing.Queue()
 
     def start_listening(self):
-        self.process = Process(target=self._listen, args=())
-        self.process.start()
+        self.thread = Thread(target=self._listen, args=())
+        self.thread.start()
 
     def stop_listening(self):
-        # TODO check stop from outside
-        self.process.close()
+        # TODO kill thread and check if stop from outside
+        self.logger.info("Blueprint worker stopping listening.")
 
     def call_function_sync(self, function_name, *args, **kwargs):
         """
@@ -100,9 +101,11 @@ class BlueprintWorker:
                         self.blueprint.create(received_message.message)
                         if received_message.callback:
                             received_message.callback(self.blueprint.id)
+                        self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
                         self.logger.success(f"Blueprint created")
                     except Exception as e:
                         self.blueprint.base_model.status.error = True
+                        self.blueprint.base_model.status.detail = str(e)
                         self.logger.error(f"Error creating blueprint", exc_info=e)
                     self.blueprint.to_db()
                 case WorkerMessageType.DAY2 | WorkerMessageType.DAY2_BY_NAME:
@@ -118,9 +121,11 @@ class BlueprintWorker:
                         # Starting processing the request.
                         if received_message.callback:
                             received_message.callback(result)
+                        self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
                         self.logger.success(f"Function called on blueprint")
                     except Exception as e:
                         self.blueprint.base_model.status.error = True
+                        self.blueprint.base_model.status.detail = str(e)
                         self.logger.error(f"Error calling function on blueprint", exc_info=e)
                     self.blueprint.to_db()
                 case WorkerMessageType.STOP:
@@ -131,7 +136,6 @@ class BlueprintWorker:
                     break
                 case _:
                     raise ValueError("Worker message type not recognized")
-            self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
 
         self.stop_listening()
 

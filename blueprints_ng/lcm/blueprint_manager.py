@@ -131,7 +131,7 @@ class BlueprintManager(metaclass=Singleton):
             created_blue.to_db()
             # Creating and starting the worker
             worker = BlueprintWorker(created_blue)
-            worker.start_listening() # Start another PROCESS
+            worker.start_listening() # Start another THREAD
             self.worker_collection[blue_id] = worker
             # Putting the creation message into the worker (the spawn happens asynch)
             if wait:

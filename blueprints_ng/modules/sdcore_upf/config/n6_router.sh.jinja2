@@ -1,0 +1,10 @@
+#!/bin/bash
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+ip r add {{ ue_ip_pool_cidr }} via {{ upf_n6_ip }} dev {{ n6_if }}
+
+ethtool --offload {{ n6_if }} rx off tx off
+
+iptables -t nat -A POSTROUTING -o {{ internet_if }} -j MASQUERADE
+iptables -A FORWARD -i {{ n6_if }} -o {{ internet_if }} -j ACCEPT
+iptables -A FORWARD -i {{ internet_if }} -o {{ n6_if }} -m state --state RELATED,ESTABLISHED -j ACCEPT

@@ -5,9 +5,6 @@
     shell: |
        cd /root/upfConfig
        docker compose down
-  - name: load oai-upf
-    shell: |
-       docker load --input /root/upfConfig/oai-upfv2.0.0.tgz
   - name: start upf container
     shell: |
        cd /root/upfConfig

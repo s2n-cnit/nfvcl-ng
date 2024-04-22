@@ -104,6 +104,8 @@ class SubArea(BaseModel):
     idLength: int
     core: bool = Field(default=True)
     slices: Optional[List[SubSlices]] = Field(default=[],description="set slices ")
+    upf_bp_id: Optional[str] = Field(default=None)
+    gnb_bp_id: Optional[str] = Field(default=None)
 # ===============================================end of sub area ======================================================
 # =============================================== main section for blue free5gc k8s model class========================
 

@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+    oai-upf{{ upf_id }}:
+        container_name: "oai-upf{{ upf_id }}"
+        image: oaisoftwarealliance/oai-upf:v2.0.0
+        expose:
+            - 2152/udp
+            - 8805/udp
+            - 8080/tcp
+        volumes:
+            - ./conf/basic_nrf_config.yaml:/openair-upf/etc/config.yaml
+        environment:
+            - TZ=Europe/Paris
+        cap_add:
+            - NET_ADMIN
+            - SYS_ADMIN
+        cap_drop:
+            - ALL
+        privileged: true
+        network_mode: host
+        extra_hosts:
+            - "oai-nrf:{{ nrf_ipv4_address }}"

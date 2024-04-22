@@ -360,6 +360,25 @@ class Currentconfig(NFVCLBaseModel):
     dnns: List[Dnn]
 
 
+class Baseconfig(NFVCLBaseModel):
+    log_level: LogLevel
+    register_nf: RegisterNf
+    http_version: int
+    snssais: List[Snssai]
+    nfs: Nfs
+    database: Database
+    dnns: List[Dnn]
+
+
+class Coreconfig(Baseconfig):
+    amf: Amf1
+    smf: Smf1
+
+
+class Upfconfig(Baseconfig):
+    upf: Upf2
+
+
 class Global(NFVCLBaseModel):
     nfConfigurationConfigMap: str
     clusterIpServiceIpAllocation: bool
@@ -554,6 +573,20 @@ class OaiValuesModel(NFVCLBaseModel):
     oai_upf: Optional[OaiUpf] = Field(None, alias='oai-upf')
     oai_smf: Optional[OaiSmf] = Field(None, alias='oai-smf')
     currentconfig: Optional[Currentconfig] = Field(None, alias='currentconfig')
+
+class OaiCoreValuesModel(NFVCLBaseModel):
+    global_: Optional[Global] = Field(None, alias='global')
+    mysql: Optional[Mysql] = None
+    oai_nrf: Optional[OaiNrf] = Field(None, alias='oai-nrf')
+    oai_udr: Optional[OaiUdr] = Field(None, alias='oai-udr')
+    oai_udm: Optional[OaiUdm] = Field(None, alias='oai-udm')
+    oai_ausf: Optional[OaiAusf] = Field(None, alias='oai-ausf')
+    oai_amf: Optional[OaiAmf] = Field(None, alias='oai-amf')
+    oai_smf: Optional[OaiSmf] = Field(None, alias='oai-smf')
+    coreconfig: Optional[Coreconfig] = Field(None, alias='currentconfig')
+
+class OaiUpfValuesModel(NFVCLBaseModel):
+    upfconfig: Optional[Upfconfig] = Field(None, alias='currentconfig')
 
 
 class OAIModel(OAIBlueCreateModel):

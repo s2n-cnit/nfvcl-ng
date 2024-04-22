@@ -16,7 +16,7 @@ logger = create_logger("BLUE NG ROUTER")
 
 __blueprint_manager: BlueprintManager | None = None
 
-def get_blueprint_manager():
+def get_blueprint_manager() -> BlueprintManager:
     """
     Allow to retrieve the BlueprintManager (that can have only one instance)
     Returns:

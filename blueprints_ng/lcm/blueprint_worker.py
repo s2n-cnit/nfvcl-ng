@@ -54,6 +54,17 @@ class BlueprintWorker:
 
         return namespace.msg
 
+    def put_message_sync(self, msg_type: WorkerMessageType, path: str, message: Any):
+        # used to wait for the call to be completed
+        event = multiprocessing_manager.Event()
+        # used to receive the return data from the function
+        namespace = multiprocessing_manager.Namespace()
+
+        self.put_message(msg_type, path, message, callback=partial(callback_function, event, namespace))
+        event.wait()
+
+        return namespace.msg
+
     def put_message(self, msg_type: WorkerMessageType, path: str, message: Any, callback: callable = None):
         """
         Insert the worker message into the queue. This function should be called by an external process to the worker.
@@ -87,6 +98,8 @@ class BlueprintWorker:
                     try:
                         self.blueprint.base_model.status = BlueprintNGStatus.deploying(self.blueprint.id)
                         self.blueprint.create(received_message.message)
+                        if received_message.callback:
+                            received_message.callback(self.blueprint.id)
                         self.logger.success(f"Blueprint created")
                     except Exception as e:
                         self.blueprint.base_model.status.error = True

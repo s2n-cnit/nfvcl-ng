@@ -106,13 +106,14 @@ class BlueprintManager(metaclass=Singleton):
         return [BlueprintNG.from_db(item) for item in self._load_all_blue_dict_from_db()]
 
 
-    def create_blueprint(self, msg: Any, path: str) -> str:
+    def create_blueprint(self, msg: Any, path: str, wait: bool = False) -> str:
         """
         Create a base, EMPTY, blueprint given the type of the blueprint.
         Then create a dedicated worker for the blueprint that spawns (ASYNC) the blueprint on the VIM.
         Args:
             msg: The message received from the user. The type change on the blueprint type. It is checked by fastAPI on the request.
             path: The blueprint-specific path, the last part of the URL for the creation request (e.g., /nfvcl/v2/api/blue/vyos ----> path='vyos')
+            wait: True to wait for blueprint creation, False otherwise
 
         Returns:
             The ID of the created blueprint.
@@ -133,7 +134,10 @@ class BlueprintManager(metaclass=Singleton):
             worker.start_listening() # Start another PROCESS
             self.worker_collection[blue_id] = worker
             # Putting the creation message into the worker (the spawn happens asynch)
-            worker.put_message(WorkerMessageType.DAY0, f'{path}', msg)
+            if wait:
+                worker.put_message_sync(WorkerMessageType.DAY0, f'{path}', msg)
+            else:
+                worker.put_message(WorkerMessageType.DAY0, f'{path}', msg)
             return blue_id
 
     def delete_blueprint(self, blueprint_id: str) -> str:

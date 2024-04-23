@@ -7,3 +7,4 @@ from .oai.oai_upf import  *
 # from .sdcore import *
 from .sdcore_upf import *
 # from .core_5g import *
+from .dns import *

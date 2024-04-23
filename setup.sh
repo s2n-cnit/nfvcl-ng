@@ -13,7 +13,7 @@ sudo apt install -y python3.11 python3.11-dev python3.11-venv python3.11-distuti
 
 echo "Installing Ansible"
 sudo apt install -y ansible
-sudo echo -e "[defaults]\nhost_key_checking = False" >> /etc/ansible/ansible.cfg
+echo -e '[defaults]\nhost_key_checking = False' | sudo tee -a /etc/ansible/ansible.cfg
 
 echo "Installing Poetry"
 curl -sSL https://install.python-poetry.org | python3 -

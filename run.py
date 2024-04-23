@@ -53,4 +53,4 @@ if __name__ == "__main__":
     if nfvcl_conf is not None:
         # Load the app only if pre-configuration is OK.
         from nfvcl import app
-        uvicorn.run(app, host=nfvcl_conf.nfvcl.ip, port=5002)
+        uvicorn.run(app, host=nfvcl_conf.nfvcl.ip, port=nfvcl_conf.nfvcl.port)

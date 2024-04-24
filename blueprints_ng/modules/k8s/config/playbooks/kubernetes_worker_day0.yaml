@@ -2,6 +2,14 @@
 - hosts: workers
   gather_facts: no
   tasks:
+      # Swap is disabled again because in some openstack this is enabled again with cloud-init
+   - name: Make the Swap inactive
+     command: swapoff -a
+   - name: Remove Swap entry from /etc/fstab.
+     lineinfile:
+       dest: /etc/fstab
+       regexp: swap
+       state: absent
    - name: Download the certificate of the testbed docker registry
      shell: openssl s_client -showcerts -cipher DEFAULT@SECLEVEL=1 -connect docker-registry.maas:5000 < /dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /usr/local/share/ca-certificates/ca.crt
    - name: Add the certificate of the testbed docker registry

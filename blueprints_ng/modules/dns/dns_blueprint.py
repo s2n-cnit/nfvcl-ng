@@ -9,7 +9,7 @@ from blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
 DNS_BLUE_TYPE = "dns"
 BASE_IMAGE = "dns-server"
 BASE_IMAGE_URL = "http://images.tnt-lab.unige.it/dns-server/dns-server-v0.0.1.qcow2"
-DNS_DEFAULT_PASSWORD = "dns-server-pwd"
+DNS_DEFAULT_PASSWORD = "ubuntu"
 
 class DNSBlueprintNGState(BlueprintNGState):
     """
@@ -32,6 +32,7 @@ class DNSBlueprint(BlueprintNG[DNSBlueprintNGState, DNSCreateModel]):
         """
         super().create(create_model)
         self.logger.info("Starting creation of example blueprint")
+        self.state.password = create_model.password
 
         # ################################# VMs Example #####################################
 
@@ -40,18 +41,18 @@ class DNSBlueprint(BlueprintNG[DNSBlueprintNGState, DNSCreateModel]):
             area=create_model.area,
             name=f"{self.id}_VM_DNS_SERVER",
             image=VmResourceImage(name=BASE_IMAGE, url=BASE_IMAGE_URL),
-            flavor=VmResourceFlavor(),
+            flavor=create_model.flavor,
             username="ubuntu",
             password=create_model.password,
             management_network=create_model.mgmt_net,
             additional_networks=create_model.data_nets
         )
-        # When a Resource is added it also need to be registered
-        # This is MANDATORY
+
+        #Registering VM for DNS
         self.register_resource(self.state.vm)
-
+        #Creating VM
         self.provider.create_vm(self.state.vm)
-
+        # No need for configuration, at least for now.
 
     @classmethod
     def rest_create(cls, msg: DNSCreateModel, request: Request):

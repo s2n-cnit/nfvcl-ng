@@ -50,6 +50,7 @@ class VmResourceImage(NFVCLBaseModel):
 
 
 class VmResourceFlavor(NFVCLBaseModel):
+    name: Optional[str] = Field(default=None, description="The name of the flavor, if specified NFVCL will try to use that flavor, if not found it will try to create new one with following specs.")
     vcpu_count: str = Field(default="4")
     memory_mb: str = Field(default="8192", description="Should be a multiple of 1024")
     storage_gb: str = Field(default="32")
@@ -125,6 +126,7 @@ class VmResource(ResourceDeployable):
     management_network: str = Field()
     additional_networks: List[str] = Field(default=[])
     require_floating_ip: bool = Field(default=False)
+    require_port_security: Optional[bool] = Field(default=False) # TODO remove optional
 
     # Potrebbe mettersi la data di creazione
     created: bool = Field(default=False)

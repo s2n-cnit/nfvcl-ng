@@ -3,6 +3,14 @@
   become: yes
   gather_facts: no
   tasks:
+      # Swap is disabled again because in some openstack this is enabled again with cloud-init
+   - name: Make the Swap inactive
+     command: swapoff -a
+   - name: Remove Swap entry from /etc/fstab.
+     lineinfile:
+       dest: /etc/fstab
+       regexp: swap
+       state: absent
    - name: Intilizing Kubernetes Cluster
      command: kubeadm init --pod-network-cidr '{{ pod_network_cidr }}' --apiserver-advertise-address '{{ k8s_master_ip }}' --apiserver-cert-extra-sans '{{ k8s_master_external_ip }}' --service-cidr '{{ k8s_service_cidr }}' --control-plane-endpoint '{{ k8s_master_external_ip }}'
    - pause: seconds=5

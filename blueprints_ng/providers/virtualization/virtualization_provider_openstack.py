@@ -6,6 +6,7 @@ import paramiko
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.connection import Connection
+from openstack.exceptions import ForbiddenException
 from openstack.network.v2.network import Network
 from openstack.network.v2.port import Port
 from openstack.network.v2.subnet import Subnet
@@ -16,7 +17,7 @@ from blueprints_ng.providers.configurators.ansible_utils import run_ansible_play
 from blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
-    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource
+    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor
 from models.vim import VimModel
 from utils.openstack.openstack_client import OpenStackClient
 
@@ -76,7 +77,13 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             'container_format': 'bare',
             'visibility': 'public',
         }
-        image = self.conn.image.create_image(**image_attrs)
+        try:
+            image = self.conn.image.create_image(**image_attrs)
+        except ForbiddenException as exc:
+            self.logger.warning("Cannot create public image, trying again with private")
+            image_attrs['visibility'] = "private"
+            image = self.conn.image.create_image(**image_attrs)
+
         self.conn.image.import_image(image, method="web-download", uri=vm_resource.image.url)
         self.conn.wait_for_image(image)
         return image
@@ -92,20 +99,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             else:
                 raise VirtualizationProviderOpenstackException(f"Image >{vm_resource.image.name}< not found")
 
-        flavor_name = f"Flavor_{vm_resource.name}"
-        if flavor_name in self.data.flavors:
-            flavor = self.conn.get_flavor(flavor_name)
-            if flavor is None:
-                raise VirtualizationProviderOpenstackException(f"Flavor '{flavor_name}' should be present but is None")
-        else:
-            flavor: Flavor = self.conn.create_flavor(
-                flavor_name,
-                vm_resource.flavor.memory_mb,
-                vm_resource.flavor.vcpu_count,
-                vm_resource.flavor.storage_gb,
-                is_public=False
-            )
-            self.data.flavors.append(flavor_name)
+        flavor: Flavor = self.create_get_flavor(vm_resource.flavor, vm_resource.name)
 
         cloudin = CloudInit(password=vm_resource.password, ssh_authorized_keys=self.vim.ssh_keys).build_cloud_config()
         self.logger.debug(f"Cloud config:\n{cloudin}")
@@ -165,8 +159,11 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         server_ports: List[Port] = self.conn.list_ports(filters={"device_id": server_obj.id})
         if len(server_ports) != len(networks):
             raise VirtualizationProviderOpenstackException(f"Mismatch in number of request network interface and ports, query: device_id={server_obj.id}")
-        for port in server_ports:
-            self.__disable_port_security(self.conn, port.id)
+
+        if getattr(vm_resource, 'require_port_security', None): # TODO remove in future. For now to maintain back compatibility
+            if vm_resource.require_port_security:
+                for port in server_ports:
+                    self.__disable_port_security(self.conn, port.id)
 
         # Run an Ansible playbook to gather information about the newly created VM
         self.__gather_info_from_vm(vm_resource)
@@ -197,6 +194,52 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.data.networks.append(network.id)
 
         self.logger.success(f"Creating NET {net_resource.name} finished")
+
+    def create_get_flavor(self, requested_flavor: VmResourceFlavor, vm_name: str) -> Flavor:
+        """
+        Get a flavor if flavor name is present, create it if a flavor with that name does not exist.
+        Otherwise, it creates a flavor, from specification, if not already present.
+        Args:
+            requested_flavor: Flavor to be get/created.
+            vm_name: The VM name used to name the flavor if the flavor name is not present.
+        Returns:
+            The flavor on the VIM
+        """
+        # If a flavor name is specified, try to use that one.
+        if requested_flavor.name is not None:
+            found_flavor_on_vim = self.conn.get_flavor(requested_flavor.name)
+            # If not found, try to create it with specifications.
+            if found_flavor_on_vim is None:
+                flavor: Flavor = self.conn.create_flavor(
+                    requested_flavor.name,
+                    requested_flavor.memory_mb,
+                    requested_flavor.vcpu_count,
+                    requested_flavor.storage_gb,
+                    is_public=True
+                )
+                return flavor
+            return found_flavor_on_vim
+        # If no name was given, create it by specifications
+        else:
+            flavor_name = f"Flavor_{vm_name}"
+            # If present in local flavor list -> Already created
+            if flavor_name in self.data.flavors:
+                flavor: Flavor = self.conn.get_flavor(flavor_name)
+                if flavor is None:
+                    raise VirtualizationProviderOpenstackException(f"Flavor '{flavor_name}' should be present but is None")
+            # Otherwise, creates the flavor
+            else:
+                flavor: Flavor = self.conn.create_flavor(
+                    flavor_name,
+                    requested_flavor.memory_mb,
+                    requested_flavor.vcpu_count,
+                    requested_flavor.storage_gb,
+                    is_public=False
+                )
+                project = self.conn.get_project(self.vim.vim_tenant_name)
+                self.conn.add_flavor_access(flavor.id, project['id'])
+                self.data.flavors.append(flavor_name)
+            return flavor
 
     def __gather_info_from_vm(self, vm_resource: VmResource):
         self.logger.info(f"Starting VM info gathering")

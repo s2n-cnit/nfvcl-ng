@@ -2,8 +2,7 @@ from __future__ import annotations
 from typing import List, Optional
 from models.k8s.common_k8s_model import Cni
 from blueprints_ng.resources import VmResourceFlavor
-from pydantic import Field, field_validator, PositiveInt, model_validator, ValidationError
-from blueprints.blue_vyos import VyOSSourceNATRule
+from pydantic import Field, field_validator, PositiveInt, model_validator
 from blueprints_ng.blueprint_ng import BlueprintNGCreateModel
 from models.base_model import NFVCLBaseModel
 
@@ -96,8 +95,8 @@ class KarmadaInstallModel(BlueprintNGCreateModel):
     """
     Model for Karmada and Submarine installation and configuration. It contains required parameters for the configuration.
     """
-    cluster_id: str = Field(description="Name of the current cluster Submariner and Karmada. Must be unique")
-    kube_config_location: str = Field(default="~/.kube/config",description="Path to local kubeconfig (on the master node)")
+    cluster_id: str = Field(description="Name of the current cluster Submariner and Karmada. Must be unique", pattern="[a-z0-9]([-a-z0-9]*[a-z0-9])?")
+    kube_config_location: str = Field(default="/root/.kube/config",description="Path to local kubeconfig (on the master node)")
     submariner_broker: str = Field(description="Content of the submariner broker file (.subm file extension)")
     karmada_control_plane: str = Field(description="The IP and port of Karmada")
     karmada_token: str = Field(description="The Karmada token")

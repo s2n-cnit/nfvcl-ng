@@ -81,9 +81,9 @@ class NetworkModel(BaseModel):
     ids: List[dict] = Field(default=[])
     cidr: IPv4Network
     gateway_ip: Optional[IPv4Address] = Field(default=None)
-    allocation_pool: List[IPv4Pool] = []
-    reserved_ranges: List[IPv4ReservedRange] = []
-    dns_nameservers: List[IPv4Address] = []
+    allocation_pool: List[IPv4Pool] = Field(default=[], description='The list of ranges that are used by the VIM to assign IP addresses to VMs (Reserved to VIM)')
+    reserved_ranges: List[IPv4ReservedRange] = Field(default=[], description='The list of ranges that have been reserved by deployed blueprints')
+    dns_nameservers: List[IPv4Address] = Field(default=[], description='List of DNS IPs avaiable in this network')
 
 
     @classmethod

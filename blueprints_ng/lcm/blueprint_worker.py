@@ -1,6 +1,6 @@
-import multiprocessing
+import queue
+import threading
 from functools import partial
-from multiprocessing import Process
 from threading import Thread
 from typing import Any
 
@@ -9,23 +9,23 @@ from blueprints_ng.lcm.blueprint_route_manager import get_function_to_be_called
 from models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage
 from utils.log import create_logger
 
-multiprocessing_manager = multiprocessing.Manager()
+# multiprocessing_manager = multiprocessing.Manager()
 
 
 def callback_function(event, namespace, msg):
-    namespace.msg = msg
+    namespace["msg"] = msg
     event.set()
 
 
 class BlueprintWorker:
     blueprint: BlueprintNG
-    message_queue: multiprocessing.Queue
+    message_queue: queue.Queue
     thread: Thread = None
 
     def __init__(self, blueprint: BlueprintNG):
         self.blueprint = blueprint
         self.logger = create_logger('BLUEV2_WORKER', blueprintid=blueprint.id)
-        self.message_queue = multiprocessing.Queue()
+        self.message_queue = queue.Queue()
 
     def start_listening(self):
         self.thread = Thread(target=self._listen, args=())
@@ -46,25 +46,25 @@ class BlueprintWorker:
         Returns: return value of the function
         """
         # used to wait for the call to be completed
-        event = multiprocessing_manager.Event()
+        event = threading.Event()
         # used to receive the return data from the function
-        namespace = multiprocessing_manager.Namespace()
+        namespace = {}
 
         self.put_message(WorkerMessageType.DAY2_BY_NAME, function_name, (args, kwargs), callback=partial(callback_function, event, namespace))
         event.wait()
 
-        return namespace.msg
+        return namespace["msg"]
 
     def put_message_sync(self, msg_type: WorkerMessageType, path: str, message: Any):
         # used to wait for the call to be completed
-        event = multiprocessing_manager.Event()
+        event = threading.Event()
         # used to receive the return data from the function
-        namespace = multiprocessing_manager.Namespace()
+        namespace = {}
 
         self.put_message(msg_type, path, message, callback=partial(callback_function, event, namespace))
         event.wait()
 
-        return namespace.msg
+        return namespace["msg"]
 
     def put_message(self, msg_type: WorkerMessageType, path: str, message: Any, callback: callable = None):
         """

@@ -4,7 +4,7 @@ from typing import List, Optional
 from pydantic import Field, field_validator, field_serializer
 
 from models.base_model import NFVCLBaseModel
-from models.network import PduInterface, NetworkModel
+from models.network import PduInterface
 from utils.log import create_logger
 
 logger: Logger = create_logger('Vim model')
@@ -42,7 +42,6 @@ class VimModel(NFVCLBaseModel):
     osm_onboard: Optional[bool] = Field(default=False)
     config: VimConfigModel = Field(default=VimConfigModel())
     networks: List[str] = []
-    vim_networks: Optional[List[NetworkModel]] = Field(default=[], description="List of VIM networks")
     routers: List[str] = []
     areas: List[int] = []
 
@@ -57,7 +56,7 @@ class VimModel(NFVCLBaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, name: str) -> str:
+    def validate_lb_pools(cls, name: str) -> str:
         # Removing uppercase
         new_name = name.lower()
         # Replacing - with _
@@ -65,7 +64,7 @@ class VimModel(NFVCLBaseModel):
 
         return new_name
 
-    def add_net_old(self, net: str):
+    def add_net(self, net: str):
         """
         Add a network to the VIM
         Args:
@@ -78,7 +77,7 @@ class VimModel(NFVCLBaseModel):
         else:
             self.networks.append(net)
 
-    def del_net_old(self, net_name: str) -> str:
+    def del_net(self, net_name: str) -> str:
         """
         Remove a network from the VIM
         Args:
@@ -94,74 +93,15 @@ class VimModel(NFVCLBaseModel):
             idx = self.networks.index(net_name)
             return self.networks.pop(idx)
 
-    def get_net_old(self, net_name: str) -> str:
+    def get_net(self, net_name: str) -> str:
         if net_name not in self.networks:
             msg_err = "Network ->{}<- is NOT in the VIM ->{}<-.".format(net_name, self.name)
             logger.error(msg_err)
         else:
             return net_name
 
-    def get_nets_old(self) -> List[str]:
+    def get_nets(self) -> List[str]:
         return self.networks
-
-    def add_net(self, net: NetworkModel):
-        """
-        Add a network to the VIM
-        Args:
-            net: the network to be added (the name must be the same on OSM)
-        Raises: ValueError if already present or empty name
-        """
-        if net in self.vim_networks:
-            msg_err = "Network ->{}<- is already present in the VIM ->{}<-".format(net, self.name)
-            logger.warning(msg_err)
-        else:
-            self.vim_networks.append(net)
-
-    def del_net(self, net_name: str) -> NetworkModel | None:
-        """
-        Remove a network from the VIM
-        Args:
-            net_name: The network to be removed
-        Returns: The name of the net that has been removed
-        Raises: ValueError if no network with that name is present
-
-        """
-        network_to_del = [network for network in self.vim_networks if network.name==net_name]
-
-        if len(network_to_del) <= 0:
-            msg_err = "Network ->{}<- is NOT in the VIM ->{}<-. Cannot remove.".format(net_name, self.name)
-            logger.error(msg_err)
-            return None
-        else:
-            if len(network_to_del) > 1:
-                msg_err = "More than one Network ->{}<- was found in the VIM ->{}<-. Removing the first one".format(net_name, self.name)
-                logger.warning(msg_err)
-            return self.vim_networks.remove(network_to_del[0]) # Removing the first one (or the only one)
-
-    def get_net(self, net_name: str) -> NetworkModel | None:
-        """
-        Return the first instance of the network with this name
-        Args:
-            net_name: The name of the network to be retrieved
-        """
-        network_to_get = [network for network in self.vim_networks if network.name == net_name]
-        if len(network_to_get) <= 0:
-            msg_err = "Network ->{}<- is NOT in the VIM ->{}<-. Cannot retrieve".format(net_name, self.name)
-            logger.error(msg_err)
-            return None
-        else:
-            if len(network_to_get) > 1:
-                msg_err = "More than one Network ->{}<- was found in the VIM ->{}<-. Returning the first one".format(net_name, self.name)
-                logger.warning(msg_err)
-            return network_to_get[0] # Retrieving the first one (or the only one)
-
-    def get_nets(self) -> List[NetworkModel]:
-        """
-        Return a list of all networks in the VIM
-        Returns:
-            The list of all the networks in VIM
-        """
-        return self.vim_networks
 
     def add_router(self, router: str):
         """

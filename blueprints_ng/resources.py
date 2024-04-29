@@ -126,7 +126,7 @@ class VmResource(ResourceDeployable):
     management_network: str = Field()
     additional_networks: List[str] = Field(default=[])
     require_floating_ip: bool = Field(default=False)
-    require_port_security: Optional[bool] = Field(default=False) # TODO remove optional
+    require_port_security_disabled: Optional[bool] = Field(default=False) # TODO remove optional
 
     # Potrebbe mettersi la data di creazione
     created: bool = Field(default=False)

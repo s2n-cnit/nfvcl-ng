@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional, Dict
 
+from models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, GNBN3Info
 from models.http_models import HttpRequestType
 
 from blueprints_ng.lcm.blueprint_route_manager import add_route
@@ -11,7 +12,6 @@ from starlette.requests import Request
 from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
-from blueprints_ng.modules.ueransim.ueransim_models import UeransimBlueprintRequestInstance, UeransimBlueprintRequestConfigureGNB, UeransimBlueprintRequestAddUE, UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, UeransimBlueprintRequestAddDelGNB
 from blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
 from blueprints_ng.utils import rel_path
@@ -59,6 +59,8 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.add_shell_task("systemctl daemon-reload")
         ansible_builder.add_service_task("config-network", ServiceState.STARTED, True)
 
+        ansible_builder.add_service_task("ueransim-gnb", ServiceState.RESTARTED, True)
+
         return ansible_builder.build()
 
 
@@ -100,8 +102,9 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
             ansible_builder.add_replace_task(ue_sim_service_path, "/opt/UERANSIM/ue.conf", ue_sim_config_path)
             ansible_builder.add_replace_task(ue_sim_service_path, "UERANSIM UE", f"UERANSIM UE SIM {sim.imsi}")
 
-        # Reload services
-        ansible_builder.add_shell_task("systemctl daemon-reload")
+            ansible_builder.add_shell_task("systemctl daemon-reload")
+            ansible_builder.add_service_task(f"ueransim-ue-sim-{sim.imsi}", ServiceState.RESTARTED, True)
+
         return ansible_builder.build()
 
 
@@ -311,8 +314,8 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     def del_sim(self, model: UeransimBlueprintRequestDelSim):
         self._del_sim(model.area_id, model.ue_id, model.imsi)
 
-    def get_n3_info(self, area_id: int) -> dict:
-        return {
-            "gnb_n3_ip": self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.ip,
-            "gnb_n3_mac": self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.mac
-        }
+    def get_n3_info(self, area_id: int) -> GNBN3Info:
+        return GNBN3Info(
+            ip=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.ip,
+            mac=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.mac
+        )

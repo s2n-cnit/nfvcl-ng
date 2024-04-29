@@ -22,6 +22,8 @@ class SubDataNets(BaseModel):
 class NetworkEndPoints(BaseModel):
     mgt: Optional[str] = Field(default=None)
     wan: Optional[str] = Field(default=None)
+    n3: Optional[str] = Field(default=None)
+    n6: Optional[str] = Field(default=None)
     data_nets: List[SubDataNets]
 
 
@@ -104,6 +106,8 @@ class SubArea(BaseModel):
     idLength: int
     core: bool = Field(default=True)
     slices: Optional[List[SubSlices]] = Field(default=[],description="set slices ")
+
+    # TODO to remove
     upf_bp_id: Optional[str] = Field(default=None)
     gnb_bp_id: Optional[str] = Field(default=None)
 # ===============================================end of sub area ======================================================

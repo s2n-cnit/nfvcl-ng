@@ -86,7 +86,8 @@
     },
 
     // Number of worker threads. Default: 1
-    "workers": 2,
+    // DPDK does not work with workers > 1 when using virtio interfaces (unless multi queue are enabled)
+    "workers": 1,
 
     // Parameters for handling outgoing requests
     "max_req_retries": 5,

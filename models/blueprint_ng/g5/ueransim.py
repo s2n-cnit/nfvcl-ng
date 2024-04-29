@@ -8,6 +8,9 @@ from blueprints_ng.blueprint_ng import BlueprintNGCreateModel
 from models.base_model import NFVCLBaseModel
 from models.ueransim.blueprint_ueransim_model import UeransimArea, UeransimConfig, UeransimUe, UeransimSim
 
+class GNBN3Info(NFVCLBaseModel):
+    ip: str = Field()
+    mac: str = Field()
 
 class UeransimBlueprintRequestInstance(BlueprintNGCreateModel):
     config: UeransimConfig

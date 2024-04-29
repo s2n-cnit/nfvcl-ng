@@ -11,16 +11,18 @@ from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
 from blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from blueprints_ng.utils import rel_path
 from models.base_model import NFVCLBaseModel
+from models.blueprint_ng.g5.ueransim import GNBN3Info
 from models.blueprint_ng.g5.upf import UPFBlueCreateModel
 
 SDCORE_UPF_BLUE_TYPE = "sdcore_upf"
 
 
 class SdCoreUPFCreateModel(UPFBlueCreateModel):
-    dnn: str = Field()
     gnb_n3_ip: str = Field()
     gnb_n3_mac: str = Field()
+    dnn: str = Field()
     ue_ip_pool_cidr: str = Field()
+    start: Optional[bool] = Field(default=True)
 
 
 class SdCoreUPFBlueprintNGState(BlueprintNGState):
@@ -54,6 +56,8 @@ class SDCoreUPFConfiguration(NFVCLBaseModel):
 
     n3_route: str = Field()
     n6_route: str = Field()
+
+    start: bool = Field()
 
     dnn: str = Field()
     ue_ip_pool_cidr: str = Field()
@@ -134,13 +138,14 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
 
         ansible_builder.set_vars_from_fields(self.configuration)
 
-        ansible_builder.add_service_task("sdcore-upf", ServiceState.STARTED, True)
+        if self.configuration.start:
+            ansible_builder.add_service_task("sdcore-upf", ServiceState.RESTARTED, True)
 
         return ansible_builder.build()
 
 
-UPF_IMAGE_NAME = "sd-core-upf-v0.4.0"
-UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v0.4.0.qcow2"
+UPF_IMAGE_NAME = "sd-core-upf-v0.4.0-3"
+UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v0.4.0-3.qcow2"
 
 
 @declare_blue_type(SDCORE_UPF_BLUE_TYPE)
@@ -159,13 +164,14 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
 
         self.state.upf_vm = VmResource(
             area=create_model.area_id,
-            name=f"{self.id}_{create_model.area_id}_SDCORE_UPF",
+            name=f"{self.id}_{create_model.area_id}_SDCORE_UPF_{create_model.dnn}",
             image=self.sdcore_upf_image,
             flavor=self.sdcore_upf_flavor,
             username="ubuntu",
             password="ubuntu",
             management_network=create_model.networks.mgt,
-            additional_networks=[create_model.networks.n4, create_model.networks.n3, create_model.networks.n6]
+            additional_networks=[create_model.networks.n4, create_model.networks.n3, create_model.networks.n6],
+            require_port_security_disabled=True
         )
         self.register_resource(self.state.upf_vm)
         self.provider.create_vm(self.state.upf_vm)
@@ -197,7 +203,8 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
             username="ubuntu",
             password="ubuntu",
             management_network=create_model.networks.mgt,
-            additional_networks=[create_model.networks.n6]
+            additional_networks=[create_model.networks.n6],
+            require_port_security_disabled=True
         )
         self.register_resource(self.state.n6_router_vm)
         self.provider.create_vm(self.state.n6_router_vm)
@@ -225,11 +232,8 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
         self.register_resource(self.state.n6_router_vm_configurator)
         self.provider.configure_vm(self.state.n6_router_vm_configurator)
 
-
-
-
         self.state.upf_vm_configurator = SDCoreUPFConfigurator(vm_resource=self.state.upf_vm, configuration=SDCoreUPFConfiguration(
-            upf_mode="af_packet",
+            upf_mode="dpdk",
             n3_nic_name=self.state.upf_vm.network_interfaces[create_model.networks.n3].fixed.interface_name,
             n6_nic_name=self.state.upf_vm.network_interfaces[create_model.networks.n6].fixed.interface_name,
             n3_net_cidr=self.state.upf_vm.network_interfaces[create_model.networks.n3].fixed.get_ip_prefix(),
@@ -247,10 +251,20 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
             n6_nh_mac=self.state.n6_router_vm.network_interfaces[create_model.networks.n6].fixed.mac,
             n3_route=self.state.upf_vm.network_interfaces[create_model.networks.n3].fixed.cidr,
             n6_route="0.0.0.0/0",
+            start=create_model.start,
             dnn=create_model.dnn,
             ue_ip_pool_cidr=create_model.ue_ip_pool_cidr
         ))
         self.register_resource(self.state.upf_vm_configurator)
+        self.provider.configure_vm(self.state.upf_vm_configurator)
+
+    def get_n4_info(self) -> str:
+        return self.state.upf_vm.network_interfaces[self.create_config.networks.n4].fixed.ip
+
+    def set_gnb_info(self, gnb_info: GNBN3Info):
+        self.state.upf_vm_configurator.configuration.n3_nh_mac = gnb_info.mac
+        self.state.upf_vm_configurator.configuration.n3_nh_ip = gnb_info.ip
+        self.state.upf_vm_configurator.configuration.start = True
         self.provider.configure_vm(self.state.upf_vm_configurator)
 
     @classmethod

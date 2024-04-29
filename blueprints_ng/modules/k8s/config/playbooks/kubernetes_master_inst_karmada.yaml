@@ -21,7 +21,7 @@
      command: bash /tmp/submariner.sh
    - name: Installing Karmada
      command: bash /tmp/karmada.sh
-   - name: Create submariner broker info
+   - name: Create submariner broker info file
      ansible.builtin.copy:
        content: "{{ submariner_broker }}"
        dest: "/tmp/sub_broker.subm"

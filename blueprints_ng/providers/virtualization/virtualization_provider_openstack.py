@@ -160,7 +160,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         if len(server_ports) != len(networks):
             raise VirtualizationProviderOpenstackException(f"Mismatch in number of request network interface and ports, query: device_id={server_obj.id}")
 
-        if getattr(vm_resource, 'require_port_security', None): # TODO remove in future. For now to maintain back compatibility
+        if getattr(vm_resource, 'require_port_security_disabled', None): # TODO remove in future. For now to maintain back compatibility
             if vm_resource.require_port_security_disabled:
                 for port in server_ports:
                     self.__disable_port_security(self.conn, port.id)

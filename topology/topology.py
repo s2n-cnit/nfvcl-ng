@@ -818,13 +818,13 @@ class Topology:
             pdu_input.details = ""
             self._model.add_pdu(pdu_input)
 
-            # Create vim accounts list to be uploaded into OSM
-            vim_accounts = []
-            for vim in get_osm_nbi_utils().get_vims():
-                vim_accounts.append(vim['_id'])
-
             # Upload the PDU into OSM
             if nfvo_onboard:
+                # Create vim accounts list to be uploaded into OSM
+                vim_accounts = []
+                for vim in get_osm_nbi_utils().get_vims():
+                    vim_accounts.append(vim['_id'])
+
                 get_osm_nbi_utils().add_pdu(OSMPduModel.build_from_topology_pdu(pdu_input, vim_accounts_ids=vim_accounts).model_dump(by_alias=True))
                 pdu_input.nfvo_onboarded = True
 

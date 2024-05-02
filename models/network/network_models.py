@@ -248,7 +248,7 @@ class PduModel(BaseModel):
     implementation: str
     config: dict
     details: str = Field(default="")
-    interface: List[PduInterface] = Field(min_items=1)
+    interface: List[PduInterface] = Field()
 
     def __eq__(self, other):
         """

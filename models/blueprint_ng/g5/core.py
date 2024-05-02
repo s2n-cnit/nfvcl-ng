@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 from pydantic import Field
 
 from blueprints.blue_5g_base.models.blue_5g_model import SubSubscribers, SubSliceProfiles, SubArea
@@ -17,7 +19,7 @@ class Core5GDelSubscriberModel(NFVCLBaseModel):
 
 
 class Core5GAddSliceModel(SubSliceProfiles):
-    area_id: int = Field()
+    area_ids: Optional[List[str]] = Field(default=None)
 
 
 class Core5GDelSliceModel(NFVCLBaseModel):

@@ -16,7 +16,9 @@ from blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavo
     NetResource
 from blueprints_ng.utils import rel_path
 from models.base_model import NFVCLBaseModel
+from models.network import PduModel
 from models.ueransim.blueprint_ueransim_model import UeransimSim, UeransimUe
+from topology.topology import build_topology
 
 UERANSIM_BLUE_TYPE = "ueransim"
 
@@ -128,6 +130,28 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             for ue in area.ues:
                 self._create_ue(str(area.id), ue)
 
+    def destroy(self):
+        for area in self.state.areas.keys():
+            self.del_gnb_from_topology(int(area))
+        super().destroy()
+
+
+    def add_gnb_to_topology(self, area_id: int):
+        name = f"UERNASIM_GNB_{self.id}_{area_id}"
+        build_topology().add_pdu(PduModel(
+            name=name,
+            area=area_id,
+            type="UERANSIM",
+            user="",
+            passwd="",
+            implementation="blueprints_ng.pdu_configurators.ueransim_pdu_configurator.UERANSIMPDUConfigurator",
+            config={"blue_id": self.id},
+            interface=[]
+        ))
+
+    def del_gnb_from_topology(self, area_id: int):
+        build_topology().del_pdu(f"UERNASIM_GNB_{self.id}_{area_id}")
+
     def _create_gnb(self, area_id: str):
         if area_id not in self.state.areas:
             radio_network_name = f"radio_{self.id}_{area_id}"
@@ -143,12 +167,14 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
                 username="ubuntu",
                 password="ubuntu",
                 management_network=self.create_config.config.network_endpoints.mgt,
-                additional_networks=[self.create_config.config.network_endpoints.n2, self.create_config.config.network_endpoints.n3, radio_network_name]
+                additional_networks=[self.create_config.config.network_endpoints.n2, self.create_config.config.network_endpoints.n3, radio_network_name],
+                require_port_security_disabled=True
             )
 
             self.register_resource(vm_gnb)
             self.provider.create_vm(vm_gnb)
             self.state.areas[area_id] = BlueUeransimArea(vm_gnb=vm_gnb, ues=[], radio_net=network)
+            self.add_gnb_to_topology(int(area_id))
         else:
             raise BlueprintNGException(f"GnB already exists in area {area_id}")
 
@@ -199,6 +225,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             if self.state.areas[area_id].vm_gnb_configurator:
                 self.deregister_resource(self.state.areas[area_id].vm_gnb_configurator)
             del self.state.areas[area_id]
+            self.del_gnb_from_topology(int(area_id))
         else:
             raise BlueprintNGException(f"No Gnb found in area {area_id}")
 

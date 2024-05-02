@@ -140,18 +140,22 @@ class BlueprintManager(metaclass=Singleton):
                 worker.put_message(WorkerMessageType.DAY0, f'{path}', msg)
             return blue_id
 
-    def delete_blueprint(self, blueprint_id: str) -> str:
+    def delete_blueprint(self, blueprint_id: str, wait: bool = False) -> str:
         """
         Deletes the blueprint from the NFVCL (DB+worker)
 
         Args:
             blueprint_id: The ID of the blueprint to be deleted.
+            wait: Wait for deletion to be complete
 
         Raises:
             BlueprintNotFoundException if blue does nor exist.
         """
         worker = self.get_worker(blueprint_id)
-        worker.destroy_blueprint()
+        if wait:
+            worker.destroy_blueprint_sync()
+        else:
+            worker.destroy_blueprint()
         self.worker_collection.pop(blueprint_id)
         return blueprint_id
 

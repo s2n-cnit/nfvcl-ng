@@ -80,6 +80,12 @@ class BlueprintWorker:
         worker_message = WorkerMessage(message_type=msg_type, message=message, path=path, callback=callback)
         self.message_queue.put(worker_message)  # Thread safe
 
+    def destroy_blueprint_sync(self):
+        """
+        Sent a termination message to the worker. This function should be called by an external process to the worker.
+        """
+        self.put_message_sync(WorkerMessageType.STOP, message="", path="")
+
     def destroy_blueprint(self):
         """
         Sent a termination message to the worker. This function should be called by an external process to the worker.

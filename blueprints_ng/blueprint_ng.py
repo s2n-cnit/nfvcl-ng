@@ -256,6 +256,20 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         else:
             raise BlueprintNGException(f"The resource to be deleted is not present in registered resources")
 
+    def get_registered_resources(self, type_filter: str = None):
+        """
+        Return the list of registered resources for this blueprint instance. The list can be filtered using the 'type_filter'
+        Args:
+            type_filter: used to filter the resources to be returned (e.g. 'blueprints_ng.resources.VmResource'). Default 'None' for no filtering.
+
+        Returns:
+            The filtered list.
+        """
+        if type_filter is None:
+            return self.base_model.registered_resources.values()
+        else:
+            return [resource for resource in self.base_model.registered_resources.values() if resource.type == type_filter]
+
     def create(self, model: CreateConfigTypeVar):
         self.base_model.create_config = model
         self.base_model.create_config_type = get_class_path_str_from_obj(model)

@@ -180,7 +180,7 @@ async def create_network(network: NetworkModel, terraform: bool = False):
     Args:
         network: The network to be inserted in the topology
 
-        terraform: If the network is terraformed on OpenStack. (Created on demand)
+        terraform: If the network is created on the VIM. This can raise problems if the network/CIDR already exists.
 
     Returns:
         OssCompliantResponse that confirm the operation has been submitted

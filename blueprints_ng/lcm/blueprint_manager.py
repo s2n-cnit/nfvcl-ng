@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from blueprints_ng.blueprint_ng import BlueprintNG
 from blueprints_ng.lcm.blueprint_type_manager import get_blueprint_class, get_registered_modules
 from blueprints_ng.lcm.blueprint_worker import BlueprintWorker
+from blueprints_ng.resources import VmResource
 from models.blueprint_ng.worker_message import WorkerMessageType
 from models.http_models import BlueprintNotFoundException, BlueprintAlreadyExisting
 from utils.database import get_ng_blue_by_id_filter, get_ng_blue_list
@@ -209,6 +210,26 @@ class BlueprintManager(metaclass=Singleton):
             return [blueprint.to_dict(detailed=True) for blueprint in blue_list]
         else:
             return [blueprint.to_dict(detailed=False) for blueprint in blue_list]
+
+    def get_VM_target_by_ip(self, ipv4: str) -> VmResource | None:
+        """
+        Check if there is a VM, belonging to any Blueprint, that have the required IP as interface
+        This method was required to execute Playbooks into VMs required by project Horse.
+        Args:
+            ipv4: The IPv4 to be used for searching the VM
+
+        Returns:
+            The
+        """
+        blue_list: List[BlueprintNG] = self._load_all_blue_from_db()
+        for blue in blue_list:
+            registered_vms = blue.get_registered_resources(type_filter="blueprints_ng.resources.VmResource") # Getting only VMs
+            for registered_resource in registered_vms:
+                vm: VmResource
+                vm = registered_resource.value
+                if ipv4 == vm.access_ip:
+                    return vm
+        return None
 
     def _load_modules(self):
         """

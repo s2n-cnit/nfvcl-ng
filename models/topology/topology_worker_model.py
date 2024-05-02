@@ -28,3 +28,11 @@ class TopologyWorkerMessage(BaseModel):
     data: dict
     optional_data: Optional[dict] = Field(default=None)
     callback: Optional[str] = Field(default=None)
+
+    @classmethod
+    def build_worker_message(cls, ops_type: TopologyWorkerOperation, data: dict, optional_data: dict = None,
+                             callback_url: str = None):
+        """
+        Allow to call constructor without passing every argument.
+        """
+        return TopologyWorkerMessage(ops_type=ops_type, data=data, optional_data=optional_data, callback=callback_url)

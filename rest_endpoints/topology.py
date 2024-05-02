@@ -24,32 +24,6 @@ topology_router = APIRouter(
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
 
-
-def build_worker_message(ops_type: TopologyWorkerOperation, data: dict, optional_data: dict = None,
-                         callback_url: str = None) -> TopologyWorkerMessage:
-    """
-    Allow to call constructor without passing every argument.
-    """
-    return TopologyWorkerMessage(ops_type=ops_type, data=data, optional_data=optional_data, callback=callback_url)
-
-
-def get_topology_item(resource_type, resource_id):
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
-    if resource_type in topology.get():
-        try:
-            obj = next(item for item in topology.get()[resource_type] if item['name'] == resource_id)
-            return obj
-        except StopIteration:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                detail="[{}] {} not found".format(resource_type, resource_id))
-
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Topology not initialized")
-
-
-class TopologyModelPost(TopologyModel):
-    callback: AnyHttpUrl = None
-
-
 @topology_router.get("/", response_model=TopologyModel)
 async def get_topology() -> dict:
     """
@@ -75,7 +49,7 @@ async def create_topology(topo: TopologyModel, terraform: bool = False):
 
     """
     opt_data = {"terraform": terraform}
-    worker_msg = build_worker_message(TopologyWorkerOperation.ADD_TOPOLOGY, topo.model_dump(), opt_data)
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.ADD_TOPOLOGY, topo.model_dump(), opt_data)
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -93,7 +67,7 @@ async def delete_topology(terraform: bool = False):
         OssCompliantResponse that confirm the operation has been submitted
     """
     opt_data = {"terraform": terraform}
-    worker_msg = build_worker_message(TopologyWorkerOperation.DEL_TOPOLOGY, {}, opt_data)
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.DEL_TOPOLOGY, {}, opt_data)
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -122,7 +96,7 @@ async def create_vim(vim: VimModel, terraform: bool = False):
         OssCompliantResponse that confirm the operation has been submitted
     """
     opt_data = {"terraform": terraform}
-    worker_msg = build_worker_message(TopologyWorkerOperation.ADD_VIM, vim.model_dump(), opt_data)
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.ADD_VIM, vim.model_dump(), opt_data)
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -141,7 +115,7 @@ async def update_vim(updated_vim: UpdateVimModel, terraform: bool = False):
         OssCompliantResponse that confirm the operation has been submitted
     """
     opt_data = {"terraform": terraform}
-    worker_msg = build_worker_message(TopologyWorkerOperation.UPDATE_VIM, updated_vim.model_dump(), opt_data)
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.UPDATE_VIM, updated_vim.model_dump(), opt_data)
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -176,7 +150,7 @@ async def delete_vim(vim_name: str, terraform: bool = False):
         OssCompliantResponse that confirm the operation has been submitted
     """
     opt_data = {"terraform": terraform}
-    worker_msg = build_worker_message(TopologyWorkerOperation.DEL_VIM, {"vim_name": vim_name}, opt_data)
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.DEL_VIM, {"vim_name": vim_name}, opt_data)
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -212,7 +186,7 @@ async def create_network(network: NetworkModel, terraform: bool = False):
         OssCompliantResponse that confirm the operation has been submitted
     """
     opt_data = {"terraform": terraform}
-    worker_msg = build_worker_message(TopologyWorkerOperation.ADD_NET, network.model_dump(), opt_data)
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.ADD_NET, network.model_dump(), opt_data)
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -232,7 +206,7 @@ async def delete_network(network_id: str, terraform: bool = False):
         OssCompliantResponse that confirm the operation has been submitted
     """
     opt_data = {"terraform": terraform}
-    worker_msg = build_worker_message(TopologyWorkerOperation.DEL_NET, {"network_id": network_id}, opt_data)
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.DEL_NET, {"network_id": network_id}, opt_data)
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -265,7 +239,7 @@ async def create_router(router: RouterModel):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    worker_msg = build_worker_message(TopologyWorkerOperation.ADD_ROUTER, router.model_dump())
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.ADD_ROUTER, router.model_dump())
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -283,7 +257,7 @@ async def delete_router(router_id: str):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    worker_msg = build_worker_message(TopologyWorkerOperation.DEL_ROUTER, {"router_id": router_id})
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.DEL_ROUTER, {"router_id": router_id})
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -329,7 +303,7 @@ async def create_pdu(pdu: PduModel):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    worker_msg = build_worker_message(TopologyWorkerOperation.ADD_PDU, pdu.model_dump())
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.ADD_PDU, pdu.model_dump())
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -346,7 +320,7 @@ async def delete_pdu(pdu_id: str):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    worker_msg = build_worker_message(TopologyWorkerOperation.DEL_PDU, {"pdu_id": pdu_id})
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.DEL_PDU, {"pdu_id": pdu_id})
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -386,7 +360,7 @@ async def add_k8s_from_blueprint(cluster_info: K8sModelCreateFromBlueprint):
     k8s_topo_model.nfvo_onboard = cluster_info.nfvo_onboard
     k8s_topo_model.name = cluster_info.name
 
-    worker_msg = build_worker_message(TopologyWorkerOperation.ADD_K8S, k8s_topo_model.model_dump())
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.ADD_K8S, k8s_topo_model.model_dump())
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -404,7 +378,7 @@ async def add_external_k8scluster(cluster: K8sModel):
         OssCompliantResponse that confirm the operation has been submitted
     """
     cluster.provided_by = 'external'
-    worker_msg = build_worker_message(TopologyWorkerOperation.ADD_K8S, cluster.model_dump())
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.ADD_K8S, cluster.model_dump())
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -427,7 +401,7 @@ async def update_k8scluster(cluster: K8sModel):
     except ValueError:
         return OssCompliantResponse(status=OssStatus.failed, detail="K8s cluster to update has not been found.")
 
-    worker_msg = build_worker_message(TopologyWorkerOperation.UPDATE_K8S, cluster.model_dump())
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.UPDATE_K8S, cluster.model_dump())
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -443,7 +417,7 @@ async def delete_k8scluster(cluster_name: str):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    worker_msg = build_worker_message(TopologyWorkerOperation.DEL_K8S, {"cluster_name": cluster_name})
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.DEL_K8S, {"cluster_name": cluster_name})
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -473,7 +447,7 @@ async def add_prom(prom_srv: PrometheusServerModel):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    worker_msg = build_worker_message(TopologyWorkerOperation.ADD_PROM, prom_srv.model_dump())
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.ADD_PROM, prom_srv.model_dump())
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -496,7 +470,7 @@ async def upd_prom(prom_srv: PrometheusServerModel):
     except ValueError:
         return OssCompliantResponse(status=OssStatus.failed, detail="K8s cluster to update has not been found.")
 
-    worker_msg = build_worker_message(TopologyWorkerOperation.UPD_PROM, prom_srv.model_dump())
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.UPD_PROM, prom_srv.model_dump())
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 
@@ -513,7 +487,7 @@ async def del_prom(prom_srv_id: str):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    worker_msg = build_worker_message(TopologyWorkerOperation.DEL_PROM, {"prom_srv_id": prom_srv_id})
+    worker_msg = TopologyWorkerMessage.build_worker_message(TopologyWorkerOperation.DEL_PROM, {"prom_srv_id": prom_srv_id})
     topology_msg_queue.put(worker_msg.model_dump())
     return OssCompliantResponse(detail="Operation submitted")
 

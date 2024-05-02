@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
 
 from fastapi import APIRouter, Request
-from pydantic import SerializeAsAny, Field, ConfigDict
+from pydantic import SerializeAsAny, Field, ConfigDict, ValidationError
 
 from blueprints_ng.lcm.blueprint_route_manager import get_module_routes
 from blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
@@ -95,6 +95,7 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
     k8s_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
 
     created: Optional[datetime] = Field(default=None)
+    corrupted: bool = Field(default=False)
     status: BlueprintNGStatus = Field(default=BlueprintNGStatus())
 
     node_exporters: List[PrometheusTargetModel] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
@@ -387,7 +388,12 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         instance.__override_variables_in_dict_ref(deserialized_dict["state"], deserialized_dict["state"], instance.base_model.registered_resources)
 
         # Deserialized remaining fields in the state and override the field in base_model
-        instance.base_model.state = instance.state_type.model_validate(deserialized_dict["state"])
+        try:
+            instance.base_model.state = instance.state_type.model_validate(deserialized_dict["state"])
+        except ValidationError as e:
+            instance.logger.error(f"Unable to load state: {str(e)}")
+            instance.base_model.corrupted = True
+            instance.logger.error(f"Blueprint set as corrupted")
 
         # Loading the providers data
         # get_virt_provider is used to create a new instance of the provider for the area
@@ -412,7 +418,10 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         if detailed:
             return self.__serialize_content()
         else:
-            return {"id": self.base_model.id, "type": self.base_model.type, "status": self.base_model.status, "created": self.base_model.created}
+            dict_to_ret = {"id": self.base_model.id, "type": self.base_model.type, "status": self.base_model.status, "created": self.base_model.created}
+            if self.base_model.corrupted:
+                dict_to_ret["corrupted"] = "True"
+            return dict_to_ret
 
     @classmethod
     @abc.abstractmethod

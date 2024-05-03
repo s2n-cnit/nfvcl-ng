@@ -7,11 +7,11 @@ In this page there is described how to deploy and use OpenAirInterface blueprint
 > ⚠️ **Check the requirements carefully**
 
 - Having a K8s cluster that is **onboarded** on the NFVO (OSM).
-  Check [Onboarding external K8S Cluster](../../topology/topology_nfvcl_k8s_onboarding.md) for more info on adding an
-  external cluster or [Kubernetes Blueprint](../k8s/k8s_blue_creation.md) to deploy a new cluster automatically
+  Check [Onboarding external K8S Cluster](../../../topology/topology_nfvcl_k8s_onboarding.md) for more info on adding an
+  external cluster or [Kubernetes Blueprint](../../k8s/k8s_blue_creation.md) to deploy a new cluster automatically
   onboarded by NFVCL.
 - Having a gNB running, it can be deployed through UERANSIM blueprint.
-  See [UERANSIM Blueprint](../ueransim/ueransim_blue_creation.md) for more information.
+  See [UERANSIM Blueprint](../../ueransim/ueransim_blue_creation.md) for more information.
 
 - Use kubectl to ensure that Metallb (or other load balancer) **have sufficient IPs** in the address pool to support
   OpenAirInterface chart deployment (one IP for each pod deployed from the blueprint).

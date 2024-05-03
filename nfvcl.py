@@ -26,6 +26,7 @@ from rest_endpoints.helm import helm_router
 from fastapi.staticfiles import StaticFiles
 from rest_endpoints.osm_rest import osm_router
 from rest_endpoints.openstack import openstack_router
+from rest_endpoints.horse import horse_router
 
 swagger_parameters={"syntaxHighlight.theme": "obsidian", "deepLinking": True}
 app = FastAPI(
@@ -53,6 +54,7 @@ app.include_router(helm_router)
 app.include_router(osm_router)
 app.include_router(openstack_router)
 app.include_router(ansible_router)
+app.include_router(horse_router)
 
 day2_files = "day2_files"
 

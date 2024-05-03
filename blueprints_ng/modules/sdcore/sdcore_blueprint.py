@@ -351,7 +351,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
     def add_area_endpoint(cls, msg: Core5GAddTacModel, blue_id: str, request: Request):
         return cls.api_day2_function(msg, blue_id, request)
 
-    @add_route(SDCORE_BLUE_TYPE, "/add_area", [HttpRequestType.PUT], add_area_endpoint)
+    @add_route(SDCORE_BLUE_TYPE, "/add_tac", [HttpRequestType.PUT], add_area_endpoint)
     def add_area(self, add_area_model: Core5GAddTacModel):
         self.logger.info(f"Adding Area with ID: {add_area_model.id}")
 
@@ -370,14 +370,14 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
     def del_area_endpoint(cls, msg: Core5GDelTacModel, blue_id: str, request: Request):
         return cls.api_day2_function(msg, blue_id, request)
 
-    @add_route(SDCORE_BLUE_TYPE, "/del_slice", [HttpRequestType.PUT], del_slice_endpoint)
+    @add_route(SDCORE_BLUE_TYPE, "/del_tac", [HttpRequestType.PUT], del_slice_endpoint)
     def del_slice(self, del_area_model: Core5GDelTacModel):
-        self.logger.info(f"Deleting Area with ID: {del_area_model.id}")
+        self.logger.info(f"Deleting Area with ID: {del_area_model.areaId}")
 
-        if not self.state.current_config.get_area(del_area_model.id):
-            raise BlueprintNGException(f"Area {del_area_model.id} not found")
+        if not self.state.current_config.get_area(del_area_model.areaId):
+            raise BlueprintNGException(f"Area {del_area_model.areaId} not found")
 
-        self.state.current_config.areas = list(filter(lambda x: x.id != del_area_model.id, self.state.current_config.areas))
+        self.state.current_config.areas = list(filter(lambda x: x.id != del_area_model.areaId, self.state.current_config.areas))
 
         self.update_upf_deployments()
         self.update_gnb_config()

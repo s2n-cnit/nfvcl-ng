@@ -29,5 +29,5 @@ class Core5GDelSliceModel(NFVCLBaseModel):
 class Core5GAddTacModel(SubArea):
     pass
 
-class Core5GDelTacModel(SubArea):
-    pass
+class Core5GDelTacModel(NFVCLBaseModel):
+    areaId: int = Field()

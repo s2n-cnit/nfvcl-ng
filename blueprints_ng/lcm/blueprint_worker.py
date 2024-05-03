@@ -138,6 +138,8 @@ class BlueprintWorker:
                     self.logger.info(f"Destroying blueprint")
                     self.blueprint.base_model.status = BlueprintNGStatus.destroying(blue_id=self.blueprint.id)
                     self.blueprint.destroy()
+                    if received_message.callback:
+                        received_message.callback(self.blueprint.id)
                     self.logger.success(f"Blueprint destroyed")
                     break
                 case _:

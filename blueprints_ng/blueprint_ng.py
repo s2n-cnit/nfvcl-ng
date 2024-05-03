@@ -79,6 +79,9 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
     id: str = Field()
     type: str = Field()
 
+    parent_blue_id: Optional[str] = Field(default=None)
+    children_blue_ids: List[str] = Field(default_factory=list)
+
     # Store every resource that a blueprint manage
     registered_resources: Dict[str, RegisteredResource] = Field(default={})
 
@@ -270,11 +273,40 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         else:
             return [resource for resource in self.base_model.registered_resources.values() if resource.type == type_filter]
 
+    def register_children(self, blue_id: str):
+        """
+        Register a blueprint id as a children of this blueprint
+        Args:
+            blue_id: Blueprint id to be registered as a children
+        """
+        if blue_id not in self.base_model.children_blue_ids:
+            self.base_model.children_blue_ids.append(blue_id)
+        else:
+            raise BlueprintNGException(f"Children blueprint {blue_id} already present")
+
+    def deregister_children(self, blue_id: str):
+        """
+        Deregister a blueprint id from being a children of this blueprint
+        Args:
+            blue_id: Blueprint id to be deregistred
+        """
+        if blue_id in self.base_model.children_blue_ids:
+            self.base_model.children_blue_ids.remove(blue_id)
+        else:
+            raise BlueprintNGException(f"Children blueprint {blue_id} not found")
+
+
     def create(self, model: CreateConfigTypeVar):
         self.base_model.create_config = model
         self.base_model.create_config_type = get_class_path_str_from_obj(model)
 
     def destroy(self):
+        from rest_endpoints.blue_ng_router import get_blueprint_manager
+
+        for children_id in self.base_model.children_blue_ids.copy():
+            get_blueprint_manager().delete_blueprint(children_id, wait=True)
+            self.deregister_children(children_id)
+
         for key, value in self.base_model.registered_resources.items():
             if isinstance(value.value, VmResource):
                 self.provider.destroy_vm(value.value)

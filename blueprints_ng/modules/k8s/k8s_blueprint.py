@@ -244,7 +244,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         for configurator in self.state.day_0_workers_configurators_tobe_exec:
             configurator.configure_worker(self.state.master_key_add_worker, self.state.master_credentials, DUMMY_NET_VM_START_IP)
             worker_result = self.provider.configure_vm(configurator)
-            self.state.day_0_workers_configurators_tobe_exec.remove(configurator)
+
+        self.state.day_0_workers_configurators_tobe_exec = []
 
         # If required, onboarding the cluster in the topology
         if topology_onboard:

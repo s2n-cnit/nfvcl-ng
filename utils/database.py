@@ -14,6 +14,7 @@ nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 NFVCL_DB_BACKUP_PATH: Path = Path("db_backup.json")
 BLUE_COLLECTION_V2 = "blue-inst-v2"
 TOPOLOGY_COLLECTION = "topology"
+EXTRA_COLLECTION = "extra"
 
 class NFVCLDatabase(object, metaclass=Singleton):
 
@@ -155,3 +156,39 @@ def delete_topology():
         The destroyed topology.
     """
     return NFVCLDatabase().delete_from_collection(TOPOLOGY_COLLECTION, {'id': 'topology'})
+
+def insert_extra(object_id: str, object_dict: dict):
+    """
+    Insert in the 'extra' collection an object with the given id. Used in cases where extra functionalities require
+    extra data that is not strictly related to NFVCL.
+
+    Args:
+        object_id: The id used to identify the object.
+        object_dict: The dictionary to be inserted into the 'extra' collection.
+
+    Returns:
+
+    """
+    database_instance = NFVCLDatabase()
+    object_dict['id'] = object_id
+    if database_instance.exists_in_collection(EXTRA_COLLECTION, {'id': object_id}):
+        return database_instance.update_in_collection(EXTRA_COLLECTION, object_dict, {'id': object_id})
+    else:
+        return database_instance.insert_in_collection(EXTRA_COLLECTION, object_dict)
+
+def get_extra(object_id: str) -> dict | None:
+    """
+    Insert in the 'extra' collection an object with the given id. Used in cases where extra functionalities require
+    extra data that is not strictly related to NFVCL.
+
+    Args:
+        object_id: The id used to identify the object.
+        object_dict: The dictionary to be inserted into the 'extra' collection.
+
+    Returns:
+
+    """
+    extra_list = NFVCLDatabase().find_in_collection(EXTRA_COLLECTION, {'id': object_id}, {"_id": False})
+    for extra in extra_list:
+        return extra  # Return the first match
+    return None

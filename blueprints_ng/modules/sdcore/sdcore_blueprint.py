@@ -112,7 +112,8 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
             ue_ip_pool_cidr=dnn_ip_pool
         )
 
-        sdcore_upf_id = get_blueprint_manager().create_blueprint(sdcore_upf_create_model, "sdcore_upf", wait=True)
+        sdcore_upf_id = get_blueprint_manager().create_blueprint(sdcore_upf_create_model, "sdcore_upf", wait=True, parent_id=self.id)
+        self.register_children(sdcore_upf_id)
         upf_n4_ip = self.call_external_function(sdcore_upf_id, "get_n4_info")
         sdcore_edge_info = SDCoreEdgeInfo(blue_id=sdcore_upf_id, n4_ip=upf_n4_ip)
 
@@ -123,7 +124,9 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.state.edge_areas[str(area_id)] = area_dict
 
     def undeploy_upf(self, area_id: int, dnn: str):
-        get_blueprint_manager().delete_blueprint(self.state.edge_areas[str(area_id)][dnn].blue_id, wait=True)
+        blue_id = self.state.edge_areas[str(area_id)][dnn].blue_id
+        get_blueprint_manager().delete_blueprint(blue_id, wait=True)
+        self.deregister_children(blue_id)
         del self.state.edge_areas[str(area_id)][dnn]
 
     def update_sdcore_values(self):

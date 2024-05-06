@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Optional
 
 from pydantic import Field
@@ -262,10 +263,14 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
         return self.state.upf_vm.network_interfaces[self.create_config.networks.n4].fixed.ip
 
     def set_gnb_info(self, gnb_info: GNBN3Info):
+        configuration_before = copy.copy(self.state.upf_vm_configurator.configuration)
         self.state.upf_vm_configurator.configuration.n3_nh_mac = gnb_info.mac
         self.state.upf_vm_configurator.configuration.n3_nh_ip = gnb_info.ip
         self.state.upf_vm_configurator.configuration.start = True
-        self.provider.configure_vm(self.state.upf_vm_configurator)
+        if self.state.upf_vm_configurator.configuration != configuration_before:
+            self.provider.configure_vm(self.state.upf_vm_configurator)
+        else:
+            self.logger.info("The UPF configuration is unchanged, skipping configuration")
 
     @classmethod
     def rest_create(cls, msg: SdCoreUPFCreateModel, request: Request):

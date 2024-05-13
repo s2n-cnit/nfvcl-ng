@@ -93,6 +93,12 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.logger.debug(f"IP AMF: {self.state.sdcore_helm_chart.services['amf'].external_ip[0]}")
 
     def deploy_upf(self, area_id: int, dnn: str):
+        """
+        Deploy a UPF in the given area for the given dnn
+        Args:
+            area_id: Area in which the UPF will be deployed
+            dnn: DNN that the UPF will serve
+        """
         upf_networks = BlueCreateModelNetworks(
             mgt=self.state.current_config.config.network_endpoints.mgt,
             n4=self.state.current_config.config.network_endpoints.wan,
@@ -124,12 +130,22 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.state.edge_areas[str(area_id)] = area_dict
 
     def undeploy_upf(self, area_id: int, dnn: str):
+        """
+        Remove a deployed UPF
+        Args:
+            area_id: Area of the UPF to undeploy
+            dnn: DNN of the UPF to undeploy
+        """
         blue_id = self.state.edge_areas[str(area_id)][dnn].blue_id
         get_blueprint_manager().delete_blueprint(blue_id, wait=True)
         self.deregister_children(blue_id)
         del self.state.edge_areas[str(area_id)][dnn]
 
     def update_sdcore_values(self):
+        """
+        Update the SD-Core values from the current config present in the state
+        This will also set the UPFs IPs on the slices
+        """
         self.config_ref.from_generic_5g_model(self.state.current_config)
 
         for area in self.state.current_config.areas:
@@ -140,9 +156,16 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
                 self.config_ref.set_upf_ip(slice.sliceId, sdcore_edge_info.n4_ip)
 
     def update_core(self):
+        """
+        Update the configuration of the deployed core
+        """
         self.provider.update_values_helm_chart(self.state.sdcore_helm_chart, self.state.sdcore_config_values.model_dump_for_helm())
 
     def update_upf_deployments(self):
+        """
+        Update the UPF deployments to match the current configuration
+        this will undeploy the ones that are not needed anymore and add new ones
+        """
         for area in self.state.current_config.areas:
             if str(area.id) not in self.state.edge_areas:
                 self.state.edge_areas[str(area.id)] = {}
@@ -165,6 +188,11 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
                     self.deploy_upf(area.id, dnn)
 
     def get_gnb_pdus(self) -> List[PduModel]:
+        """
+        Get the list of PDUs for the GNBs that need to be connected to this core instance
+
+        Returns: List of PDUs
+        """
         # TODO it only support UERANSIM now
         pdus = build_topology().get_pdus()
         ueransim_pdus = list(filter(lambda x: x.type == "UERANSIM", pdus))

@@ -28,10 +28,11 @@ def rtr_request(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], service:
     Allows running an ansible playbook on a remote host. The host NEEDS to be managed by nfvcl.
 
     Args:
-
         target: The host on witch the playbook is applied ('host:port' format)
-
-        payload: The ansible playbook in yaml format to be applied on the remote target
+        service: str, Service type for our demo 3 "DNS", should be obtain from RTR request
+        actionType: str, For this first iteration is always going to be a "Service modification" but for second iteration should be othes type of actions
+        actionID: str, this field should be provided by RTR, I think that is really important for second iteration since we need to control the life cycle of actions, so we should implement it now but could be a dummy parameter for this iteration
+        payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
     """
     bm = get_blueprint_manager()
     target_ip = target.split(":")[0]
@@ -60,7 +61,7 @@ def rtr_request(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], service:
 @horse_router.post("/set_doc_ip_port", response_model=RTRRestAnswer)
 def set_doc_ip_port(doc_ip: Annotated[str, Query(pattern=IP_PORT_PATTERN)], url_path: Annotated[str, Query(pattern=PATH_PATTERN)]):
     """
-    Set up and save the IP of HORSE doc module
+    Set up and save the IP of HORSE DOC module
     """
     insert_extra("doc_module", {"url": f"{doc_ip}{url_path}"})
     return RTRRestAnswer(description="DOC module IP has been set", status="success")

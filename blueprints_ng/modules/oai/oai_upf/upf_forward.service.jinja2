@@ -1,0 +1,12 @@
+[Unit]
+Description=Enable forward for UPF
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/upf_forward.sh
+
+[Install]
+WantedBy=multi-user.target

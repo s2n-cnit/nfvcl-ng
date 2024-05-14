@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from typing import Optional, Dict, List
 
+from blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
 from blueprints_ng.pdu_configurators.ueransim_pdu_configurator import UERANSIMPDUConfigurator
 from blueprints_ng.utils import get_class_from_path
 from pydantic import Field
@@ -199,7 +200,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
 
             slices = []
             for slice in list(filter(lambda x: x.id == pdu.area, self.state.current_config.areas))[0].slices:
-                slices.append(UeransimSlice(sd=slice.sliceId, sst=1))  # TODO get slice type
+                slices.append(UeransimSlice(sd=slice.sliceId, sst=SstConvertion.to_int(slice.sliceType)))
 
             gnb_configuration_request = UeransimBlueprintRequestConfigureGNB(
                 area=pdu.area,

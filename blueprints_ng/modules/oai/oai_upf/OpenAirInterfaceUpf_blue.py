@@ -7,7 +7,7 @@ from starlette.requests import Request
 from blueprints.blue_oai_cn5g.models.blue_OAI_model import Upfconfig, Snssai, DnnItem
 from pydantic import Field
 
-from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
+from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
 from blueprints_ng.modules.oai import oai_default_upf_config, oai_utils
@@ -33,17 +33,18 @@ class OpenAirInterfaceUpfConfigurator(VmResourceAnsibleConfiguration):
         This method need to be implemented, it should return the Ansible playbook as a string
         """
 
-        # While not mandatory it is recommended to use AnsiblePlaybookBuilder to create the playbook
         ansible_builder = AnsiblePlaybookBuilder("Playbook OpenAirInterfaceUpfConfigurator")
 
-        # This will compile the 'example_conf_file.jinja2' file using jinja2 and save the result in the '/example_conf.cfg' file on the server
         ansible_builder.add_template_task(rel_path("compose.jinja2"), "/root/upfConfig/compose.yaml")
         ansible_builder.add_template_task(rel_path("upf_conf.jinja2"), "/root/upfConfig/conf/basic_nrf_config.yaml")
 
-        # With the rel_path function you can use paths relative to this file (example_blue.py) location
+        ansible_builder.add_template_task(rel_path("upf_forward.sh.jinja2"), "/opt/upf_forward.sh")
+        ansible_builder.add_template_task(rel_path("upf_forward.service.jinja2"), "/etc/systemd/system/upf_forward.service")
+        ansible_builder.add_shell_task("systemctl daemon-reload")
+        ansible_builder.add_service_task("upf_forward", ServiceState.STARTED, True)
+
         ansible_builder.add_tasks_from_file(rel_path("compose.yaml"))
 
-        # Set the playbook variables (can be done anywhere in this method, but it needs to be before the build)
         ansible_builder.set_var("upf_id", self.upf_id)
         ansible_builder.set_var("nrf_ipv4_address", self.nrf_ipv4_address)
         ansible_builder.set_var("upf_conf", self.upf_conf)

@@ -6,6 +6,7 @@ from typing import Optional, Dict, List
 from pydantic import Field
 from starlette.requests import Request
 
+from blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
 from blueprints.blue_5g_base.models import Create5gModel
 from blueprints.blue_5g_base.models.blue_5g_model import SubSubscribers, SubSliceProfiles, SubSlices
 from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
@@ -226,7 +227,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
 
             slices = []
             for slice in list(filter(lambda x: x.id == pdu.area, self.state.current_config.areas))[0].slices:
-                slices.append(UeransimSlice(sd=slice.sliceId, sst=1))  # TODO get slice type
+                slices.append(UeransimSlice(sd=slice.sliceId, sst=SstConvertion.to_int(slice.sliceType)))
 
             gnb_configuration_request = UeransimBlueprintRequestConfigureGNB(
                 area=pdu.area,

@@ -21,6 +21,42 @@ class RTRRestAnswer(BaseModel):
     status: str = 'submitted'
     status_code: int = 202 # OK
 
+@horse_router.post("/rtr_request_demo1", response_model=RTRRestAnswer)
+def rtr_request_demo1(host: str, username: str, password: str, forward_to_doc: bool, payload: str = Body(None, media_type="application/yaml")):
+    """
+    Allows running an ansible playbook on a remote host.
+    Integration for HORSE Project. Allow applying mitigation action on a target. This function is implemented as a workaround since in the first demo
+    targets are not managed by ePEM, but they are static. In this way it is possible to apply playbooks on targets, having usr and pwd.
+
+    Args:
+        target: The host on witch the playbook is applied ('192.168.X.X' format)
+        username: str, the user that is used on the remote machine to apply the playbook
+        password: str, the user that is used on the remote machine to apply the playbook
+        forward_to_doc: str, if true the request is forwarded to DOC module, otherwise the playbook is applied by ePEM on the target.
+        payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
+    """
+    if forward_to_doc is False:
+        ansible_runner_result, fact_cache = run_ansible_playbook(host, username, password, payload)
+        if ansible_runner_result.status == "failed":
+            raise HTTPException(status_code=500, detail="Execution of Playbook failed. See ePEM DEBUG log for more info.")
+        return RTRRestAnswer(description="Playbook applied", status="success")
+    else:
+        doc_mod_info = get_extra("doc_module")
+        if doc_mod_info is None:
+            return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL. The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="forwarded", status_code=404)
+        else:
+            if 'url' in doc_mod_info:
+                doc_module_url = doc_mod_info['url']
+                body = {"actionID": "0", "target": host, "actionType": "0", "service": "0", "action": payload} # TODO define what to do. The format has not been fixed
+                try:
+                    httpx.post(f"http://{doc_module_url}", data=body, headers={"Content-Type": "application/json"}, timeout=10) # TODO TEST
+                except ConnectTimeout:
+                    raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
+                return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL, the request has been forwarded to DOC module.", status="forwarded", status_code=404)
+            else:
+                return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL. The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="forwarded", status_code=404)
+
+
 @horse_router.post("/rtr_request", response_model=RTRRestAnswer)
 def rtr_request(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], service: str, actionType: str, actionID: str, payload: str = Body(None, media_type="application/yaml")):
     """
@@ -44,9 +80,9 @@ def rtr_request(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], service:
         else:
             if 'url' in doc_mod_info:
                 doc_module_url = doc_mod_info['url']
-                body = {"actionID": actionID, "target": target, "actionType": actionType, "service": service, "action": payload}
+                body = {"actionID": actionID, "target": target, "actionType": actionType, "service": service, "action": payload} # TODO define what to do. The format has not been fixed
                 try:
-                    httpx.post(f"http://{doc_module_url}", data=body, headers={"Content-Type": "application/json"}, timeout=10)
+                    httpx.post(f"http://{doc_module_url}", data=body, headers={"Content-Type": "application/json"}, timeout=10) # TODO test
                 except ConnectTimeout:
                     raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
                 return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL, the request has been forwarded to DOC module.", status="forwarded", status_code=404)

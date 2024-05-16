@@ -12,7 +12,6 @@ from rest_endpoints.nfvcl_callback import callback_router
 from topology.topology import Topology, topology_lock, build_topology
 from topology.topology_worker import topology_msg_queue
 from main import db, nbiUtil
-from pydantic import AnyHttpUrl
 from typing import List
 
 from utils.openstack.openstack_utils import check_openstack_instances

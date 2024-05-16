@@ -30,16 +30,16 @@ Blueprint List
      - 2
    * - :doc:`free5gc/free5gc_blue_index`
      - 5G Core
-     - K8s cluster onboarded in OSM
-     - 1
-   * - :doc:`openairinterface/openairinterface_blue_index`
-     - 5G Core
      - K8s cluster onboarded in OSM + VIM
      - 1
-   * - SDCore
-     - 5G Core
-     - K8s cluster onboarded in OSM + VIM
-     - 1
+   * - :doc:`5gcores/openairinterface/openairinterface_blue_index`
+     - :doc:`5gcores/5gcore_blue_index`
+     - K8s in topology + VIM
+     - 2
+   * - :doc:`5gcores/sdcore/sdcore_blue_index`
+     - :doc:`5gcores/5gcore_blue_index`
+     - K8s in topology + VIM
+     - 2
    * - :doc:`vyos/vyos_blue_index`
      - Virtual Router
      - VIM

@@ -1,7 +1,8 @@
 from __future__ import annotations
+
 from typing import List, Optional, Literal
-from pydantic import BaseModel, IPvAnyAddress, IPvAnyNetwork,\
-    Field, constr, HttpUrl
+
+from pydantic import BaseModel, Field, constr, HttpUrl
 
 
 # ===================================== SubClasses of subconfig section ================================================
@@ -31,7 +32,7 @@ class SubFlows(BaseModel):
     flowId: str = Field(..., description="set flow Id, exp: f0")
     ipAddrFilter: Optional[str] = Field(None, description="set IP address filter")
     qi: constr(pattern=r"[0-9]")
-    gfbr: Optional[str] = Field(default= None, description="set gfbr, exp: 100Mbps")
+    gfbr: Optional[str] = Field(default=None, description="set gfbr, exp: 100Mbps")
 
 
 class SubpduSessions(BaseModel):
@@ -59,7 +60,7 @@ class SubEnabledUEList(BaseModel):
 
 
 class SubSliceProfiles(BaseModel):
-    sliceId: str
+    sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
     dnnList: List[str] = Field([], description="set dnn-list as a listst on names")
     profileParams: SubProfileParams
@@ -68,7 +69,7 @@ class SubSliceProfiles(BaseModel):
 
 
 class SubSnssai(BaseModel):
-    sliceId: str
+    sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
     pduSessionIds: List[str] = Field(..., description="Set Default slices parameters, exp: ['p0', 'p1']")
     default_slice: Optional[bool] = Field(default=None)
@@ -86,8 +87,8 @@ class SubSubscribers(BaseModel):
 class SubConfig(BaseModel):
     network_endpoints: NetworkEndPoints
     plmn: str = Field(..., pattern=r'^[0-9]*$', min_length=5, max_length=6,
-        description='PLMN identifier of the mobile network'
-    )
+                      description='PLMN identifier of the mobile network'
+                      )
     sliceProfiles: Optional[List[SubSliceProfiles]] = Field(default=None, description="Set Default slices parameters")
     subscribers: List[SubSubscribers]
 
@@ -97,7 +98,7 @@ class SubConfig(BaseModel):
 
 class SubSlices(BaseModel):
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
-    sliceId: str
+    sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
 
 
 class SubArea(BaseModel):
@@ -105,11 +106,9 @@ class SubArea(BaseModel):
     nci: str
     idLength: int
     core: bool = Field(default=True)
-    slices: Optional[List[SubSlices]] = Field(default=[],description="set slices ")
+    slices: Optional[List[SubSlices]] = Field(default=[], description="set slices ")
 
-    # TODO to remove
-    upf_bp_id: Optional[str] = Field(default=None)
-    gnb_bp_id: Optional[str] = Field(default=None)
+
 # ===============================================end of sub area ======================================================
 # =============================================== main section for blue free5gc k8s model class========================
 
@@ -122,6 +121,7 @@ class Create5gModel(BaseModel):
     )
     config: SubConfig
     areas: List[SubArea] = Field(..., description="Set area")
+
 
 # =========================================== End of main section =====================================================
 

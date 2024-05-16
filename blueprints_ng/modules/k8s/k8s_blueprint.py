@@ -76,7 +76,7 @@ class K8sBlueprintNGState(BlueprintNGState):
         # TODO check working
         for configurator in self.day_0_workers_configurators:
             if configurator.vm_resource.name == worker_to_be_rem.name:
-                self.release_worker_number(configurator.vm_number)
+                self._release_worker_number(configurator.vm_number)
                 self.day_0_workers_configurators.remove(configurator)
         #self.day_0_workers_configurators = [configur for configur in self.day_0_workers_configurators if configur.vm_resource.name != worker_to_be_rem.name]
         self.day_0_workers_configurators_tobe_exec = [configur for configur in self.day_0_workers_configurators_tobe_exec if configur.vm_resource.name != worker_to_be_rem.name]
@@ -91,6 +91,11 @@ class K8sBlueprintNGState(BlueprintNGState):
         return ip_list
 
     def reserve_worker_number(self):
+        """
+        Reserve worker number in the state
+        Args:
+            number: The number to be reserved
+        """
         position = 0
         for val in self.worker_numbers:
             if val == 0:
@@ -99,7 +104,12 @@ class K8sBlueprintNGState(BlueprintNGState):
             position += 1
         raise ValueError("Cannot assign number to a worker, all numbers has been reserved.")
 
-    def release_worker_number(self, number: int) -> None:
+    def _release_worker_number(self, number: int) -> None:
+        """
+        Release a worker number from the state
+        Args:
+            number: The number to be released
+        """
         if self.worker_numbers[number] == 1:
             self.worker_numbers[number] = 0
         else:
@@ -116,10 +126,11 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
     def create(self, create_model: K8sCreateModel):
         """
-        Creates the master node in the master area.
-        Creates the desired number of worker nodes in the desired areas
-        Starts the DAY-0 configuration of master and worker nodes.
-        Installs default plugins to the cluster (if required, by default yes)
+        Initialize a K8S blueprint.
+        1 - Creates the master node in the master area.
+        2 - Creates the desired number of worker nodes in the desired areas
+        3 - Starts the DAY-0 configuration of master and worker nodes.
+        4 - Installs default plugins to the cluster (if required, by default yes)
         """
         super().create(create_model)
         self.logger.info(f"Starting creation of K8s blueprint")
@@ -133,9 +144,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             if area.is_master_area:
                 self.state.master_area = area
                 self.deploy_master_node(area, create_model.master_flavors)
-
             self.deploy_area(area)
-
+        # Start initial configuration, first it get network list ready. Set self.state.reserved_pools
         self.setup_networks()
         self.day0conf(create_model.topology_onboard, configure_master=True)
         # Install K8s Plugins if required (default=yes)
@@ -200,6 +210,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         # Reserve a range of IP in the service net
         reserved_pools = []
         if self.state.master_area.service_net:
+            # TODO reserve IPS os specified nets, assign on Provider
             # In this case, the NET exists on OPENSTACK, and we should work with the topology
             pool = LBPool(net_name=self.state.master_area.service_net, range_length=self.state.master_area.service_net_required_ip_number)
             res_range = build_topology().reserve_range_lb_pool(pool, self.id)  # TODO IP should be reserved in VIM
@@ -208,12 +219,16 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             pool.ip_end = res_range.end.exploded
             reserved_pools.append(pool)
         else:
-            # In this case, the net is a dummy net (present on all machines), created on day0 by the configurator, so we can do what we want
-            pool = LBPool(net_name=DUMMY_NET_INT_NAME, range_length=self.state.master_area.service_net_required_ip_number)
-            ip_start_tmp = IPv4Address(DUMMY_NET_POOL_START_IP)
-            pool.ip_start = ip_start_tmp.exploded
-            pool.ip_end = (ip_start_tmp+pool.range_length).exploded
-            reserved_pools.append(pool)
+            if self.state.master_area.use_vxlan:
+                # In this case, the net is a dummy net (present on all machines), created on day0 by the configurator, so we can do what we want
+                pool = LBPool(net_name=DUMMY_NET_INT_NAME, range_length=self.state.master_area.service_net_required_ip_number)
+                ip_start_tmp = IPv4Address(DUMMY_NET_POOL_START_IP)
+                pool.ip_start = ip_start_tmp.exploded
+                pool.ip_end = (ip_start_tmp+pool.range_length).exploded
+                reserved_pools.append(pool)
+            else:
+                # TODO reserve IPS on MGT net, assign on Provider
+                raise ValueError
 
         self.state.reserved_pools = reserved_pools
 
@@ -225,6 +240,15 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         return cls.api_day0_function(msg, request)
 
     def day0conf(self, topology_onboard: bool, configure_master: bool = False):
+        """
+        TODO
+        Args:
+            topology_onboard:
+            configure_master:
+
+        Returns:
+
+        """
         if configure_master:
             # Configuring the master node
             master_conf = self.state.day_0_master_configurator
@@ -244,7 +268,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         for configurator in self.state.day_0_workers_configurators_tobe_exec:
             configurator.configure_worker(self.state.master_key_add_worker, self.state.master_credentials, DUMMY_NET_VM_START_IP)
             worker_result = self.provider.configure_vm(configurator)
-            self.state.day_0_workers_configurators_tobe_exec.remove(configurator)
+
+        self.state.day_0_workers_configurators_tobe_exec = []
 
         # If required, onboarding the cluster in the topology
         if topology_onboard:

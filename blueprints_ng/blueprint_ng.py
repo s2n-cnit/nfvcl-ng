@@ -288,7 +288,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         """
         Deregister a blueprint id from being a children of this blueprint
         Args:
-            blue_id: Blueprint id to be deregistred
+            blue_id: Blueprint id to be deregistered
         """
         if blue_id in self.base_model.children_blue_ids:
             self.base_model.children_blue_ids.remove(blue_id)

@@ -3,11 +3,10 @@ from __future__ import annotations
 import copy
 from typing import Optional, Dict, List
 
-from blueprints_ng.pdu_configurators.ueransim_pdu_configurator import UERANSIMPDUConfigurator
-from blueprints_ng.utils import get_class_from_path
 from pydantic import Field
 from starlette.requests import Request
 
+from blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
 from blueprints.blue_5g_base.models import Create5gModel
 from blueprints.blue_5g_base.models.blue_5g_model import SubSubscribers, SubSliceProfiles, SubSlices
 from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
@@ -16,9 +15,11 @@ from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
 from blueprints_ng.modules.sdcore.sdcore_default_config import default_config
 from blueprints_ng.modules.sdcore.sdcore_values_model import SDCoreValuesModel, SimAppYamlConfiguration
 from blueprints_ng.modules.sdcore_upf.sdcore_upf_blueprint import SdCoreUPFCreateModel
+from blueprints_ng.pdu_configurators.ueransim_pdu_configurator import UERANSIMPDUConfigurator
 from blueprints_ng.resources import HelmChartResource
+from blueprints_ng.utils import get_class_from_path
 from models.base_model import NFVCLBaseModel
-from models.blueprint_ng.g5.core import Core5GAttachGNBModel, Core5GAddSubscriberModel, Core5GDelSubscriberModel, \
+from models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, \
     Core5GAddSliceModel, Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel
 from models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, UeransimSlice
 from models.blueprint_ng.g5.upf import BlueCreateModelNetworks
@@ -44,6 +45,7 @@ class SDCoreEdgeInfo(NFVCLBaseModel):
     blue_id: str = Field()
     n4_ip: str = Field()
 
+
 class SdCoreBlueprintNGState(BlueprintNGState):
     sdcore_helm_chart: Optional[HelmChartResource] = Field(default=None)
     current_config: Optional[BlueSDCoreCreateModel] = Field(default=None)
@@ -66,7 +68,6 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
     def create(self, create_model: BlueSDCoreCreateModel):
         super().create(create_model)
         self.logger.info("Starting creation of example blueprint")
-
 
         self.state.sdcore_config_values = copy.deepcopy(default_config)
         self.state.current_config = copy.deepcopy(create_model)
@@ -93,6 +94,12 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.logger.debug(f"IP AMF: {self.state.sdcore_helm_chart.services['amf'].external_ip[0]}")
 
     def deploy_upf(self, area_id: int, dnn: str):
+        """
+        Deploy a UPF in the given area for the given dnn
+        Args:
+            area_id: Area in which the UPF will be deployed
+            dnn: DNN that the UPF will serve
+        """
         upf_networks = BlueCreateModelNetworks(
             mgt=self.state.current_config.config.network_endpoints.mgt,
             n4=self.state.current_config.config.network_endpoints.wan,
@@ -124,12 +131,22 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.state.edge_areas[str(area_id)] = area_dict
 
     def undeploy_upf(self, area_id: int, dnn: str):
+        """
+        Remove a deployed UPF
+        Args:
+            area_id: Area of the UPF to undeploy
+            dnn: DNN of the UPF to undeploy
+        """
         blue_id = self.state.edge_areas[str(area_id)][dnn].blue_id
         get_blueprint_manager().delete_blueprint(blue_id, wait=True)
         self.deregister_children(blue_id)
         del self.state.edge_areas[str(area_id)][dnn]
 
     def update_sdcore_values(self):
+        """
+        Update the SD-Core values from the current config present in the state
+        This will also set the UPFs IPs on the slices
+        """
         self.config_ref.from_generic_5g_model(self.state.current_config)
 
         for area in self.state.current_config.areas:
@@ -140,10 +157,16 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
                 self.config_ref.set_upf_ip(slice.sliceId, sdcore_edge_info.n4_ip)
 
     def update_core(self):
+        """
+        Update the configuration of the deployed core
+        """
         self.provider.update_values_helm_chart(self.state.sdcore_helm_chart, self.state.sdcore_config_values.model_dump_for_helm())
 
-
     def update_upf_deployments(self):
+        """
+        Update the UPF deployments to match the current configuration
+        this will undeploy the ones that are not needed anymore and add new ones
+        """
         for area in self.state.current_config.areas:
             if str(area.id) not in self.state.edge_areas:
                 self.state.edge_areas[str(area.id)] = {}
@@ -155,17 +178,22 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
 
             dnns_to_deploy_in_area = list(set(dnns_to_deploy_in_area))
 
-            for dnn in self.state.edge_areas[str(area.id)]:
+            for dnn in list(self.state.edge_areas[str(area.id)].keys()):
                 if dnn not in dnns_to_deploy_in_area:
                     self.logger.info(f"Undeploying UPF for dnn '{dnn}' in area '{area.id}'")
                     self.undeploy_upf(area.id, dnn)
 
             for dnn in dnns_to_deploy_in_area:
-                if dnn not in self.state.edge_areas[str(area.id)]:
+                if dnn not in list(self.state.edge_areas[str(area.id)].keys()):
                     self.logger.info(f"Deploying UPF for dnn '{dnn}' in area '{area.id}'")
                     self.deploy_upf(area.id, dnn)
 
     def get_gnb_pdus(self) -> List[PduModel]:
+        """
+        Get the list of PDUs for the GNBs that need to be connected to this core instance
+
+        Returns: List of PDUs
+        """
         # TODO it only support UERANSIM now
         pdus = build_topology().get_pdus()
         ueransim_pdus = list(filter(lambda x: x.type == "UERANSIM", pdus))
@@ -199,7 +227,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
 
             slices = []
             for slice in list(filter(lambda x: x.id == pdu.area, self.state.current_config.areas))[0].slices:
-                slices.append(UeransimSlice(sd=slice.sliceId, sst=1))  # TODO get slice type
+                slices.append(UeransimSlice(sd=slice.sliceId, sst=SstConvertion.to_int(slice.sliceType)))
 
             gnb_configuration_request = UeransimBlueprintRequestConfigureGNB(
                 area=pdu.area,
@@ -212,7 +240,6 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
 
             configurator_instance.configure(gnb_configuration_request)
 
-
     @classmethod
     def rest_create(cls, msg: BlueSDCoreCreateModel, request: Request):
         return cls.api_day0_function(msg, request)
@@ -221,7 +248,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
     # def attach_gnb_endpoint(cls, msg: Core5GAttachGNBModel, blue_id: str, request: Request):
     #     return cls.api_day2_function(msg, blue_id, request)
     #
-    # @add_route(SDCORE_BLUE_TYPE, "/attach_gnb", [HttpRequestType.POST], attach_gnb_endpoint)
+    # @add_route(SDCORE_BLUE_TYPE, "/attach_gnb", [HttpRequestType.PUT], attach_gnb_endpoint)
     # def attach_gnb(self, model: Core5GAttachGNBModel):
     #     gnb_n3_info = self.call_external_function(model.gnb_blue_id, "get_n3_info", model.area_id)
     #     for upf_id in self.state.edge_areas[str(model.area_id)]:
@@ -307,7 +334,6 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.update_sdcore_values()
         self.update_core()
 
-
     @classmethod
     def add_slice_oss_endpoint(cls, msg: Core5GAddSliceModel, blue_id: str, request: Request):
         return cls.api_day2_function(msg, blue_id, request)
@@ -348,11 +374,11 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.update_core()
 
     @classmethod
-    def add_area_endpoint(cls, msg: Core5GAddTacModel, blue_id: str, request: Request):
+    def add_tac_endpoint(cls, msg: Core5GAddTacModel, blue_id: str, request: Request):
         return cls.api_day2_function(msg, blue_id, request)
 
-    @add_route(SDCORE_BLUE_TYPE, "/add_area", [HttpRequestType.PUT], add_area_endpoint)
-    def add_area(self, add_area_model: Core5GAddTacModel):
+    @add_route(SDCORE_BLUE_TYPE, "/add_tac", [HttpRequestType.PUT], add_tac_endpoint)
+    def add_tac(self, add_area_model: Core5GAddTacModel):
         self.logger.info(f"Adding Area with ID: {add_area_model.id}")
 
         if self.state.current_config.get_area(add_area_model.id):
@@ -365,26 +391,20 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.update_sdcore_values()
         self.update_core()
 
-
     @classmethod
-    def del_area_endpoint(cls, msg: Core5GDelTacModel, blue_id: str, request: Request):
+    def del_tac_endpoint(cls, msg: Core5GDelTacModel, blue_id: str, request: Request):
         return cls.api_day2_function(msg, blue_id, request)
 
-    @add_route(SDCORE_BLUE_TYPE, "/del_slice", [HttpRequestType.PUT], del_slice_endpoint)
-    def del_slice(self, del_area_model: Core5GDelTacModel):
-        self.logger.info(f"Deleting Area with ID: {del_area_model.id}")
+    @add_route(SDCORE_BLUE_TYPE, "/del_tac", [HttpRequestType.PUT], del_tac_endpoint)
+    def del_tac(self, del_area_model: Core5GDelTacModel):
+        self.logger.info(f"Deleting Area with ID: {del_area_model.areaId}")
 
-        if not self.state.current_config.get_area(del_area_model.id):
-            raise BlueprintNGException(f"Area {del_area_model.id} not found")
+        if not self.state.current_config.get_area(del_area_model.areaId):
+            raise BlueprintNGException(f"Area {del_area_model.areaId} not found")
 
-        self.state.current_config.areas = list(filter(lambda x: x.id != del_area_model.id, self.state.current_config.areas))
+        self.state.current_config.areas = list(filter(lambda x: x.id != del_area_model.areaId, self.state.current_config.areas))
 
         self.update_upf_deployments()
         self.update_gnb_config()
         self.update_sdcore_values()
         self.update_core()
-
-
-
-
-

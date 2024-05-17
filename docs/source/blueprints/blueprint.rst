@@ -13,6 +13,18 @@ Here will be described how the blueprint system (v2) is working. Blue V1 is NO m
 * Configurators
 * ...
 
+Flavors
+*******
+Flavors of a blueprint could be problematic, usually flavors for VMs are created on Blueprint creation or when adding nodes to
+an existing Blueprint. It is not always possible to do this operation, depending on user permission.
+In this case it is possible to use an existing flavor.
+The scheme below summarize the behavior depending on the case.
+
+.. image:: ../../images/blueprint/NVFCL-diagrams-Flavor Management.drawio.svg
+  :width: 400
+  :alt: Flavor
+  :align: center
+
 Blueprint List
 ++++++++++++++
 

@@ -43,7 +43,7 @@ def rtr_request_demo1(host: str, username: str, password: str, forward_to_doc: b
     else:
         doc_mod_info = get_extra("doc_module")
         if doc_mod_info is None:
-            return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL. The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="forwarded", status_code=404)
+            return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="error", status_code=404)
         else:
             if 'url' in doc_mod_info:
                 doc_module_url = doc_mod_info['url']
@@ -52,9 +52,9 @@ def rtr_request_demo1(host: str, username: str, password: str, forward_to_doc: b
                     httpx.post(f"http://{doc_module_url}", data=body, headers={"Content-Type": "application/json"}, timeout=10) # TODO TEST
                 except ConnectTimeout:
                     raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
-                return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL, the request has been forwarded to DOC module.", status="forwarded", status_code=404)
+                return RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
             else:
-                return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL. The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="forwarded", status_code=404)
+                return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
 
 
 @horse_router.post("/rtr_request", response_model=RTRRestAnswer)
@@ -76,7 +76,7 @@ def rtr_request(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], service:
     if vm is None:
         doc_mod_info = get_extra("doc_module")
         if doc_mod_info is None:
-            return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL. The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="forwarded", status_code=404)
+            return RTRRestAnswer(description="The Target has not been found in VMs managed by the ePEM. The request will NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the DOC IP.", status="error", status_code=404)
         else:
             if 'url' in doc_mod_info:
                 doc_module_url = doc_mod_info['url']
@@ -87,7 +87,7 @@ def rtr_request(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], service:
                     raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
                 return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL, the request has been forwarded to DOC module.", status="forwarded", status_code=404)
             else:
-                return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL. The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="forwarded", status_code=404)
+                return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL. The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the DOC URL.", status="error", status_code=404)
     else:
         ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, vm.username, vm.password, payload)
         if ansible_runner_result.status == "failed":

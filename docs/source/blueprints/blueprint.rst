@@ -5,13 +5,50 @@ The NFVCL is deploying ecosystems instances using Blueprints. A network ecosyste
 network environment, such as a 5G system, an overlay system for network cybersecurity or a simple application service
 mesh.
 
+.. image:: ../../images/blueprint/NVFCL-diagrams-BlueprintV1vsV2.drawio.svg
+  :width: 400
+  :alt: Flavor
+  :align: center
+
 Blueprint System
 +++++++++++++++++
-Here will be described how the blueprint system (v2) is working. Blue V1 is NO more supported.
+Starting from the top of the picture, we can see that everything that happens in the NFVCL is triggered by the user.
+For the topology part, please refer to (:doc:`../topology/topology`).
 
-* Providers
-* Configurators
-* ...
+The Blueprint Life Cycle Management (LCM) have a dedicated manager witch main scope is to load and save Blueprints from
+the NFVCL database.
+
+A Blueprint contains a lot of data that can be categorized in:
+
+* Status: contains information of the status of resources (like the list of interfaces with the relative IP)
+* Configurators: the list of configurators (status included) that are created and used by the Blueprint (Day0,Day2,DayN)
+* Topology: the information of the topology in witch the Blueprint is deployed.
+
+.. image:: ../../images/NVFCL-diagrams-General-Scheme.drawio.svg
+  :width: 400
+  :alt: Flavor
+  :align: center
+
+The code of a Blueprint class is the one managing how, and in witch order, Resources are generated. The Blueprint instance is
+also managing Day2 operations like adding,updating and deleting a node from the blueprint instance.
+
+The new Blueprint system abstract the concept of Provider, offering to the every type of Blueprint an uniform set of functions.
+These functions are offering the tools for LCM of resources composing the specific instance of that type of blueprint.
+
+Since a Blueprint can be composed of both VMs and K8S resources, the provider interaction is not limited to one,
+but we can interact with several providers.
+
+Flavors
+*******
+Flavors of a blueprint could be problematic, usually flavors for VMs are created on Blueprint creation or when adding nodes to
+an existing Blueprint. It is not always possible to do this operation, depending on user permission.
+In this case it is possible to use an existing flavor.
+The scheme below summarize the behavior depending on the case.
+
+.. image:: ../../images/blueprint/NVFCL-diagrams-Flavor-Management.drawio.svg
+  :width: 400
+  :alt: Flavor
+  :align: center
 
 Blueprint List
 ++++++++++++++

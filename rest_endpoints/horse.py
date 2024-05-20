@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 import httpx
 from fastapi import APIRouter, status, Body, Query, HTTPException
@@ -8,10 +8,10 @@ from blueprints_ng.providers.configurators.ansible_utils import run_ansible_play
 from blueprints_ng.resources import VmResource
 from rest_endpoints.blue_ng_router import get_blueprint_manager
 from utils.database import insert_extra, get_extra
-from utils.util import IP_PORT_PATTERN, PATH_PATTERN
+from utils.util import IP_PORT_PATTERN, PATH_PATTERN, IP_PATTERN, PORT_PATTERN
 
 horse_router = APIRouter(
-    prefix="/v1/horse",
+    prefix="/v2/horse",
     tags=["Horse"],
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
@@ -29,10 +29,15 @@ def rtr_request_demo1(host: str, username: str, password: str, forward_to_doc: b
     targets are not managed by ePEM, but they are static. In this way it is possible to apply playbooks on targets, having usr and pwd.
 
     Args:
-        target: The host on witch the playbook is applied ('192.168.X.X' format)
+
+        host: The host on witch the playbook is applied ('192.168.X.X' format)
+
         username: str, the user that is used on the remote machine to apply the playbook
+
         password: str, the user that is used on the remote machine to apply the playbook
+
         forward_to_doc: str, if true the request is forwarded to DOC module, otherwise the playbook is applied by ePEM on the target.
+
         payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
     """
     if forward_to_doc is False:
@@ -58,20 +63,30 @@ def rtr_request_demo1(host: str, username: str, password: str, forward_to_doc: b
 
 
 @horse_router.post("/rtr_request", response_model=RTRRestAnswer)
-def rtr_request(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], service: str, actionType: str, actionID: str, payload: str = Body(None, media_type="application/yaml")):
+def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_port: Optional[Annotated[str, Query(pattern=PORT_PATTERN)]], service: str, actionType: str, actionID: str, payload: str = Body(None, media_type="application/yaml")):
     """
     Integration for HORSE Project. Allow applying mitigation action on a target managed by the NFVCL (ePEM).
     Allows running an ansible playbook on a remote host. The host NEEDS to be managed by nfvcl.
 
+    See Also:
+
+        [HORSE_Demo3_Components_Specification_v0.1](https://tntlabunigeit-my.sharepoint.com/:w:/r/personal/horse-cloud_tnt-lab_unige_it/_layouts/15/Doc.aspx?sourcedoc=%7B34097F2D-C0F8-4E06-B34C-0BA0B3D81DE0%7D&file=HORSE_Demo3_Components_Specification_v0.1.docx&action=default&mobileredirect=true)
+
     Args:
-        target: The host on witch the playbook is applied ('host:port' format)
-        service: str, Service type for our demo 3 "DNS", should be obtain from RTR request
-        actionType: str, For this first iteration is always going to be a "Service modification" but for second iteration should be othes type of actions
+
+        target_ip: The IP of the host on witch the Ansible playbook is applied ('1.52.65.25' format)
+
+        target_port: The port used by Ansible on the host in witch the playbook is applied. This is for optional for future use.
+
+        service: str, Service type for our demo 3 "DNS", should be obtained from RTR request
+
+        actionType: str, For this first iteration is always going to be a "Service modification" but for second iteration should be others type of actions
+
         actionID: str, this field should be provided by RTR, I think that is really important for second iteration since we need to control the life cycle of actions, so we should implement it now but could be a dummy parameter for this iteration
+
         payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
     """
     bm = get_blueprint_manager()
-    target_ip = target.split(":")[0]
     vm: VmResource = bm.get_VM_target_by_ip(target_ip)
     if vm is None:
         doc_mod_info = get_extra("doc_module")
@@ -80,7 +95,7 @@ def rtr_request(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], service:
         else:
             if 'url' in doc_mod_info:
                 doc_module_url = doc_mod_info['url']
-                body = {"actionID": actionID, "target": target, "actionType": actionType, "service": service, "action": payload} # TODO define what to do. The format has not been fixed
+                body = {"actionID": actionID, "target_ip": target_ip, "target_port": target_port, "actionType": actionType, "service": service, "action": payload}
                 try:
                     httpx.post(f"http://{doc_module_url}", data=body, headers={"Content-Type": "application/json"}, timeout=10) # TODO test
                 except ConnectTimeout:

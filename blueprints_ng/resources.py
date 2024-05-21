@@ -55,6 +55,7 @@ class VmResourceFlavor(NFVCLBaseModel):
     memory_mb: str = Field(default="8192", description="Should be a multiple of 1024")
     storage_gb: str = Field(default="32")
     vcpu_type: Optional[str] = Field(default="host")
+    require_port_security_disabled: Optional[bool] = Field(default=False)
 
 
 class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):

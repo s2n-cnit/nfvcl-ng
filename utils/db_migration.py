@@ -10,7 +10,7 @@ from utils.log import create_logger
 logger = create_logger("DB Migrations")
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 mongo_client: MongoClient = MongoClient("mongodb://{}:{}/".format(nfvcl_config.mongodb.host, nfvcl_config.mongodb.port))
-db = mongo_client.get_database("nfvcl")
+db = mongo_client.get_database(nfvcl_config.mongodb.db)
 
 
 if 'migrations' not in db.list_collection_names():

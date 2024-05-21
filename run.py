@@ -51,6 +51,10 @@ if __name__ == "__main__":
     check_py_version()
     nfvcl_conf: NFVCLConfigModel = check_ip()
     if nfvcl_conf is not None:
+        # Run database migrations
+        from utils.db_migration import start_migrations
+        start_migrations()
+
         # Load the app only if pre-configuration is OK.
         from nfvcl import app
         uvicorn.run(app, host=nfvcl_conf.nfvcl.ip, port=nfvcl_conf.nfvcl.port)

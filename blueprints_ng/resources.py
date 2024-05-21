@@ -115,7 +115,7 @@ class VmResource(ResourceDeployable):
         become_password (str): The password to be used in the VM to get admin power
         management_network (str): name of the management network attached to VM (like OS network)
         additional_networks (List[str]): name list of network attached to VM (like OS network)
-        network_interfaces (Dict[str, VmResourceNetworkInterface]): list of network interfaces attached to the VM indexed by vim network name.
+        network_interfaces (Dict[str, List[VmResourceNetworkInterface]]): list of network interfaces attached to the VM indexed by vim network name.
         state (str): running, stopped, initializated,
     """
     image: VmResourceImage = Field()
@@ -131,7 +131,7 @@ class VmResource(ResourceDeployable):
     # Potrebbe mettersi la data di creazione
     created: bool = Field(default=False)
     access_ip: Optional[str] = Field(default=None)
-    network_interfaces: Dict[str, VmResourceNetworkInterface] = Field(default_factory=dict)
+    network_interfaces: Dict[str, List[VmResourceNetworkInterface]] = Field(default_factory=dict)
     # TODO accesa, spenta, in inizializzazione..., cambiare tipo con enum
     state: Optional[str] = Field(default=None)
 
@@ -139,13 +139,16 @@ class VmResource(ResourceDeployable):
         """
         Retrieves the management network interface
         """
-        return self.network_interfaces[self.management_network]
+        return self.network_interfaces[self.management_network][0]
 
     def get_additional_interfaces(self) -> List[VmResourceNetworkInterface]:
         """
         Retrieves the additional network interfaces
         """
-        return [self.network_interfaces[key] for key in self.additional_networks]
+        additional_interfaces_list = []
+        for key in self.additional_networks:
+            additional_interfaces_list.extend(self.network_interfaces[key])
+        return additional_interfaces_list
 
     def get_network_interface_by_name(self, name: str) -> VmResourceNetworkInterface | None:
         """
@@ -156,9 +159,10 @@ class VmResource(ResourceDeployable):
         Returns:
             If found, returns the interface instance, otherwise None
         """
-        for net_interface in self.network_interfaces.values():
-            if net_interface.fixed.interface_name == name:
-                return net_interface
+        for net_interface_list in self.network_interfaces.values():
+            for net_interface in net_interface_list:
+                if net_interface.fixed.interface_name == name:
+                    return net_interface
         return None
 
     def check_if_network_connected_by_name(self, network_name: str) -> bool:
@@ -182,9 +186,10 @@ class VmResource(ResourceDeployable):
         Returns:
             True if it connected, False otherwise
         """
-        for net_interface in self.network_interfaces.values():
-            if net_interface.fixed.cidr == cidr:
-                return True
+        for net_interface_list in self.network_interfaces.values():
+            for net_interface in net_interface_list:
+                if net_interface.fixed.cidr == cidr:
+                    return True
         return False
 
 

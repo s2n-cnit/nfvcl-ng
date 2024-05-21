@@ -108,9 +108,6 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         networks = [vm_resource.management_network]
         networks.extend(vm_resource.additional_networks)
 
-        # Deduplicate networks
-        networks = list(set(networks))
-
         # The floating IP should be requested if the VIM require it or if explicitly requested in the blueprint
         auto_ip = self.vim_need_floating_ip or vm_resource.require_floating_ip
 
@@ -153,7 +150,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         if server_obj.access_ipv4 and len(server_obj.access_ipv4) > 0:
             vm_resource.access_ip = server_obj.access_ipv4
         else:
-            vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network].fixed.ip
+            vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network][0].fixed.ip
 
         # Disable port security on every port
         server_ports: List[Port] = self.conn.list_ports(filters={"device_id": server_obj.id})
@@ -258,10 +255,11 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             mac = interface_line_splitted[1].strip()
             mac_name_dict[mac] = name
 
-        for value in vm_resource.network_interfaces.values():
-            value.fixed.interface_name = mac_name_dict[value.fixed.mac]
-            if value.floating:
-                value.floating.interface_name = mac_name_dict[value.floating.mac]
+        for network_interfaces_list in vm_resource.network_interfaces.values():
+            for value in network_interfaces_list:
+                value.fixed.interface_name = mac_name_dict[value.fixed.mac]
+                if value.floating:
+                    value.floating.interface_name = mac_name_dict[value.floating.mac]
 
         self.logger.info(f"Ended VM info gathering")
 
@@ -365,7 +363,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                     fixed = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"], cidr=subnet_details[network_name].cidr)
                 if address["OS-EXT-IPS:type"] == "floating":
                     floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"], cidr=subnet_details[network_name].cidr)
-            vm_resource.network_interfaces[network_name] = VmResourceNetworkInterface(fixed=fixed, floating=floating)
+                if network_name not in vm_resource.network_interfaces:
+                    vm_resource.network_interfaces[network_name] = []
+                vm_resource.network_interfaces[network_name].append(VmResourceNetworkInterface(fixed=fixed, floating=floating))
 
     def __disable_port_security(self, conn: Connection, port_id):
         try:

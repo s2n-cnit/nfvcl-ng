@@ -1,17 +1,17 @@
 import copy
-from typing import Optional
 import json
+from typing import Optional
+
 import yaml
+from pydantic import Field
 from starlette.requests import Request
 
 from blueprints.blue_oai_cn5g.models.blue_OAI_model import Upfconfig, Snssai, DnnItem
-from pydantic import Field
-
 from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
 from blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
 from blueprints_ng.modules.oai import oai_default_upf_config, oai_utils
-from blueprints_ng.resources import VmResourceImage, VmResourceFlavor, VmResource, NetResource, VmResourceAnsibleConfiguration
+from blueprints_ng.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
 from blueprints_ng.utils import rel_path
 from models.blueprint_ng.g5.upf import UPFBlueCreateModel, UpfPayloadModel
 
@@ -117,11 +117,11 @@ class OpenAirInterfaceUpf(BlueprintNG[OAIUpfBlueprintNGState, UPFBlueCreateModel
         self.state.upf_conf.dnns.clear()
 
         self.state.upf_conf.nfs.upf.host = f"oai-upf{self.state.area_id}"
-        self.state.upf_conf.nfs.upf.sbi.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n4].fixed.interface_name
-        self.state.upf_conf.nfs.upf.n3.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n3].fixed.interface_name
-        self.state.upf_conf.nfs.upf.n4.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n4].fixed.interface_name
-        self.state.upf_conf.nfs.upf.n6.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n6].fixed.interface_name
-        self.state.upf_conf.nfs.upf.n9.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n4].fixed.interface_name
+        self.state.upf_conf.nfs.upf.sbi.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.n3.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n3][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.n4.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.n6.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n6][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.n9.interface_name = self.state.vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.interface_name
 
         for new_slice in upf_config.slices:
             new_snssai: Snssai = oai_utils.add_snssai(self.state.upf_conf, new_slice.id, new_slice.type)
@@ -142,12 +142,12 @@ class OpenAirInterfaceUpf(BlueprintNG[OAIUpfBlueprintNGState, UPFBlueCreateModel
         self.provider.configure_vm(self.state.vm_upf_configurator)
 
     def get_ip(self):
-        '''
+        """
 
         Returns: IP of the vm
 
-        '''
-        return self.state.vm_upf.network_interfaces[self.create_config.networks.n4].fixed.ip
+        """
+        return self.state.vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.ip
 
     @classmethod
     def rest_create(cls, msg: UPFBlueCreateModel, request: Request):

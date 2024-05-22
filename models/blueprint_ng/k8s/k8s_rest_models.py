@@ -49,6 +49,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     password: str = Field(default="ubuntu", description="The password to be set, in every vm, for user ubuntu", pattern=r'^[a-zA-Z0-9_.-]*$')
     install_plugins: bool = Field(default=True, description="Whether to install default plugin list on blueprint deployment (Flannel, MetalLb, OpenEBS)")
     master_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="2048", storage_gb='16', vcpu_count='2')
+    require_port_security_disabled: Optional[bool] = Field(default=True, description="Global port security disable, override port security in nodes flavors")
     areas: List[K8sAreaDeployment] = Field(min_items=1, description="List of areas in witch deployment is made (with requirements)")
 
     @field_validator('areas')

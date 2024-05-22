@@ -58,6 +58,7 @@ class K8sModel(NFVCLBaseModel):
     cni: Optional[str] = Field(default=None)
     nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED)
     nfvo_onboard: bool = Field(default=False)
+    anti_spoofing_enabled: Optional[bool] = Field(default=False)
 
     def __eq__(self, other):
         """

@@ -6,3 +6,4 @@ K8S Blueprint
 
 .. toctree::
     k8s_blue_creation.md
+    k8s_request_examples.md

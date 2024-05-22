@@ -279,7 +279,7 @@ class AnsiblePlaybookBuilder:
         self.add_task(
             f"Shell Task '{command}'",
             "ansible.builtin.shell",
-            AnsibleShellTask(cmd=command),
+            AnsibleShellTask(cmd=LS(command)),
             register_output_as=register_output_as
         )
 

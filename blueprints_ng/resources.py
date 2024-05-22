@@ -27,7 +27,7 @@ class ResourceDeployable(Resource):
         """
         Returns the name of the node given by k8s to the node
         """
-        return self.name.lower().replace('_','-')
+        return self.name.lower().replace('_', '-')
 
 
 class ResourceConfiguration(Resource):
@@ -127,7 +127,7 @@ class VmResource(ResourceDeployable):
     management_network: str = Field()
     additional_networks: List[str] = Field(default=[])
     require_floating_ip: bool = Field(default=False)
-    require_port_security_disabled: Optional[bool] = Field(default=False) # TODO remove optional
+    require_port_security_disabled: Optional[bool] = Field(default=False)  # TODO remove optional
 
     # Potrebbe mettersi la data di creazione
     created: bool = Field(default=False)
@@ -135,6 +135,16 @@ class VmResource(ResourceDeployable):
     network_interfaces: Dict[str, List[VmResourceNetworkInterface]] = Field(default_factory=dict)
     # TODO accesa, spenta, in inizializzazione..., cambiare tipo con enum
     state: Optional[str] = Field(default=None)
+
+    def get_all_connected_network_names(self) -> List[str]:
+        """
+        Get a list of all the network connected to this VM
+
+        Returns: List of connected networks
+        """
+        networks = [self.management_network]
+        networks.extend(self.additional_networks)
+        return networks
 
     def get_management_interface(self) -> VmResourceNetworkInterface:
         """
@@ -163,6 +173,21 @@ class VmResource(ResourceDeployable):
         for net_interface_list in self.network_interfaces.values():
             for net_interface in net_interface_list:
                 if net_interface.fixed.interface_name == name:
+                    return net_interface
+        return None
+
+    def get_network_interface_by_fixed_mac(self, mac: str) -> VmResourceNetworkInterface | None:
+        """
+        Search for a network interface with the given mac in the VM.
+        Args:
+            mac: The mac of the interface.
+
+        Returns:
+            If found, returns the interface instance, otherwise None
+        """
+        for net_interface_list in self.network_interfaces.values():
+            for net_interface in net_interface_list:
+                if net_interface.fixed.mac == mac:
                     return net_interface
         return None
 

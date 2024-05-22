@@ -178,6 +178,9 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
     def create_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).create_vm(vm_resource)
 
+    def attach_net(self, vm_resource: VmResource, net_name: str):
+        return self.get_virt_provider(vm_resource.area).attach_net(vm_resource, net_name)
+
     def create_net(self, net_resource: NetResource):
         return self.get_virt_provider(net_resource.area).create_net(net_resource)
 

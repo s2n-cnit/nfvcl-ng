@@ -11,6 +11,21 @@ spec:
 {% endfor %}
   autoAssign: false
 {% endif %}
+{% if confvar.lb_ipaddresses %}
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: workers-lb-int
+  namespace: metallb-system
+spec:
+  addresses:
+{% for ipa in confvar.lb_ipaddresses_auto %}
+  - {{ ipa }}/32
+{% endfor %}
+  autoAssign: true
+---
+{% endif %}
 {% if confvar.lb_pools %}
 {% for pool in confvar.lb_pools %}
 ---

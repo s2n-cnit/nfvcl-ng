@@ -1,7 +1,7 @@
 # K8S Blueprint request examples
 
-# Network cases
-## Using mgt net to expose services
+## Network cases
+### Using mgt net to expose services
 ```
 {
   "password": "ubuntu",
@@ -19,7 +19,7 @@
 }
 ```
 
-## Using secondary net to expose services
+### Using secondary net to expose services
 ```
 {
   "password": "ubuntu",
@@ -37,7 +37,7 @@
 }
 ```
 
-## Using VXLAN to expose services
+### Using VXLAN to expose services
 ```
 {
   "password": "ubuntu",
@@ -54,8 +54,8 @@
 }
 ```
 
-# Flavors
-## Use default flavors
+## Flavors
+### Use default flavors
 ```
 {
   "password": "ubuntu",
@@ -72,7 +72,7 @@
 }
 ```
 
-## Use a custom flavor
+### Use a custom flavor
 ```
 {
 	"password": "ubuntu",
@@ -104,7 +104,7 @@
 }
 ```
 
-## Use an existing flavor (use case: no permission to create it)
+### Use an existing flavor (use case: no permission to create it)
 ```
 {
 	"password": "ubuntu",
@@ -136,7 +136,7 @@
 }
 ```
 
-# Add a K8S node to an existing cluster
+## Add a K8S node to an existing cluster
 Make sure you have added the cluster ID (Blueprint ID) as query parameter
 
 http://NFVCL_IP:5002/nfvcl/v2/api/blue/k8s/add_node?blue_id=ITPHY8
@@ -154,13 +154,18 @@ http://NFVCL_IP:5002/nfvcl/v2/api/blue/k8s/add_node?blue_id=ITPHY8
 }
 ```
 
-# Remove a node from an existing cluster
+## Remove a node from an existing cluster
 Make sure you have added the cluster ID (Blueprint ID) as query parameter
 http://NFVCL_IP:5002/nfvcl/v2/api/blue/k8s/del_workers?blue_id=Z0AOU1
 And then the list of nodes to remove:
 
 ```
-
+{
+  "node_names": [
+    "XLQ4H2_VM_W_1"
+  ]
+}
 ```
 
-# Install additional plugins
+## Install additional plugins
+Refer to [Install Plugins](/kubernetes/k8s_man_apis_example#Plugin installation)

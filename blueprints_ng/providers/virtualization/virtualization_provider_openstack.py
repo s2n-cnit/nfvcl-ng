@@ -221,6 +221,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.logger.success(f"Network {net_name} attached to VM {vm_resource.name}")
         self.blueprint.to_db()
 
+        return net_intf.fixed.ip
+
     def create_net(self, net_resource: NetResource):
         self.logger.info(f"Creating NET {net_resource.name}")
 

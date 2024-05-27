@@ -5,11 +5,13 @@ from typing import List, Dict
 import paramiko
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
+from openstack.compute.v2.server_interface import ServerInterface
 from openstack.connection import Connection
 from openstack.exceptions import ForbiddenException
 from openstack.network.v2.network import Network
 from openstack.network.v2.port import Port
 from openstack.network.v2.subnet import Subnet
+from pydantic import Field
 
 from blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from blueprints_ng.cloudinit_builder import CloudInit
@@ -18,6 +20,7 @@ from blueprints_ng.providers.virtualization.virtualization_provider_interface im
     VirtualizationProviderInterface, VirtualizationProviderData
 from blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor
+from models.base_model import NFVCLBaseModel
 from models.vim import VimModel
 from utils.openstack.openstack_client import OpenStackClient
 
@@ -47,6 +50,34 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
             R"""find /sys/class/net -mindepth 1 -maxdepth 1 ! -name lo -printf "%P: " -execdir cat {}/address \;""",
             "interfaces_mac"
         )
+
+        return ansible_playbook_builder.build()
+
+
+class NetplanNetMatch(NFVCLBaseModel):
+    macaddress: str = Field()
+
+
+class NetplanNetConfig(NFVCLBaseModel):
+    dhcp4: str = Field()
+    set_name: str = Field(alias="set-name")
+    match: NetplanNetMatch = Field()
+
+
+class VmAddNicNetplanConfigurator(VmResourceAnsibleConfiguration):
+    """
+    This configurator is used to add a nic to the netplan configuration of a VM and reload
+    """
+    nic_name: str = Field()
+    mac_address: str = Field()
+
+    def dump_playbook(self) -> str:
+        ansible_playbook_builder = AnsiblePlaybookBuilder("Add nic to netplan")
+
+        netplan_config_to_add = NetplanNetConfig(dhcp4="true", set_name=self.nic_name, match=NetplanNetMatch(macaddress=self.mac_address))
+        # TODO add dhcp override route to prevent multiple default gateways
+        ansible_playbook_builder.add_shell_task(f"netplan set --origin-hint 50-cloud-init 'network.ethernets.{self.nic_name}={netplan_config_to_add.model_dump_json(by_alias=True)}'")
+        ansible_playbook_builder.add_shell_task("netplan apply")
 
         return ansible_playbook_builder.build()
 
@@ -104,13 +135,6 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         cloudin = CloudInit(password=vm_resource.password, ssh_authorized_keys=self.vim.ssh_keys).build_cloud_config()
         self.logger.debug(f"Cloud config:\n{cloudin}")
 
-        # Create a list with all the network interfaces that need to be added to the new VM
-        networks = [vm_resource.management_network]
-        networks.extend(vm_resource.additional_networks)
-
-        # Deduplicate networks
-        networks = list(set(networks))
-
         # The floating IP should be requested if the VIM require it or if explicitly requested in the blueprint
         auto_ip = self.vim_need_floating_ip or vm_resource.require_floating_ip
 
@@ -133,7 +157,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             auto_ip=auto_ip,
             nat_destination=vm_resource.management_network,
             ip_pool=floating_ip_net,
-            network=networks,
+            network=vm_resource.get_all_connected_network_names(),
             userdata=cloudin
         )
 
@@ -144,8 +168,19 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.data.os_dict[vm_resource.id] = server_obj.id
         self.blueprint.to_db()
 
+        self.__update_net_info_vm(vm_resource, server_obj)
+        self.__disable_port_security_all_ports(vm_resource, server_obj)
+
+        # The VM is now created
+        vm_resource.created = True
+
+        self.logger.success(f"Creating VM {vm_resource.name} finished")
+        self.blueprint.to_db()
+
+    def __update_net_info_vm(self, vm_resource: VmResource, server_obj: Server):
+        vm_resource.network_interfaces.clear()
         # Getting detailed info about the networks attached to the machine
-        subnet_detailed = self.__get_network_details(self.conn, networks)
+        subnet_detailed = self.__get_network_details(self.conn, vm_resource.get_all_connected_network_names())
         # Parse the OS output and create a structured network_interfaces dictionary
         self.__parse_os_addresses(vm_resource, server_obj.addresses, subnet_detailed)
 
@@ -153,26 +188,40 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         if server_obj.access_ipv4 and len(server_obj.access_ipv4) > 0:
             vm_resource.access_ip = server_obj.access_ipv4
         else:
-            vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network].fixed.ip
+            vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network][0].fixed.ip
 
-        # Disable port security on every port
+        # Run an Ansible playbook to gather information
+        self.__gather_info_from_vm(vm_resource)
+
+    def __disable_port_security_all_ports(self, vm_resource: VmResource, server_obj: Server):
         server_ports: List[Port] = self.conn.list_ports(filters={"device_id": server_obj.id})
-        if len(server_ports) != len(networks):
+        if len(server_ports) != len(vm_resource.get_all_connected_network_names()):
             raise VirtualizationProviderOpenstackException(f"Mismatch in number of request network interface and ports, query: device_id={server_obj.id}")
 
-        if getattr(vm_resource, 'require_port_security_disabled', None): # TODO remove in future. For now to maintain back compatibility
+        if getattr(vm_resource, 'require_port_security_disabled', None):  # TODO remove in future. For now to maintain back compatibility
             if vm_resource.require_port_security_disabled:
                 for port in server_ports:
                     self.__disable_port_security(self.conn, port.id)
 
-        # Run an Ansible playbook to gather information about the newly created VM
-        self.__gather_info_from_vm(vm_resource)
+    def attach_net(self, vm_resource: VmResource, net_name: str):
+        # Get the OS SDK network object
+        network = self.conn.get_network(net_name)
+        # Connect the network to the instance
+        new_server_interface: ServerInterface = self.conn.compute.create_server_interface(self.data.os_dict[vm_resource.id], net_id=network.id)
+        # Add the network to the VmResource object
+        vm_resource.additional_networks.append(net_name)
 
-        # The VM is now created
-        vm_resource.created = True
+        server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
 
-        self.logger.success(f"Creating VM {vm_resource.name} finished")
+        self.__update_net_info_vm(vm_resource, server_obj)
+
+        net_intf = vm_resource.get_network_interface_by_fixed_mac(new_server_interface.mac_addr)
+        self.__configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nic_name=net_intf.fixed.interface_name, mac_address=new_server_interface.mac_addr))
+
+        self.logger.success(f"Network {net_name} attached to VM {vm_resource.name}")
         self.blueprint.to_db()
+
+        return net_intf.fixed.ip
 
     def create_net(self, net_resource: NetResource):
         self.logger.info(f"Creating NET {net_resource.name}")
@@ -258,10 +307,11 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             mac = interface_line_splitted[1].strip()
             mac_name_dict[mac] = name
 
-        for value in vm_resource.network_interfaces.values():
-            value.fixed.interface_name = mac_name_dict[value.fixed.mac]
-            if value.floating:
-                value.floating.interface_name = mac_name_dict[value.floating.mac]
+        for network_interfaces_list in vm_resource.network_interfaces.values():
+            for value in network_interfaces_list:
+                value.fixed.interface_name = mac_name_dict[value.fixed.mac]
+                if value.floating:
+                    value.floating.interface_name = mac_name_dict[value.floating.mac]
 
         self.logger.info(f"Ended VM info gathering")
 
@@ -365,7 +415,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                     fixed = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"], cidr=subnet_details[network_name].cidr)
                 if address["OS-EXT-IPS:type"] == "floating":
                     floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"], cidr=subnet_details[network_name].cidr)
-            vm_resource.network_interfaces[network_name] = VmResourceNetworkInterface(fixed=fixed, floating=floating)
+                if network_name not in vm_resource.network_interfaces:
+                    vm_resource.network_interfaces[network_name] = []
+                vm_resource.network_interfaces[network_name].append(VmResourceNetworkInterface(fixed=fixed, floating=floating))
 
     def __disable_port_security(self, conn: Connection, port_id):
         try:

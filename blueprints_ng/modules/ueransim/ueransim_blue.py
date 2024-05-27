@@ -199,7 +199,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             vm_ue_configurator = UeransimUEConfigurator(
                 vm_resource=vm_ue,
                 sims=[],
-                gnbSearchList=[blue_ueransim_area.vm_gnb.network_interfaces[radio_network_name].fixed.ip]
+                gnbSearchList=[blue_ueransim_area.vm_gnb.network_interfaces[radio_network_name][0].fixed.ip]
             )
             for sim in ue.sims:
                 vm_ue_configurator.sims.append(sim)
@@ -312,10 +312,10 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         area.vm_gnb_configurator = UeransimGNBConfigurator(
             vm_resource=area.vm_gnb,
             configuration=model,
-            radio_addr=area.vm_gnb.network_interfaces[area.radio_net.name].fixed.ip,
-            ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2].fixed.ip,
-            gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.ip,
-            n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.interface_name
+            radio_addr=area.vm_gnb.network_interfaces[area.radio_net.name][0].fixed.ip,
+            ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2][0].fixed.ip,
+            gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.ip,
+            n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.interface_name
         )
 
         self.register_resource(area.vm_gnb_configurator)
@@ -343,6 +343,6 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
     def get_n3_info(self, area_id: int) -> GNBN3Info:
         return GNBN3Info(
-            ip=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.ip,
-            mac=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3].fixed.mac
+            ip=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.ip,
+            mac=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.mac
         )

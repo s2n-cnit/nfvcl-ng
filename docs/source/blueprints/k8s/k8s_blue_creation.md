@@ -11,11 +11,11 @@ See [Deployment](#deployment)
 The Blueprint dedicated APIs base url is `{{ base_url }}/nfvcl/v2/api/blue/k8s`
 
 ## Deployment
-To deploy the K8S Blueprint V2 you will need to perform a POST request on:
+To deploy the K8S Blueprint V2, you will need to perform a POST request on:
 ```
 {{ base_url }}/nfvcl/v2/api/blue/k8s
 ```
-This POST request body contains a lot of optional parameters as you can see looking to models in the exposed [Swagger](#TODO).
+This POST request body contains a lot of optional parameters as you can see looking to models in the exposed [Swagger](/).
 
 ```json
 {
@@ -33,22 +33,23 @@ This POST request body contains a lot of optional parameters as you can see look
 ```
 
 Here you can see a simple request (with no optional data) that is deploying a K8S cluster in the `area=3` (the VIM should be present in the Topology).
-One and only one Core area must be always present! You can choose where the master node should be deployed. 
-Using the worker_replicas parameter you can choose how many workers will be deployed in that area.
+One and only one Core area must always be present! You can choose where the master node should be deployed. 
+Using the worker_replicas parameter, you can choose how many workers will be deployed in that area.
 
 The NFVCL should support deployment over different VIMs of the same K8S cluster, nodes must have MGT connectivity between them.
-Service Net is used by the MetalLb to expose services, possibly on a network that is reachable by the outside.
-For a more detailed description of service network look at the following picture:
+Service Net of the MASTER NODE is used by the MetalLb to expose services, possibly on a network that is reachable by the outside.
 
-TODO
-.. image:: ../../../images/k8s/k8s_blueprint-LB_assignment.drawio.svg
-  :width: 400
-  :alt: Service Net in K8S clusters
-  :align: center
+Instead for NOT all the areas different from the one in witch the master is present, the service net is connected but it is not
+used to expose K8S services.
 
+For a more detailed description of the service network, look at the following picture:
+
+<p align="center">
+  <img src="../../../images/k8s/k8s_blueprint-LB_assignment.drawio.svg"  alt="Load balancer assignment"/>
+</p>
 
 ### Plugin installation
-
+TODO
 
 ## Adding Nodes to the cluster
 > This call is working only on K8S deployed using the Blueprint system, NOT on external clusters.

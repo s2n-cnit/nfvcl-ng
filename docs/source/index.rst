@@ -80,14 +80,14 @@ For more details you can go to :doc:`prometheus/prometheus`
 -------------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 4
    :hidden:
 
    self
 
 .. toctree::
    :caption: Topology
-   :maxdepth: 2
+   :maxdepth: 4
    :hidden:
 
    topology/topology
@@ -98,7 +98,7 @@ For more details you can go to :doc:`prometheus/prometheus`
 
 .. toctree::
    :caption: Blueprints
-   :maxdepth: 2
+   :maxdepth: 4
    :hidden:
 
    blueprints/blueprint
@@ -110,21 +110,23 @@ For more details you can go to :doc:`prometheus/prometheus`
 
 .. toctree::
    :caption: K8s Management
-   :maxdepth: 2
+   :maxdepth: 4
    :hidden:
 
    kubernetes/k8s_man_index
 
 .. toctree::
    :caption: Data Analytics
-   :maxdepth: 2
+   :maxdepth: 4
    :hidden:
 
    prometheus/prometheus
+   prometheus/prometheus_server_conf
+   prometheus/prometheus_top_add
 
 .. toctree::
    :caption: More
-   :maxdepth: 2
+   :maxdepth: 4
    :hidden:
 
    contacts

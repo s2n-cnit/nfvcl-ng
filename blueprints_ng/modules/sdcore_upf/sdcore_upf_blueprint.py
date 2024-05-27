@@ -81,10 +81,10 @@ class N3RouterConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.add_template_task(rel_path("config/n3_router.sh.jinja2"), "/opt/router.sh")
         ansible_builder.add_template_task(rel_path("config/router.service.jinja2"), "/etc/systemd/system/router.service")
         ansible_builder.set_var("side", "N3")
-        ansible_builder.set_var("n3_if", self.vm_resource.network_interfaces[self.n3_net_name].fixed.interface_name)
+        ansible_builder.set_var("n3_if", self.vm_resource.network_interfaces[self.n3_net_name][0].fixed.interface_name)
         ansible_builder.set_var("ue_ip_pool_cidr", self.ue_ip_pool_cidr)
         ansible_builder.set_var("gnb_ip", self.gnb_ip)
-        ansible_builder.set_var("gnb_if", self.vm_resource.network_interfaces[self.gnb_net_name].fixed.interface_name)
+        ansible_builder.set_var("gnb_if", self.vm_resource.network_interfaces[self.gnb_net_name][0].fixed.interface_name)
 
         ansible_builder.add_shell_task("systemctl daemon-reload")
 
@@ -114,8 +114,8 @@ class N6RouterConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.add_template_task(rel_path("config/n6_router.sh.jinja2"), "/opt/router.sh")
         ansible_builder.add_template_task(rel_path("config/router.service.jinja2"), "/etc/systemd/system/router.service")
         ansible_builder.set_var("side", "N6")
-        ansible_builder.set_var("n6_if", self.vm_resource.network_interfaces[self.n6_net_name].fixed.interface_name)
-        ansible_builder.set_var("internet_if", self.vm_resource.network_interfaces[self.mgt_net_name].fixed.interface_name)
+        ansible_builder.set_var("n6_if", self.vm_resource.network_interfaces[self.n6_net_name][0].fixed.interface_name)
+        ansible_builder.set_var("internet_if", self.vm_resource.network_interfaces[self.mgt_net_name][0].fixed.interface_name)
         ansible_builder.set_var("ue_ip_pool_cidr", self.ue_ip_pool_cidr)
         ansible_builder.set_var("upf_n6_ip", self.upf_n6_ip)
 
@@ -225,7 +225,7 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
 
         self.state.n6_router_vm_configurator = N6RouterConfigurator(
             vm_resource=self.state.n6_router_vm,
-            upf_n6_ip=self.state.upf_vm.network_interfaces[create_model.networks.n6].fixed.ip,
+            upf_n6_ip=self.state.upf_vm.network_interfaces[create_model.networks.n6][0].fixed.ip,
             n6_net_name=create_model.networks.n6,
             mgt_net_name=create_model.networks.mgt,
             ue_ip_pool_cidr=create_model.ue_ip_pool_cidr
@@ -235,22 +235,22 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
 
         self.state.upf_vm_configurator = SDCoreUPFConfigurator(vm_resource=self.state.upf_vm, configuration=SDCoreUPFConfiguration(
             upf_mode="dpdk",
-            n3_nic_name=self.state.upf_vm.network_interfaces[create_model.networks.n3].fixed.interface_name,
-            n6_nic_name=self.state.upf_vm.network_interfaces[create_model.networks.n6].fixed.interface_name,
-            n3_net_cidr=self.state.upf_vm.network_interfaces[create_model.networks.n3].fixed.get_ip_prefix(),
-            n6_net_cidr=self.state.upf_vm.network_interfaces[create_model.networks.n6].fixed.get_ip_prefix(),
-            n3_nic_mac=self.state.upf_vm.network_interfaces[create_model.networks.n3].fixed.mac,
-            n6_nic_mac=self.state.upf_vm.network_interfaces[create_model.networks.n6].fixed.mac,
+            n3_nic_name=self.state.upf_vm.network_interfaces[create_model.networks.n3][0].fixed.interface_name,
+            n6_nic_name=self.state.upf_vm.network_interfaces[create_model.networks.n6][0].fixed.interface_name,
+            n3_net_cidr=self.state.upf_vm.network_interfaces[create_model.networks.n3][0].fixed.get_ip_prefix(),
+            n6_net_cidr=self.state.upf_vm.network_interfaces[create_model.networks.n6][0].fixed.get_ip_prefix(),
+            n3_nic_mac=self.state.upf_vm.network_interfaces[create_model.networks.n3][0].fixed.mac,
+            n6_nic_mac=self.state.upf_vm.network_interfaces[create_model.networks.n6][0].fixed.mac,
             # n3_nh_ip=self.state.n3_router_vm.network_interfaces[create_model.networks.n3].fixed.ip,
             # n6_nh_ip=self.state.n6_router_vm.network_interfaces[create_model.networks.n6].fixed.ip,
             # n3_nh_mac=self.state.n3_router_vm.network_interfaces[create_model.networks.n3].fixed.mac,
             # n6_nh_mac=self.state.n6_router_vm.network_interfaces[create_model.networks.n6].fixed.mac,
             # n3_route=self.state.n3_router_vm.network_interfaces[create_model.networks.gnb].fixed.cidr,
             n3_nh_ip=create_model.gnb_n3_ip,
-            n6_nh_ip=self.state.n6_router_vm.network_interfaces[create_model.networks.n6].fixed.ip,
+            n6_nh_ip=self.state.n6_router_vm.network_interfaces[create_model.networks.n6][0].fixed.ip,
             n3_nh_mac=create_model.gnb_n3_mac,
-            n6_nh_mac=self.state.n6_router_vm.network_interfaces[create_model.networks.n6].fixed.mac,
-            n3_route=self.state.upf_vm.network_interfaces[create_model.networks.n3].fixed.cidr,
+            n6_nh_mac=self.state.n6_router_vm.network_interfaces[create_model.networks.n6][0].fixed.mac,
+            n3_route=self.state.upf_vm.network_interfaces[create_model.networks.n3][0].fixed.cidr,
             n6_route="0.0.0.0/0",
             start=create_model.start,
             dnn=create_model.dnn,
@@ -260,7 +260,7 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
         self.provider.configure_vm(self.state.upf_vm_configurator)
 
     def get_n4_info(self) -> str:
-        return self.state.upf_vm.network_interfaces[self.create_config.networks.n4].fixed.ip
+        return self.state.upf_vm.network_interfaces[self.create_config.networks.n4][0].fixed.ip
 
     def set_gnb_info(self, gnb_info: GNBN3Info):
         configuration_before = copy.copy(self.state.upf_vm_configurator.configuration)

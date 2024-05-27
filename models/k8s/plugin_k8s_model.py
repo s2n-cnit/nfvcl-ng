@@ -66,6 +66,7 @@ class K8sTemplateFillData(NFVCLBaseModel):
     """
     pod_network_cidr: str = Field(default="")
     lb_ipaddresses: List[str] = Field(default=[])
+    lb_ipaddresses_auto: List[str] = Field(default=[])
     lb_pools: List[LBPool] = Field(default=[])
 
     @field_validator('lb_pools')

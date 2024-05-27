@@ -29,6 +29,21 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
         return {}
 
     @abc.abstractmethod
+    def attach_net(self, vm_resource: VmResource, net_name: str) -> str:
+        """
+        Attach a network to an already running VM
+        DO NOT manually add the network name to the VmResource object
+
+        Args:
+            vm_resource: VM where the network will be attached
+            net_name: Network to attach
+
+        Returns:
+             the ip that has been set in that network
+        """
+        pass
+
+    @abc.abstractmethod
     def create_net(self, net_resource: NetResource):
         pass
 

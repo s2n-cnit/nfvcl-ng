@@ -50,8 +50,8 @@ The scheme below summarize the behavior depending on the case.
   :alt: Flavor
   :align: center
 
-Blueprint List
-++++++++++++++
+Blueprint Type List
++++++++++++++++++++
 
 .. list-table:: Blueprint list
    :widths: 25 50 50 25
@@ -109,3 +109,13 @@ the blueprint (change the config of a VM) or the deployment of an new VM/Helm-Ch
 Blueprint deletion
 ******************
 To remove a Blueprint it should be only needed to call the DELETE call with the target ID.
+
+Blueprint instances
+*******************
+To retrieve a list of instantiated blueprints you can make a GET request to:
+
+http://NFVCL_URL:5002/nfvcl/v2/api/blue/
+
+To get a list that includes all the details of a Blueprint instance you can add the following query param:
+
+http://NFVCL_URL:5002/nfvcl/v2/api/blue/?detailed=true

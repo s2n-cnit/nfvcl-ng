@@ -13,7 +13,7 @@ class K8sAreaDeployment(NFVCLBaseModel):
     mgmt_net: str = Field(description="The management network") # TODO validate
     use_vxlan: bool = Field(default=True, description="If true the VXLAN is used. This parameter is ignored in case `service_net` is specifed.")
     service_net: Optional[str] = Field(default=None, min_items=1, description="Network on witch services are exposed. If not present, service are exposed to an internal net (that can be accessed thought a VXLAN tunnel)")
-    service_net_required_ip_number: int = Field(default=20, description="The required IPs number to exposed services, they should be reserved. USED only in master area")
+    service_net_required_ip_number: int = Field(default=10, description="The required IPs number to exposed services, they should be reserved. USED only in master area")
     worker_replicas: PositiveInt = Field(default=1, description="Number of workers in this area")
     worker_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="8192", storage_gb='32', vcpu_count='6')
 
@@ -49,6 +49,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     password: str = Field(default="ubuntu", description="The password to be set, in every vm, for user ubuntu", pattern=r'^[a-zA-Z0-9_.-]*$')
     install_plugins: bool = Field(default=True, description="Whether to install default plugin list on blueprint deployment (Flannel, MetalLb, OpenEBS)")
     master_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="2048", storage_gb='16', vcpu_count='2')
+    require_port_security_disabled: Optional[bool] = Field(default=True, description="Global port security disable, override port security in nodes flavors")
     areas: List[K8sAreaDeployment] = Field(min_items=1, description="List of areas in witch deployment is made (with requirements)")
 
     @field_validator('areas')

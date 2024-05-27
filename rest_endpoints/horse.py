@@ -21,8 +21,8 @@ class RTRRestAnswer(BaseModel):
     status: str = 'submitted'
     status_code: int = 202 # OK
 
-@horse_router.post("/rtr_request_demo1", response_model=RTRRestAnswer)
-def rtr_request_demo1(host: str, username: str, password: str, forward_to_doc: bool, payload: str = Body(None, media_type="application/yaml")):
+@horse_router.post("/rtr_request_workaround", response_model=RTRRestAnswer)
+def rtr_request_workaround(host: str, username: str, password: str, forward_to_doc: bool, payload: str = Body(None, media_type="application/yaml")):
     """
     Allows running an ansible playbook on a remote host.
     Integration for HORSE Project. Allow applying mitigation action on a target. This function is implemented as a workaround since in the first demo
@@ -57,6 +57,8 @@ def rtr_request_demo1(host: str, username: str, password: str, forward_to_doc: b
                     httpx.post(f"http://{doc_module_url}", data=body, headers={"Content-Type": "application/json"}, timeout=10) # TODO TEST
                 except ConnectTimeout:
                     raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
+                except httpx.ConnectError:
+                    raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
                 return RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
             else:
                 return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)

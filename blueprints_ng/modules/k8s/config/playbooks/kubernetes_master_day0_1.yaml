@@ -49,7 +49,7 @@
        path: /root/.kube/cache
        state: absent
    - name: Get the token for workers to join the cluster
-     shell: kubeadm token create  --print-join-command
+     shell: kubeadm token create --print-join-command --ttl 0
      register: kubernetes_join_command
    - name: Get k8s credential file
      shell: cat /root/.kube/config

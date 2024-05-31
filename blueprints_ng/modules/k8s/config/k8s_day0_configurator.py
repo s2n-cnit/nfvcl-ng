@@ -108,3 +108,11 @@ class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):
         self._ansible_builder.set_var("karmada_control_plane", request.karmada_control_plane)
         self._ansible_builder.set_var("karmada_token", request.karmada_token)
         self._ansible_builder.set_var("discovery_token_hash", request.discovery_token_hash)
+
+    def install_istio(self):
+        """
+        Creates tasks for the ansible builder that install and configure istio
+        """
+        self._ansible_builder = AnsiblePlaybookBuilder("K8s Master Day0 Istio")
+        # Using the playbook to configure karmada and submariner
+        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/kubernetes_master_istio.yaml"))

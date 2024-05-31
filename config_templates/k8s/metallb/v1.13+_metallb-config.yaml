@@ -11,7 +11,7 @@ spec:
 {% endfor %}
   autoAssign: false
 {% endif %}
-{% if confvar.lb_ipaddresses %}
+{% if confvar.lb_ipaddresses_auto %}
 ---
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool

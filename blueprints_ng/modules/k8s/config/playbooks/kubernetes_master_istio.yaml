@@ -1,0 +1,16 @@
+---
+- hosts: workers
+  gather_facts: no
+  tasks:
+   - name: Download Istio installer
+     ansible.builtin.get_url:
+       url: https://istio.io/downloadIstio
+       dest: /tmp
+       mode: '0755'
+   - name: Downloading istio
+     shell: /tmp/downloadIstio ISTIO_VERSION=1.22.0 TARGET_ARCH=x86_64
+   - name: Installing istio
+     shell: ./istio-1.22.0/bin/istioctl install -y
+   - name: Activating Prometheus
+     shell: kubectl apply -f ./istio-1.22.0/samples/addons/prometheus.yaml
+

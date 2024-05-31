@@ -312,7 +312,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         plug_list.append(K8sPluginName.METALLB)
         plug_list.append(K8sPluginName.OPEN_EBS)
 
-        # IP on the management inteface for the workers, the ones mapped with the floating IP if present
+        # IP on the management interface for the workers, the ones mapped with the floating IP if present
         workers_mgt_int = [item.get_management_interface().fixed.ip for item in self.state.vm_workers]
 
         # Get the k8s pod network cidr
@@ -444,6 +444,23 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.logger.info(f"Client configuration: \n{client_commands}")
         master_result = self.provider.configure_vm(master_day2_conf)
 
+    @classmethod
+    def install_k8s_istio(cls, blue_id: str, request: Request):
+        """
+        Install and configure submariner and Karmada on an existing blueprint generated K8S cluster.
+        """
+        return cls.api_day2_function("", blue_id, request)
+
+    @add_route(K8S_BLUE_TYPE, "/install_istio", [HttpRequestType.POST], install_k8s_istio)
+    def install_istio(self, msg):
+        """
+        Creates a configurator that installs and configures submarine and istio.
+        """
+        master_conf = self.state.day_0_master_configurator
+        master_conf.install_istio()
+        master_result = self.provider.configure_vm(master_conf)
+        # TODO expose prometheus to external using nodeport
+
     def destroy(self):
         """
         Destroy the blueprints. Calls super destroy that destroy VMs and configurators.
@@ -459,3 +476,4 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 build_topology().del_k8scluster(self.id)
             except ValueError:
                 self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")
+

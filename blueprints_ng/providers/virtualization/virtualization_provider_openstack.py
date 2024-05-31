@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
 
@@ -360,7 +361,10 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         playbook_str = vm_resource_configuration.dump_playbook()
 
-        with open(Path(nfvcl_tmp_dir, f"{self.blueprint.id}_{vm_resource_configuration.vm_resource.name}.yml"), "w+") as f:
+        # Dumping the playbook in the "/tmp/nfvcl/playbook" folder
+        now = datetime.now()
+        formatted_time = now.strftime("%Y%m%d-%H%M")
+        with open(Path(nfvcl_tmp_dir, f"{self.blueprint.id}_{vm_resource_configuration.vm_resource.name}_{formatted_time}.yml"), "w+") as f:
             f.write(playbook_str)
 
         # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections

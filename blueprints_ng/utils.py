@@ -40,6 +40,12 @@ def rel_path(file: str) -> Path:
     mod_path = Path(inspect.stack()[1].filename).parent
     return Path(mod_path, file)
 
+# define a custom representer for strings
+def quoted_presenter(dumper, data):
+    if ":"in data:
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+    else:
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
 class MyYAML(YAML):
     """
@@ -49,6 +55,7 @@ class MyYAML(YAML):
     def __init__(self: Any, *, typ: Optional[Union[List[Text], Text]] = None, pure: Any = False, output: Any = None, plug_ins: Any = None) -> None:
         super().__init__(typ=typ, pure=pure, output=output, plug_ins=plug_ins)
         self.preserve_quotes = True
+        self.representer.add_representer(str, quoted_presenter)
 
     def dump(self, data, stream=None, **kw):
         """

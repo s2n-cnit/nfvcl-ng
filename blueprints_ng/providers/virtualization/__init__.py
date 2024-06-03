@@ -1,2 +1,2 @@
 from .virtualization_provider_openstack import VirtualizationProviderOpenstack
-from .virtualization_provider_proxmox import VirtualizationProviderProxmox
+from blueprints_ng.providers.virtualization.proxmox.virtualization_provider_proxmox import VirtualizationProviderProxmox

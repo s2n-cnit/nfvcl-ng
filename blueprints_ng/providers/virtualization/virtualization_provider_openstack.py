@@ -4,6 +4,9 @@ from pathlib import Path
 from typing import List, Dict
 
 import paramiko
+from blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator
+
+from blueprints_ng.providers.virtualization.common.utils import wait_for_ssh_to_be_ready
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.compute.v2.server_interface import ServerInterface
@@ -51,34 +54,6 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
             R"""find /sys/class/net -mindepth 1 -maxdepth 1 ! -name lo -printf "%P: " -execdir cat {}/address \;""",
             "interfaces_mac"
         )
-
-        return ansible_playbook_builder.build()
-
-
-class NetplanNetMatch(NFVCLBaseModel):
-    macaddress: str = Field()
-
-
-class NetplanNetConfig(NFVCLBaseModel):
-    dhcp4: str = Field()
-    set_name: str = Field(alias="set-name")
-    match: NetplanNetMatch = Field()
-
-
-class VmAddNicNetplanConfigurator(VmResourceAnsibleConfiguration):
-    """
-    This configurator is used to add a nic to the netplan configuration of a VM and reload
-    """
-    nic_name: str = Field()
-    mac_address: str = Field()
-
-    def dump_playbook(self) -> str:
-        ansible_playbook_builder = AnsiblePlaybookBuilder("Add nic to netplan")
-
-        netplan_config_to_add = NetplanNetConfig(dhcp4="true", set_name=self.nic_name, match=NetplanNetMatch(macaddress=self.mac_address))
-        # TODO add dhcp override route to prevent multiple default gateways
-        ansible_playbook_builder.add_shell_task(f"netplan set --origin-hint 50-cloud-init 'network.ethernets.{self.nic_name}={netplan_config_to_add.model_dump_json(by_alias=True)}'")
-        ansible_playbook_builder.add_shell_task("netplan apply")
 
         return ansible_playbook_builder.build()
 
@@ -332,29 +307,6 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         return configurator_facts
 
-    def __wait_for_ssh_to_be_ready(self, host: str, port: int, user: str, passwd: str, timeout: int, retry_interval: float) -> bool:
-        self.logger.debug(f"Starting SSH connection to {host}:{port} as user <{user}> and passwd <{passwd}>. Timeout is {timeout}, retry interval is {retry_interval}")
-        client = paramiko.client.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        timeout_start = time.time()
-        while time.time() < timeout_start + timeout:
-            try:
-                client.connect(host, port, username=user, password=passwd, allow_agent=False, look_for_keys=False)
-                self.logger.debug('SSH transport is available!')
-                client.close()
-                return True
-            except paramiko.ssh_exception.SSHException as e:
-                # socket is open, but not SSH service responded
-                self.logger.debug(f"Socket is open, but not SSH service responded: {e}")
-                time.sleep(retry_interval)
-                continue
-
-            except paramiko.ssh_exception.NoValidConnectionsError as e:
-                self.logger.debug('SSH transport is not ready...')
-                time.sleep(retry_interval)
-                continue
-        return False
-
     def __configure_vm_ansible(self, vm_resource_configuration: VmResourceAnsibleConfiguration) -> dict:
         nfvcl_tmp_dir = Path("/tmp/nfvcl/playbook")
         nfvcl_tmp_dir.mkdir(exist_ok=True, parents=True)
@@ -368,7 +320,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             f.write(playbook_str)
 
         # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections
-        self.__wait_for_ssh_to_be_ready(
+        wait_for_ssh_to_be_ready(
             vm_resource_configuration.vm_resource.access_ip,
             22,
             vm_resource_configuration.vm_resource.username,

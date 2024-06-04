@@ -12,10 +12,10 @@ from httpx import Response
 
 from nfvcl.blueprints_ng.cloudinit_builder import CloudInit, CloudInitNetworkRoot
 from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
-from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator
+from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, NetplanInterface
 from nfvcl.blueprints_ng.providers.virtualization.common.utils import wait_for_ssh_to_be_ready
 from nfvcl.blueprints_ng.providers.virtualization.proxmox.models.models import ProxmoxZones, ProxmoxZone, Subnets, Subnet, \
-    ProxmoxNetsDevice, ProxmoxNodes, ProxmoxMac
+    ProxmoxNetsDevice, ProxmoxNodes, ProxmoxMac, ProxmoxTicket
 from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
@@ -39,6 +39,7 @@ class VirtualizationProviderDataProxmox(VirtualizationProviderData):
     proxmox_net_device: ProxmoxNetsDevice = ProxmoxNetsDevice()
     proxmox_vnet: List[str] = []
     proxmox_node_name: str = ""
+    proxmox_credentials: ProxmoxTicket = ProxmoxTicket()
 
 
 class VirtualizationProviderProxmoxException(VirtualizationProviderException):
@@ -59,6 +60,21 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                          password=self.vim.vim_password, timeout=3)
         self.path = self.__get_storage_path(self.vim.vim_proxmox_storage_id)
 
+        with httpx.Client(verify=False) as client:
+            header = {
+                'Content-Type': 'application/json',
+            }
+            credentials = {
+                'username': f'{self.vim.vim_user}@{self.vim.vim_proxmox_realm}',
+                'password': self.vim.vim_password,
+            }
+            response = client.post(f"https://{self.vim.vim_url}:8006/api2/json/access/ticket", headers=header, json=credentials)
+
+        response = response.json()
+        self.data.proxmox_credentials = ProxmoxTicket(
+            ticket=response['data']['ticket'],
+            csrfpreventiontoken=response['data']['CSRFPreventionToken'],
+        )
         self.__create_ci_qcow_folders()
         self.__load_scripts()
 
@@ -162,21 +178,43 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__create_sdn_vnet(net_resource)
         self.__create_sdn_subnet(net_resource)
 
-    def attach_net(self, vm_resource: VmResource, net_name: str):
-        vm_resource.additional_networks.append(net_name)
+    def attach_nets(self, vm_resource: VmResource, nets_name: List[str]) -> List[str]:
+        netplan_interfaces: List[NetplanInterface] = []
+        interfaces = []
         vmid = self.data.proxmox_dict[vm_resource.id]
-        interface = self.data.proxmox_net_device.add_net_device(str(vmid))
-        self.__execute_ssh_command(f'qm set {vmid} --{interface} virtio,bridge={net_name},firewall=0')
+
+        for net in nets_name:
+            vm_resource.additional_networks.append(net)
+            interface = self.data.proxmox_net_device.add_net_device(str(vmid))
+            interfaces.append(interface)
+            self.__execute_ssh_command(f'qm set {vmid} --{interface} virtio,bridge={net},firewall=0')
+
         self.__get_macs(int(vmid))
 
-        for mac in self.data.proxmox_macs[vmid]:
-            if mac.hw_interface_name == interface:
-                self.__configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nic_name=mac.interface_name, mac_address=mac.mac))
+        for interface in interfaces:
+            for mac in self.data.proxmox_macs[vmid]:
+                if mac.hw_interface_name == interface:
+                    tmp = NetplanInterface(
+                        nic_name=mac.interface_name,
+                        mac_address=mac.mac
+                    )
+                    netplan_interfaces.append(tmp)
+
+        self.__configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces))
 
         self.__parse_proxmox_addresses(vm_resource, vmid)
 
-        self.logger.success(f"Network {net_name} attached to VM {vm_resource.name}")
+        self.logger.success(f"Network {', '.join(nets_name)} attached to VM {vm_resource.name}")
         self.blueprint.to_db()
+
+        ips = []
+        for net in nets_name:
+            for interface in netplan_interfaces:
+                for net_interface in vm_resource.network_interfaces[net]:
+                    if net_interface.fixed.interface_name == interface.nic_name and net_interface.fixed.ip not in ips:
+                        ips.append(net_interface.fixed.ip)
+
+        return ips
 
     def __get_free_vmid(self) -> int:
         nfvcl_vmid = list(range(10000, 11000))
@@ -296,12 +334,13 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         else:
             return stdout
 
-    def __execute_rest_request(self, url: str, parameters: dict, r_type: ApiRequestType, my_data: dict = None, my_json=None):
+    def __execute_rest_request(self, url: str, parameters: dict, r_type: ApiRequestType, my_data: dict = None, my_json=None, ):
         url_base = f"https://{self.vim.vim_url}:8006/api2/json/"
         with httpx.Client(base_url=url_base, verify=False) as client:
             header = {
                 'Content-Type': 'application/json',
-                'Authorization': 'PVEAPIToken=root@pam!APIToken=1dcaa25f-7d6a-44ce-aa63-6f73f10db3a6'
+                'Cookie': f'PVEAuthCookie={self.data.proxmox_credentials.ticket}',
+                'CSRFPreventionToken': self.data.proxmox_credentials.csrfpreventiontoken
             }
             match r_type:
                 case ApiRequestType.POST:
@@ -375,7 +414,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __create_sdn_vnet(self, vnet: NetResource):
         self.logger.info(f"Creating Vnet {vnet.name}")
         nfvcl_zone = self.__get_nfvcl_sdn_zone()
-        stdout : Response = self.__execute_rest_request(f'cluster/sdn/vnets', {}, r_type=ApiRequestType.POST, my_json={'vnet': f'{vnet.name}', 'zone': f'{nfvcl_zone.zone}'})
+        stdout: Response = self.__execute_rest_request(f'cluster/sdn/vnets', {}, r_type=ApiRequestType.POST, my_json={'vnet': f'{vnet.name}', 'zone': f'{nfvcl_zone.zone}'})
         if stdout.reason_phrase != "OK":
             raise VirtualizationProviderProxmoxException(f"{stdout.reason_phrase}")
         self.__apply_sdn()
@@ -401,7 +440,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __create_sdn_subnet(self, vnet: NetResource):
         self.logger.info(f"Creating Vnet Subnet {vnet.cidr}")
         gateway, start_dhcp, end_dhcp = self.__get_ips_for_subnets(vnet.cidr)
-        stdout = self.__execute_rest_request(f"cluster/sdn/vnets/{vnet.name}/subnets", {}, r_type=ApiRequestType.POST, my_json={'subnet': f'{vnet.cidr}', 'type': 'subnet', 'gateway' : f'{gateway}', 'dhcp-range' : f'start-address={start_dhcp},end-address={end_dhcp}'})
+        stdout = self.__execute_rest_request(f"cluster/sdn/vnets/{vnet.name}/subnets", {}, r_type=ApiRequestType.POST, my_json={'subnet': f'{vnet.cidr}', 'type': 'subnet', 'gateway': f'{gateway}', 'dhcp-range': f'start-address={start_dhcp},end-address={end_dhcp}'})
         if stdout.reason_phrase != "OK":
             raise VirtualizationProviderProxmoxException(f"{stdout.reason_phrase}")
         self.__apply_sdn()

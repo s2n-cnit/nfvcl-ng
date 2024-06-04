@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import Field
 
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
@@ -28,18 +30,23 @@ class NetplanNetConfig(NFVCLBaseModel):
     match: NetplanNetMatch = Field()
 
 
+class NetplanInterface(NFVCLBaseModel):
+    nic_name: str = Field()
+    mac_address: str = Field()
+
+
 class VmAddNicNetplanConfigurator(VmResourceAnsibleConfiguration):
     """
     This configurator is used to add a nic to the netplan configuration of a VM and reload
     """
-    nic_name: str = Field()
-    mac_address: str = Field()
+    nics: List[NetplanInterface] = Field(default_factory=list)
 
     def dump_playbook(self) -> str:
         ansible_playbook_builder = AnsiblePlaybookBuilder("Add nic to netplan")
 
-        netplan_config_to_add = NetplanNetConfig(dhcp4="true", set_name=self.nic_name, match=NetplanNetMatch(macaddress=self.mac_address), dhcp4_overrides=DhcpOverride())
-        ansible_playbook_builder.add_shell_task(f"netplan set --origin-hint 50-cloud-init 'network.ethernets.{self.nic_name}={netplan_config_to_add.model_dump_json(by_alias=True)}'")
+        for nic in self.nics:
+            netplan_config_to_add = NetplanNetConfig(dhcp4="true", set_name=nic.nic_name, match=NetplanNetMatch(macaddress=nic.mac_address), dhcp4_overrides=DhcpOverride())
+            ansible_playbook_builder.add_shell_task(f"netplan set --origin-hint 50-cloud-init 'network.ethernets.{nic.nic_name}={netplan_config_to_add.model_dump_json(by_alias=True)}'")
         ansible_playbook_builder.add_shell_task("netplan apply")
 
         return ansible_playbook_builder.build()

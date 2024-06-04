@@ -178,18 +178,18 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
     def create_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).create_vm(vm_resource)
 
-    def attach_net(self, vm_resource: VmResource, net_name: str):
+    def attach_nets(self, vm_resource: VmResource, nets_name: List[str]):
         """
         Attach a network to an already running VM
 
         Args:
             vm_resource: VM where the network will be attached
-            net_name: Network to attach
+            nets_name: List of networks to attach
 
         Returns:
              the ip that has been set in that network
         """
-        return self.get_virt_provider(vm_resource.area).attach_net(vm_resource, net_name)
+        return self.get_virt_provider(vm_resource.area).attach_nets(vm_resource, nets_name)
 
     def create_net(self, net_resource: NetResource):
         return self.get_virt_provider(net_resource.area).create_net(net_resource)
@@ -532,7 +532,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
         Returns: Result of the function call
         """
-        from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
+        from rest_endpoints.blue_ng_router import get_blueprint_manager
 
         self.logger.debug(f"Calling external function '{function_name}' on blueprint '{external_blue_id}', args={args}, kwargs={kwargs}")
         res = get_blueprint_manager().get_worker(external_blue_id).call_function_sync(function_name, *args, **kwargs)

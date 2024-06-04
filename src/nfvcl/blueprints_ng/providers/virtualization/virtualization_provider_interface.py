@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+from typing import List
 
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, \
     BlueprintNGProviderData
@@ -29,14 +30,14 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
         return {}
 
     @abc.abstractmethod
-    def attach_net(self, vm_resource: VmResource, net_name: str) -> str:
+    def attach_nets(self, vm_resource: VmResource, nets_name: List[str]) -> List[str]:
         """
         Attach a network to an already running VM
         DO NOT manually add the network name to the VmResource object
 
         Args:
             vm_resource: VM where the network will be attached
-            net_name: Network to attach
+            nets_name: List of networks to attach
 
         Returns:
              the ip that has been set in that network

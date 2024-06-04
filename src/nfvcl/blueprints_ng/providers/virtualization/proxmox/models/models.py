@@ -3,11 +3,18 @@ from typing import List, Optional, Dict
 from pydantic import Field
 from nfvcl.models.base_model import NFVCLBaseModel
 
+
+class ProxmoxTicket(NFVCLBaseModel):
+    ticket: str = Field(default=None)
+    csrfpreventiontoken: str = Field(default=None)
+
+
 class ProxmoxMac(NFVCLBaseModel):
     mac: str = Field()
     net_name: str = Field()
     hw_interface_name: str = Field()
     interface_name: str = Field()
+
 
 class ProxmoxZone(NFVCLBaseModel):
     digest: str = Field()
@@ -43,6 +50,7 @@ class ProxmoxNode(NFVCLBaseModel):
     mem: Optional[int] = Field(default=None)
     ssl_fingerprint: Optional[str] = Field(default=None)
     uptime: Optional[int] = Field(default=None)
+
 
 class ProxmoxNodes(NFVCLBaseModel):
     data: List[ProxmoxNode] = Field(default_factory=list)

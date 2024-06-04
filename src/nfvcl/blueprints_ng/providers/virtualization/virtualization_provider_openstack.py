@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
 
-from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator
+from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, NetplanInterface
 
 from nfvcl.blueprints_ng.providers.virtualization.common.utils import wait_for_ssh_to_be_ready
 from openstack.compute.v2.flavor import Flavor
@@ -175,25 +175,35 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                 for port in server_ports:
                     self.__disable_port_security(self.conn, port.id)
 
-    def attach_net(self, vm_resource: VmResource, net_name: str):
-        # Get the OS SDK network object
-        network = self.conn.get_network(net_name)
-        # Connect the network to the instance
-        new_server_interface: ServerInterface = self.conn.compute.create_server_interface(self.data.os_dict[vm_resource.id], net_id=network.id)
-        # Add the network to the VmResource object
-        vm_resource.additional_networks.append(net_name)
+    def attach_nets(self, vm_resource: VmResource, nets_name: List[str]) -> List[str]:
+        new_interfaces: List[ServerInterface] = []
+
+        for net in nets_name:
+            # Get the OS SDK network object
+            network = self.conn.get_network(net)
+            # Connect the network to the instance
+            new_server_interface: ServerInterface = self.conn.compute.create_server_interface(self.data.os_dict[vm_resource.id], net_id=network.id)
+            # Add the network to the VmResource object
+            vm_resource.additional_networks.append(net)
+            new_interfaces.append(new_server_interface)
 
         server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
 
         self.__update_net_info_vm(vm_resource, server_obj)
 
-        net_intf = vm_resource.get_network_interface_by_fixed_mac(new_server_interface.mac_addr)
-        self.__configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nic_name=net_intf.fixed.interface_name, mac_address=new_server_interface.mac_addr))
+        ips: List[str] = []
+        nics: List[NetplanInterface] = []
+        for net in new_interfaces:
+            net_intf = vm_resource.get_network_interface_by_fixed_mac(net.mac_addr)
+            nics.append(NetplanInterface(nic_name=net_intf.fixed.interface_name, mac_address=net.mac_addr))
+            ips.append(net_intf.fixed.ip)
 
-        self.logger.success(f"Network {net_name} attached to VM {vm_resource.name}")
+        self.__configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics))
+
+        self.logger.success(f"Networks {new_interfaces} attached to VM {vm_resource.name}")
         self.blueprint.to_db()
 
-        return net_intf.fixed.ip
+        return ips
 
     def create_net(self, net_resource: NetResource):
         self.logger.info(f"Creating NET {net_resource.name}")

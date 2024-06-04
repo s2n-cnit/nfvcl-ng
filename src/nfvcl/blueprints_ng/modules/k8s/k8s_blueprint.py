@@ -21,9 +21,9 @@ from pydantic import Field
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
 
 K8S_BLUE_TYPE = "k8s"
-BASE_IMAGE_MASTER = "k8s-base"
-BASE_IMAGE_URL = "http://images.tnt-lab.unige.it/k8s/k8s-v0.0.1.qcow2"
-BASE_IMAGE_WORKER = "k8s-base"
+BASE_IMAGE_MASTER = "k8s-base-v0.0.3"
+BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.0.3.qcow2"
+BASE_IMAGE_WORKER = "k8s-base-v0.0.3"
 DUMMY_NET_INT_NAME = "eth99"
 POD_NET_CIDR = "10.254.0.0/16"
 POD_SERVICE_CIDR = "10.200.0.0/16"
@@ -477,3 +477,23 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             except ValueError:
                 self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")
 
+    def to_dict(self, detailed: bool) -> dict:
+        """
+        OVERRIDE
+        Return a dictionary representation of the K8S blueprint instance.
+        Use the father function to generate the dict, if not detailed, add the node list.
+
+        Args:
+            detailed: Return the same content saved in the database containing all the details of the blueprint.
+
+        Returns:
+
+        """
+        if detailed:
+            return super().to_dict(detailed)
+        else:
+            base_dict = super().to_dict(detailed)
+            ip_list = [f"Controller: {self.base_model.state.vm_master.access_ip}"]
+            ip_list.extend([f"Worker: {vm.access_ip}" for vm in self.base_model.state.vm_workers])
+            base_dict['node_list'] = ip_list
+            return base_dict

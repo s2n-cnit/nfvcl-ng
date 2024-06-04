@@ -2,6 +2,9 @@
 name = "nfvcl"
 version = "0.2.2"
 description = ""
+packages = [
+    { include = "nfvcl", from = "src" },
+]
 authors = ["TNT LAB <staff@tnt-lab.unige.it>"]
 maintainers = [
     "Paolo Bono <paolob@tnt-lab.unige.it>",

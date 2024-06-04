@@ -24,6 +24,7 @@ class ExampleCreateModel(BlueprintNGCreateModel):
     """
     This class represent the model for the create request
     """
+    area_id: int = Field()
     mgmt_net: str = Field()
     data_net: str = Field()
     chart_value: str = Field()
@@ -117,7 +118,7 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
 
         # To describe a new VM create a VmResource object and save it in the state
         self.state.vm_ubuntu1 = VmResource(
-            area=0,
+            area=create_model.area_id,
             name=f"{self.id}_VM_Ubuntu_1",
             image=VmResourceImage(name="ubuntu2204"),
             flavor=VmResourceFlavor(),
@@ -131,7 +132,7 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
         self.register_resource(self.state.vm_ubuntu1)
 
         self.state.vm_ubuntu2 = VmResource(
-            area=0,
+            area=create_model.area_id,
             name=f"{self.id}_VM_Ubuntu_2",
             image=VmResourceImage(name="ubuntu2204"),
             flavor=VmResourceFlavor(),
@@ -173,7 +174,7 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
         # chart_as_path to True
         # If you want to install a chart from a repo also set the 'repo' and 'version' fields
         self.state.mqtt_helm_chart = HelmChartResource(
-            area=1,
+            area=create_model.area_id,
             name=f"mqttbroker",
             # repo="https://mysql.github.io/mysql-operator/",
             chart="helm_charts/charts/mqttbroker-0.0.3.tgz",
@@ -207,7 +208,7 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
     @add_route(EXAMPLE_BLUE_TYPE, "/add_vm", [HttpRequestType.POST], add_vm_endpoint)
     def add_vm(self, model: ExampleAddVMModel):
         new_vm = VmResource(
-            area=0,
+            area=self.create_config.area_id,
             name=f"{self.id}_VM_Ubuntu_{model.num}",
             image=VmResourceImage(name="ubuntu2204"),
             flavor=VmResourceFlavor(),

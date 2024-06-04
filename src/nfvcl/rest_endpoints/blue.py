@@ -45,7 +45,7 @@ def initialize_blueprints_routers():
     for b in blueprint_types:
         try:
             logger.info("exposing REST APIs for Blueprint {}".format(blueprint_types[b]['class_name']))
-            BlueClass = getattr(importlib.import_module("blueprints.{}".format(blueprint_types[b]['module_name'])),
+            BlueClass = getattr(importlib.import_module("nfvcl.blueprints.{}".format(blueprint_types[b]['module_name'])),
                                 blueprint_types[b]['class_name'])
             # Define as methods to handle creation and modification of blueprint the 2 method in this file.
             blue_router.include_router(BlueClass.fastapi_router(create_blueprint, modify_blueprint))

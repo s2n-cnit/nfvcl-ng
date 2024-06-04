@@ -1,5 +1,10 @@
 from pathlib import Path
 
+from nfvcl.models.config_model import NFVCLConfigModel
+from nfvcl.utils.log import create_logger
+from nfvcl.utils.util import get_nfvcl_config
+
+
 def check_folders():
     """
     Creates empty folders not pushed on GitHub, if not already present.
@@ -13,9 +18,6 @@ check_folders()
 from logging import Logger
 import uvicorn
 import sys
-from models.config_model import NFVCLConfigModel
-from utils.util import get_nfvcl_config
-from utils.log import create_logger
 
 logger: Logger
 PY_MIN_MAJOR = 3
@@ -52,7 +54,7 @@ if __name__ == "__main__":
     nfvcl_conf: NFVCLConfigModel = check_ip()
     if nfvcl_conf is not None:
         # Run database migrations
-        from utils.db_migration import start_migrations
+        from nfvcl.utils.db_migration import start_migrations
         start_migrations()
 
         # Load the app only if pre-configuration is OK.

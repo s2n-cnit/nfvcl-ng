@@ -29,4 +29,4 @@ RUN /root/.local/bin/poetry install && \
     rm -rf /root/.cache/pypoetry/artifacts && \
     rm -rf /root/.cache/pip
 
-CMD ["/root/.local/bin/poetry", "run", "python", "./run.py"]
+CMD ["/root/.local/bin/poetry", "run", "python", "-m", "nfvcl"]

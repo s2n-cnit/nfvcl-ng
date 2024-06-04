@@ -1,16 +1,16 @@
 from multiprocessing import Process
 
-from blueprints.blue_lcm_beta import LCMWorkersBeta
+from nfvcl.blueprints.blue_lcm_beta import LCMWorkersBeta
 from nfvcl.utils.log import create_logger
-from utils.openstack.openstack_utils import check_openstack_instances
-from utils.util import *
-from utils import persistency
-from topology.topology import topology_lock, build_topology
-from topology.topology_worker import TopologyWorker
-from nfvo import PNFmanager
-from nfvo.osm_nbi_util import get_osm_nbi_utils
-from blueprints import LCMWorkers
-from subscribe_endpoints.k8s_manager import initialize_k8s_man_subscriber
+from nfvcl.utils.openstack.openstack_utils import check_openstack_instances
+from nfvcl.utils.util import *
+from nfvcl.utils import persistency
+from nfvcl.topology.topology import topology_lock, build_topology
+from nfvcl.topology.topology_worker import TopologyWorker
+from nfvcl.nfvo import PNFmanager
+from nfvcl.nfvo.osm_nbi_util import get_osm_nbi_utils
+from nfvcl.blueprints import LCMWorkers
+from nfvcl.subscribe_endpoints.k8s_manager import initialize_k8s_man_subscriber
 import signal
 import atexit
 

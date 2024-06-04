@@ -1,0 +1,81 @@
+replicaCount: 1
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+namespace: "nfvcl"
+
+nfvclImage:
+  repository: registry.gitlab.tnt-lab.unige.it/nfvcl/nfvcl-ng
+  pullPolicy: IfNotPresent
+  tag: "master"
+redisImage:
+  repository: redis
+  pullPolicy: IfNotPresent
+  tag: "7.0-alpine"
+mongoImage:
+  repository: mongo
+  pullPolicy: IfNotPresent
+  tag: "7.0-jammy"
+
+podAnnotations: {}
+
+nfvclPodLabels: {
+    appSubSvc: nfvcl
+    }
+mongoPodLabels: {
+    appSubSvc: mongo
+    }
+redisPodLabels: {
+    appSubSvc: redis
+    }
+
+resources: {}
+
+nfvclLivenessProbe:
+  httpGet:
+    path: /
+    port: 5002
+nfvclReadinessProbe:
+  httpGet:
+    path: /
+    port: 5002
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+nfvclService:
+  name: nfvcl-svc
+  type: LoadBalancer
+  port: 5002
+  targetPort: 5002
+
+mongoService:
+  name: mongo-svc
+  type: NodePort
+  port: 27017
+  targetPort: 27017
+  nodePort: 31000
+
+redisService:
+  name: redis-svc
+  type: NodePort
+  port: 6379
+  targetPort: 6379
+  nodePort: 32000

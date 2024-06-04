@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.nfvclService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "helm-nfvcl.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.nfvclService.type }}
+  ports:
+    - port: {{ .Values.nfvclService.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "helm-nfvcl.selectorLabels" . | nindent 4 }}
+    {{- with .Values.nfvclPodLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}

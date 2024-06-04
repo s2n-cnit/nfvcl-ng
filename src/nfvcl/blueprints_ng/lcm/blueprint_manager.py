@@ -104,7 +104,11 @@ class BlueprintManager(metaclass=Singleton):
         Returns:
             The blueprint list (List[BlueprintNG]).
         """
-        return [BlueprintNG.from_db(item) for item in self._load_all_blue_dict_from_db()]
+        blue_list = []
+        for item in self._load_all_blue_dict_from_db():
+            logger.debug(f"Deserializing Blueprint {item['id']}")
+            blue_list.append(BlueprintNG.from_db(item))
+        return blue_list
 
 
     def create_blueprint(self, msg: Any, path: str, wait: bool = False, parent_id: str | None = None) -> str:

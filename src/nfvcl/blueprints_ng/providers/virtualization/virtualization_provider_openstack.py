@@ -183,6 +183,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             network = self.conn.get_network(net)
             # Connect the network to the instance
             new_server_interface: ServerInterface = self.conn.compute.create_server_interface(self.data.os_dict[vm_resource.id], net_id=network.id)
+            self.logger.debug(f"OS network '{net}' attached to VM {vm_resource.name}")
             # Add the network to the VmResource object
             vm_resource.additional_networks.append(net)
             new_interfaces.append(new_server_interface)
@@ -200,7 +201,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         self.__configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics))
 
-        self.logger.success(f"Networks {new_interfaces} attached to VM {vm_resource.name}")
+        self.logger.success(f"Networks {nets_name} attached to VM {vm_resource.name}")
         self.blueprint.to_db()
 
         return ips

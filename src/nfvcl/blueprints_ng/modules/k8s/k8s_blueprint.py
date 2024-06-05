@@ -229,9 +229,9 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         reserved_pools = []
         if self.state.master_area.service_net:
             # In this case, the NET exists on OPENSTACK, and we should ask OS for attaching a new interface with an IP on that network
-            for i in range(0, self.state.master_area.service_net_required_ip_number):
-                ip = self.provider.attach_net(self.state.vm_master, self.state.master_area.service_net)
-                self.state.load_balancer_ips.append(ip)
+            networks_to_attach = [self.state.master_area.service_net] * self.state.master_area.service_net_required_ip_number
+            ips = self.provider.attach_nets(self.state.vm_master, networks_to_attach)
+            self.state.load_balancer_ips.extend(ips)
         else:
             if self.state.master_area.use_vxlan:
                 # In this case, the net is a dummy net (present on all machines), created on day0 by the configurator, so we can do what we want
@@ -242,9 +242,9 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 reserved_pools.append(pool)
             else:
                 # Reserving pool in the management network. The management network can be obtained from the master node of the cluster
-                for i in range(0, self.state.master_area.service_net_required_ip_number):
-                    ip = self.provider.attach_net(self.state.vm_master, self.state.vm_master.management_network)
-                    self.state.load_balancer_ips.append(ip)
+                networks_to_attach = [self.state.vm_master.management_network] * self.state.master_area.service_net_required_ip_number
+                ips = self.provider.attach_nets(self.state.vm_master, networks_to_attach)
+                self.state.load_balancer_ips.extend(ips)
         self.state.reserved_pools = reserved_pools
 
     @classmethod

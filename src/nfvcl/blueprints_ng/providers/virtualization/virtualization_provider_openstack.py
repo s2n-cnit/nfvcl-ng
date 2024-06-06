@@ -191,6 +191,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
 
         self.__update_net_info_vm(vm_resource, server_obj)
+        self.__disable_port_security_all_ports(vm_resource, server_obj)
 
         ips: List[str] = []
         nics: List[NetplanInterface] = []

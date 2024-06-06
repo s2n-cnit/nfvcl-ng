@@ -20,6 +20,7 @@ class AnsiblePlaybook(NFVCLBaseModel):
     become: bool = Field()
     gather_facts: str = Field()
     tasks: List[Dict[str, Any]] = Field()
+    roles: List[str] = Field()
     vars: Dict[str, Any] = Field()
 
 
@@ -101,7 +102,8 @@ class AnsiblePlaybookBuilder:
             become=become,
             gather_facts="yes" if gather_facts else "no",
             vars={},
-            tasks=[]
+            tasks=[],
+            roles=[],
         )
 
     def set_vars(self, vars_: Dict[str, Any]):
@@ -177,6 +179,14 @@ class AnsiblePlaybookBuilder:
         if task_vars:
             dictionary["vars"] = task_vars
         self.playbook.tasks.append(dictionary)
+
+    def add_role(self, role: str):
+        """
+        Add a role to the playbook
+        Args:
+            role: Role to add
+        """
+        self.playbook.roles.append(role)
 
     def add_task_embedded(self, task_descr: AnsibleTaskDescription):
         """

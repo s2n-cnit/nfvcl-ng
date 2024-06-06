@@ -3,7 +3,6 @@ import json
 import math
 import re
 from enum import Enum
-from pathlib import Path
 from typing import Dict, List
 
 import httpx
@@ -11,12 +10,14 @@ import paramiko
 from httpx import Response
 
 from nfvcl.blueprints_ng.cloudinit_builder import CloudInit, CloudInitNetworkRoot
-from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
-from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, NetplanInterface
-from nfvcl.blueprints_ng.providers.virtualization.common.utils import wait_for_ssh_to_be_ready
-from nfvcl.blueprints_ng.providers.virtualization.proxmox.models.models import ProxmoxZones, ProxmoxZone, Subnets, Subnet, \
+from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
+    NetplanInterface
+from nfvcl.blueprints_ng.providers.virtualization.common.utils import configure_vm_ansible
+from nfvcl.blueprints_ng.providers.virtualization.proxmox.models.models import ProxmoxZones, ProxmoxZone, Subnets, \
+    Subnet, \
     ProxmoxNetsDevice, ProxmoxNodes, ProxmoxMac, ProxmoxTicket
-from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderException, \
+from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import \
+    VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
     VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource
@@ -155,7 +156,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            configurator_facts = self.__configure_vm_ansible(vm_resource_configuration)
+            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint.id)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
         self.blueprint.to_db()
@@ -200,7 +201,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     )
                     netplan_interfaces.append(tmp)
 
-        self.__configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces))
+        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces), self.blueprint.id)
 
         self.__parse_proxmox_addresses(vm_resource, vmid)
 
@@ -356,38 +357,6 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
             self.logger.info(f"Status code: {response.status_code}")
             return response
-
-    def __configure_vm_ansible(self, vm_resource_configuration: VmResourceAnsibleConfiguration) -> dict:
-        nfvcl_tmp_dir = Path("/tmp/nfvcl/playbook")
-        nfvcl_tmp_dir.mkdir(exist_ok=True, parents=True)
-
-        playbook_str = vm_resource_configuration.dump_playbook()
-
-        with open(Path(nfvcl_tmp_dir, f"{self.blueprint.id}_{vm_resource_configuration.vm_resource.name}.yml"), "w+") as f:
-            f.write(playbook_str)
-
-        # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections
-        wait_for_ssh_to_be_ready(
-            vm_resource_configuration.vm_resource.access_ip,
-            22,
-            vm_resource_configuration.vm_resource.username,
-            vm_resource_configuration.vm_resource.password,
-            300,
-            5
-        )
-
-        ansible_runner_result, fact_cache = run_ansible_playbook(
-            vm_resource_configuration.vm_resource.access_ip,
-            vm_resource_configuration.vm_resource.username,
-            vm_resource_configuration.vm_resource.password,
-            playbook_str,
-            self.logger
-        )
-
-        if ansible_runner_result.status == "failed":
-            raise VirtualizationProviderProxmoxException("Error running ansible configurator")
-
-        return fact_cache
 
     def __get_nfvcl_sdn_zone(self) -> ProxmoxZone:
         response = self.__execute_rest_request("cluster/sdn/zones", {'type': 'simple'}, r_type=ApiRequestType.GET)

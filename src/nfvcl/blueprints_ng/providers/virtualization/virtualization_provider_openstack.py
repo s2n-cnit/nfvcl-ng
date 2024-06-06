@@ -1,10 +1,5 @@
-from datetime import datetime
-from pathlib import Path
 from typing import List, Dict
 
-from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, NetplanInterface
-
-from nfvcl.blueprints_ng.providers.virtualization.common.utils import wait_for_ssh_to_be_ready
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.compute.v2.server_interface import ServerInterface
@@ -16,8 +11,11 @@ from openstack.network.v2.subnet import Subnet
 
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl.blueprints_ng.cloudinit_builder import CloudInit
-from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
-from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderException, \
+from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
+    NetplanInterface
+from nfvcl.blueprints_ng.providers.virtualization.common.utils import configure_vm_ansible
+from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import \
+    VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor
@@ -199,7 +197,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             nics.append(NetplanInterface(nic_name=net_intf.fixed.interface_name, mac_address=net.mac_addr))
             ips.append(net_intf.fixed.ip)
 
-        self.__configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics))
+        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics), self.blueprint.id)
 
         self.logger.success(f"Networks {nets_name} attached to VM {vm_resource.name}")
         self.blueprint.to_db()
@@ -276,7 +274,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def __gather_info_from_vm(self, vm_resource: VmResource):
         self.logger.info(f"Starting VM info gathering")
 
-        facts = self.__configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource))
+        facts = configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource), self.blueprint.id)
 
         mac_name_dict = {}
 
@@ -307,47 +305,12 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            configurator_facts = self.__configure_vm_ansible(vm_resource_configuration)
+            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint.id)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
         self.blueprint.to_db()
 
         return configurator_facts
-
-    def __configure_vm_ansible(self, vm_resource_configuration: VmResourceAnsibleConfiguration) -> dict:
-        nfvcl_tmp_dir = Path("/tmp/nfvcl/playbook")
-        nfvcl_tmp_dir.mkdir(exist_ok=True, parents=True)
-
-        playbook_str = vm_resource_configuration.dump_playbook()
-
-        # Dumping the playbook in the "/tmp/nfvcl/playbook" folder
-        now = datetime.now()
-        formatted_time = now.strftime("%Y%m%d-%H%M")
-        with open(Path(nfvcl_tmp_dir, f"{self.blueprint.id}_{vm_resource_configuration.vm_resource.name}_{formatted_time}.yml"), "w+") as f:
-            f.write(playbook_str)
-
-        # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections
-        wait_for_ssh_to_be_ready(
-            vm_resource_configuration.vm_resource.access_ip,
-            22,
-            vm_resource_configuration.vm_resource.username,
-            vm_resource_configuration.vm_resource.password,
-            300,
-            5
-        )
-
-        ansible_runner_result, fact_cache = run_ansible_playbook(
-            vm_resource_configuration.vm_resource.access_ip,
-            vm_resource_configuration.vm_resource.username,
-            vm_resource_configuration.vm_resource.password,
-            playbook_str,
-            self.logger
-        )
-
-        if ansible_runner_result.status == "failed":
-            raise VirtualizationProviderOpenstackException("Error running ansible configurator")
-
-        return fact_cache
 
     def destroy_vm(self, vm_resource: VmResource):
         self.logger.info(f"Destroying VM {vm_resource.name}")

@@ -2,9 +2,16 @@ import time
 
 import paramiko
 
+from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderException
+from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
 from nfvcl.utils.log import create_logger
+from pathlib import Path
 
 logger = create_logger('Providers_Utils')
+
+class VirtualizationConfiguratorException(VirtualizationProviderException):
+    pass
 
 def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeout: int, retry_interval: float) -> bool:
     logger.debug(f"Starting SSH connection to {host}:{port} as user <{user}> and passwd <{passwd}>. Timeout is {timeout}, retry interval is {retry_interval}")
@@ -28,3 +35,36 @@ def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeo
             time.sleep(retry_interval)
             continue
     return False
+
+
+def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfiguration, blueprint_id: str) -> dict:
+    nfvcl_tmp_dir = Path("/tmp/nfvcl/playbook")
+    nfvcl_tmp_dir.mkdir(exist_ok=True, parents=True)
+
+    playbook_str = vm_resource_configuration.dump_playbook()
+
+    with open(Path(nfvcl_tmp_dir, f"{blueprint_id}_{vm_resource_configuration.vm_resource.name}.yml"), "w+") as f:
+        f.write(playbook_str)
+
+    # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections
+    wait_for_ssh_to_be_ready(
+        vm_resource_configuration.vm_resource.access_ip,
+        22,
+        vm_resource_configuration.vm_resource.username,
+        vm_resource_configuration.vm_resource.password,
+        300,
+        5
+    )
+
+    ansible_runner_result, fact_cache = run_ansible_playbook(
+        vm_resource_configuration.vm_resource.access_ip,
+        vm_resource_configuration.vm_resource.username,
+        vm_resource_configuration.vm_resource.password,
+        playbook_str,
+        logger
+    )
+
+    if ansible_runner_result.status == "failed":
+        raise VirtualizationConfiguratorException("Error running ansible configurator")
+
+    return fact_cache

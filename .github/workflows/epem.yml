@@ -5,7 +5,7 @@ name: ePEM CI
 on:
   push:
     branches:
-      - main
+      - HORSE
 
 jobs:
   build:

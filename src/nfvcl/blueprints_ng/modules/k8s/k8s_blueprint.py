@@ -142,13 +142,20 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.state.pod_service_cidr = create_model.service_cidr
         self.state.cni = create_model.cni
         self.state.password = create_model.password
-        self.state.require_port_security_disabled = create_model.require_port_security_disabled
 
         area: K8sAreaDeployment
         for area in create_model.areas:  # In each area we deploy workers and in the core area also the master (there is always a core area containing the master)
             if area.is_master_area:
                 self.state.master_area = area
+                # If attaching to a service net or using the management network -> Requires port security disabled
+                if self.state.master_area.service_net or (not self.state.master_area.service_net and not self.state.master_area.use_vxlan):
+                    if not self.state.require_port_security_disabled:
+                        self.logger.warning("When exposing K8S services to mgt or specific net, port security need to be disabled. Overriding given value")
+                    self.state.require_port_security_disabled = True
+                else:
+                    self.state.require_port_security_disabled = create_model.require_port_security_disabled
                 self.deploy_master_node(area, create_model.master_flavors)
+
             self.deploy_area(area)
         # Start initial configuration, first it get network list ready. Set self.state.reserved_pools
         self.setup_load_balancer_pool()

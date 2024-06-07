@@ -1,0 +1,56 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+      # Swap is disabled again because in some openstack this is enabled again with cloud-init
+   - name: Make the Swap inactive
+     command: swapoff -a
+   - name: Remove Swap entry from /etc/fstab.
+     lineinfile:
+       dest: /etc/fstab
+       regexp: swap
+       state: absent
+   - name: Intilizing Kubernetes Cluster
+     command: kubeadm init --pod-network-cidr '{{ pod_network_cidr }}' --apiserver-advertise-address '{{ k8s_master_ip }}' --apiserver-cert-extra-sans '{{ k8s_master_external_ip }}' --service-cidr '{{ k8s_service_cidr }}' --control-plane-endpoint '{{ k8s_master_external_ip }}'
+   - pause: seconds=5
+   - name: Create directory for kube config.
+     file: 
+       path: /root/.kube
+       state: directory
+       owner: root
+       group: root
+       mode: 0755
+   - name: Create directory for kube config.
+     file:
+       path: /home/ubuntu/.kube
+       state: directory
+       owner: ubuntu
+       group: ubuntu
+       mode: 0755
+   - name: Copy /etc/kubernetes/admin.conf to user root.
+     copy:
+       src: /etc/kubernetes/admin.conf
+       dest: /root/.kube/config
+       remote_src: yes
+       owner: root
+       group: root
+       mode: '0644'
+   - name: Copy /etc/kubernetes/admin.conf to user ubuntu.
+     copy:
+       src: /etc/kubernetes/admin.conf
+       dest: /home/ubuntu/.kube/config
+       remote_src: yes
+       owner: ubuntu
+       group: ubuntu
+       mode: '0644'
+   - name: Remove the cache directory.
+     file: 
+       path: /root/.kube/cache
+       state: absent
+   - name: Get the token for workers to join the cluster
+     shell: kubeadm token create --print-join-command --ttl 0
+     register: kubernetes_join_command
+   - name: Get k8s credential file
+     shell: cat /root/.kube/config
+     register: credentials_file

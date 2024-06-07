@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-deployment
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: nfvcl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "helm-nfvcl.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "helm-nfvcl.labels" . | nindent 8 }}
+        {{- with .Values.mongoPodLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+      - name: mongo
+        image: "{{ .Values.mongoImage.repository }}:{{ .Values.mongoImage.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.nfvclImage.pullPolicy }}
+        ports:
+          - name: http
+            containerPort: {{ .Values.mongoService.targetPort }}
+            protocol: TCP
+        volumeMounts:
+          - name: mongodata
+            mountPath: /data/db
+      volumes:
+      - name: mongodata
+        persistentVolumeClaim:
+          claimName: pvc-mongodata

@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfvcl-deployment
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: nfvcl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "helm-nfvcl.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "helm-nfvcl.labels" . | nindent 8 }}
+        {{- with .Values.nfvclPodLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      initContainers:
+      - name: init-wait-for-mongo
+        image: alpine
+        command: ["/bin/sh", "-c", "for i in $(seq 1 300); do nc -zvw1 mongo-svc {{ .Values.mongoService.port }} && exit 0 || sleep 3; done; exit 1"]
+      initContainers:
+      - name: init-wait-for-redis
+        image: alpine
+        command: ["/bin/sh", "-c", "for i in $(seq 1 300); do nc -zvw1 redis-svc {{ .Values.redisService.port }} && exit 0 || sleep 3; done; exit 1"]
+      containers:
+      - name: nfvcl
+        image: "{{ .Values.nfvclImage.repository }}:{{ .Values.nfvclImage.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.nfvclImage.pullPolicy }}
+        ports:
+          - name: http
+            containerPort: {{ .Values.nfvclService.targetPort }}
+            protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.nfvclLivenessProbe | nindent 12 }}
+        volumeMounts:
+          - name: configmap-files
+            mountPath: /app/nfvcl-ng/config.yaml
+            subPath: config.yaml
+      volumes:
+      - name: configmap-files
+        configMap:
+          name: nfvcl-config-file

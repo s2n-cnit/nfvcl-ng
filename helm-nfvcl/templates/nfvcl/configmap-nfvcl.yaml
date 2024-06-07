@@ -1,0 +1,32 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+    name: nfvcl-config-file
+    namespace: {{ .Values.namespace }}
+data:
+    config.yaml: |
+        {
+          'log_level': 20,
+          'nfvcl': {
+            'version': "0.2.2",
+            'port': 5002,
+            'ip': ''
+          },
+          'osm': {
+            'host': '127.0.0.1',
+            'port': '9999',
+            'username':'admin',
+            'password':'admin',
+            'project': 'admin',
+            'version': 12
+          },
+          'mongodb': {
+            'host': 'mongo-svc',
+            'port': 27017,
+            'db': 'nfvcl'
+          },
+          'redis': {
+            'host': 'redis-svc',
+            'port': 6379
+          }
+        }

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: nfvcl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "helm-nfvcl.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "helm-nfvcl.labels" . | nindent 8 }}
+        {{- with .Values.redisPodLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+      - name: redis
+        image: "{{ .Values.redisImage.repository }}:{{ .Values.redisImage.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.nfvclImage.pullPolicy }}
+        ports:
+          - name: http
+            containerPort: {{ .Values.redisService.targetPort }}
+            protocol: TCP
+        volumeMounts:
+          - name: redisdata
+            mountPath: /data/db
+      volumes:
+      - name: redisdata
+        persistentVolumeClaim:
+          claimName: pvc-redisdata

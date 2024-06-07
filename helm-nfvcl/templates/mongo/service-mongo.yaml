@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mongoService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "helm-nfvcl.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.mongoService.type }}
+  ports:
+    - port: {{ .Values.mongoService.port }}
+      targetPort: {{ .Values.mongoService.targetPort }}
+      nodePort: {{ .Values.mongoService.nodePort }}
+      protocol: TCP
+      name: mongo-port
+  selector:
+    {{- include "helm-nfvcl.selectorLabels" . | nindent 4 }}
+    {{- with .Values.mongoPodLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+

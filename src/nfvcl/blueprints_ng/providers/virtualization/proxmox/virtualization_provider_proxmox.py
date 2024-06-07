@@ -87,10 +87,11 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         self.logger.info(f"Creating VM {vm_resource.name}")
         self.__download_cloud_image(f'{vm_resource.image.url}', f'{vm_resource.image.name}')
-        user_cloud_init = CloudInit(password=vm_resource.password,
-                                    packages=cloud_init_packages,
+        c_init = CloudInit(packages=cloud_init_packages,
                                     ssh_authorized_keys=self.vim.ssh_keys,
-                                    runcmd=cloud_init_runcmd).build_cloud_config()
+                                    runcmd=cloud_init_runcmd)
+        c_init.add_user(vm_resource.username, vm_resource.password)
+        user_cloud_init = c_init.build_cloud_config()
 
         netwotk_cloud_init: CloudInitNetworkRoot = CloudInitNetworkRoot()
         vmid = self.__get_free_vmid()

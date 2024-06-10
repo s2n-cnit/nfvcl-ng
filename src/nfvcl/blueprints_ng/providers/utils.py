@@ -9,6 +9,6 @@ def create_ansible_inventory(host: str, username: str, password: str, become_pas
 
     str_list.append("ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'")
 
-    return f"host {' '.join(str_list)}"
+    return f"{host} {' '.join(str_list)}"
 
 

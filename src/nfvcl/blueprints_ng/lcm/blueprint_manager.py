@@ -229,7 +229,7 @@ class BlueprintManager(metaclass=Singleton):
         """
         blue_list: List[BlueprintNG] = self._load_all_blue_from_db()
         for blue in blue_list:
-            registered_vms = blue.get_registered_resources(type_filter="blueprints_ng.resources.VmResource") # Getting only VMs
+            registered_vms = blue.get_registered_resources(type_filter="nfvcl.blueprints_ng.resources.VmResource") # Getting only VMs
             for registered_resource in registered_vms:
                 vm: VmResource
                 vm = registered_resource.value

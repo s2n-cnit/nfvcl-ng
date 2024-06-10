@@ -102,7 +102,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         flavor: Flavor = self.create_get_flavor(vm_resource.flavor, vm_resource.name)
 
-        cloudin = CloudInit(password=vm_resource.password, ssh_authorized_keys=self.vim.ssh_keys).build_cloud_config()
+        c_init = CloudInit(ssh_authorized_keys=self.vim.ssh_keys)
+        c_init.add_user(vm_resource.username, vm_resource.password)
+        cloudin = c_init.build_cloud_config()
         self.logger.debug(f"Cloud config:\n{cloudin}")
 
         # The floating IP should be requested if the VIM require it or if explicitly requested in the blueprint

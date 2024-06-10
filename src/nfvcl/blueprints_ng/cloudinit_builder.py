@@ -7,17 +7,25 @@ from nfvcl.models.base_model import NFVCLBaseModel
 
 
 class CloudInitChpasswd(NFVCLBaseModel):
+    list: List[str] = Field(default_factory=list)
     expire: bool = Field(default=False)
 
 
 class CloudInit(NFVCLBaseModel):
     manage_etc_hosts: bool = Field(default=True)
-    password: str = Field()
     chpasswd: CloudInitChpasswd = Field(default=CloudInitChpasswd())
+    disable_root: bool = Field(default=False)
     ssh_pwauth: bool = Field(default=True)
     ssh_authorized_keys: Optional[List[str]] = Field(default=None)
     packages: Optional[List[str]] = Field(default=None)
     runcmd: Optional[List[str]] = Field(default=None)
+
+    def add_user(self, username: str, password: str):
+        self.chpasswd.list.append(f'{username}:{password}')
+        if username == "root":
+            self.runcmd.append("sed -i'.orig' -e's/PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config")
+            self.runcmd.append("sed -i'.orig' -e's/#PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config")
+            self.runcmd.append("service sshd restart")
 
     def build_cloud_config(self) -> str:
         return f"#cloud-config\n{get_yaml_parser().dump(self.model_dump(exclude_none=True))}"

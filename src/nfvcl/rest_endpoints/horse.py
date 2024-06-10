@@ -1,28 +1,110 @@
+from enum import Enum
+from logging import Logger
 from typing import Annotated, Optional
-
+import yaml
 import httpx
 from fastapi import APIRouter, status, Body, Query, HTTPException
 from httpx import ConnectTimeout
 from pydantic import BaseModel
-from blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
-from blueprints_ng.resources import VmResource
-from rest_endpoints.blue_ng_router import get_blueprint_manager
-from utils.database import insert_extra, get_extra
-from utils.util import IP_PORT_PATTERN, PATH_PATTERN, IP_PATTERN, PORT_PATTERN
+from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl.blueprints_ng.resources import VmResource
+from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
+from nfvcl.utils.database import insert_extra, get_extra
+from nfvcl.utils.util import IP_PORT_PATTERN, PATH_PATTERN, IP_PATTERN, PORT_PATTERN
+
+from nfvcl.utils.log import create_logger
 
 horse_router = APIRouter(
     prefix="/v2/horse",
     tags=["Horse"],
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
+logger: Logger = create_logger("Horse REST")
+
 
 class RTRRestAnswer(BaseModel):
     description: str = 'operation submitted'
     status: str = 'submitted'
-    status_code: int = 202 # OK
+    status_code: int = 202  # OK
+
+
+class RTRActionType(str, Enum):
+    DNS_RATE_LIMIT = "DNS_RATE_LIMIT"
+    DNS_SERV_DISABLE = "DNS_SERV_DISABLE"
+    DNS_SERV_ENABLE = "DNS_SERV_ENABLE"
+
+
+class DOCActionDNSstatus(NFVCLBaseModel):
+    zone: str
+    status: str
+
+
+class DOCActionDNSLimit(NFVCLBaseModel):
+    zone: str
+    rate: int
+
+
+class DOCActionDefinition(NFVCLBaseModel):
+    actiontype: str
+    service: str
+    action: dict
+
+
+class DOCNorthModel(NFVCLBaseModel):
+    actionid: str
+    target: str
+    actiondefinition: DOCActionDefinition
+
+
+def extract_action(actionType: RTRActionType, playbook) -> DOCActionDNSLimit | DOCActionDNSstatus:
+    """
+    Extract action, to be used in DOC request, from playbook
+    Args:
+        actionType: The action type identifies the type of playbook that was received to be able to retrieve te correct data.
+        playbook: The content of the playbook.
+
+    Returns:
+        The action to be included in the request body to DOC
+    """
+    data = yaml.safe_load(playbook)
+    match actionType:
+        case RTRActionType.DNS_RATE_LIMIT:
+            for task in data[0]['tasks']:
+                if 'iptables' in task:
+                    limit = task['iptables']['limit']
+                    action = DOCActionDNSLimit(zone="", rate=limit)
+                    logger.debug(action)
+                    return action
+            # If reach this point, 'iptables' was not found.
+            raise HTTPException(status_code=422, detail=f"Field >iptables< not present in the body of the playbook. Cannot parse data for DOC")
+        case RTRActionType.DNS_SERV_DISABLE:
+            return DOCActionDNSstatus(zone="", status='disabled')
+        case RTRActionType.DNS_SERV_ENABLE:
+            return DOCActionDNSstatus(zone="", status='enabled')
+
+
+def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType, service: str, playbook) -> DOCNorthModel:
+    """
+    Build the request body for the DOC
+    Args:
+        actionid: The id of the action
+        target: The IP of the target
+        actiontype: The action type
+        service: The service affected by mitigation
+        playbook: The content of the playbook for that mitigation
+
+    Returns:
+        The filled model to be used when requesting to DOC.
+    """
+    action_model = extract_action(actionType=actiontype, playbook=playbook)
+    action_definition = DOCActionDefinition(actiontype=actiontype, service=service, action=action_model.dict())
+    doc_north_model = DOCNorthModel(actionid=actionid, target=target, actiondefinition=action_definition)
+    return doc_north_model
+
 
 @horse_router.post("/rtr_request_workaround", response_model=RTRRestAnswer)
-def rtr_request_workaround(host: str, username: str, password: str, forward_to_doc: bool, payload: str = Body(None, media_type="application/yaml")):
+def rtr_request_workaround(target: str, action_type: RTRActionType, username: str, password: str, forward_to_doc: bool, payload: str = Body(None, media_type="application/yaml")):
     """
     Allows running an ansible playbook on a remote host.
     Integration for HORSE Project. Allow applying mitigation action on a target. This function is implemented as a workaround since in the first demo
@@ -30,7 +112,7 @@ def rtr_request_workaround(host: str, username: str, password: str, forward_to_d
 
     Args:
 
-        host: The host on witch the playbook is applied ('192.168.X.X' format)
+        target: The host on witch the playbook is applied ('192.168.X.X' format)
 
         username: str, the user that is used on the remote machine to apply the playbook
 
@@ -41,7 +123,7 @@ def rtr_request_workaround(host: str, username: str, password: str, forward_to_d
         payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
     """
     if forward_to_doc is False:
-        ansible_runner_result, fact_cache = run_ansible_playbook(host, username, password, payload)
+        ansible_runner_result, fact_cache = run_ansible_playbook(target, username, password, payload)
         if ansible_runner_result.status == "failed":
             raise HTTPException(status_code=500, detail="Execution of Playbook failed. See ePEM DEBUG log for more info.")
         return RTRRestAnswer(description="Playbook applied", status="success")
@@ -52,9 +134,9 @@ def rtr_request_workaround(host: str, username: str, password: str, forward_to_d
         else:
             if 'url' in doc_mod_info:
                 doc_module_url = doc_mod_info['url']
-                body = {"actionID": "0", "target": host, "actionType": "0", "service": "0", "action": payload} # TODO define what to do. The format has not been fixed
+                body: DOCNorthModel = build_request_for_doc(actionid="", target=target, actiontype=action_type, service="", playbook=payload)
                 try:
-                    httpx.post(f"http://{doc_module_url}", data=body, headers={"Content-Type": "application/json"}, timeout=10) # TODO TEST
+                    httpx.post(f"http://{doc_module_url}", data=body.json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
                 except ConnectTimeout:
                     raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
                 except httpx.ConnectError:
@@ -65,7 +147,7 @@ def rtr_request_workaround(host: str, username: str, password: str, forward_to_d
 
 
 @horse_router.post("/rtr_request", response_model=RTRRestAnswer)
-def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_port: Optional[Annotated[str, Query(pattern=PORT_PATTERN)]], service: str, actionType: str, actionID: str, payload: str = Body(None, media_type="application/yaml")):
+def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_port: Optional[Annotated[str, Query(pattern=PORT_PATTERN)]], service: str, actionType: RTRActionType, actionID: str, payload: str = Body(None, media_type="application/yaml")):
     """
     Integration for HORSE Project. Allow applying mitigation action on a target managed by the NFVCL (ePEM).
     Allows running an ansible playbook on a remote host. The host NEEDS to be managed by nfvcl.
@@ -97,9 +179,9 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
         else:
             if 'url' in doc_mod_info:
                 doc_module_url = doc_mod_info['url']
-                body = {"actionID": actionID, "target_ip": target_ip, "target_port": target_port, "actionType": actionType, "service": service, "action": payload}
+                body: DOCNorthModel = build_request_for_doc(actionid="", target=target_ip, actiontype=actionType, service=service, playbook=payload)
                 try:
-                    httpx.post(f"http://{doc_module_url}", data=body, headers={"Content-Type": "application/json"}, timeout=10) # TODO test
+                    httpx.post(f"http://{doc_module_url}", data=body.json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO test
                 except ConnectTimeout:
                     raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
                 return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL, the request has been forwarded to DOC module.", status="forwarded", status_code=404)
@@ -110,6 +192,7 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
         if ansible_runner_result.status == "failed":
             raise HTTPException(status_code=500, detail="Execution of Playbook failed. See NFVCL DEBUG log for more info.")
         return RTRRestAnswer(description="Playbook applied", status="success")
+
 
 @horse_router.post("/set_doc_ip_port", response_model=RTRRestAnswer)
 def set_doc_ip_port(doc_ip: Annotated[str, Query(pattern=IP_PORT_PATTERN)], url_path: Annotated[str, Query(pattern=PATH_PATTERN)]):

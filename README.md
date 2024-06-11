@@ -3,7 +3,7 @@
 # 🐎 HORSE Section 
 You can find APIs examples in [Horse test section](/src/nfvcl/rest_endpoints/HORSE/api_examples)
 
-The file containing APIs for HORSE is [there](/nfvcl/rest_endpoints/HORSE/horse.py)
+The file containing APIs for HORSE is [there](src/nfvcl/rest_endpoints/HORSE/horse.py)
 
 <!-- TABLE OF CONTENTS -->
 

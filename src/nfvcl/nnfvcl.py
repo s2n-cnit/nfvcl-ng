@@ -12,7 +12,7 @@ from nfvcl.rest_endpoints.osm_rest import osm_router
 from nfvcl.rest_endpoints.rest_callback import RestAnswer202
 from nfvcl.rest_endpoints.topology import topology_router
 from nfvcl.rest_endpoints.blue_ng_router import blue_ng_router as blue_ng_router2
-from nfvcl.rest_endpoints.horse import horse_router
+from nfvcl.rest_endpoints.HORSE.horse import horse_router
 
 from nfvcl.rest_endpoints import blue, blue_ng_router
 from nfvcl.utils.log import mod_logger, set_log_level

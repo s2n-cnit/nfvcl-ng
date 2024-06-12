@@ -7,7 +7,6 @@ from nfvcl.rest_endpoints.blue import blue_router
 from nfvcl.rest_endpoints.day2action import day2_router
 from nfvcl.rest_endpoints.helm import helm_router
 from nfvcl.rest_endpoints.k8s import k8s_router
-from nfvcl.rest_endpoints.openstack import openstack_router
 from nfvcl.rest_endpoints.osm_rest import osm_router
 from nfvcl.rest_endpoints.rest_callback import RestAnswer202
 from nfvcl.rest_endpoints.topology import topology_router
@@ -53,7 +52,6 @@ app.include_router(day2_router)
 app.include_router(k8s_router)
 app.include_router(helm_router)
 app.include_router(osm_router)
-app.include_router(openstack_router)
 app.include_router(ansible_router)
 
 day2_files = "day2_files"

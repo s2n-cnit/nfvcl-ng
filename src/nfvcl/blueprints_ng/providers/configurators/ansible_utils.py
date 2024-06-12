@@ -40,7 +40,7 @@ def run_ansible_playbook(host: str, username: str, password: str, playbook: str,
     )
 
     # Save the fact cache to a variable before deleting tmp_private_data_dir
-    fact_cache = ansible_runner_result.get_fact_cache("host")
+    fact_cache = ansible_runner_result.get_fact_cache(host)
 
     # Close the tmp files, this will delete them
     tmp_playbook.close()

@@ -12,7 +12,6 @@ from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 from nfvcl.utils.database import insert_extra, get_extra
 from nfvcl.utils.util import IP_PORT_PATTERN, PATH_PATTERN, IP_PATTERN, PORT_PATTERN
-
 from nfvcl.utils.log import create_logger
 
 horse_router = APIRouter(
@@ -27,6 +26,7 @@ class RTRRestAnswer(BaseModel):
     description: str = 'operation submitted'
     status: str = 'submitted'
     status_code: int = 202  # OK
+    data: dict = {}
 
 
 class RTRActionType(str, Enum):
@@ -197,7 +197,16 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
 @horse_router.post("/set_doc_ip_port", response_model=RTRRestAnswer)
 def set_doc_ip_port(doc_ip: Annotated[str, Query(pattern=IP_PORT_PATTERN)], url_path: Annotated[str, Query(pattern=PATH_PATTERN)]):
     """
-    Set up and save the IP of HORSE DOC module
+    Set up and save the URL of HORSE DOC module. The URL is composed by {doc_ip_port}{url_path}
     """
-    insert_extra("doc_module", {"url": f"{doc_ip}{url_path}"})
+    insert_extra("doc_module", {"url": f"{doc_ip}{url_path}", "ip":doc_ip, "url_path":url_path})
     return RTRRestAnswer(description="DOC module IP has been set", status="success")
+
+
+@horse_router.get("/get_doc_ip_port", response_model=RTRRestAnswer)
+def get_doc_ip_port():
+    """
+    Allows to retrieve the DOC URL
+    """
+    url = get_extra("doc_module")
+    return RTRRestAnswer(description="DOC URL", status="success", data=url)

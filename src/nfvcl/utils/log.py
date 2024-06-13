@@ -1,5 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Dict
 
 from redis import Redis
@@ -111,6 +112,7 @@ def create_logger(name: str, ov_log_level: int = None, blueprintid='SYSTEM') -> 
 
     # Adding file handler to post log into file
     # w = every restart log is cleaned
+    Path("logs/").mkdir(parents=True, exist_ok=True)
     log_file_handler = RotatingFileHandler("logs/nfvcl.log", maxBytes=10000000, backupCount=4)
     log_file_handler.setLevel(local_log_level)
     log_file_handler.setFormatter(formatter)

@@ -136,6 +136,15 @@ class VmResource(ResourceDeployable):
     # TODO accesa, spenta, in inizializzazione..., cambiare tipo con enum
     state: Optional[str] = Field(default=None)
 
+    def model_post_init(self, __context):
+        """
+        Clean the networks to prevent duplicates
+        """
+        self.additional_networks = list(set(self.additional_networks))
+
+        if self.management_network in self.additional_networks:
+            self.additional_networks.remove(self.management_network)
+
     def get_all_connected_network_names(self) -> List[str]:
         """
         Get a list of all the network connected to this VM

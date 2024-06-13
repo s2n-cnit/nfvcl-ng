@@ -176,9 +176,24 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                     self.__disable_port_security(self.conn, port.id)
 
     def attach_nets(self, vm_resource: VmResource, nets_name: List[str]) -> List[str]:
+        server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
+
         new_interfaces: List[ServerInterface] = []
 
+        to_attach: List[str] = []
+        ips: List[str] = []
         for net in nets_name:
+            if net not in server_obj.addresses and net not in to_attach:
+                to_attach.append(net)
+            else:
+                self.logger.warning(f"Network {net} already attached, skipping")
+
+        # If there are no network to attach return
+        if len(to_attach) == 0:
+            self.logger.warning(f"No new network will be attached to VM {vm_resource.name}")
+            return []
+
+        for net in to_attach:
             # Get the OS SDK network object
             network = self.conn.get_network(net)
             # Connect the network to the instance
@@ -188,12 +203,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             vm_resource.additional_networks.append(net)
             new_interfaces.append(new_server_interface)
 
-        server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
-
         self.__update_net_info_vm(vm_resource, server_obj)
         self.__disable_port_security_all_ports(vm_resource, server_obj)
 
-        ips: List[str] = []
         nics: List[NetplanInterface] = []
         for net in new_interfaces:
             net_intf = vm_resource.get_network_interface_by_fixed_mac(net.mac_addr)
@@ -201,8 +213,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             ips.append(net_intf.fixed.ip)
 
         configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics), self.blueprint.id)
-
-        self.logger.success(f"Networks {nets_name} attached to VM {vm_resource.name}")
+        self.logger.success(f"Networks {to_attach} attached to VM {vm_resource.name}")
         self.blueprint.to_db()
 
         return ips

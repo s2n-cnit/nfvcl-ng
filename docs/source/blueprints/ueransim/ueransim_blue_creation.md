@@ -11,7 +11,8 @@ the blueprint should be deployed like follows. The `wan` network is the one used
     "config": {
         "network_endpoints": {
             "mgt": "dmz-internal",
-            "wan": "data_paolo"
+            "n2": "data_paolo",
+            "n3": "n3"
         }
     },
     "areas": [

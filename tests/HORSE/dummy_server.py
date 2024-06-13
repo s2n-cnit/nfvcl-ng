@@ -8,6 +8,7 @@ SENTINEL = "---STOP---"
 PIPE_CONNECTION: Connection = None
 
 def set_pipe(connection: Connection):
+    global PIPE_CONNECTION
     PIPE_CONNECTION = connection
 
 

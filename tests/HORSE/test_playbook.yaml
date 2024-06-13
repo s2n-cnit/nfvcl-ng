@@ -1,0 +1,15 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Touch a file, using symbolic modes to set the permissions (equivalent to 0644)
+      ansible.builtin.file:
+        path: ~/foo.conf
+        state: touch
+        mode: u=rw,g=r,o=r
+    - name: Create a directory if it does not exist
+      ansible.builtin.file:
+        path: ~/some_directory
+        state: directory
+        mode: '0755'

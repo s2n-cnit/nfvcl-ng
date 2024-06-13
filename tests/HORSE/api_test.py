@@ -1,17 +1,16 @@
 import os
-
-os.environ['HORSE_DEBUG'] = "True"
-os.environ.get('HORSE_DEBUG')
-
+from pathlib import Path
 import logging
 import time
 import unittest
 from http.server import HTTPServer
 from multiprocessing import Process, Pipe
 from multiprocessing.connection import Connection
+os.environ['HORSE_DEBUG'] = "True"
+os.environ.get('HORSE_DEBUG')
 from nfvcl.rest_endpoints.HORSE.horse import *
-
 from tests.HORSE.dummy_server import HTTPDummyServer, set_pipe
+
 
 HTTP_DUMMY_SRV_PORT = 9999
 
@@ -38,6 +37,7 @@ class UnitTestHorseAPIs(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         logging.info('Stopping dummy http server\n')
+        cls.process.terminate()
         cls.process.close()
         cls.process = None
     def test_000_set_doc_ip(self):
@@ -54,7 +54,11 @@ class UnitTestHorseAPIs(unittest.TestCase):
         self.assertEqual("/api/test", doc_module_info['url_path'])
 
     def test_001_rest_endpoints(self):
-        rtr_request_workaround("10.10.10.10", RTRActionType.DNS_RATE_LIMIT, "urs", "pwd", True, "---")
+        path = Path("test_playbook.yaml")
+        data = yaml.safe_load(path)
+        yaml_text = yaml.dump(data, default_flow_style=False)
+        # Should be forwarded
+        rtr_request_workaround("10.10.10.10", RTRActionType.DNS_RATE_LIMIT, "urs", "pwd", True, yaml_text)
         received = self.parent_conn.recv()
         self.assertEqual(received, "---")
 

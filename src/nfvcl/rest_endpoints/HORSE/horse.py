@@ -9,10 +9,13 @@ from pydantic import BaseModel
 from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
 from nfvcl.blueprints_ng.resources import VmResource
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 from nfvcl.utils.database import insert_extra, get_extra
 from nfvcl.utils.util import IP_PORT_PATTERN, PATH_PATTERN, IP_PATTERN, PORT_PATTERN
 from nfvcl.utils.log import create_logger
+import os
+
+if not os.environ.get('HORSE_DEBUG'):
+    from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 
 horse_router = APIRouter(
     prefix="/v2/horse",
@@ -103,6 +106,21 @@ def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType,
     return doc_north_model
 
 
+def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
+    if 'url' in doc_mod_info:
+        doc_module_url = doc_mod_info['url']
+
+        try:
+            httpx.post(f"http://{doc_module_url}", data=body.json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
+        except ConnectTimeout:
+            raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
+        except httpx.ConnectError:
+            raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
+        return RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
+    else:
+        return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
+
+
 @horse_router.post("/rtr_request_workaround", response_model=RTRRestAnswer)
 def rtr_request_workaround(target: str, action_type: RTRActionType, username: str, password: str, forward_to_doc: bool, payload: str = Body(None, media_type="application/yaml")):
     """
@@ -132,18 +150,8 @@ def rtr_request_workaround(target: str, action_type: RTRActionType, username: st
         if doc_mod_info is None:
             return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="error", status_code=404)
         else:
-            if 'url' in doc_mod_info:
-                doc_module_url = doc_mod_info['url']
-                body: DOCNorthModel = build_request_for_doc(actionid="", target=target, actiontype=action_type, service="", playbook=payload)
-                try:
-                    httpx.post(f"http://{doc_module_url}", data=body.json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
-                except ConnectTimeout:
-                    raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
-                except httpx.ConnectError:
-                    raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
-                return RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
-            else:
-                return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
+            body: DOCNorthModel = build_request_for_doc(actionid="", target=target, actiontype=action_type, service="", playbook=payload)
+            forward_request_to_doc(doc_mod_info, body)
 
 
 @horse_router.post("/rtr_request", response_model=RTRRestAnswer)
@@ -170,25 +178,27 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
 
         payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
     """
-    bm = get_blueprint_manager()
-    vm: VmResource = bm.get_VM_target_by_ip(target_ip)
+    if not os.environ.get('HORSE_DEBUG'):
+        bm = get_blueprint_manager()
+        vm: VmResource = bm.get_VM_target_by_ip(target_ip)
+    else:
+        if target_ip == "127.0.0.1":
+            vm = "not_none"
+        else:
+            vm=None
+
     if vm is None:
         doc_mod_info = get_extra("doc_module")
         if doc_mod_info is None:
             return RTRRestAnswer(description="The Target has not been found in VMs managed by the ePEM. The request will NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the DOC IP.", status="error", status_code=404)
         else:
-            if 'url' in doc_mod_info:
-                doc_module_url = doc_mod_info['url']
-                body: DOCNorthModel = build_request_for_doc(actionid="", target=target_ip, actiontype=actionType, service=service, playbook=payload)
-                try:
-                    httpx.post(f"http://{doc_module_url}", data=body.json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO test
-                except ConnectTimeout:
-                    raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
-                return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL, the request has been forwarded to DOC module.", status="forwarded", status_code=404)
-            else:
-                return RTRRestAnswer(description="The Target has not been found in VMs managed by the NFVCL. The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the DOC URL.", status="error", status_code=404)
+            body: DOCNorthModel = build_request_for_doc(actionid="", target=target_ip, actiontype=actionType, service="", playbook=payload)
+            forward_request_to_doc(doc_mod_info, body)
     else:
-        ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, vm.username, vm.password, payload)
+        if not os.environ.get('HORSE_DEBUG'):
+            ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, vm.username, vm.password, payload)
+        else:
+            ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, "ubuntu", "testpassword", payload)
         if ansible_runner_result.status == "failed":
             raise HTTPException(status_code=500, detail="Execution of Playbook failed. See NFVCL DEBUG log for more info.")
         return RTRRestAnswer(description="Playbook applied", status="success")
@@ -199,7 +209,7 @@ def set_doc_ip_port(doc_ip: Annotated[str, Query(pattern=IP_PORT_PATTERN)], url_
     """
     Set up and save the URL of HORSE DOC module. The URL is composed by {doc_ip_port}{url_path}
     """
-    insert_extra("doc_module", {"url": f"{doc_ip}{url_path}", "ip":doc_ip, "url_path":url_path})
+    insert_extra("doc_module", {"url": f"{doc_ip}{url_path}", "ip": doc_ip, "url_path": url_path})
     return RTRRestAnswer(description="DOC module IP has been set", status="success")
 
 

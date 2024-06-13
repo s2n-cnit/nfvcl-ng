@@ -235,10 +235,14 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         # Reserve a range of IP in the service net
         reserved_pools = []
         if self.state.master_area.service_net:
-            # In this case, the NET exists on OPENSTACK, and we should ask OS for attaching a new interface with an IP on that network
-            networks_to_attach = [self.state.master_area.service_net] * self.state.master_area.service_net_required_ip_number
-            ips = self.provider.attach_nets(self.state.vm_master, networks_to_attach)
-            self.state.load_balancer_ips.extend(ips)
+            # In this case, the NET exists on OPENSTACK, and we should work with the topology
+            pool = LBPool(net_name=self.state.master_area.service_net, range_length=self.state.master_area.service_net_required_ip_number)
+            res_range = build_topology().reserve_range_lb_pool(pool, self.id)
+            # TODO the range should assigned in VIM to the master
+            # Building IPv4Addresses to validate. Then saving string because obj cannot be serialized.
+            pool.ip_start = res_range.start.exploded
+            pool.ip_end = res_range.end.exploded
+            reserved_pools.append(pool)
         else:
             if self.state.master_area.use_vxlan:
                 # In this case, the net is a dummy net (present on all machines), created on day0 by the configurator, so we can do what we want
@@ -248,10 +252,15 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 pool.ip_end = (ip_start_tmp + pool.range_length).exploded
                 reserved_pools.append(pool)
             else:
-                # Reserving pool in the management network. The management network can be obtained from the master node of the cluster
-                networks_to_attach = [self.state.vm_master.management_network] * self.state.master_area.service_net_required_ip_number
-                ips = self.provider.attach_nets(self.state.vm_master, networks_to_attach)
-                self.state.load_balancer_ips.extend(ips)
+                # Reserving pool in the management network
+                # The management network can be obtained from the master node of the cluster
+                pool = LBPool(net_name=self.state.vm_master.management_network, range_length=self.state.master_area.service_net_required_ip_number)
+                # TODO the range should assigned in VIM to the master
+                res_range = build_topology().reserve_range_lb_pool(pool, self.id)
+                pool.ip_start = res_range.start.exploded
+                pool.ip_end = res_range.end.exploded
+                reserved_pools.append(pool)
+
         self.state.reserved_pools = reserved_pools
 
     @classmethod

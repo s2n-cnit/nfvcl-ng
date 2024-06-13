@@ -40,6 +40,6 @@ def start_migrations():
     for migration_file in migration_files:
         migration_name = migration_file.split(".")[0]
         if migration_name not in applied_migrations:
-            migration_module = importlib.import_module(f'utils.migrations.{migration_name}')
+            migration_module = importlib.import_module(f'nfvcl.utils.migrations.{migration_name}')
             apply_migration(migration_name, migration_module)
 

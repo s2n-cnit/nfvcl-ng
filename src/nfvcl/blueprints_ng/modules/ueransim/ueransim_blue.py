@@ -137,20 +137,20 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
 
     def add_gnb_to_topology(self, area_id: int):
-        name = f"UERNASIM_GNB_{self.id}_{area_id}"
+        name = f"UERANSIM_GNB_{self.id}_{area_id}"
         build_topology().add_pdu(PduModel(
             name=name,
             area=area_id,
             type="UERANSIM",
             user="",
             passwd="",
-            implementation="blueprints_ng.pdu_configurators.ueransim_pdu_configurator.UERANSIMPDUConfigurator",
+            implementation="nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator.UERANSIMPDUConfigurator", # TODO this should be dynamic
             config={"blue_id": self.id},
             interface=[]
         ))
 
     def del_gnb_from_topology(self, area_id: int):
-        build_topology().del_pdu(f"UERNASIM_GNB_{self.id}_{area_id}")
+        build_topology().del_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
 
     def _create_gnb(self, area_id: str):
         if area_id not in self.state.areas:

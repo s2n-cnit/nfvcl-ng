@@ -532,7 +532,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
         Returns: Result of the function call
         """
-        from rest_endpoints.blue_ng_router import get_blueprint_manager
+        from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 
         self.logger.debug(f"Calling external function '{function_name}' on blueprint '{external_blue_id}', args={args}, kwargs={kwargs}")
         res = get_blueprint_manager().get_worker(external_blue_id).call_function_sync(function_name, *args, **kwargs)

@@ -1,6 +1,6 @@
 services:
   nfvcl:
-    image: ghcr.io/HORSE-EU-Project/epem:latest # image: registry.gitlab.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
+    image: ghcr.io/horse-eu-project/epem:latest # image: registry.gitlab.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
     container_name: epem
     depends_on:
       - mongo

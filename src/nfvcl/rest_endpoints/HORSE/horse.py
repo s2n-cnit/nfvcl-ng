@@ -104,7 +104,7 @@ def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType,
         The filled model to be used when requesting to DOC.
     """
     action_model = extract_action(actionType=actiontype, playbook=playbook)
-    action_definition = DOCActionDefinition(actiontype=actiontype, service=service, action=action_model.dict())
+    action_definition = DOCActionDefinition(actiontype=actiontype, service=service, action=action_model.model_dump())
     doc_north_model = DOCNorthModel(actionid=actionid, target=target, actiondefinition=action_definition)
     return doc_north_model
 
@@ -112,9 +112,8 @@ def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType,
 def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
     if 'url' in doc_mod_info:
         doc_module_url = doc_mod_info['url']
-
         try:
-            httpx.post(f"http://{doc_module_url}", data=doc_request.json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
+            httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
         except ConnectTimeout:
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
         except httpx.ConnectError:
@@ -154,7 +153,7 @@ def rtr_request_workaround(target: str, action_type: RTRActionType, username: st
             return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="error", status_code=404)
         else:
             body: DOCNorthModel = build_request_for_doc(actionid="", target=target, actiontype=action_type, service="", playbook=payload)
-            forward_request_to_doc(doc_mod_info, body)
+            return forward_request_to_doc(doc_mod_info, body)
 
 
 @horse_router.post("/rtr_request", response_model=RTRRestAnswer)
@@ -196,7 +195,7 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
             return RTRRestAnswer(description="The Target has not been found in VMs managed by the ePEM. The request will NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the DOC IP.", status="error", status_code=404)
         else:
             body: DOCNorthModel = build_request_for_doc(actionid="", target=target_ip, actiontype=actionType, service="", playbook=payload)
-            forward_request_to_doc(doc_mod_info, body)
+            return forward_request_to_doc(doc_mod_info, body)
     else:
         if not os.environ.get('HORSE_DEBUG'):
             ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, vm.username, vm.password, payload)

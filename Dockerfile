@@ -2,6 +2,7 @@ FROM ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Rome
+ENV PYTHONPATH=/app/nfvcl-ng/src/nfvcl
 
 RUN apt-get update && \
     apt-get -y dist-upgrade && \

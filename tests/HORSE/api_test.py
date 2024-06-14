@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import logging
 import time
+import yaml
 import unittest
 from http.server import HTTPServer
 from multiprocessing import Process, Pipe
@@ -38,13 +39,16 @@ class UnitTestHorseAPIs(unittest.TestCase):
     def tearDownClass(cls):
         logging.info('Stopping dummy http server\n')
         cls.process.terminate()
+        cls.process.join()
         cls.process.close()
         cls.process = None
     def test_000_set_doc_ip(self):
         doc_module_info = get_extra("doc_module")
-        # TODO check if IP was NONE!!!
-        self.old_ip = doc_module_info['ip']
-        self.old_path = doc_module_info['url_path']
+        if doc_module_info is None:
+            set_doc_ip_port(f"127.0.0.1:{HTTP_DUMMY_SRV_PORT}", "/api/test")
+
+        self.old_ip = doc_module_info['ip'] if doc_module_info['ip'] else "127.0.0.1"
+        self.old_path = doc_module_info['url_path'] if doc_module_info['url_path'] else "/"
         set_doc_ip_port(f"127.0.0.1:{HTTP_DUMMY_SRV_PORT}", "/api/test")
         # Check that they changed
         doc_module_info = get_extra("doc_module")
@@ -53,17 +57,21 @@ class UnitTestHorseAPIs(unittest.TestCase):
         self.assertEqual(f"127.0.0.1:{HTTP_DUMMY_SRV_PORT}", doc_module_info['ip'])
         self.assertEqual("/api/test", doc_module_info['url_path'])
 
-    def test_001_rest_endpoints(self):
-        path = Path("test_playbook.yaml")
-        data = yaml.safe_load(path)
-        yaml_text = yaml.dump(data, default_flow_style=False)
+    def test_001_test_workaround_forwarding(self):
+        path = Path("tests/HORSE/test_playbook.yaml")
+        yaml_text = path.read_text()
         # Should be forwarded
-        rtr_request_workaround("10.10.10.10", RTRActionType.DNS_RATE_LIMIT, "urs", "pwd", True, yaml_text)
+        rtr_request_workaround("10.10.10.10", RTRActionType.TEST, "urs", "pwd", True, yaml_text)
+        time.sleep(2)
         received = self.parent_conn.recv()
-        self.assertEqual(received, "---")
+        self.assertEqual(received, '{"actionid":"","target":"10.10.10.10","actiondefinition":{"actiontype":"TEST","service":"","action":{"zone":"TEST","status":"TEST"}}}')
 
-        for i in range(1,10):
-            time.sleep(1)
+    def test_002_test_workaround_apply(self):
+        path = Path("tests/HORSE/test_playbook.yaml")
+        yaml_text = path.read_text()
+        # Should be forwarded
+        result = rtr_request_workaround("127.0.0.1", RTRActionType.TEST, "test", "testpassword", False, yaml_text)
+        self.assertEqual(result, RTRRestAnswer(description="Playbook applied", status="success"))
 
 
     def test_100_reset_doc_ip(self):

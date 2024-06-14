@@ -36,6 +36,7 @@ class RTRActionType(str, Enum):
     DNS_RATE_LIMIT = "DNS_RATE_LIMIT"
     DNS_SERV_DISABLE = "DNS_SERV_DISABLE"
     DNS_SERV_ENABLE = "DNS_SERV_ENABLE"
+    TEST = "TEST"
 
 
 class DOCActionDNSstatus(NFVCLBaseModel):
@@ -85,6 +86,8 @@ def extract_action(actionType: RTRActionType, playbook) -> DOCActionDNSLimit | D
             return DOCActionDNSstatus(zone="", status='disabled')
         case RTRActionType.DNS_SERV_ENABLE:
             return DOCActionDNSstatus(zone="", status='enabled')
+        case RTRActionType.TEST:
+            return DOCActionDNSstatus(zone="TEST", status='TEST')
 
 
 def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType, service: str, playbook) -> DOCNorthModel:
@@ -111,7 +114,7 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
         doc_module_url = doc_mod_info['url']
 
         try:
-            httpx.post(f"http://{doc_module_url}", data=body.json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
+            httpx.post(f"http://{doc_module_url}", data=doc_request.json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
         except ConnectTimeout:
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
         except httpx.ConnectError:

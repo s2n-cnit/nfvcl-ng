@@ -13,21 +13,29 @@ def set_pipe(connection: Connection):
 
 
 class HTTPDummyServer(BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
     parent_conn: Connection = None
     child_conn: Connection = None
     process_id = None
 
-    def _set_response(self):
-        self.send_header('Content-type', 'application/json')
+    def _set_get_response(self):
         self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Content-Length', '0')
+        self.end_headers()
+
+    def _set_post_response(self, content_length):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Content-Length', content_length)
         self.end_headers()
 
     def do_GET(self):
         logging.info(f"GET request from {self.client_address[0]}")
         logging.info(f"Path: {self.path}")
         logging.info(f"Headers: {self.headers}")
-        self._set_response()
-        resp = "{ Received: true }"
+        self._set_get_response()
+        resp = ""
         resp_utf8 = resp.encode('utf-8')
         self.write_to_pipe(resp)
         self.wfile.write(resp_utf8)
@@ -37,8 +45,8 @@ class HTTPDummyServer(BaseHTTPRequestHandler):
         logging.info(f"Path: {self.path}")
         logging.info(f"Headers: {self.headers}")
 
-        cont_len = int(self.headers['Content-Length'])  # <--- Gets the size of data
-        post_data = self.rfile.read(cont_len)
+        content_length = int(self.headers['Content-Length'])  # <--- Gets the size of data
+        post_data = self.rfile.read(content_length)
         body = post_data.decode('utf-8')
 
         logging.info(f"Body: {body}")
@@ -46,7 +54,7 @@ class HTTPDummyServer(BaseHTTPRequestHandler):
         decoded_string = urllib.parse.unquote(post_data)
         logging.info(decoded_string)
 
-        self._set_response()
+        self._set_post_response(content_length)
         self.write_to_pipe(decoded_string)
         self.wfile.write(post_data)
 

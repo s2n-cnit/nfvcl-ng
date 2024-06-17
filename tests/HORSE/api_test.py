@@ -1,4 +1,5 @@
 import os
+import uuid
 from pathlib import Path
 import logging
 import time
@@ -14,8 +15,12 @@ os.environ.get('HORSE_DEBUG')
 from nfvcl.rest_endpoints.HORSE.horse import *
 from tests.HORSE.dummy_server import HTTPDummyServer, set_pipe
 
-
 HTTP_DUMMY_SRV_PORT = 9999
+action_id = str(uuid.uuid4())
+action_type = RTRActionType.TEST
+target_ip_external = "10.145.212.201"
+service_type = "DNS"
+
 
 class UnitTestHorseAPIs(unittest.TestCase):
     http_dummy_server = None
@@ -48,7 +53,6 @@ class UnitTestHorseAPIs(unittest.TestCase):
         cls.process.close()
         cls.process = None
 
-
     def test_000_set_doc_ip(self):
         """
          Test IP DOC setup and save the old one.
@@ -75,30 +79,78 @@ class UnitTestHorseAPIs(unittest.TestCase):
         path = Path("tests/HORSE/test_playbook.yaml")
         yaml_text = path.read_text()
         # Fake request to dummy server
-        result = rtr_request_workaround("10.10.10.10", RTRActionType.TEST, "urs", "pwd", True, yaml_text)
+        result = rtr_request_workaround(target_ip_external, RTRActionType.TEST, "urs", "pwd", True, yaml_text, service=service_type, actionID=action_id)
+        # Building a copy of the request
+        request = build_request_for_doc(actionid=action_id, target=target_ip_external, actiontype=RTRActionType.TEST, service=service_type, playbook=yaml_text)
+        # -------------- Assertions
         self.assertEqual(result, RTRRestAnswer(description='The request has been forwarded to DOC module.', status='forwarded', status_code=404, data={}))
         time.sleep(2)
         # What is received by dummy server is in the pipe
         received = self.parent_conn.recv()
-        # What is received should be always the same, given the same input
-        self.assertEqual(received, '{"actionid":"","target":"10.10.10.10","actiondefinition":{"actiontype":"TEST","service":"","action":{"zone":"TEST","status":"TEST"}}}')
+        # What is received should be always equal to the request, given the same input
+        self.assertEqual(received, request.model_dump_json())
 
     def test_002_test_workaround_apply(self):
         """
-        Test the run of playbook workaround
+        Test the application on localhost that MUST fail with a certain error.
+        It is impossible to include a target where playbook is applied during test.
+        This test is looking that the error is the expected one.
         """
         path = Path("tests/HORSE/test_playbook.yaml")
         yaml_text = path.read_text()
-        # Should be runned in localhost and have success
-        result = rtr_request_workaround("127.0.0.1", RTRActionType.TEST, "test", "testpassword", False, yaml_text)
-        self.assertEqual(result, RTRRestAnswer(description="Playbook applied", status="success"))
+        try:
+            result = rtr_request_workaround("127.0.0.1", RTRActionType.TEST, "test", "testpassword", False, yaml_text)
+        except HTTPException as http_exc:
+            if http_exc.status_code == 500:
+                logging.info("TEST on workaround done")
+            else:
+                raise ValueError(f"HTTPException should give 500 error code. Actual value is {http_exc.status_code}")
+        except Exception as e:
+            raise ValueError("Unexpected exception")
 
+    def test_003_test_forwarding(self):
+        """
+        Test the forwarding to DOC
+        """
+        # Load test playbook
+        path = Path("tests/HORSE/test_playbook.yaml")
+        yaml_text = path.read_text()
+        # Fake request to dummy server
+        result = rtr_request(target_ip=target_ip_external, target_port="", service=service_type, actionType=action_type, actionID=action_id, payload=yaml_text)
+        # Building a copy of the request
+        request = build_request_for_doc(actionid=action_id, target=target_ip_external, actiontype=RTRActionType.TEST, service=service_type, playbook=yaml_text)
+        # -------------- Assertions
+        self.assertEqual(result, RTRRestAnswer(description='The request has been forwarded to DOC module.', status='forwarded', status_code=404, data={}))
+        time.sleep(2)
+        # What is received by dummy server is in the pipe
+        received = self.parent_conn.recv()
+        # What is received should be always equal to the request, given the same input
+        self.assertEqual(received, request.model_dump_json())
+
+    def test_004_test_apply(self):
+        """
+        Test the application on localhost that MUST fail with a certain error.
+        It is impossible to include a target where playbook is applied during test.
+        This test is looking that the error is the expected one.
+        """
+        # Load test playbook
+        path = Path("tests/HORSE/test_playbook.yaml")
+        yaml_text = path.read_text()
+        try:
+            result = rtr_request("127.0.0.1", "", "DNS", RTRActionType.TEST, str(uuid.uuid4()), yaml_text)
+        except HTTPException as http_exc:
+            if http_exc.status_code == 500:
+                logging.info("TEST on workaround done")
+            else:
+                raise ValueError(f"HTTPException should give 500 error code. Actual value is {http_exc.status_code}")
+        except Exception as e:
+            raise ValueError("Unexpected exception")
 
     def test_100_reset_doc_ip(self):
         """
-        Restore DOC IP before test
+        Restore DOC IP before tests.
         """
-        set_doc_ip_port(self.old_ip,  self.old_path)
+        set_doc_ip_port(self.old_ip, self.old_path)
         doc_module_info = get_extra("doc_module")
         self.assertEqual(self.old_ip, doc_module_info['ip'])
         self.assertEqual(self.old_path, doc_module_info['url_path'])

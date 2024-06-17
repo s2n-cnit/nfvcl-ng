@@ -1,3 +1,4 @@
+import uuid
 from enum import Enum
 from logging import Logger
 from typing import Annotated, Optional
@@ -124,7 +125,7 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
 
 
 @horse_router.post("/rtr_request_workaround", response_model=RTRRestAnswer)
-def rtr_request_workaround(target: str, action_type: RTRActionType, username: str, password: str, forward_to_doc: bool, payload: str = Body(None, media_type="application/yaml")):
+def rtr_request_workaround(target: str, action_type: RTRActionType, username: str, password: str, forward_to_doc: bool, payload: str = Body(None, media_type="application/yaml"), service: str | None = None, actionID: str | None = None) -> RTRRestAnswer:
     """
     Allows running an ansible playbook on a remote host.
     Integration for HORSE Project. Allow applying mitigation action on a target. This function is implemented as a workaround since in the first demo
@@ -152,7 +153,9 @@ def rtr_request_workaround(target: str, action_type: RTRActionType, username: st
         if doc_mod_info is None:
             return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="error", status_code=404)
         else:
-            body: DOCNorthModel = build_request_for_doc(actionid="", target=target, actiontype=action_type, service="", playbook=payload)
+            if actionID is None: actionID=uuid.uuid4()
+            if service is None: service = "DNS" # TODO Workaround
+            body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target, actiontype=action_type, service=service, playbook=payload)
             return forward_request_to_doc(doc_mod_info, body)
 
 
@@ -194,7 +197,7 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
         if doc_mod_info is None:
             return RTRRestAnswer(description="The Target has not been found in VMs managed by the ePEM. The request will NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the DOC IP.", status="error", status_code=404)
         else:
-            body: DOCNorthModel = build_request_for_doc(actionid="", target=target_ip, actiontype=actionType, service="", playbook=payload)
+            body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target_ip, actiontype=actionType, service=service, playbook=payload)
             return forward_request_to_doc(doc_mod_info, body)
     else:
         if not os.environ.get('HORSE_DEBUG'):

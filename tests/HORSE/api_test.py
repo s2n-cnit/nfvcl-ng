@@ -60,8 +60,9 @@ class UnitTestHorseAPIs(unittest.TestCase):
         doc_module_info = get_extra("doc_module")
         if doc_module_info is None:
             set_doc_ip_port(f"127.0.0.1:{HTTP_DUMMY_SRV_PORT}", "/api/test")
+            doc_module_info = get_extra("doc_module")
 
-        self.old_ip = doc_module_info['ip'] if doc_module_info['ip'] else "127.0.0.1"
+        self.old_ip = doc_module_info['ip'] if 'ip' in doc_module_info is not None else "127.0.0.1"
         self.old_path = doc_module_info['url_path'] if doc_module_info['url_path'] else "/"
         set_doc_ip_port(f"127.0.0.1:{HTTP_DUMMY_SRV_PORT}", "/api/test")
         # Check that they changed

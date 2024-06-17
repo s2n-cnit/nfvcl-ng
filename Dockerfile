@@ -5,7 +5,7 @@ ENV TZ=Europe/Rome
 
 RUN apt-get update && \
     apt-get -y dist-upgrade && \
-    apt-get -y install curl gnupg2 software-properties-common lsb-release git wget && \
+    apt-get -y install curl gnupg2 software-properties-common lsb-release git wget sshpass && \
     rm -rf /var/lib/apt/lists/*
 
 RUN apt-add-repository --yes ppa:ansible/ansible && \

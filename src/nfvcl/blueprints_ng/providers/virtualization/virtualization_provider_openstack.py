@@ -89,8 +89,24 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.conn.wait_for_image(image)
         return image
 
+    def _pre_creation_checks(self, vm_resource: VmResource):
+        """
+        Check if everything on the OpenStack server is as expected
+        Args:
+            vm_resource: VmResource
+
+        Returns: True if everything is as expected, False otherwise
+        """
+        for net in vm_resource.get_all_connected_network_names():
+            if self.conn.get_network(net) is None:
+                raise VirtualizationProviderOpenstackException(f"Network >{net}< not found on vim")
+
+
     def create_vm(self, vm_resource: VmResource):
         self.logger.info(f"Creating VM {vm_resource.name}")
+
+        self._pre_creation_checks(vm_resource)
+
         image = self.conn.get_image(vm_resource.image.name)
         if image is None:
             if vm_resource.image.url:

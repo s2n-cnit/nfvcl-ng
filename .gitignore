@@ -12,4 +12,4 @@ main_debug.py
 helm_charts/charts/*
 helm_charts/index.yaml
 /docs/build/*
-
+*.drawio*.bkp

@@ -32,7 +32,6 @@ class BlueprintWorker:
         self.thread.start()
 
     def stop_listening(self):
-        # TODO kill thread and check if stop from outside
         self.logger.info("Blueprint worker stopping listening.")
 
     def call_function_sync(self, function_name, *args, **kwargs):
@@ -92,6 +91,19 @@ class BlueprintWorker:
         """
         worker_message = WorkerMessage(message_type=WorkerMessageType.STOP, message="", path="")
         self.message_queue.put(worker_message)  # Thread safe
+
+    def protect_blueprint(self, protect: bool) -> bool:
+        """
+        Change the protected status given the desired one.
+        Args:
+            protect: true if the blueprint is protected from deletion.
+
+        Returns:
+            The new protected value in state.
+        """
+        self.blueprint.base_model.protected = protect
+        self.blueprint.to_db()
+        return self.blueprint.base_model.protected
 
     def _listen(self):
         self.logger.debug(f"Worker listening")

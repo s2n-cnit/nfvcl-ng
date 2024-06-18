@@ -56,7 +56,7 @@ async def run_playbook(target: Annotated[str, Query(pattern=IP_PORT_PATTERN)], s
     """
     bm = get_blueprint_manager()
     target_ip = target.split(":")[0]
-    vm: VmResource = bm.get_VM_target_by_ip(target_ip)
+    vm: VmResource = bm.get_vm_target_by_ip(target_ip)
     if vm is None:
         # TODO post to DOC module
         return AnsibleRestAnswer(description="The Target has not been found in VMs managed by the NFVCL, the request will be forwarded to DOC module.", status="forwarded", status_code=404)

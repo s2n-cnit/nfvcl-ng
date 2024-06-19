@@ -1,5 +1,4 @@
 import importlib
-from logging import Logger
 from typing import Callable, Any, List
 
 from fastapi import APIRouter
@@ -8,19 +7,21 @@ from nfvcl.blueprints_ng.lcm.blueprint_type_manager import get_blueprint_class, 
 from nfvcl.blueprints_ng.lcm.blueprint_worker import BlueprintWorker
 from nfvcl.blueprints_ng.resources import VmResource
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
-from nfvcl.models.http_models import BlueprintNotFoundException, BlueprintAlreadyExisting
+from nfvcl.models.http_models import BlueprintNotFoundException, BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl.utils.database import get_ng_blue_by_id_filter, get_ng_blue_list
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.patterns import Singleton
 from nfvcl.utils.util import generate_blueprint_id
+from verboselogs import VerboseLogger
 
 BLUEPRINTS_MODULE_FOLDER: str = "nfvcl.blueprints_ng.modules"
-logger: Logger = create_logger("BlueprintNGManager")
+logger: VerboseLogger = create_logger("BlueprintNGManager")
 
 
 class BlueprintManager(metaclass=Singleton):
     """
-    This class is responsible for managing blueprints. This class will manage all blueprints that have been created.
+    This class is responsible for managing blueprints.
+    This class will manage all blueprints that have been created.
     When a request arrives at the NFVCL, the blueprint worker of the blueprint is returned.
 
     Attributes:
@@ -105,11 +106,10 @@ class BlueprintManager(metaclass=Singleton):
             The blueprint list (List[BlueprintNG]).
         """
         blue_list = []
-        for item in self._load_all_blue_dict_from_db():
+        for item in self._load_all_blue_dict_from_db(blueprint_type):
             logger.debug(f"Deserializing Blueprint {item['id']}")
             blue_list.append(BlueprintNG.from_db(item))
         return blue_list
-
 
     def create_blueprint(self, msg: Any, path: str, wait: bool = False, parent_id: str | None = None) -> str:
         """
@@ -138,7 +138,7 @@ class BlueprintManager(metaclass=Singleton):
             created_blue.to_db()
             # Creating and starting the worker
             worker = BlueprintWorker(created_blue)
-            worker.start_listening() # Start another THREAD
+            worker.start_listening()  # Start another THREAD
             self.worker_collection[blue_id] = worker
             # Putting the creation message into the worker (the spawn happens asynch)
             if wait:
@@ -149,7 +149,7 @@ class BlueprintManager(metaclass=Singleton):
 
     def delete_blueprint(self, blueprint_id: str, wait: bool = False) -> str:
         """
-        Deletes the blueprint from the NFVCL (DB+worker)
+        Deletes the blueprint from the NFVCL (DB+worker) if the blueprint is not protected.
 
         Args:
             blueprint_id: The ID of the blueprint to be deleted.
@@ -159,6 +159,9 @@ class BlueprintManager(metaclass=Singleton):
             BlueprintNotFoundException if blue does nor exist.
         """
         worker = self.get_worker(blueprint_id)
+        if worker.blueprint.base_model.protected:
+            raise BlueprintProtectedException(blueprint_id)
+
         if wait:
             worker.destroy_blueprint_sync()
         else:
@@ -173,7 +176,10 @@ class BlueprintManager(metaclass=Singleton):
         blue_list: List[dict] = self._load_all_blue_dict_from_db()
 
         for blue in blue_list:
-            self.delete_blueprint(blueprint_id=blue['id'])
+            try:
+                self.delete_blueprint(blueprint_id=blue['id'])
+            except BlueprintProtectedException:
+                logger.warning(f"The deletion of blueprint {blue['id']} has been skipped cause it is protected")
 
     def get_blueprint_summary_by_id(self, blueprint_id: str, detailed: bool = False) -> dict:
         """
@@ -185,7 +191,7 @@ class BlueprintManager(metaclass=Singleton):
         Returns:
             The summary/details of a blueprint
         """
-        # If the blueprint is active and loaded in memory then use the one in memory
+        # If the blueprint is active and loaded in memory, then use the one in memory
         if blueprint_id in self.worker_collection:
             blueprint: BlueprintNG = self.worker_collection[blueprint_id].blueprint
         else:
@@ -217,7 +223,7 @@ class BlueprintManager(metaclass=Singleton):
         else:
             return [blueprint.to_dict(detailed=False) for blueprint in blue_list]
 
-    def get_VM_target_by_ip(self, ipv4: str) -> VmResource | None:
+    def get_vm_target_by_ip(self, ipv4: str) -> VmResource | None:
         """
         Check if there is a VM, belonging to any Blueprint, that have the required IP as interface
         This method was required to execute Playbooks into VMs required by project Horse.
@@ -229,7 +235,7 @@ class BlueprintManager(metaclass=Singleton):
         """
         blue_list: List[BlueprintNG] = self._load_all_blue_from_db()
         for blue in blue_list:
-            registered_vms = blue.get_registered_resources(type_filter="nfvcl.blueprints_ng.resources.VmResource") # Getting only VMs
+            registered_vms = blue.get_registered_resources(type_filter="nfvcl.blueprints_ng.resources.VmResource")  # Getting only VMs
             for registered_resource in registered_vms:
                 vm: VmResource
                 vm = registered_resource.value

@@ -117,9 +117,19 @@ def delete(blueprint_id: str):
     return OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint deletion message for {blueprint_id} given to the worker...")
 
 
-@blue_ng_router.delete('/all/blue', response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED,
-                    callbacks=callback_router.routes)
+@blue_ng_router.delete('/all/blue', response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
 def delete_all_blueprints():
+    """
+    Deletes all blueprints
+    """
     blue_man = get_blueprint_manager()
     blue_man.delete_all_blueprints()
-    return OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprints are being delete...")
+    return OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprints are being deleted...")
+
+
+@blue_ng_router.patch('/protect/{blueprint_id}', response_model=dict, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
+def protect_blueprint(blueprint_id: str, protect: bool):
+    blue_man = get_blueprint_manager()
+    worker = blue_man.get_worker(blueprint_id=blueprint_id)
+    worker.protect_blueprint(protect)
+    return blue_man.get_blueprint_summary_by_id(blueprint_id=blueprint_id, detailed=False)

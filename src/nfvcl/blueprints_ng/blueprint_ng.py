@@ -99,6 +99,7 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
 
     created: Optional[datetime] = Field(default=None)
     corrupted: bool = Field(default=False)
+    protected: bool = Field(default=False)
     status: BlueprintNGStatus = Field(default=BlueprintNGStatus())
 
     node_exporters: List[PrometheusTargetModel] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
@@ -477,7 +478,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         if detailed:
             return self.__serialize_content()
         else:
-            dict_to_ret = {"id": self.base_model.id, "type": self.base_model.type, "status": self.base_model.status, "created": self.base_model.created}
+            dict_to_ret = {"id": self.base_model.id, "type": self.base_model.type, "status": self.base_model.status, "created": self.base_model.created, "protected": self.base_model.protected}
             if self.base_model.corrupted:
                 dict_to_ret["corrupted"] = "True"
             return dict_to_ret

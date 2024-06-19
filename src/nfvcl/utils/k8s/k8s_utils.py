@@ -212,7 +212,7 @@ def get_deployments(kube_client_config: kubernetes.client.Configuration, namespa
 
 
 def get_services(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
-                    label_selector: str = None) -> V1ServiceList:
+                 label_selector: str = None) -> V1ServiceList:
     """
     Search for all Deployments of a namespace. If a namespace is not specified, it will work on
     all namespaces.
@@ -241,6 +241,31 @@ def get_services(kube_client_config: kubernetes.client.Configuration, namespace:
             api_client.close()
 
         return service_list
+
+
+def get_config_map(kube_client_config: kubernetes.client.Configuration, namespace: str, config_map_name: str) -> V1ConfigMap:
+    """
+        Retrieve a config map from a k8s cluster.
+
+        Args:
+            kube_client_config: the configuration of K8s on which the client is built.
+            namespace: the namespace in witch the configmap is located
+            config_map_name: The name of the config map
+
+        Returns: an object V1ConfigMap containing the desired configmap if found
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_configmap = kubernetes.client.CoreV1Api(api_client)
+        try:
+            config_map = api_instance_configmap.read_namespaced_config_map(config_map_name, namespace=namespace)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1->read_namespaced_config_map: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return config_map
+
 
 def get_installed_plugins(kube_client_config: kubernetes.client.Configuration) -> List[K8sPluginName]:
     """
@@ -273,6 +298,30 @@ def get_installed_plugins(kube_client_config: kubernetes.client.Configuration) -
                 to_return.append(K8sPluginName(plugin.name))
 
     return to_return
+
+
+def patch_config_map(kube_client_config: kubernetes.client.Configuration, name, namespace, config_map: V1ConfigMap):
+    """
+        Patch a config map in a k8s cluster.
+
+        Args:
+            kube_client_config: the configuration of K8s on which the client is built.
+            namespace: the namespace in witch the configmap is located
+            config_map: The configmap to be patched
+
+        Returns: an object V1ConfigMap containing the patched configmap if patched
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_configmap = kubernetes.client.CoreV1Api(api_client)
+        try:
+            config_map = api_instance_configmap.patch_namespaced_config_map(name, namespace, config_map)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1->patch_namespaced_config_map: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return config_map
 
 
 def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, dict_to_be_applied: dict = None,
@@ -448,7 +497,7 @@ def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins
         # If type is generic -> No need to check for conflict
         if plugin_type in types and plugin_type is not K8sPluginType.GENERIC:
             msg_warning = "There is a conflict between installed plugins + ones to be installed. 2 or more plugins of " \
-                      "the same type {} have been found (Example calico and flannel)".format(plugin_type)
+                          "the same type {} have been found (Example calico and flannel)".format(plugin_type)
             logger.warning(msg_warning)
         types.append(plugin_type)
 

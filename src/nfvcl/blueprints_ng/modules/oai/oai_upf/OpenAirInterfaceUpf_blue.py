@@ -94,16 +94,16 @@ class OpenAirInterfaceUpf(BlueprintNG[OAIUpfBlueprintNGState, UPFBlueCreateModel
             username="ubuntu",
             password="ubuntu",
             management_network=create_model.networks.mgt,
-            additional_networks=[]
+            additional_networks=[create_model.networks.n4, create_model.networks.n3, create_model.networks.n6]
         )
         self.register_resource(self.state.vm_upf)
         self.provider.create_vm(self.state.vm_upf)
 
-        nets = [create_model.networks.n4, create_model.networks.n3, create_model.networks.n6]
-        additional_nets = list(set(nets).symmetric_difference([create_model.networks.mgt]))
-
-        for net in additional_nets:
-            self.provider.attach_net(self.state.vm_upf, net)
+        # nets = [create_model.networks.n4, create_model.networks.n3, create_model.networks.n6]
+        # additional_nets = list(set(nets).symmetric_difference([create_model.networks.mgt]))
+        #
+        # for net in additional_nets:
+        #     self.provider.attach_net(self.state.vm_upf, net)
 
         self.state.vm_upf_configurator = OpenAirInterfaceUpfConfigurator(vm_resource=self.state.vm_upf)
         self.register_resource(self.state.vm_upf_configurator)

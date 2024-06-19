@@ -35,7 +35,7 @@ spec:
         image: "{{ .Values.nfvclImage.repository }}:{{ .Values.nfvclImage.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.nfvclImage.pullPolicy }}
         ports:
-          - name: http
+          - name: http-nfvcl
             containerPort: {{ .Values.nfvclService.targetPort }}
             protocol: TCP
         livenessProbe:

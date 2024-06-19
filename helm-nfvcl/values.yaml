@@ -36,10 +36,14 @@ nfvclLivenessProbe:
   httpGet:
     path: /
     port: 5002
+  initialDelaySeconds: 3
+  periodSeconds: 10
 nfvclReadinessProbe:
   httpGet:
     path: /
     port: 5002
+  initialDelaySeconds: 3
+  periodSeconds: 10
 
 # Additional volumes on the output Deployment definition.
 volumes: []

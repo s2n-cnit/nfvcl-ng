@@ -8,10 +8,10 @@ metadata:
 spec:
   type: {{ .Values.nfvclService.type }}
   ports:
-    - port: {{ .Values.nfvclService.port }}
-      targetPort: http
+    - port: 80
+      targetPort: http-nfvcl
       protocol: TCP
-      name: http
+      name: http-svc-nfvcl
   selector:
     {{- include "helm-nfvcl.selectorLabels" . | nindent 4 }}
     {{- with .Values.nfvclPodLabels }}

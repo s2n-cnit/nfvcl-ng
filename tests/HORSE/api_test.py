@@ -80,9 +80,9 @@ class UnitTestHorseAPIs(unittest.TestCase):
         path = Path("tests/HORSE/test_playbook.yaml")
         yaml_text = path.read_text()
         # Fake request to dummy server
-        result = rtr_request_workaround(target_ip_external, RTRActionType.TEST, "urs", "pwd", True, yaml_text, service=service_type, actionID=action_id)
+        result = rtr_request_workaround(target_ip_external, RTRActionType.DNS_RATE_LIMIT, "urs", "pwd", True, yaml_text, service=service_type, actionID=action_id)
         # Building a copy of the request
-        request = build_request_for_doc(actionid=action_id, target=target_ip_external, actiontype=RTRActionType.TEST, service=service_type, playbook=yaml_text)
+        request = build_request_for_doc(actionid=action_id, target=target_ip_external, actiontype=RTRActionType.DNS_RATE_LIMIT, service=service_type, playbook=yaml_text)
         # -------------- Assertions
         self.assertEqual(result, RTRRestAnswer(description='The request has been forwarded to DOC module.', status='forwarded', status_code=404, data={}))
         time.sleep(2)

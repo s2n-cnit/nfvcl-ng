@@ -1,14 +1,47 @@
 ---
-- hosts: all
-  gather_facts: no
+- name: Apply rate limiting on DNS server
+  hosts: 192.45.65.22
+  become: true
   tasks:
-    - name: Touch a file, using symbolic modes to set the permissions (equivalent to 0644)
-      ansible.builtin.file:
-        path: ~/foo.conf
-        state: touch
-        mode: u=rw,g=r,o=r
-    - name: Create a directory if it does not exist
-      ansible.builtin.file:
-        path: ~/some_directory
-        state: directory
-        mode: '0755'
+    - name: Install iptables-persistent package (Debian/Ubuntu)
+      package:
+        name: iptables-persistent
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install iptables-services package (CentOS/RHEL)
+      package:
+        name: iptables-services
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Configure iptables rate limiting rule for DNS
+      iptables:
+        table: filter
+        chain: INPUT
+        protocol: TCP
+        destination_port: 258
+        match: limit
+        limit: 23
+        jump: ACCEPT
+      notify:
+        - Save iptables rules
+
+    - name: Save iptables rules
+      command: iptables-save > /etc/iptables/rules.v4
+      notify:
+        - Restart iptables service
+
+
+  handlers:
+    - name: Restart iptables service (Debian/Ubuntu)
+      service:
+        name: iptables-persistent
+        state: restarted
+      when: ansible_os_family == 'Debian'
+
+    - name: Restart iptables service (CentOS/RHEL)
+      service:
+        name: iptables
+        state: restarted
+      when: ansible_os_family == 'RedHat'

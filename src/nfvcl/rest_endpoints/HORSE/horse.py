@@ -41,25 +41,25 @@ class RTRActionType(str, Enum):
 
 
 class DOCActionDNSstatus(NFVCLBaseModel):
-    zone: str
-    status: str
+    Zone: str
+    Status: str
 
 
 class DOCActionDNSLimit(NFVCLBaseModel):
-    zone: str
-    rate: int
+    Zone: str
+    Rate: int
 
 
 class DOCActionDefinition(NFVCLBaseModel):
-    actiontype: str
-    service: str
-    action: dict
+    ActionType: str
+    Service: str
+    Action: dict
 
 
 class DOCNorthModel(NFVCLBaseModel):
-    actionid: str
-    target: str
-    actiondefinition: DOCActionDefinition
+    ActionID: str
+    Target: str
+    ActionDefinition: DOCActionDefinition
 
 
 def extract_action(actionType: RTRActionType, playbook) -> DOCActionDNSLimit | DOCActionDNSstatus:
@@ -78,17 +78,17 @@ def extract_action(actionType: RTRActionType, playbook) -> DOCActionDNSLimit | D
             for task in data[0]['tasks']:
                 if 'iptables' in task:
                     limit = task['iptables']['limit']
-                    action = DOCActionDNSLimit(zone="", rate=limit)
+                    action = DOCActionDNSLimit(Zone="", Rate=limit)
                     logger.debug(action)
                     return action
             # If reach this point, 'iptables' was not found.
             raise HTTPException(status_code=422, detail=f"Field >iptables< not present in the body of the playbook. Cannot parse data for DOC")
         case RTRActionType.DNS_SERV_DISABLE:
-            return DOCActionDNSstatus(zone="", status='disabled')
+            return DOCActionDNSstatus(Zone="", Status='disabled')
         case RTRActionType.DNS_SERV_ENABLE:
-            return DOCActionDNSstatus(zone="", status='enabled')
+            return DOCActionDNSstatus(Zone="", Status='enabled')
         case RTRActionType.TEST:
-            return DOCActionDNSstatus(zone="TEST", status='TEST')
+            return DOCActionDNSstatus(Zone="TEST", Status='TEST')
 
 
 def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType, service: str, playbook) -> DOCNorthModel:
@@ -105,8 +105,8 @@ def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType,
         The filled model to be used when requesting to DOC.
     """
     action_model = extract_action(actionType=actiontype, playbook=playbook)
-    action_definition = DOCActionDefinition(actiontype=actiontype, service=service, action=action_model.model_dump())
-    doc_north_model = DOCNorthModel(actionid=actionid, target=target, actiondefinition=action_definition)
+    action_definition = DOCActionDefinition(ActionType=actiontype, Service=service, Action=action_model.model_dump())
+    doc_north_model = DOCNorthModel(ActionID=actionid, Target=target, ActionDefinition=action_definition)
     return doc_north_model
 
 

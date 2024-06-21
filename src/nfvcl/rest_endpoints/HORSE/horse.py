@@ -79,7 +79,6 @@ def extract_action(actionType: RTRActionType, playbook) -> DOCActionDNSLimit | D
                 if 'iptables' in task:
                     limit = task['iptables']['limit']
                     action = DOCActionDNSLimit(Zone="", Rate=limit)
-                    logger.debug(action)
                     return action
             # If reach this point, 'iptables' was not found.
             raise HTTPException(status_code=422, detail=f"Field >iptables< not present in the body of the playbook. Cannot parse data for DOC")

@@ -39,14 +39,16 @@ Using the worker_replicas parameter, you can choose how many workers will be dep
 The NFVCL should support deployment over different VIMs of the same K8S cluster, nodes must have MGT connectivity between them.
 Service Net of the MASTER NODE is used by the MetalLb to expose services, possibly on a network that is reachable by the outside.
 
-Instead for NOT all the areas different from the one in witch the master is present, the service net is connected but it is not
+Instead, for NOT all the areas different from the one in witch the master is present, the service net is connected but it is not
 used to expose K8S services.
 
 For a more detailed description of the service network, look at the following picture:
 
-<p align="center">
-  <img src="../../../images/k8s/k8s_blueprint-LB_assignment.drawio.svg"  alt="Load balancer assignment"/>
-</p>
+```{image} ../../../images/k8s/k8s_blueprint-LB_assignment.drawio.svg
+:alt: Load balancer assignment
+:width: 400px
+:align: center
+```
 
 ### Plugin installation
 TODO

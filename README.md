@@ -205,7 +205,7 @@ for message in redis_pub_sub.listen():
 
 ### Deployment
 
-You can deploy this project using Doker or Kubernetes
+You can deploy this project using Doker or Helm (Kubernetes)
 
 #### Docker
 ![Docker compose scheme](docs/images/NVFCL-diagrams-DockerCompose.drawio.svg)
@@ -220,8 +220,8 @@ docker compose up
 ```
 For the Docker container, to visualize logs it is sufficient to use `docker logs` utility.
 
-#### Kubernetes
-Still to be implemented
+#### Helm installation (Kubernetes)
+The installation using Helm is described in the dedicated [section](https://nfvcl-ng.readthedocs.io/en/latest/helm.html).
 
 ### Usage
 The NFVCL usage is described in the dedicated [Wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html) page.

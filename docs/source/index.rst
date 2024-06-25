@@ -91,6 +91,7 @@ For more details you can go to :doc:`prometheus/prometheus`
    :hidden:
 
    helm
+   docker
 
 .. toctree::
    :caption: Topology

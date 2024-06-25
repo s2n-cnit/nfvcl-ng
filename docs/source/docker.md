@@ -50,5 +50,5 @@ INFO:     Waiting for application startup.
 ```
 
 ## Swagger / APIs list
-Suppose that the server on which containers are running as an IP that is 192.168.254.12
+Suppose that the server on which containers are running as an IP that is `192.168.254.12`
 To access and try APIs, you can use the Swagger that contains a list of available APIs: http://192.168.254.11:5002/docs

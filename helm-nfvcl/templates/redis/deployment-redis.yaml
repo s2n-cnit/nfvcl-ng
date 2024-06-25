@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis-deployment
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Values.namespace }}-{{ .Release.Name }}
   labels:
     app: nfvcl
 spec:

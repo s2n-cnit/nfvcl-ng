@@ -1,6 +1,6 @@
 kind: Namespace
 apiVersion: v1
 metadata:
-  name: {{ .Values.namespace }}
+  name: {{ .Values.namespace }}-{{ .Release.Name }}
   labels:
-    name: {{ .Values.namespace }}
+    name: {{ .Values.namespace }}-{{ .Release.Name }}

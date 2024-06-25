@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Values.mongoService.name }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Values.namespace }}-{{ .Release.Name }}
   labels:
     {{- include "helm-nfvcl.labels" . | nindent 4 }}
 spec:

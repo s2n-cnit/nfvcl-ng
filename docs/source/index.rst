@@ -86,6 +86,13 @@ For more details you can go to :doc:`prometheus/prometheus`
    self
 
 .. toctree::
+   :caption: Installation
+   :maxdepth: 4
+   :hidden:
+
+   helm
+
+.. toctree::
    :caption: Topology
    :maxdepth: 4
    :hidden:

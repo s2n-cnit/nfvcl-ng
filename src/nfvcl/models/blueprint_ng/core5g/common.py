@@ -1,8 +1,13 @@
 from __future__ import annotations
+from typing import Literal
+from pydantic import BaseModel, constr, HttpUrl
+from enum import Enum
+from typing import List, Optional, Dict
+from pydantic import Field
+from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.blueprint.blueprint_base_model import BlueNSD, BlueprintBaseModel
+from nfvcl.models.vim.vim_models import VimModel
 
-from typing import List, Optional, Literal
-
-from pydantic import BaseModel, Field, constr, HttpUrl
 
 
 # ===================================== SubClasses of subconfig section ================================================
@@ -133,3 +138,99 @@ class AddTacModel(Create5gModel):
 
 class SubAreaOnlyId(BaseModel):
     id: int
+
+
+class SstConvertion():
+    sstType = {"EMBB": 1, "URLLC": 2, "MMTC": 3}
+
+    def __init__(self) -> None:
+        pass
+
+    @classmethod
+    def to_string(cls, value: int = None) -> str:
+        return next((k for k, v in cls.sstType.items() if v == value), None)
+
+    @classmethod
+    def to_int(cls, value: str = None) -> int:
+        return next((v for k, v in cls.sstType.items() if k == value), None)
+
+
+class NssiConvertion(SstConvertion):
+    @classmethod
+    def toNssi(cls, fromSlice: SubSlices = None):
+        return {"sst": cls.to_int(fromSlice.sliceType), "sd": fromSlice.sliceId}
+
+    @classmethod
+    def toSlice(cls, fromNssi: dict = None) -> SubSlices:
+        return SubSlices.model_validate({"sliceType": cls.to_string(fromNssi["sst"]), "sliceId": fromNssi["sd"]})  # TODO workaround for Literal type
+
+
+class Area5GTypeEnum(Enum):
+    CORE = "core"
+    EDGE = "edge"
+    RAN = "ran"
+
+
+class Area5G(NFVCLBaseModel):
+    """
+    Base class that define an Area for 5G blueprints
+    """
+    id: int
+    type: Area5GTypeEnum
+    nsd: Optional[BlueNSD] = Field(default=None)
+
+
+class CoreArea5G(Area5G):
+    """
+    Class that define a core area for 5G blueprints
+
+    amf_ip: IP address of the amf core function, needs to be reachable by the gnb
+    """
+    type: Area5GTypeEnum = Area5GTypeEnum.CORE
+    amf_ip: Optional[str] = Field(default=None)
+
+
+class EdgeArea5G(Area5G):
+    """
+    Class that define a edge area for 5G blueprints
+
+    upf_mgt_ip: IP address of the mgt interface of the UPF vm in this area
+    upf_data_ip: IP address of the data interface of the UPF vm in this area
+    upf_data_network_cidr: CIDR of the data network
+    upf_ue_ip_pool: Pool of IP to use for UEs connecting to this area
+    """
+    type: Area5GTypeEnum = Area5GTypeEnum.EDGE
+    upf_mgt_ip: Optional[str] = Field(default=None)
+    upf_data_ip: Optional[str] = Field(default=None)
+    upf_data_network_cidr: Optional[str] = Field(default=None)
+    upf_ue_ip_pool: Optional[str] = Field(default=None)
+    upf_dnn: Optional[str] = Field(default=None)
+
+
+class RanArea5G(Area5G):
+    """
+    Class that define a edge area for 5G blueprints
+
+    nb_mgt_ip: IP address of the mgt interface of the GNB vm in this area
+    nb_wan_ip: IP address of the data interface of the GNB vm in this area
+    """
+    type: Area5GTypeEnum = Area5GTypeEnum.RAN
+    nb_mgt_ip: Optional[str] = Field(default=None)
+    nb_wan_ip: Optional[str] = Field(default=None)
+
+
+class Networks5G(NFVCLBaseModel):
+    wan: str
+    mgt: str
+
+
+class Blueprint5GBaseModel(BlueprintBaseModel):
+    """
+    Class that contains additional blueprint data that need to be saved in NFVCL's database
+    """
+    blue_model_5g: Optional[Create5gModel] = Field(default=None)
+    core_vim: Optional[VimModel] = Field(default=None)
+    networks_5g: Optional[Networks5G] = Field(default=None)
+    core_area: Optional[CoreArea5G] = Field(default=None)
+    edge_areas: Dict[int, EdgeArea5G] = {}
+    ran_areas: Dict[int, RanArea5G] = {}

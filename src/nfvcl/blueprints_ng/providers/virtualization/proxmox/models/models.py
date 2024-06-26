@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict
 
 from pydantic import Field
+
 from nfvcl.models.base_model import NFVCLBaseModel
 
 

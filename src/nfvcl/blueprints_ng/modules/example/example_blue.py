@@ -3,21 +3,15 @@ from __future__ import annotations
 from typing import List, Optional
 
 from pydantic import Field
-from starlette.requests import Request
 
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGCreateModel, BlueprintNGState
-from nfvcl.blueprints_ng.lcm.blueprint_route_manager import add_route
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     HelmChartResource
 from nfvcl.blueprints_ng.utils import rel_path
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.http_models import HttpRequestType
-
-# Use a global variable to define the blueprint type, this will be used in the decorator for the requests supported
-# by this blueprint
-EXAMPLE_BLUE_TYPE = "example"
 
 
 class ExampleCreateModel(BlueprintNGCreateModel):
@@ -102,7 +96,7 @@ class ExampleVmUbuntuConfigurator(VmResourceAnsibleConfiguration):
 # This decorator is needed to declare a new blueprint type
 # The blueprint class need to extend BlueprintNG, the type of the state and create model need to be explicitly passed
 # for type hinting to work
-@declare_blue_type(EXAMPLE_BLUE_TYPE)
+@blueprint_type("example")
 class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel]):
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = ExampleBlueprintNGState):
         """
@@ -111,6 +105,9 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
         super().__init__(blueprint_id, state_type)
 
     def create(self, create_model: ExampleCreateModel):
+        """
+        This docstring for the create function will be shown on Swagger
+        """
         super().create(create_model)
         self.logger.info("Starting creation of example blueprint")
 
@@ -191,22 +188,11 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
             }
         )
 
-    @classmethod
-    def rest_create(cls, msg: ExampleCreateModel, request: Request):
-        """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
-        """
-        return cls.api_day0_function(msg, request)
-
-    @classmethod
-    def add_vm_endpoint(cls, msg: ExampleAddVMModel, blue_id: str, request: Request):
-        """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
-        """
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(EXAMPLE_BLUE_TYPE, "/add_vm", [HttpRequestType.POST], add_vm_endpoint)
+    @day2_function("/add_vm", [HttpRequestType.POST])
     def add_vm(self, model: ExampleAddVMModel):
+        """
+        This docstring for the add_vm day2 function will be shown on Swagger
+        """
         new_vm = VmResource(
             area=self.create_config.area_id,
             name=f"{self.id}_VM_Ubuntu_{model.num}",

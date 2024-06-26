@@ -1,8 +1,9 @@
 from typing import Optional
 
-from nfvcl.blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
-from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubDataNets
-from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import Snssai, Baseconfig, Dnn, Upfconfig, SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, OaiSmf, HostAliase, UpfAvailable, LocalSubscriptionInfo, QosProfile, SNssaiSmfInfoListItem, PlmnSupportListItem
+from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubDataNets
+from nfvcl.models.blueprint_ng.core5g.OAI_Models import Snssai, Baseconfig, Dnn, Upfconfig, \
+    SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, OaiSmf, HostAliase, UpfAvailable, \
+    LocalSubscriptionInfo, QosProfile, SNssaiSmfInfoListItem, PlmnSupportListItem
 
 
 def add_snssai(config: Baseconfig, slice_id: str, slice_type: str) -> Snssai:
@@ -287,9 +288,9 @@ def add_dnn_snssai_smf_info_list_item(config: Coreconfig, nssai: Snssai, dnn: Dn
     Add item to OAI values configuration "dnn_snssai_smf_info_list", if "snssai_smf_info_list" doesn't exist
     it will be created and then item added.
     :param config: config to add the item to.
-    :param snssai: snssai of the item.
+    :param nssai: snssai of the item.
     :param dnn: dnn of the item.
-    :return: True if the item was successfully added, otherwise None.
+    :return: True, if the item was successfully added, otherwise None.
     """
     for item in config.smf.smf_info.sNssaiSmfInfoList:
         if item.sNssai.sd == nssai.sd:

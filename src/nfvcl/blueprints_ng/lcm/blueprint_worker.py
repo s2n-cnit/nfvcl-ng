@@ -5,9 +5,10 @@ from threading import Thread
 from typing import Any
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGStatus, CurrentOperation
-from nfvcl.blueprints_ng.lcm.blueprint_route_manager import get_function_to_be_called
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage
 from nfvcl.utils.log import create_logger
+
 
 # multiprocessing_manager = multiprocessing.Manager()
 
@@ -132,8 +133,8 @@ class BlueprintWorker:
                     self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.RUNNING_DAY2_OP, detail=f"Calling function {received_message.path} on blueprint {self.blueprint.id}")
                     try:
                         if received_message.message_type == WorkerMessageType.DAY2:
-                            function = get_function_to_be_called(received_message.path)
-                            result = getattr(self.blueprint, function)(received_message.message)
+                            function = blueprint_type.get_function_to_be_called(received_message.path)
+                            result = getattr(self.blueprint, function.__name__)(received_message.message)
                         else:
                             result = getattr(self.blueprint, received_message.path)(*received_message.message[0], **received_message.message[1])
                         # Starting processing the request.

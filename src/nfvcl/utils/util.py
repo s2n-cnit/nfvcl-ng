@@ -3,7 +3,6 @@ import os
 import string
 import random
 import glob
-from logging import Logger
 from pathlib import Path
 from typing import List
 import OpenSSL
@@ -144,7 +143,7 @@ def render_file_jinja2_to_str(file_to_render: Path, confvar: dict):
     """
     Takes a file and renders it using values in the dictionary
     Args:
-        playbook_file: The file to be rendered containing '{{ variable123 }}' references
+        file_to_render: The file to be rendered containing '{{ variable123 }}' references
         confvar: A dictionary containing the variables to be rendered. { 'variable123': 'desiredvalue' }
 
     Returns:

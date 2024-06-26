@@ -16,7 +16,6 @@ from redis.client import PubSub
 from nfvcl.models.k8s.blueprint_k8s_model import LBPool
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sTemplateFillData, K8sOperationType, K8sPluginName
 from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sModel
-from nfvcl.nfvo import NbiUtil
 from nfvcl.topology.topology import Topology
 from nfvcl.utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, \
     convert_str_list_2_plug_name, apply_def_to_cluster, get_k8s_cidr_info
@@ -31,16 +30,14 @@ class K8sManager:
     subscriber: PubSub = redis_cli.pubsub()
     logger: Logger
     db: OSSdb
-    nbiutil: NbiUtil
     lock: RLock
     stop: bool
 
-    def __init__(self, db: OSSdb, nbiutil: NbiUtil, lock: RLock):
+    def __init__(self, db: OSSdb, lock: RLock):
         """
         Initialize the object and start logger + redis client.
         """
         self.db = db
-        self.nbiutil = nbiutil
         self.lock = lock
         self.stop = False
         self.locker = threading.RLock()
@@ -87,7 +84,7 @@ class K8sManager:
 
             The matching k8s cluster or Throw ValueError if NOT found.
         """
-        topology = Topology.from_db(self.db, self.nbiutil, self.lock)
+        topology = Topology.from_db(self.db, self.lock)
         k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
         match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
@@ -257,7 +254,7 @@ class K8sManager:
         if K8sPluginName.METALLB in plugin_to_install:
             cluster: K8sModel = self.get_k8s_cluster_by_id(cluster_id)
 
-            topology: Topology = Topology.from_db(db=self.db, nbiutil=self.nbiutil, lock=self.lock)
+            topology: Topology = Topology.from_db(db=self.db, lock=self.lock)
 
             if not template_data.lb_pools:
                 # If no load balancer pool is given
@@ -265,8 +262,7 @@ class K8sManager:
                 network_name = cluster.networks[0]
                 reserved_range = topology.reserve_range(net_name=network_name, range_length=20,
                                                         owner=cluster_id)
-                lb_pool = LBPool(mode='layer2', net_name=network_name, ip_start=reserved_range.start,
-                                 ip_end=reserved_range.end, range_length=20)
+                lb_pool = LBPool(mode='layer2', net_name=network_name, ip_start=reserved_range.start, ip_end=reserved_range.end, range_length=20)
                 template_data.lb_pools = [lb_pool]
             else:
                 # Checking that every single network is in k8s cluster and reserving the desired range length.
@@ -290,27 +286,26 @@ class K8sManager:
 # ----- Global functions for multiprocessing compatibility -----
 # It requires functions in the namespace of the file (not in classes)
 
-def initialize_k8s_man_subscriber(db: OSSdb, nbiutil: NbiUtil, lock: RLock):
+def initialize_k8s_man_subscriber(db: OSSdb, lock: RLock):
     """
     Start new K8S manager.
 
     Args:
         db: The database
-        nbiutil: The nbiUtil from main
         lock: The topology lock
     """
 
-    # Start a sub process that will listen on redis topic
-    Process(target=__start, args=(db, nbiutil, lock)).start()
+    # Start a subprocess that will listen to a redis topic
+    Process(target=__start, args=(db, lock)).start()
 
 
-def __start(db: OSSdb, nbiutil: NbiUtil, lock: RLock):
+def __start(db: OSSdb, lock: RLock):
     """
     Generate a new manager in order to listen at the k8s management topic.
     Setup signals handler for closing K8S manager.
     Start listening at the incoming messages from redis.
     """
-    k8s_instance = K8sManager(db, nbiutil, lock)
+    k8s_instance = K8sManager(db, lock)
 
     atexit.register(k8s_instance.close)
     signal.signal(signal.SIGTERM, k8s_instance.close)

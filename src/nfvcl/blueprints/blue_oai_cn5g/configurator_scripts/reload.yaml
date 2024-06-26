@@ -1,8 +1,0 @@
----
-- hosts: all
-  tasks:
-  - name: restart upf container
-    shell: |
-       cd /root/upfConfig
-       docker compose restart
-...

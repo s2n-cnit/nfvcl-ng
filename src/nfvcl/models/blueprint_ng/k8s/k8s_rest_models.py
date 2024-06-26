@@ -12,7 +12,7 @@ class K8sAreaDeployment(NFVCLBaseModel):
     is_master_area: bool = Field(default=False, description="If true the master is deployed in this area")
     mgmt_net: str = Field(description="The management network") # TODO validate
     use_vxlan: bool = Field(default=True, description="If true the VXLAN is used. This parameter is ignored in case `service_net` is specifed.")
-    service_net: Optional[str] = Field(default=None, min_items=1, description="Network on witch services are exposed. If not present, service are exposed to an internal net (that can be accessed thought a VXLAN tunnel)")
+    service_net: Optional[str] = Field(default=None, min_length=1, description="Network on witch services are exposed. If not present, service are exposed to an internal net (that can be accessed thought a VXLAN tunnel)")
     service_net_required_ip_number: int = Field(default=10, description="The required IPs number to exposed services, they should be reserved. USED only in master area")
     worker_replicas: PositiveInt = Field(default=1, description="Number of workers in this area")
     worker_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="8192", storage_gb='32', vcpu_count='6')
@@ -50,7 +50,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     install_plugins: bool = Field(default=True, description="Whether to install default plugin list on blueprint deployment (Flannel, MetalLb, OpenEBS)")
     master_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="2048", storage_gb='16', vcpu_count='2')
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Global port security disable, override port security in nodes flavors")
-    areas: List[K8sAreaDeployment] = Field(min_items=1, description="List of areas in witch deployment is made (with requirements)")
+    areas: List[K8sAreaDeployment] = Field(min_length=1, description="List of areas in witch deployment is made (with requirements)")
 
     @field_validator('areas')
     @classmethod
@@ -76,7 +76,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
 
 
 class K8sAddNodeModel(BlueprintNGCreateModel):
-    areas: List[K8sAreaDeployment] = Field(min_items=1, description="List of areas in witch deployment is made (with requirements)")
+    areas: List[K8sAreaDeployment] = Field(min_length=1, description="List of areas in witch deployment is made (with requirements)")
 
     @field_validator('areas')
     @classmethod
@@ -91,7 +91,7 @@ class K8sAddNodeModel(BlueprintNGCreateModel):
         return areas
 
 class K8sDelNodeModel(BlueprintNGCreateModel):
-    node_names: List[str] = Field(min_items=1, description="List of nodes names (1VSVPN_VM_K8S_C) to be removed from the cluster")
+    node_names: List[str] = Field(min_length=1, description="List of nodes names (1VSVPN_VM_K8S_C) to be removed from the cluster")
 
 class KarmadaInstallModel(BlueprintNGCreateModel):
     """

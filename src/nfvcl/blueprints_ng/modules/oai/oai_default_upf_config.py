@@ -1,4 +1,4 @@
-from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import OaiUpfValuesModel
+from nfvcl.models.blueprint_ng.core5g.OAI_Models import OaiUpfValuesModel
 
 # Class rappresenting default config, it will be overwritten with the input one
 default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({

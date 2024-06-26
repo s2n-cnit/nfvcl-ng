@@ -1,7 +1,0 @@
----
-- hosts: all
-  tasks:
-    - name: Enable and start SDCore UPF Service
-      shell: |
-        systemctl enable --now sdcore-upf.service
-...

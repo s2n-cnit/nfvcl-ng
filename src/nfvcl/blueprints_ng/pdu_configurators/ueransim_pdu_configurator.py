@@ -1,5 +1,4 @@
-from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
-
+from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUConfigurator
 from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB
 from nfvcl.models.network import PduModel

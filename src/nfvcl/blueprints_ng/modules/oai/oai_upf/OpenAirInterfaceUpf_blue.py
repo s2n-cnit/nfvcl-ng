@@ -4,12 +4,11 @@ from typing import Optional
 
 import yaml
 from pydantic import Field
-from starlette.requests import Request
 
-from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import Upfconfig, Snssai, DnnItem
+from nfvcl.models.blueprint_ng.core5g.OAI_Models import Upfconfig, Snssai, DnnItem
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.oai import oai_default_upf_config
 from nfvcl.blueprints_ng.modules.oai import oai_utils
 from nfvcl.blueprints_ng.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
@@ -70,7 +69,7 @@ class OAIUpfBlueprintNGState(BlueprintNGState):
     area_id: Optional[int] = Field(default=None)
 
 
-@declare_blue_type(OAI_UPF_BLUE_TYPE)
+@blueprint_type(OAI_UPF_BLUE_TYPE)
 class OpenAirInterfaceUpf(BlueprintNG[OAIUpfBlueprintNGState, UPFBlueCreateModel]):
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = OAIUpfBlueprintNGState):
@@ -155,9 +154,3 @@ class OpenAirInterfaceUpf(BlueprintNG[OAIUpfBlueprintNGState, UPFBlueCreateModel
         """
         return self.state.vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.ip
 
-    @classmethod
-    def rest_create(cls, msg: UPFBlueCreateModel, request: Request):
-        """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
-        """
-        return cls.api_day0_function(msg, request)

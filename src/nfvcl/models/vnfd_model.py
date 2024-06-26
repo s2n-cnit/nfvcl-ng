@@ -98,7 +98,7 @@ class VNFSol006Descriptor(NFVCLBaseModel):
 
     @field_serializer('kdu', 'vdu', 'df', 'ext_cpd', 'sw_image_desc', 'virtual_compute_desc', 'virtual_storage_desc')
     @classmethod
-    def serialize_dt(self, list_to_ser: List, _info):
+    def serialize_dt(cls, list_to_ser: List, _info):
         """
         If the list is empty return None such that when the model is serialized -> Empty list are not included in the
         dump of the model.

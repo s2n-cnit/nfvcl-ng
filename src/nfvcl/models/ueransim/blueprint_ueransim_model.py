@@ -62,9 +62,9 @@ class UeransimSim(NFVCLBaseModel):
     op: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
     opType: OpType
     amf: constr(min_length=4, max_length=4) | None = None
-    configured_nssai: List[UeransimConfiguredNssaiItem] | None = Field(None, min_items=1)
-    default_nssai: List[UeransimDefaultNssaiItem] | None= Field(None, min_items=1)
-    sessions: List[UeransimSession] | None = Field(None, min_items=1)
+    configured_nssai: List[UeransimConfiguredNssaiItem] | None = Field(None, min_length=1)
+    default_nssai: List[UeransimDefaultNssaiItem] | None= Field(None, min_length=1)
+    sessions: List[UeransimSession] | None = Field(None, min_length=1)
 
 
 class UeransimUe(NFVCLBaseModel):

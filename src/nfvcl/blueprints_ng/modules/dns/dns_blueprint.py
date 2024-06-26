@@ -1,14 +1,15 @@
 from typing import Optional
-from nfvcl.models.blueprint_ng.dns.dns_rest_models import DNSCreateModel
-from starlette.requests import Request
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage
+
 from pydantic import Field
+
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage
+from nfvcl.models.blueprint_ng.dns.dns_rest_models import DNSCreateModel
 
 DNS_BLUE_TYPE = "dns"
 BASE_IMAGE = "dns-server"
-BASE_IMAGE_URL = "http://images.tnt-lab.unige.it/dns-server/dns-server-v0.0.1.qcow2"
+BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/dns-server/dns-server-v0.0.1.qcow2"
 DNS_DEFAULT_PASSWORD = "ubuntu"
 
 class DNSBlueprintNGState(BlueprintNGState):
@@ -19,7 +20,7 @@ class DNSBlueprintNGState(BlueprintNGState):
     vm: Optional[VmResource] = Field(default=None)
 
 
-@declare_blue_type(DNS_BLUE_TYPE)
+@blueprint_type(DNS_BLUE_TYPE)
 class DNSBlueprint(BlueprintNG[DNSBlueprintNGState, DNSCreateModel]):
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = DNSBlueprintNGState):
         """
@@ -29,6 +30,7 @@ class DNSBlueprint(BlueprintNG[DNSBlueprintNGState, DNSCreateModel]):
 
     def create(self, create_model: DNSCreateModel):
         """
+        Creates a K8S cluster using the NFVCL blueprint
         """
         super().create(create_model)
         self.logger.info("Starting creation of example blueprint")
@@ -54,9 +56,3 @@ class DNSBlueprint(BlueprintNG[DNSBlueprintNGState, DNSCreateModel]):
         self.provider.create_vm(self.state.vm)
         # No need for configuration, at least for now.
 
-    @classmethod
-    def rest_create(cls, msg: DNSCreateModel, request: Request):
-        """
-        Creates a K8S cluster using the NFVCL blueprint
-        """
-        return cls.api_day0_function(msg, request)

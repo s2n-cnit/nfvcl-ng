@@ -11,7 +11,7 @@ from nfvcl.models.vim import VimModel, UpdateVimModel
 from nfvcl.rest_endpoints.nfvcl_callback import callback_router
 from nfvcl.topology.topology import Topology, topology_lock, build_topology
 from nfvcl.topology.topology_worker import topology_msg_queue
-from nfvcl.main import db, nbiUtil
+from nfvcl.main import db
 from typing import List
 
 from nfvcl.utils.openstack.openstack_utils import check_openstack_instances
@@ -29,7 +29,7 @@ async def get_topology() -> dict:
     Get information regarding the managed topology
     """
     # returning last saved topo
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     return topology.get()
 
 
@@ -73,7 +73,7 @@ async def delete_topology(terraform: bool = False):
 
 @topology_router.get("/vim/{vim_id}", response_model=VimModel)
 async def get_vim(vim_id: str):
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     try:
         vim: VimModel = topology.get_model().get_vim(vim_id)
         return vim
@@ -165,7 +165,7 @@ async def get_network(network_id: str):
     Returns:
         NetworkModel containing data on the desired network
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     net: NetworkModel = topology.get_network(network_id)
     return net
 
@@ -221,7 +221,7 @@ async def get_router(router_id: str):
     Returns:
         RouterModel containing data on the desired network
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     router: RouterModel = topology.get_router(router_id)
     return router
 
@@ -272,7 +272,7 @@ async def get_pdu(pdu_id: str):
     Returns:
         PduModel containing data on the desired network
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     pdu: PduModel = topology.get_pdu(pdu_id)
     return pdu
 
@@ -285,7 +285,7 @@ async def get_pdus():
     Returns:
         List[PduModel] containing list of PDU in the topology
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     pdus: List[PduModel] = topology.get_pdus()
     return pdus
 
@@ -394,7 +394,7 @@ async def update_k8scluster(cluster: K8sModel):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     try:
         topology.get_k8s_cluster(cluster.name)
     except ValueError:
@@ -430,7 +430,7 @@ async def get_k8scluster():
         The list of k8s clusters.
     """
 
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     return topology.get_k8s_clusters()
 
 
@@ -463,7 +463,7 @@ async def upd_prom(prom_srv: PrometheusServerModel):
     Returns:
         OssCompliantResponse that confirm the operation has been submitted
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     try:
         topology.get_prometheus_server(prom_srv.id)
     except ValueError:
@@ -502,7 +502,7 @@ async def get_prom_list():
     Returns:
         The list of prometheus server.
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     prom_list = topology.get_prometheus_servers_model()
     return prom_list
 
@@ -511,7 +511,7 @@ async def get_prom_list():
                      callbacks=callback_router.routes, summary=GET_PROM_SRV_SUMMARY,
                      description=GET_PROM_SRV_DESCRIPTION)
 async def get_prom(prometheus_id: str):
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     try:
         prom_inst = topology.get_prometheus_server(prom_server_id=prometheus_id)
     except ValueError:

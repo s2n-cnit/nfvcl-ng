@@ -209,21 +209,10 @@ for message in redis_pub_sub.listen():
 ```
 
 ### Deployment
-
-You can deploy this project using Doker or Helm (Kubernetes)
+You can deploy this project using **Docker** or **Helm** (Kubernetes)
 
 #### Docker
-![Docker compose scheme](docs/images/NVFCL-diagrams-DockerCompose.drawio.svg)
-
-Clone the repo:
-``` bash
-git clone --depth 1 https://github.com/s2n-cnit/nfvcl-ng
-```
-Then run docker compose
-``` bash
-docker compose up
-```
-For the Docker container, to visualize logs it is sufficient to use `docker logs` utility.
+The installation using Helm is described in the dedicated [section](https://nfvcl-ng.readthedocs.io/en/latest/docker.html).
 
 #### Helm installation (Kubernetes)
 The installation using Helm is described in the dedicated [section](https://nfvcl-ng.readthedocs.io/en/latest/helm.html).

@@ -6,7 +6,6 @@ from nfvcl.models.event import Event
 from nfvcl.models.k8s.common_k8s_model import LBPool
 from nfvcl.models.k8s.topology_k8s_model import K8sModel
 from nfvcl.models.network.network_models import RouterPortModel, IPv4ReservedRange
-from nfvcl.models.osm.osm_pdu_model import OSMPduModel
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl.models.vim import VimModel, UpdateVimModel
 from nfvcl.topology.topology_events import TopologyEventType
@@ -14,11 +13,9 @@ from nfvcl.utils import persistency
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.ipam import *
 from nfvcl.utils.util import remove_files_by_pattern
-from nfvcl.topology.vim_terraform import VimTerraformer
 from nfvcl.models.topology import TopologyModel
 from nfvcl.models.network import PduModel, NetworkModel, RouterModel
 from nfvcl.utils.persistency import OSSdb
-from nfvcl.nfvo.osm_nbi_util import NbiUtil, get_osm_nbi_utils
 import typing
 import json
 import traceback
@@ -65,22 +62,17 @@ class Topology:
                     logger.error(traceback.format_exc())
                     raise ValueError("Topology cannot be initialized")
 
-            # Re-creating terraformer objs
-            for vim in self._model.vims:
-                logger.debug('creating terraformer object for VIM {}'.format(vim.name))
-                self._os_terraformer[vim.name] = VimTerraformer(vim.model_dump())
         else:
             msg_err = "Topology information are not existing"
             self._model = None
             logger.warning(msg_err)
 
     @classmethod
-    def from_db(cls, db: OSSdb, nbiutil: NbiUtil, lock: RLock):
+    def from_db(cls, db: OSSdb, lock: RLock):
         """
         Return the topology from the DB as TopologyModel instance.
         Args:
             db: the database
-            nbiutil: the NbiUtil
             lock: the resource lock
         Returns:
             Topology: The instance of the topology from the database
@@ -179,8 +171,6 @@ class Topology:
         """
         # Check if the vim already exists and add it
         self._model.add_vim(vim_model)
-        # Create the terraformer for the VIM that will manage resources on the VIM
-        self._os_terraformer[vim_model.name] = VimTerraformer(vim_model.model_dump())  # Recreate it even if existing
 
         if terraform:
             # For each network, if terraforming, we need to create it in the real VIM
@@ -202,12 +192,6 @@ class Topology:
         vim_dict = vim_model.model_dump(exclude={'networks', 'routers', 'areas'})
         vim_dict['config']['use_floating_ip'] = use_floating_ip
 
-        # Adding the VIM on OSM
-        if vim_model.osm_onboard:
-            data = get_osm_nbi_utils().add_vim(vim_dict)
-            if not data:
-                raise ValueError("failed to onboard VIM {} onto OSM".format(vim_model.name))
-
         trigger_event(TopologyEventType.TOPO_VIM_CREATE, vim_model.model_dump())
 
     @obj_multiprocess_lock
@@ -215,25 +199,7 @@ class Topology:
         # VIM is unique by name
         vim_model = self._model.get_vim(vim_name)
 
-        if vim_model.osm_onboard:
-            # In every case (of terraform) we need to delete VIM account from OSM.
-            try:
-                # Check that VIM is present on OSM -> Raise error if not
-                osm_vim = get_osm_nbi_utils().get_vim_by_tenant_and_name(vim_model.name, vim_model.vim_tenant_name)
-
-                logger.info('Removing VIM {} from osm'.format(vim_model.name))
-                try:
-                    # Remote deletion from OSM
-                    get_osm_nbi_utils().del_vim(osm_vim['_id'])
-                except ValueError as error:
-                    logger.error(f"VIM >{vim_name}< has not been deleted from OSM: {error}")
-                    return  # In case of error, stop here and does not delete from the topology
-
-            except ValueError:
-                logger.warning(f'VIM >{vim_model.name}< has not been found on OSM, it will be removed anyway from the topology')
-
-
-        # If terraform is enabled then we need to delete also OpenStack resources
+        # If terraform is enabled, then we need to delete also OpenStack resources
         if terraform:
             # remove all networks, ports and routers from topology and from vim
             for router in self._model.routers:
@@ -313,7 +279,6 @@ class Topology:
         """
         return self._model.get_vim_by_area(area_id=area)
 
-
     def get_vim_list_from_area_id_model(self, area: int) -> List[VimModel]:
         """
         Returns the list of VIM given the area id
@@ -361,7 +326,6 @@ class Topology:
             vim.get_net(net_name)  # Raise error if the VIM does not have the network
 
         return net_model
-
 
     def add_network_by_area(self, network: NetworkModel, areas: List[int] = None, terraform: bool = False):
         """
@@ -444,7 +408,6 @@ class Topology:
         self._model.del_network(network.name)
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, network.model_dump())
-
 
     @obj_multiprocess_lock
     def del_network_by_name(self, network_name: str, terraform: bool = False):
@@ -708,12 +671,11 @@ class Topology:
         net_routers: List[RouterModel] = self.get_routers_in_net(net_name)
         for router in net_routers:
             # Check if the NET is connected to this router
-            if(router.external_gateway_info and
-               "enable_snat" in router.external_gateway_info and
-               router.external_gateway_info["enable_snat"] is True):
+            if (router.external_gateway_info and
+                "enable_snat" in router.external_gateway_info and
+                router.external_gateway_info["enable_snat"] is True):
                 return True
         return False
-
 
     def reserve_range_lb_pool(self, lb_pool: LBPool, owner: str) -> IPv4ReservedRange:
         """
@@ -726,10 +688,9 @@ class Topology:
         """
         return self.reserve_range(lb_pool.net_name, lb_pool.range_length, owner)
 
-
     @obj_multiprocess_lock
     def reserve_range(self, net_name: str, range_length: int, owner: str, vim_name: typing.Optional[str] = None) \
-            -> IPv4ReservedRange:
+        -> IPv4ReservedRange:
         """
         Reserve a range in a network of the topology. The range has an owner. The network can be retrieved from a VIM.
         Args:
@@ -818,16 +779,6 @@ class Topology:
             pdu_input.details = ""
             self._model.add_pdu(pdu_input)
 
-            # Upload the PDU into OSM
-            if nfvo_onboard:
-                # Create vim accounts list to be uploaded into OSM
-                vim_accounts = []
-                for vim in get_osm_nbi_utils().get_vims():
-                    vim_accounts.append(vim['_id'])
-
-                get_osm_nbi_utils().add_pdu(OSMPduModel.build_from_topology_pdu(pdu_input, vim_accounts_ids=vim_accounts).model_dump(by_alias=True))
-                pdu_input.nfvo_onboarded = True
-
             # Saving changes to the topology
             self._save_topology_from_model()
 
@@ -859,18 +810,7 @@ class Topology:
         """
         pdu = self._model.get_pdu(pdu_name)
 
-        if pdu.nfvo_onboarded:
-            res = get_osm_nbi_utils().delete_pdu(pdu_name)
-            logger.info("Deleting pdu from OSM, result: {}".format(res))
-
-            if res:
-                deleted_pdu = self._model.del_pdu(pdu_name)
-            else:
-                msg_err = "->{}<- PDU deonboarding failed. PDU not removed".format(pdu.name)
-                logger.error(msg_err)
-                raise ValueError(msg_err)
-        else:
-            deleted_pdu = self._model.del_pdu(pdu_name)
+        deleted_pdu = self._model.del_pdu(pdu_name)
 
         trigger_event(TopologyEventType.TOPO_DELETE_PDU, deleted_pdu.model_dump())
         self._save_topology_from_model()
@@ -921,8 +861,8 @@ class Topology:
         Args:
             data: the k8s cluster to be adde
         """
-        # Delegate add operation to the model. Registering the cluster on OSM if requested
-        self._model.add_k8s_cluster(data, get_osm_nbi_utils())
+        # Delegate adds operation to the model. Registering the cluster on OSM if requested
+        self._model.add_k8s_cluster(data)
 
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_CREATE_K8S, data.model_dump())
@@ -935,7 +875,7 @@ class Topology:
         Args:
             cluster_id: The id (or name) of the cluster to be removed
         """
-        k8s_deleted_cluster = self._model.del_k8s_cluster(cluster_id, get_osm_nbi_utils())
+        k8s_deleted_cluster = self._model.del_k8s_cluster(cluster_id)
 
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_deleted_cluster.model_dump())
@@ -947,7 +887,7 @@ class Topology:
         Args:
             cluster: The k8s cluster to be added in the topology
         """
-        updated_cluster = self._model.upd_k8s_cluster(cluster, get_osm_nbi_utils())
+        updated_cluster = self._model.upd_k8s_cluster(cluster)
 
         self._save_topology_from_model()
         trigger_event(TopologyEventType.TOPO_UPDATE_K8S, updated_cluster.model_dump())
@@ -955,7 +895,7 @@ class Topology:
     @obj_multiprocess_lock
     def add_prometheus_server(self, prom_server: PrometheusServerModel):
         """
-        Add prometheus server to the topology. After this operation it should be possible to configure this instance to
+        Add prometheus server to the topology. After this operation, it should be possible to configure this instance to
         scrape data from target dynamically from the NFVCL.
         Args:
             prom_server: The server that will be added to the topology
@@ -1029,6 +969,5 @@ def build_topology() -> Topology:
     Returns:
         A topology object ready to operate on the topology.
     """
-    nbiUtil = get_osm_nbi_utils()
-    db = persistency.DB() # TODO remove
-    return Topology.from_db(db,nbiUtil,topology_lock)
+    db = persistency.DB()  # TODO remove
+    return Topology.from_db(db, topology_lock)

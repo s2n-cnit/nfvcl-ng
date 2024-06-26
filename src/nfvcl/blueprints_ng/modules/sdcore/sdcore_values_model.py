@@ -1,12 +1,7 @@
 from __future__ import annotations
-
 from typing import List, Optional
-
-from nfvcl.blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
 from pydantic import Field
-
-from nfvcl.blueprints.blue_5g_base.models import Create5gModel
-from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers
+from nfvcl.models.blueprint_ng.core5g.common import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers, Create5gModel, SstConvertion
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.utils.log import create_logger
 

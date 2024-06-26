@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubSubscribers, SubSliceProfiles, SubArea, SubDataNets
+from nfvcl.models.blueprint_ng.core5g.common import SubSubscribers, SubSliceProfiles, SubArea, SubDataNets
 from nfvcl.models.base_model import NFVCLBaseModel
 
 

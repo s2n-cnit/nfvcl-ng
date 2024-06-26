@@ -4,11 +4,10 @@ import copy
 from typing import Optional
 
 from pydantic import Field
-from starlette.requests import Request
 
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from nfvcl.blueprints_ng.utils import rel_path
 from nfvcl.models.base_model import NFVCLBaseModel
@@ -149,7 +148,7 @@ UPF_IMAGE_NAME = "sd-core-upf-v0.4.0-3"
 UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v0.4.0-3.qcow2"
 
 
-@declare_blue_type(SDCORE_UPF_BLUE_TYPE)
+@blueprint_type(SDCORE_UPF_BLUE_TYPE)
 class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreateModel]):
     sdcore_upf_image = VmResourceImage(name=UPF_IMAGE_NAME, url=UPF_IMAGE_URL)
     router_image = VmResourceImage(name="ubuntu2204")
@@ -271,7 +270,3 @@ class SdCoreUPFBlueprintNG(BlueprintNG[SdCoreUPFBlueprintNGState, SdCoreUPFCreat
             self.provider.configure_vm(self.state.upf_vm_configurator)
         else:
             self.logger.info("The UPF configuration is unchanged, skipping configuration")
-
-    @classmethod
-    def rest_create(cls, msg: SdCoreUPFCreateModel, request: Request):
-        return cls.api_day0_function(msg, request)

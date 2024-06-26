@@ -3,8 +3,8 @@ from fastapi import APIRouter, status, Body, Query, HTTPException
 from typing_extensions import Annotated
 from pydantic import BaseModel
 
+from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 from nfvcl.blueprints_ng.resources import VmResource
-from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 from nfvcl.utils.util import IP_PORT_PATTERN
 
 from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook

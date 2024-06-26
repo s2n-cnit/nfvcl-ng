@@ -1,3 +1,0 @@
-from .free5gc_user_configurator import Configurator_Free5GC_User
-from .free5gc_configurator import Configurator_Free5GC
-from .free5gc_core_configurator import Configurator_Free5GC_Core

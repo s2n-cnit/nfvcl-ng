@@ -1,2 +1,0 @@
-from .blueprint_amari5G import Amari5G
-from .configurators.amari5GC_configurator import Configurator_Amari5GC

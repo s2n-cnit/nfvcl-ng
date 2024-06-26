@@ -1,8 +1,0 @@
-nf:
-  - ip: __WEBSOCKET_IP__
-    port: __WEBSOCKET_PORT__
-    type: __TYPE__
-    plmn: __PLMN__
-exporter:
-  port: __EXPORTER_PORT__
-  polling_period_s: __POLLING_TIME__

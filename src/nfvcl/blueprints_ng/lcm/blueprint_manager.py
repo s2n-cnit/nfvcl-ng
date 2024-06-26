@@ -1,9 +1,12 @@
-import importlib
-from typing import Callable, Any, List
+from __future__ import annotations
 
-from fastapi import APIRouter
+import importlib
+from typing import Any, List
+
+from verboselogs import VerboseLogger
+
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import get_blueprint_class, get_registered_modules
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.lcm.blueprint_worker import BlueprintWorker
 from nfvcl.blueprints_ng.resources import VmResource
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
@@ -12,10 +15,24 @@ from nfvcl.utils.database import get_ng_blue_by_id_filter, get_ng_blue_list
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.patterns import Singleton
 from nfvcl.utils.util import generate_blueprint_id
-from verboselogs import VerboseLogger
 
 BLUEPRINTS_MODULE_FOLDER: str = "nfvcl.blueprints_ng.modules"
 logger: VerboseLogger = create_logger("BlueprintNGManager")
+
+__blueprint_manager: BlueprintManager | None = None
+
+def get_blueprint_manager() -> BlueprintManager:
+    """
+    Allow to retrieve the BlueprintManager (that can have only one instance)
+    Returns:
+        The blueprint manager
+    """
+    global __blueprint_manager
+    if __blueprint_manager is not None:
+        return __blueprint_manager
+    else:
+        __blueprint_manager = BlueprintManager()
+        return __blueprint_manager
 
 
 class BlueprintManager(metaclass=Singleton):
@@ -26,20 +43,11 @@ class BlueprintManager(metaclass=Singleton):
 
     Attributes:
         worker_collection (dict[str, BlueprintWorker]): The collection of active workers
-        blue_router (APIRouter): The main router for the blueprints
-        create_endpoint (Callable): The function to be pointed for ALL blueprints creation.
-        update_endpoint (Callable): The function to be pointed for ALL blueprints day2 calls.
     """
     worker_collection: dict[str, BlueprintWorker] = {}
-    blue_router: APIRouter
-    create_endpoint: Callable
-    update_endpoint: Callable
 
-    def __init__(self, api_router: APIRouter, create_endpoint: Callable, update_endpoint: Callable):
-        self.blue_router = api_router
-        self.create_endpoint = create_endpoint
-        self.update_endpoint = update_endpoint
-        # Load the modules into the memory and add the module routers into the main blue router.
+    def __init__(self):
+        # Load the modules into the memory
         self._load_modules()
 
     def get_worker(self, blueprint_id: str) -> BlueprintWorker:
@@ -130,7 +138,7 @@ class BlueprintManager(metaclass=Singleton):
             raise BlueprintAlreadyExisting(blue_id)
         else:
             # Get the class, based on the blue type.
-            BlueClass = get_blueprint_class(path)
+            BlueClass = blueprint_type.get_blueprint_class(path)
             # Instantiate the object (creation of services is done by the worker)
             created_blue: BlueprintNG = BlueClass(blue_id)
             created_blue.base_model.parent_blue_id = parent_id
@@ -246,12 +254,6 @@ class BlueprintManager(metaclass=Singleton):
     def _load_modules(self):
         """
         IMPORT all blueprints modules in the NFVCL. When a module is loaded in the memory, decorators are read and executed.
-        @declare_blue_type is used to actually load the info about every single module in the global collection.
-        When all blueprint modules have been loaded, they are iterated by this function to create and add the router (for every blueprint type) to the main blue router.
+        @blueprint_type is used to actually load the info about every module
         """
         importlib.import_module(BLUEPRINTS_MODULE_FOLDER)
-
-        for module in get_registered_modules().values():
-            BlueClass = getattr(importlib.import_module(module.module), module.class_name)
-            logger.debug(f"Loading BlueClass {BlueClass} from {module.class_name}")
-            self.blue_router.include_router(BlueClass.init_router(self.create_endpoint, self.update_endpoint, module.path))

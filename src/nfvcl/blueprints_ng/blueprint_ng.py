@@ -1,25 +1,22 @@
 from __future__ import annotations
 
-import abc
 import copy
 import enum
-import sys
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Callable, TypeVar, Generic, Optional, List, Any, Dict
+from typing import TypeVar, Generic, Optional, List, Any, Dict
 
-from fastapi import APIRouter, Request
 from pydantic import SerializeAsAny, Field, ConfigDict, ValidationError
 
-from nfvcl.blueprints_ng.lcm.blueprint_route_manager import get_module_routes
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from nfvcl.blueprints_ng.providers.kubernetes import K8SProviderNative
 from nfvcl.blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface
 from nfvcl.blueprints_ng.providers.virtualization import VirtualizationProviderOpenstack, VirtualizationProviderProxmox
-from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderInterface
-from nfvcl.blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource, \
-    VmResourceConfiguration, NetResource
+from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import \
+    VirtualizationProviderInterface
+from nfvcl.blueprints_ng.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, \
+    HelmChartResource, VmResourceConfiguration, NetResource
 from nfvcl.blueprints_ng.utils import get_class_from_path, get_class_path_str_from_obj
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.prometheus.prometheus_model import PrometheusTargetModel
@@ -30,12 +27,14 @@ from nfvcl.utils.log import create_logger
 StateTypeVar = TypeVar("StateTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
 
+
 class CurrentOperation(enum.Enum):
-    UNDEFINED=""
-    IDLE="idle"
-    DEPLOYING="deploying"
-    RUNNING_DAY2_OP="running-day2-op"
-    DESTROYING="destroying"
+    UNDEFINED = ""
+    IDLE = "idle"
+    DEPLOYING = "deploying"
+    RUNNING_DAY2_OP = "running-day2-op"
+    DESTROYING = "destroying"
+
 
 class BlueprintNGStatus(NFVCLBaseModel):
     error: bool = Field(default=False)
@@ -47,13 +46,15 @@ class BlueprintNGStatus(NFVCLBaseModel):
         use_enum_values=True,  # Needed to be able to save the state to the mongo DB
         validate_default=True
     )
+
     @classmethod
     def deploying(cls, blue_id) -> BlueprintNGStatus:
-        return BlueprintNGStatus(current_operation=CurrentOperation.DEPLOYING,detail=f"The blueprint {blue_id} is deploying")
+        return BlueprintNGStatus(current_operation=CurrentOperation.DEPLOYING, detail=f"The blueprint {blue_id} is deploying")
 
     @classmethod
     def destroying(cls, blue_id) -> BlueprintNGStatus:
         return BlueprintNGStatus(current_operation=CurrentOperation.DESTROYING, detail=f"The blueprint {blue_id} is being destroyed")
+
 
 class BlueprintNGCreateModel(NFVCLBaseModel):
     model_config = ConfigDict(
@@ -219,10 +220,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
 
 class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
     base_model: BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar]
-    api_router: APIRouter
     provider: ProvidersAggregator
-    api_day0_function: Callable
-    api_day2_function: Callable
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = None):
         """
@@ -309,13 +307,12 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         else:
             raise BlueprintNGException(f"Children blueprint {blue_id} not found")
 
-
     def create(self, model: CreateConfigTypeVar):
         self.base_model.create_config = model
         self.base_model.create_config_type = get_class_path_str_from_obj(model)
 
     def destroy(self):
-        from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
+        from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 
         for children_id in self.base_model.children_blue_ids.copy():
             get_blueprint_manager().delete_blueprint(children_id, wait=True)
@@ -483,45 +480,6 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 dict_to_ret["corrupted"] = "True"
             return dict_to_ret
 
-    @classmethod
-    @abc.abstractmethod
-    def rest_create(cls, msg: dict, request: Request):
-        pass
-
-    @classmethod
-    def init_router(cls, _day0_func: Callable, _day2_func: Callable, prefix: str) -> APIRouter:
-        """
-        Initialize the blueprint router and register apis to it.
-        Args:
-            _day0_func: The function to be pointed for blueprint creation
-            _day2_func: The function that will handle all day-2 operations
-            prefix: The prefix that all the APIs declared in the blueprint will have.
-
-        Returns:
-            The created and configured router.
-        """
-        cls.api_day0_function = _day0_func
-        cls.api_day2_function = _day2_func
-        cls.api_router = APIRouter(
-            prefix=f"/{prefix}",
-            tags=[f"Blueprint {cls.__name__}"],
-            responses={404: {"description": "Not found"}}
-        )
-        cls.api_router.add_api_route("", cls.rest_create, methods=["POST"])
-
-        # The prefix is the base path of the module, e.g., 'api_common_url/vyos/create' -> prefix = 'vyos'
-        for day2_route in get_module_routes(prefix):
-            fake_endpoint = day2_route.fake_endpoint
-            module_location = fake_endpoint.__module__
-            module = sys.modules[module_location]
-            func_class, func_name = day2_route.fake_endpoint.__func__.__qualname__.split('.')
-            class_obj = getattr(module, func_class)
-            bound_method = getattr(class_obj, func_name)
-
-            cls.api_router.add_api_route(day2_route.final_path, bound_method, methods=day2_route.get_methods_str())
-
-        return cls.api_router
-
     def call_external_function(self, external_blue_id: str, function_name: str, *args, **kwargs):
         """
         Call a function on another blueprint
@@ -533,7 +491,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
         Returns: Result of the function call
         """
-        from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
+        from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 
         self.logger.debug(f"Calling external function '{function_name}' on blueprint '{external_blue_id}', args={args}, kwargs={kwargs}")
         res = get_blueprint_manager().get_worker(external_blue_id).call_function_sync(function_name, *args, **kwargs)

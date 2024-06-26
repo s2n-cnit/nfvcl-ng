@@ -26,7 +26,7 @@ To get a summary of the topology and see the list of containers:
 ```
 ➜  nfvcl-ng git:(master) ✗ docker ps
 CONTAINER ID   IMAGE                                                    COMMAND                  CREATED         STATUS              PORTS                                           NAMES
-9a748ec9ee0c   registry.gitlab.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest   "/root/.local/bin/po…"   2 minutes ago   Up About a minute   0.0.0.0:5002->5002/tcp, :::5002->5002/tcp       nfvcl-ng-nfvcl-1
+9a748ec9ee0c   registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest          "/root/.local/bin/po…"   2 minutes ago   Up About a minute   0.0.0.0:5002->5002/tcp, :::5002->5002/tcp       nfvcl-ng-nfvcl-1
 02528ee4b0b3   mongo                                                    "docker-entrypoint.s…"   2 minutes ago   Up About a minute   0.0.0.0:27017->27017/tcp, :::27017->27017/tcp   nfvcl-ng-mongo-1
 31472b7cf98b   redis:alpine                                             "docker-entrypoint.s…"   2 minutes ago   Up About a minute   0.0.0.0:6379->6379/tcp, :::6379->6379/tcp       nfvcl-ng-redis-1
 ```

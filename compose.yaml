@@ -1,6 +1,6 @@
 services:
   nfvcl:
-    image: registry.gitlab.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
+    image: registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
     depends_on:
       - mongo
       - redis

@@ -4,14 +4,13 @@ import copy
 from typing import Optional, Dict, List
 
 from pydantic import Field
-from starlette.requests import Request
 
 from nfvcl.blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
 from nfvcl.blueprints.blue_5g_base.models import Create5gModel
 from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubSubscribers, SubSliceProfiles, SubSlices
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_route_manager import add_route
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
+from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_default_config import default_config
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_values_model import SDCoreValuesModel, SimAppYamlConfiguration
 from nfvcl.blueprints_ng.modules.sdcore_upf.sdcore_upf_blueprint import SdCoreUPFCreateModel
@@ -19,13 +18,12 @@ from nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator import UERA
 from nfvcl.blueprints_ng.resources import HelmChartResource
 from nfvcl.blueprints_ng.utils import get_class_from_path
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, \
-    Core5GAddSliceModel, Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel
+from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
+    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel
 from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, UeransimSlice
 from nfvcl.models.blueprint_ng.g5.upf import BlueCreateModelNetworks
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.network import PduModel
-from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 from nfvcl.topology.topology import build_topology
 
 SDCORE_BLUE_TYPE = "sdcore"
@@ -53,7 +51,7 @@ class SdCoreBlueprintNGState(BlueprintNGState):
     edge_areas: Dict[str, Dict[str, SDCoreEdgeInfo]] = Field(default_factory=dict)
 
 
-@declare_blue_type(SDCORE_BLUE_TYPE)
+@blueprint_type(SDCORE_BLUE_TYPE)
 class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateModel]):
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = SdCoreBlueprintNGState):
         super().__init__(blueprint_id, state_type)
@@ -240,10 +238,6 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
 
             configurator_instance.configure(gnb_configuration_request)
 
-    @classmethod
-    def rest_create(cls, msg: BlueSDCoreCreateModel, request: Request):
-        return cls.api_day0_function(msg, request)
-
     # @classmethod
     # def attach_gnb_endpoint(cls, msg: Core5GAttachGNBModel, blue_id: str, request: Request):
     #     return cls.api_day2_function(msg, blue_id, request)
@@ -271,11 +265,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
     #
     #     self.call_external_function(model.gnb_blue_id, "configure_gnb", gnb_configuration_request)
 
-    @classmethod
-    def add_ues_endpoint(cls, msg: Core5GAddSubscriberModel, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(SDCORE_BLUE_TYPE, "/add_ues", [HttpRequestType.PUT], add_ues_endpoint)
+    @day2_function("/add_ues", [HttpRequestType.PUT])
     def add_ues(self, subscriber_model: Core5GAddSubscriberModel):
         self.logger.info(f"Adding UE with IMSI: {subscriber_model.imsi}")
         # self.config_ref.add_subscriber_from_generic_model(subscriber_model)
@@ -283,11 +273,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.update_sdcore_values()
         self.update_core()
 
-    @classmethod
-    def del_ues_endpoint(cls, msg: Core5GDelSubscriberModel, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(SDCORE_BLUE_TYPE, "/del_ues", [HttpRequestType.PUT], del_ues_endpoint)
+    @day2_function("/del_ues", [HttpRequestType.PUT])
     def del_ues(self, subscriber_model: Core5GDelSubscriberModel):
         self.logger.info(f"Deleting UE with IMSI: {subscriber_model.imsi}")
         # self.config_ref.delete_subscriber(subscriber_model.imsi)
@@ -334,27 +320,15 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.update_sdcore_values()
         self.update_core()
 
-    @classmethod
-    def add_slice_oss_endpoint(cls, msg: Core5GAddSliceModel, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(SDCORE_BLUE_TYPE, "/add_slice_oss", [HttpRequestType.PUT], add_slice_oss_endpoint)
+    @day2_function("/add_slice_oss", [HttpRequestType.PUT])
     def add_slice_oss(self, add_slice_model: Core5GAddSliceModel):
         self.add_slice(add_slice_model, True)
 
-    @classmethod
-    def add_slice_operator_endpoint(cls, msg: Core5GAddSliceModel, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(SDCORE_BLUE_TYPE, "/add_slice_operator", [HttpRequestType.PUT], add_slice_operator_endpoint)
+    @day2_function("/add_slice_operator", [HttpRequestType.PUT])
     def add_slice_operator(self, add_slice_model: Core5GAddSliceModel):
         self.add_slice(add_slice_model, False)
 
-    @classmethod
-    def del_slice_endpoint(cls, msg: Core5GDelSliceModel, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(SDCORE_BLUE_TYPE, "/del_slice", [HttpRequestType.PUT], del_slice_endpoint)
+    @day2_function("/del_slice", [HttpRequestType.PUT])
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
         self.logger.info(f"Deleting Slice with ID: {del_slice_model.sliceId}")
         # self.config_ref.delete_slice(del_slice_model.sliceId)
@@ -373,11 +347,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.update_sdcore_values()
         self.update_core()
 
-    @classmethod
-    def add_tac_endpoint(cls, msg: Core5GAddTacModel, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(SDCORE_BLUE_TYPE, "/add_tac", [HttpRequestType.PUT], add_tac_endpoint)
+    @day2_function("/add_tac", [HttpRequestType.PUT])
     def add_tac(self, add_area_model: Core5GAddTacModel):
         self.logger.info(f"Adding Area with ID: {add_area_model.id}")
 
@@ -391,11 +361,7 @@ class SdCoreBlueprintNG(BlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateMode
         self.update_sdcore_values()
         self.update_core()
 
-    @classmethod
-    def del_tac_endpoint(cls, msg: Core5GDelTacModel, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(SDCORE_BLUE_TYPE, "/del_tac", [HttpRequestType.PUT], del_tac_endpoint)
+    @day2_function("/del_tac", [HttpRequestType.PUT])
     def del_tac(self, del_area_model: Core5GDelTacModel):
         self.logger.info(f"Deleting Area with ID: {del_area_model.areaId}")
 

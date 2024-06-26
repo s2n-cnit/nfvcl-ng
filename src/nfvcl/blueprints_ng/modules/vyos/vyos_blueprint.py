@@ -1,24 +1,24 @@
 from __future__ import annotations
+
 from typing import Optional
 
-from nfvcl.models.blueprint_ng.vyos.vyos_models import VyOSNetworkNotConnectedToVM, VyOSInterfaceNotExisting
-from nfvcl.blueprints_ng.modules.vyos.config.vyos_nat_conf import VmVyOSNatConfigurator
-from nfvcl.models.http_models import HttpRequestType
-from nfvcl.blueprints_ng.lcm.blueprint_route_manager import add_route
-from starlette.requests import Request
-from nfvcl.blueprints.blue_vyos import VyOSSourceNATRule
-from nfvcl.blueprints_ng.modules.vyos.config.vyos_day0_conf import VmVyOSDay0Configurator
-from nfvcl.models.blueprint_ng.vyos.vyos_rest_models import VyOSCreateModel
 from pydantic import Field
+
+from nfvcl.blueprints.blue_vyos import VyOSSourceNATRule
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl.blueprints_ng.modules.vyos.config.vyos_day0_conf import VmVyOSDay0Configurator
+from nfvcl.blueprints_ng.modules.vyos.config.vyos_nat_conf import VmVyOSNatConfigurator
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor
+from nfvcl.models.blueprint_ng.vyos.vyos_models import VyOSNetworkNotConnectedToVM, VyOSInterfaceNotExisting
+from nfvcl.models.blueprint_ng.vyos.vyos_rest_models import VyOSCreateModel
+from nfvcl.models.http_models import HttpRequestType
 
 # Use a global variable to define the blueprint type, this will be used in the decorator for the requests supported
 # by this blueprint
 VYOS_BLUE_TYPE = "vyos"
 VYOS_BASE_NAME = "VyOS"
-VYOS_BASE_IMAGE_URL = "http://images.tnt-lab.unige.it/k8s/k8s-v0.0.1.qcow2"
+VYOS_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.0.1.qcow2"
 
 
 class VyOSBlueprintNGState(BlueprintNGState):
@@ -40,7 +40,7 @@ class VyOSBlueprintNGState(BlueprintNGState):
 # This decorator is needed to declare a new blueprint type
 # The blueprint class need to extend BlueprintNG, the type of the state and create model need to be explicitly passed
 # for type hinting to work
-@declare_blue_type(VYOS_BLUE_TYPE)
+@blueprint_type(VYOS_BLUE_TYPE)
 class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = VyOSBlueprintNGState):
         """
@@ -87,22 +87,7 @@ class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
         self.state.vm_vyos_configurator.initial_setup()
         self.provider.configure_vm(self.state.vm_vyos_configurator)
 
-    @classmethod
-    def rest_create(cls, msg: VyOSCreateModel, request: Request):
-        """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
-        """
-        return cls.api_day0_function(msg, request)
-
-
-    @classmethod
-    def add_snat_rule_rest(cls, msg: VyOSSourceNATRule, blue_id: str, request: Request):
-        """
-        This is needed for FastAPI to work, don't write code here, just changed the msg type to the correct one
-        """
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(VYOS_BLUE_TYPE, "/snat", [HttpRequestType.POST], add_snat_rule_rest)
+    @day2_function("/snat", [HttpRequestType.POST])
     def add_snat_rule(self, model: VyOSSourceNATRule):
         # Checks
         if self.state.vm_vyos.get_network_interface_by_name(model.outbound_interface) is None:

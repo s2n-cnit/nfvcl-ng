@@ -41,10 +41,10 @@ logger = create_logger('Main')
 nbiUtil = get_osm_nbi_utils()
 db = persistency.DB()
 # Start process LCM for blueprint 1.0
-old_workers = LCMWorkers(topology_lock)
-# Start process LCM for blueprint 2.0
-workers = LCMWorkersBeta(topology_lock)
-pnf_manager = PNFmanager()
+# old_workers = LCMWorkers(topology_lock)
+# # Start process LCM for blueprint 2.0
+# workers = LCMWorkersBeta(topology_lock)
+# pnf_manager = PNFmanager()
 
 # Start process LCM for topology
 topology_worker = TopologyWorker(db, nbiUtil, topology_lock)

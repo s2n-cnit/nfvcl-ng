@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import abc
 
-from nfvcl.topology.topology import build_topology
-
 from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.topology.topology import build_topology
 from nfvcl.utils.log import create_logger
 
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import List
 
-from nfvcl.models.blueprint_ng.vyos.vyos_models import AnsibleVyOSInterface, AnsibleVyOSL3Interface
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterfaceAddress
+from nfvcl.models.blueprint_ng.vyos.vyos_models import AnsibleVyOSInterface, AnsibleVyOSL3Interface
 
 
 class VmVyOSDay0Configurator(VmResourceAnsibleConfiguration):

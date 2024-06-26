@@ -1,6 +1,13 @@
-from typing import List, Optional
+import typing
+from typing import List, Optional, Callable
+
 from fastapi import APIRouter, Query, status, Request
-from nfvcl.blueprints_ng.lcm.blueprint_manager import BlueprintManager
+
+from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG
+from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl.blueprints_ng.utils import clone_function_and_patch_types
+from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
 from nfvcl.models.response_model import OssCompliantResponse, OssStatus
 from nfvcl.rest_endpoints.nfvcl_callback import callback_router
@@ -14,20 +21,47 @@ blue_ng_router = APIRouter(
 
 logger = create_logger("BLUE NG ROUTER")
 
-__blueprint_manager: BlueprintManager | None = None
+class BlueprintNGFunction(NFVCLBaseModel):
+    path: str
+    bound_method: Callable
+    rest_method: List[str]
 
-def get_blueprint_manager() -> BlueprintManager:
+def add_fake_endpoints(cls: BlueprintNG, prefix: str) -> List[BlueprintNGFunction]:
     """
-    Allow to retrieve the BlueprintManager (that can have only one instance)
+    Initialize the blueprint router and register apis to it.
+    Args:
+        cls: Bluprint class
+        prefix: The prefix that all the APIs declared in the blueprint will have.
+
     Returns:
-        The blueprint manager
+        The created and configured router.
     """
-    global __blueprint_manager
-    if __blueprint_manager is not None:
-        return __blueprint_manager
-    else:
-        __blueprint_manager = BlueprintManager(blue_ng_router, create_blueprint, update_blueprint)
-        return __blueprint_manager
+    function_list: List[BlueprintNGFunction] = []
+
+    setattr(cls, "patched_create", classmethod(clone_function_and_patch_types(create_blueprint, {"msg": next(iter(typing.get_type_hints(cls.create).values()))}, doc=cls.create.__doc__)))
+    function_list.append(BlueprintNGFunction(path=f"", bound_method=getattr(cls, "patched_create"), rest_method=["POST"]))
+
+    # The prefix is the base path of the module, e.g., 'api_common_url/vyos/create' -> prefix = 'vyos'
+    for day2_route in blueprint_type.get_module_routes(prefix):
+        type_overrides = {}
+        if len(typing.get_type_hints(day2_route.function)) > 0:
+            type_overrides["msg"] = next(iter(typing.get_type_hints(day2_route.function).values()))
+        patched_name = f"patched_{day2_route.function.__name__}"
+        setattr(cls, patched_name, classmethod(clone_function_and_patch_types(update_blueprint, type_overrides, doc=day2_route.function.__doc__)))
+        function_list.append(BlueprintNGFunction(path=f"{day2_route.final_path}", bound_method=getattr(cls, patched_name), rest_method=day2_route.get_methods_str()))
+        # print("GenericItem[str]:", inspect.signature(getattr(cls, patched_name)))
+    return function_list
+
+def setup_blueprints_routers():
+    for module in blueprint_type.get_registered_modules().values():
+        module_router = APIRouter(
+            prefix=f"/{module.path}",
+            tags=[f"Blueprints NG - {module.class_name}"],
+            responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
+        )
+        for function in add_fake_endpoints(module.blue_class, module.path):
+            module_router.add_api_route(function.path, function.bound_method, methods=function.rest_method)
+        blue_ng_router.include_router(module_router)
 
 @blue_ng_router.get("/", response_model=List[dict])
 async def get_blueprints(blue_type: Optional[str] = Query(default=None), detailed: bool = Query(default=False)) -> List[dict]:
@@ -64,7 +98,7 @@ async def get_blueprint(blueprint_id: str, detailed: bool = Query(default=False)
     return blue_man.get_blueprint_summary_by_id(blueprint_id=blueprint_id, detailed=detailed)
 
 
-def create_blueprint(msg: dict, request: Request):
+def create_blueprint(cls, msg: dict, request: Request):
     """
     Deploy a new blueprint in the NFVCL.
     This function receives ALL the creation requests of all the blueprints!
@@ -82,7 +116,7 @@ def create_blueprint(msg: dict, request: Request):
     return OssCompliantResponse(status=OssStatus.deploying, detail=f"Blueprint {blue_id} is being deployed...")
 
 
-def update_blueprint(msg: dict, blue_id: str, request: Request):
+def update_blueprint(cls, msg: dict, blue_id: str, request: Request):
     """
     Update an existing blueprint in the NFVCL (day 2 request).
     This function receives ALL the update (day2) requests of all the blueprints!

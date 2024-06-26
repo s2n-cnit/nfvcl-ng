@@ -2,20 +2,19 @@ from __future__ import annotations
 
 from typing import List, Optional, Dict
 
-from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, GNBN3Info
-from nfvcl.models.http_models import HttpRequestType
-
-from nfvcl.blueprints_ng.lcm.blueprint_route_manager import add_route
 from pydantic import Field
-from starlette.requests import Request
 
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
 from nfvcl.blueprints_ng.utils import rel_path
 from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, \
+    UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
+    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, GNBN3Info
+from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.network import PduModel
 from nfvcl.models.ueransim.blueprint_ueransim_model import UeransimSim, UeransimUe
 from nfvcl.topology.topology import build_topology
@@ -110,7 +109,7 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
         return ansible_builder.build()
 
 
-@declare_blue_type(UERANSIM_BLUE_TYPE)
+@blueprint_type(UERANSIM_BLUE_TYPE)
 class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprintRequestInstance]):
     # RADIO_NET_CIDR = '10.168.0.0/16'
     # RADIO_NET_CIDR_START = '10.168.0.2'
@@ -135,7 +134,6 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             self.del_gnb_from_topology(int(area))
         super().destroy()
 
-
     def add_gnb_to_topology(self, area_id: int):
         name = f"UERANSIM_GNB_{self.id}_{area_id}"
         build_topology().add_pdu(PduModel(
@@ -144,7 +142,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             type="UERANSIM",
             user="",
             passwd="",
-            implementation="nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator.UERANSIMPDUConfigurator", # TODO this should be dynamic
+            implementation="nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator.UERANSIMPDUConfigurator",  # TODO this should be dynamic
             config={"blue_id": self.id},
             interface=[]
         ))
@@ -270,43 +268,11 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
                         return
                 raise BlueprintNGException(f"Sim with imsi {imsi} does not exist")
 
-    @classmethod
-    def rest_create(cls, msg: UeransimBlueprintRequestInstance, request: Request):
-        return cls.api_day0_function(msg, request)
-
-    @classmethod
-    def add_gnb_endpoint(cls, msg: UeransimBlueprintRequestAddDelGNB, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @classmethod
-    def configure_gnb_endpoint(cls, msg: UeransimBlueprintRequestConfigureGNB, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @classmethod
-    def del_gnb_endpoint(cls, msg: UeransimBlueprintRequestAddDelGNB, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @classmethod
-    def add_ue_endpoint(cls, msg: UeransimBlueprintRequestAddUE, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @classmethod
-    def del_ue_endpoint(cls, msg: UeransimBlueprintRequestDelUE, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @classmethod
-    def add_sim_endpoint(cls, msg: UeransimBlueprintRequestAddSim, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @classmethod
-    def del_sim_endpoint(cls, msg: UeransimBlueprintRequestDelSim, blue_id: str, request: Request):
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(UERANSIM_BLUE_TYPE, "/add_gnb", [HttpRequestType.POST], add_gnb_endpoint)
+    @day2_function("/add_gnb", [HttpRequestType.POST])
     def add_gnb(self, model: UeransimBlueprintRequestAddDelGNB):
         self._create_gnb(model.area_id)
 
-    @add_route(UERANSIM_BLUE_TYPE, "/configure_gnb", [HttpRequestType.POST], configure_gnb_endpoint)
+    @day2_function("/configure_gnb", [HttpRequestType.POST])
     def configure_gnb(self, model: UeransimBlueprintRequestConfigureGNB):
         area = self.state.areas[str(model.area)]
         area.vm_gnb_configurator = UeransimGNBConfigurator(
@@ -321,23 +287,23 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         self.register_resource(area.vm_gnb_configurator)
         self.provider.configure_vm(area.vm_gnb_configurator)
 
-    @add_route(UERANSIM_BLUE_TYPE, "/del_gnb", [HttpRequestType.DELETE], del_gnb_endpoint)
+    @day2_function("/del_gnb", [HttpRequestType.DELETE])
     def del_gnb(self, model: UeransimBlueprintRequestAddDelGNB):
         self._delete_gnb(model.area_id)
 
-    @add_route(UERANSIM_BLUE_TYPE, "/add_ue", [HttpRequestType.POST], add_ue_endpoint)
+    @day2_function("/add_ue", [HttpRequestType.POST])
     def add_ue(self, model: UeransimBlueprintRequestAddUE):
         self._create_ue(model.area_id, model.ue)
 
-    @add_route(UERANSIM_BLUE_TYPE, "/del_ue", [HttpRequestType.DELETE], del_ue_endpoint)
+    @day2_function("/del_ue", [HttpRequestType.DELETE])
     def del_ue(self, model: UeransimBlueprintRequestDelUE):
         self._delete_ue(model.area_id, model.ue_id)
 
-    @add_route(UERANSIM_BLUE_TYPE, "/add_sim", [HttpRequestType.POST], add_sim_endpoint)
+    @day2_function("/add_sim", [HttpRequestType.POST])
     def add_sim(self, model: UeransimBlueprintRequestAddSim):
         self._add_sim(model.area_id, model.ue_id, model.sim)
 
-    @add_route(UERANSIM_BLUE_TYPE, "/del_sim", [HttpRequestType.DELETE], del_sim_endpoint)
+    @day2_function("/del_sim", [HttpRequestType.DELETE])
     def del_sim(self, model: UeransimBlueprintRequestDelSim):
         self._del_sim(model.area_id, model.ue_id, model.imsi)
 

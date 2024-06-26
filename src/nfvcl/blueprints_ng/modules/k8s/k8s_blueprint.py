@@ -1,26 +1,25 @@
+import re
 from ipaddress import IPv4Address
 from typing import Optional, List
-import re
 
 from netaddr.ip import IPNetwork
-from nfvcl.blueprints_ng.lcm.blueprint_route_manager import add_route
+from pydantic import Field
+
+from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day2_configurator import VmK8sDay2Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
+from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
+from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
+    KarmadaInstallModel, K8sDelNodeModel, CreateVxLanModel
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.k8s.common_k8s_model import Cni, LBPool
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sTemplateFillData
+from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sVersion
+from nfvcl.topology.topology import Topology, build_topology
 from nfvcl.utils.k8s import get_k8s_config_from_file_content, install_plugins_to_cluster, get_k8s_cidr_info, \
     get_config_map, patch_config_map
-from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sVersion
-from starlette.requests import Request
-from nfvcl.topology.topology import Topology, build_topology
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
-from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
-from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
-    KarmadaInstallModel, K8sDelNodeModel, CreateVxLanModel
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from pydantic import Field
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
 
 K8S_BLUE_TYPE = "k8s"
 BASE_IMAGE_MASTER = "k8s-base-v0.0.3"
@@ -134,7 +133,7 @@ class K8sBlueprintNGState(BlueprintNGState):
             raise ValueError("The worker number was not reserved")
 
 
-@declare_blue_type(K8S_BLUE_TYPE)
+@blueprint_type(K8S_BLUE_TYPE)
 class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = K8sBlueprintNGState):
         """
@@ -144,6 +143,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
     def create(self, create_model: K8sCreateModel):
         """
+        Creates a K8S cluster using the NFVCL blueprint
+
         Initialize a K8S blueprint.
         1 - Creates the master node in the master area.
         2 - Creates the desired number of worker nodes in the desired areas
@@ -284,13 +285,6 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         self.state.reserved_pools = reserved_pools
 
-    @classmethod
-    def rest_create(cls, msg: K8sCreateModel, request: Request):
-        """
-        Creates a K8S cluster using the NFVCL blueprint
-        """
-        return cls.api_day0_function(msg, request)
-
     def day0conf(self, topology_onboard: bool, configure_master: bool = False):
         """
         Perform Day 0 configuration for master or worker.
@@ -395,16 +389,12 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         install_plugins_to_cluster(kube_client_config=client_config, plugins_to_install=plug_list,
                                    template_fill_data=add_data, cluster_id=self.base_model.id)
 
-    @classmethod
-    def add_k8s_worker(cls, msg: K8sAddNodeModel, blue_id: str, request: Request):
-        """
-        Adds a kubernetes node to a blueprint generated K8S cluster.
-        """
-        return cls.api_day2_function(msg, blue_id, request)
 
-    @add_route(K8S_BLUE_TYPE, "/add_node", [HttpRequestType.POST], add_k8s_worker)
+    @day2_function("/add_node", [HttpRequestType.POST])
     def add_worker(self, model: K8sAddNodeModel):
         """
+        Adds a kubernetes node to a blueprint generated K8S cluster.
+
         Elaborates the request to add WORKER nodes to (multiple) area(s).
         First it deploys the workers, then it configures them.
         Args:
@@ -417,26 +407,12 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         self.day0conf(topology_onboard=False, configure_master=False)
 
-    @classmethod
-    def del_k8s_workers(cls, msg: K8sDelNodeModel, blue_id: str, request: Request):
-        """
-        Destroy a worker from a blueprint generated K8S cluster. The number of nodes (controller/master + workers) cannot be lower than 2.
-
-        Args:
-
-            msg: The list of VM names to be deleted from the K8S cluster
-            blue_id: The blueprint from witch the node is removed
-            request: The request details
-        """
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(K8S_BLUE_TYPE, "/del_workers", [HttpRequestType.DELETE], del_k8s_workers)
+    @day2_function("/del_workers", [HttpRequestType.DELETE])
     def del_workers(self, model: K8sDelNodeModel):
         """
-        Delete (multiple) workers from this blueprint generated K8S cluster
+        Destroy a worker from a blueprint generated K8S cluster. The number of nodes (controller/master + workers) cannot be lower than 2.
         Args:
             model: The list of VM names to be deleted from the K8S cluster
-
         """
         vm_to_be_destroyed = []  # The list of VM to be destroyed (After the check that exist)
         # If one of the nodes to be removed is the MASTER, let's remove it
@@ -476,30 +452,18 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             for configurator in conf_to_be_deregistered:
                 self.deregister_resource(configurator)
 
-    @classmethod
-    def configure_k8s_karmada(cls, msg: KarmadaInstallModel, blue_id: str, request: Request):
-        """
-        Install and configure submariner and Karmada on an existing blueprint generated K8S cluster.
-        """
-        return cls.api_day2_function(msg, blue_id, request)
-
-    @add_route(K8S_BLUE_TYPE, "/install_karmada", [HttpRequestType.POST], configure_k8s_karmada)
+    @day2_function("/install_karmada", [HttpRequestType.POST])
     def configure_karmada(self, model: KarmadaInstallModel):
         """
+        Install and configure submariner and Karmada on an existing blueprint generated K8S cluster.
         Creates a configurator that installs and configures submarine and karmada.
         """
         master_conf = self.state.day_0_master_configurator
         master_conf.install_karmada(model)
         master_result = self.provider.configure_vm(master_conf)
 
-    @classmethod
-    def configure_vxlan(cls, msg: CreateVxLanModel, blue_id: str, request: Request):
-        """
-        Install and configure submariner and Karmada on an existing blueprint generated K8S cluster.
-        """
-        return cls.api_day2_function(msg, blue_id, request)
 
-    @add_route(K8S_BLUE_TYPE, "/create_vx_lan", [HttpRequestType.POST], configure_vxlan)
+    @day2_function("/create_vx_lan", [HttpRequestType.POST])
     def setup_vxlan(self, model: CreateVxLanModel):
         """
         Creates a vxlan interface on the k8s master node and configure it to be accessible from the given client IP in the request.
@@ -522,14 +486,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.logger.info(f"Client configuration: \n{client_commands}")
         master_result = self.provider.configure_vm(master_day2_conf)
 
-    @classmethod
-    def install_k8s_istio(cls, blue_id: str, request: Request):
-        """
-        Install and configure submariner and Karmada on an existing blueprint generated K8S cluster.
-        """
-        return cls.api_day2_function("", blue_id, request)
-
-    @add_route(K8S_BLUE_TYPE, "/install_istio", [HttpRequestType.POST], install_k8s_istio)
+    @day2_function( "/install_istio", [HttpRequestType.POST])
     def install_istio(self, msg):
         """
         Creates a configurator that installs and configures submarine and istio.

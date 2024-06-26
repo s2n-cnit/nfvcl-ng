@@ -1,7 +1,9 @@
+import copy
 import importlib
 import inspect
 from pathlib import Path
-from typing import Any, Optional, Union, List, Text
+from types import FunctionType
+from typing import Any, Optional, Union, List, Text, Dict
 
 from ruamel.yaml import YAML, StringIO
 
@@ -46,6 +48,25 @@ def quoted_presenter(dumper, data):
         return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
     else:
         return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+def clone_function_and_patch_types(f, func_types: Dict[str, Any], name: str = None, doc: str = None):
+    # Create a new function object with the same code, globals, defaults, and closure as f
+    new_func = FunctionType(f.__code__, f.__globals__, name or f.__name__, f.__defaults__, f.__closure__)
+
+    # Deep copy the annotations to ensure no shared state
+    new_func.__annotations__ = copy.deepcopy(f.__annotations__)
+
+    # Update the type annotations with the provided func_types
+    for key, value in func_types.items():
+        new_func.__annotations__[key] = value
+
+    # Update the documentation
+    new_func.__doc__ = doc
+
+    # Copy other relevant attributes
+    new_func.__kwdefaults__ = f.__kwdefaults__
+
+    return new_func
 
 class MyYAML(YAML):
     """

@@ -1,4 +1,5 @@
 from typing import List
+
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription, AnsibleShellTask
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
 

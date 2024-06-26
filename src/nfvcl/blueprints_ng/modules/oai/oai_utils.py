@@ -2,7 +2,9 @@ from typing import Optional
 
 from nfvcl.blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
 from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubDataNets
-from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import Snssai, Baseconfig, Dnn, Upfconfig, SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, OaiSmf, HostAliase, UpfAvailable, LocalSubscriptionInfo, QosProfile, SNssaiSmfInfoListItem, PlmnSupportListItem
+from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import Snssai, Baseconfig, Dnn, Upfconfig, \
+    SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, OaiSmf, HostAliase, UpfAvailable, \
+    LocalSubscriptionInfo, QosProfile, SNssaiSmfInfoListItem, PlmnSupportListItem
 
 
 def add_snssai(config: Baseconfig, slice_id: str, slice_type: str) -> Snssai:

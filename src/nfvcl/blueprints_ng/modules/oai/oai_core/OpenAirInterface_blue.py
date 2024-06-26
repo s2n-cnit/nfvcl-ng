@@ -5,7 +5,6 @@ from typing import Optional, List, Dict
 
 import httpx
 from pydantic import Field
-from starlette.requests import Request
 
 from nfvcl.blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
 from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubArea, SubSubscribers, SubDataNets, SubSliceProfiles, \
@@ -13,13 +12,13 @@ from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubArea, SubSubsc
 from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import DnnItem, Snssai, Ue, OaiCoreValuesModel, \
     SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_route_manager import add_route
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import declare_blue_type
+from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator import UERANSIMPDUConfigurator
 from nfvcl.blueprints_ng.resources import HelmChartResource
 from nfvcl.blueprints_ng.utils import get_class_from_path
-from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
+from nfvcl.models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
     Core5GUpdateSliceModel
 from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, UeransimSlice
@@ -27,7 +26,6 @@ from nfvcl.models.blueprint_ng.g5.upf import UpfPayloadModel, SliceModel, DnnMod
     BlueCreateModelNetworks
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.network import PduModel
-from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 from nfvcl.topology.topology import build_topology
 from nfvcl.utils.log import create_logger
 
@@ -64,7 +62,7 @@ class OAIBlueprintNGState(BlueprintNGState):
     base_udr_url: Optional[str] = Field(default=None)
 
 
-@declare_blue_type(OAI_CORE_BLUE_TYPE)
+@blueprint_type(OAI_CORE_BLUE_TYPE)
 class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = OAIBlueprintNGState):
@@ -637,54 +635,6 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
                 return dnn
         raise ValueError(f'Dnn {dnn_name} not found.')
 
-    @classmethod
-    def rest_create(cls, msg: OAIBlueCreateModel, request: Request):
-        return cls.api_day0_function(msg, request)
-
-    # @classmethod
-    # def rest_attach_gnb(cls, gnb: Core5GAttachGNBModel, blue_id: str, request: Request):
-    #     return cls.api_day2_function(gnb, blue_id, request)
-
-    @classmethod
-    def rest_add_subscriber(cls, add_subscriber_model: Core5GAddSubscriberModel, blue_id: str, request: Request):
-        return cls.api_day2_function(add_subscriber_model, blue_id, request)
-
-    @classmethod
-    def rest_del_subscriber(cls, del_subscriber_model: Core5GDelSubscriberModel, blue_id: str, request: Request):
-        return cls.api_day2_function(del_subscriber_model, blue_id, request)
-
-    @classmethod
-    def rest_add_slice_opertor(cls, add_slice_model: Core5GAddSliceModel, blue_id: str, request: Request):
-        return cls.api_day2_function(add_slice_model, blue_id, request)
-
-    @classmethod
-    def rest_add_slice_oss(cls, add_slice_model: Core5GAddSliceModel, blue_id: str, request: Request):
-        return cls.api_day2_function(add_slice_model, blue_id, request)
-
-    @classmethod
-    def rest_update_slice(cls, update_slice_model: Core5GUpdateSliceModel, blue_id: str, request: Request):
-        return cls.api_day2_function(update_slice_model, blue_id, request)
-
-    @classmethod
-    def rest_del_slice(cls, del_slice_model: Core5GDelSliceModel, blue_id: str, request: Request):
-        return cls.api_day2_function(del_slice_model, blue_id, request)
-
-    @classmethod
-    def rest_add_tac(cls, add_tac_model: Core5GAddTacModel, blue_id: str, request: Request):
-        return cls.api_day2_function(add_tac_model, blue_id, request)
-
-    @classmethod
-    def rest_del_tac(cls, del_tac_model: Core5GDelTacModel, blue_id: str, request: Request):
-        return cls.api_day2_function(del_tac_model, blue_id, request)
-
-    @classmethod
-    def rest_add_dnn(cls, add_dnn_model: Core5GAddDnnModel, blue_id: str, request: Request):
-        return cls.api_day2_function(add_dnn_model, blue_id, request)
-
-    @classmethod
-    def rest_del_dnn(cls, del_dnn_model: Core5GDelDnnModel, blue_id: str, request: Request):
-        return cls.api_day2_function(del_dnn_model, blue_id, request)
-
     # @add_route(OAI_CORE_BLUE_TYPE, "/attach_gnb", [HttpRequestType.PUT], rest_attach_gnb)
     # def attach_gnb(self, gnb: Core5GAttachGNBModel):
     #     area = self.get_area(gnb.area_id)
@@ -706,7 +656,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
     #
     #     self.call_external_function(gnb.gnb_blue_id, "configure_gnb", gnb_payload)
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/add_subscriber", [HttpRequestType.PUT], rest_add_subscriber)
+    @day2_function("/add_subscriber", [HttpRequestType.PUT])
     def add_ues(self, subscriber_model: SubSubscribers, inizialization=False):
         """
         Calls OAI api to add new UE and his SMS (Session Management Subscription) to DB.
@@ -718,7 +668,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         self.add_subscriber_to_conf(subscriber_model, inizialization)
         self.associating_subscriber_with_slice(subscriber_model.imsi)
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/del_subscriber", [HttpRequestType.PUT], rest_del_subscriber)
+    @day2_function("/del_subscriber", [HttpRequestType.PUT])
     def del_ues(self, subscriber_model: Core5GDelSubscriberModel):
         """
         Calls OAI api to delete an existing UE and all his related SMS from DB.
@@ -730,7 +680,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         self.disassociating_subscriber_from_slice(subscriber_model.imsi)
         self.del_subscriber_to_conf(subscriber_model.imsi)
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/add_slice_oss", [HttpRequestType.PUT], rest_add_slice_oss)
+    @day2_function("/add_slice_oss", [HttpRequestType.PUT])
     def _add_slice_oss(self, add_slice_model: Core5GAddSliceModel):
         """
         Add slice as OSS, if area is not provided an exception will be thrown.
@@ -740,7 +690,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         """
         self.add_slice_to_conf(add_slice_model, oss=True)
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/add_slice_operator", [HttpRequestType.PUT], rest_add_slice_opertor)
+    @day2_function( "/add_slice_operator", [HttpRequestType.PUT])
     def _add_slice_operator(self, add_slice_model: Core5GAddSliceModel):
         """
         Add slice as Operator, area is not necessary for the slice to be added.
@@ -750,7 +700,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         """
         self.add_slice_to_conf(add_slice_model, oss=False)
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/update_slice", [HttpRequestType.PUT], rest_update_slice)
+    @day2_function( "/update_slice", [HttpRequestType.PUT])
     def _update_slice(self, update_slice_model: Core5GUpdateSliceModel):
         """
         Update slice.
@@ -760,7 +710,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         """
         self.update_slice(update_slice_model)
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/del_slice", [HttpRequestType.PUT], rest_del_slice)
+    @day2_function("/del_slice", [HttpRequestType.PUT])
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
         """
         Delete SubSliceProfiles from conf.
@@ -770,7 +720,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         """
         self.del_slice_from_conf(del_slice_model.sliceId)
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/add_tac", [HttpRequestType.PUT], rest_add_tac)
+    @day2_function("/add_tac", [HttpRequestType.PUT])
     def add_tac(self, area: Core5GAddTacModel):
         """
         Add new SubArea to conf.
@@ -790,7 +740,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         self.update_upfs_config()
         self.update_gnbs_config()
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/del_tac", [HttpRequestType.PUT], rest_del_tac)
+    @day2_function("/del_tac", [HttpRequestType.PUT])
     def del_tac(self, area: Core5GDelTacModel):
         """
         Delete SubArea from conf.
@@ -809,7 +759,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         self.update_upfs_config()
         self.update_gnbs_config()
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/add_dnn", [HttpRequestType.PUT], rest_add_dnn)
+    @day2_function("/add_dnn", [HttpRequestType.PUT])
     def add_dnn(self, dnn: Core5GAddDnnModel):
         """
         Add new SubDataNets to conf.
@@ -819,7 +769,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         """
         self.add_dnn_to_conf(dnn)
 
-    @add_route(OAI_CORE_BLUE_TYPE, "/del_dnn", [HttpRequestType.PUT], rest_del_dnn)
+    @day2_function("/del_dnn", [HttpRequestType.PUT])
     def del_dnn(self, dnn: Core5GDelDnnModel):
         """
         Delete SubDataNets from conf.

@@ -1,12 +1,13 @@
 import time
+from pathlib import Path
 
 import paramiko
 
 from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
-from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import VirtualizationProviderException
+from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import \
+    VirtualizationProviderException
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
 from nfvcl.utils.log import create_logger
-from pathlib import Path
 
 logger = create_logger('Providers_Utils')
 

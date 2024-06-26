@@ -1,13 +1,8 @@
 from __future__ import annotations
-
 import copy
 from typing import Optional, Dict, List
-
 from pydantic import Field
-
-from nfvcl.blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
-from nfvcl.blueprints.blue_5g_base.models import Create5gModel
-from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubSubscribers, SubSliceProfiles, SubSlices
+from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function

@@ -2,13 +2,11 @@ from typing import List
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from nfvcl.models.config_model import NFVCLConfigModel
-from nfvcl.nfvo.osm_nbi_util import get_osm_nbi_utils
 from nfvcl.utils.helm_repository import CHART_PATH, REPO_PATH, setup_helm_repo
 from nfvcl.utils.log import create_logger
 import os
 from nfvcl.utils.util import get_nfvcl_config
 
-nbiUtil = get_osm_nbi_utils()
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 helm_router = APIRouter(

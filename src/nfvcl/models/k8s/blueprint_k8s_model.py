@@ -12,7 +12,7 @@ class K8sNetworkEndpoints(NFVCLBaseModel):
         ..., description='The name of the topology network to be used for management'
     )
     mgt_internal: Optional[str] = None
-    data_nets: List[LBPool] = Field(description='topology networks to be used by the load balancer', min_items=1)
+    data_nets: List[LBPool] = Field(description='topology networks to be used by the load balancer', min_length=1)
 
 
 class K8sNsdInterfaceDesc(NFVCLBaseModel):
@@ -51,16 +51,9 @@ class K8sConfig(NFVCLBaseModel):
 
 class K8sBlueprintCreate(NFVCLBaseModel):
     type: Literal['K8sBlue']
-    callbackURL: Optional[str] = Field(
-        None,
-        description='url that will be used to notify when the blueprint processing finishes',
-    )
+    callbackURL: Optional[str] = Field(None, description='url that will be used to notify when the blueprint processing finishes')
     config: K8sConfig
-    areas: List[K8sAreaInfo] = Field(
-        ...,
-        description='list of areas to instantiate the Blueprint',
-        min_items=1
-    )
+    areas: List[K8sAreaInfo] = Field(..., description='list of areas to instantiate the Blueprint', min_length=1)
 
     class Config:
         use_enum_values = True

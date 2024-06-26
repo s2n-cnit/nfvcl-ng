@@ -2,10 +2,11 @@ import json
 from fastapi import APIRouter, HTTPException, Body, status
 from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
     V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota, V1ClusterRoleBinding
-
 from nfvcl.models.event import Event
 from nfvcl.models.k8s.blueprint_k8s_model import K8sModel
-from nfvcl.main import *
+from nfvcl.main import db, topology_lock
+from verboselogs import VerboseLogger
+from typing import List
 from nfvcl.models.k8s.k8s_events import K8sEventType
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sOperationType, K8sPluginName
 from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sQuota
@@ -26,7 +27,7 @@ k8s_router = APIRouter(
     tags=["Kubernetes cluster management"],
     responses={404: {"description": "Not found"}},
 )
-logger: Logger = create_logger('K8s Management REST endpoint')
+logger: VerboseLogger = create_logger('K8s Management REST endpoint')
 redis_cli = get_redis_instance()
 
 
@@ -43,7 +44,7 @@ def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
 
         The matching k8s cluster or Throw HTTPException if NOT found.
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
     match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
@@ -67,7 +68,7 @@ def get_k8s_cluster_by_area(area_id: int) -> K8sModel:
 
         The matching k8s cluster or Throw HTTPException if NOT found.
     """
-    topology = Topology.from_db(db, nbiUtil, topology_lock)
+    topology = Topology.from_db(db, topology_lock)
     k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
     match = next((x for x in k8s_clusters if area_id in x.areas), None)
 

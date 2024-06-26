@@ -220,7 +220,7 @@ class VimLink(NFVCLBaseModel):
     port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
 
     @classmethod
-    def build_vim_link(self, net_map: VimNetMap, intf_type: str = None, port_security_enabled: bool = True):
+    def build_vim_link(cls, net_map: VimNetMap, intf_type: str = None, port_security_enabled: bool = True):
         return VimLink(vld=net_map.vld, name=net_map.name, mgt=net_map.mgt, intf_type=intf_type, port_security_enabled=port_security_enabled)
 
 
@@ -353,9 +353,9 @@ class VirtualNetworkFunctionDescriptor(NFVCLBaseModel):
 
     @field_serializer('vdu', 'kdu', 'pdu')
     @classmethod
-    def serialize_list(self, list_to_ser: List, _info):
+    def serialize_list(cls, list_to_ser: List, _info):
         """
-        If the list is empty return None such that when the model is serialized -> Empty list are not included in the
+        If the list is empty, return None such that when the model is serialized -> Empty list are not included in the
         dump of the model.
         WARNING: use exclude_none option when serializing the model:
             model.model_dump(by_alias=True, exclude_none=True)

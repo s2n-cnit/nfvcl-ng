@@ -17,7 +17,7 @@ class UeransimBlueprintRequestInstance(BlueprintNGCreateModel):
     areas: List[UeransimArea] = Field(
         ...,
         description='list of areas to instantiate the Blueprint',
-        min_items=1
+        min_length=1
     )
 
     class Config:
@@ -115,7 +115,7 @@ class UeransimBlueprintRequestAddDelUe(NFVCLBaseModel):
     areas: List[UeransimArea] = Field(
         ...,
         description='List of areas with devices to be added',
-        min_items=1
+        min_length=1
     )
 
     class Config:

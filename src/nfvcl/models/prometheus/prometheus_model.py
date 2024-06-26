@@ -33,7 +33,6 @@ class PrometheusServerModel(BaseModel):
         the existing target inside the relative job
         Args:
             new_target: The target to be added for scraping
-            labels: Labels to be assigned at metrics coming from the target
         """
         # For all existing jobs, we check that there isn't already a target corresponding to the one to be added
         conflicting_targets = False

@@ -1,4 +1,4 @@
-from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import OaiCoreValuesModel
+from nfvcl.models.blueprint_ng.core5g.OAI_Models import OaiCoreValuesModel
 
 # Class rappresenting default config, it will be overwritten with the input one
 default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({

@@ -6,11 +6,8 @@ from typing import Optional, List, Dict
 import httpx
 from pydantic import Field
 
-from nfvcl.blueprints.blue_5g_base.blueprint_5g_base_beta import SstConvertion
-from nfvcl.blueprints.blue_5g_base.models.blue_5g_model import SubArea, SubSubscribers, SubDataNets, SubSliceProfiles, \
-    SubSlices, Create5gModel
-from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import DnnItem, Snssai, Ue, OaiCoreValuesModel, \
-    SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile
+from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubArea, SubSubscribers, SubDataNets, SubSliceProfiles, SubSlices, Create5gModel
+from nfvcl.models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, OaiCoreValuesModel, SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
@@ -442,7 +439,6 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
         Dissociate subscriber with specified slice.
         Args:
             imsi: imsi of the subscriber to dissociate.
-            sd: sd of slice.
 
         """
         for sms in self.state.ue_dict[imsi]:

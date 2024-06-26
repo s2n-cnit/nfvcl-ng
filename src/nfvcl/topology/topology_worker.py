@@ -10,22 +10,19 @@ from multiprocessing import Queue, RLock
 from nfvcl.topology.topology import Topology, build_topology
 import traceback
 from nfvcl.utils.persistency import DB
-from nfvcl.nfvo import NbiUtil
 
 logger = create_logger('Topology Worker')
 topology_msg_queue: Queue = Queue()
 
 class TopologyWorker:
     db: DB
-    osmUtil: NbiUtil
     topology_msg_queue_local: Queue
     topology_lock: RLock
 
 
-    def __init__(self, db, nbiUtil, topology_lock):
+    def __init__(self, db, topology_lock):
         super().__init__()
         self.db = db
-        self.osmUtil = nbiUtil
         self.topology_lock = topology_lock
         self.topology_msg_queue_local = topology_msg_queue
 

@@ -1,13 +1,10 @@
 #!/usr/bin/python3
 # DO NOT MOVE THIS PIECE OF CODE -------
 # Log level must be set before loggers are created!
-# import nfvcl.rest_endpoints.blue
 from nfvcl.rest_endpoints.ansible import ansible_router
-# from nfvcl.rest_endpoints.blue import blue_router
 from nfvcl.rest_endpoints.day2action import day2_router
 from nfvcl.rest_endpoints.helm import helm_router
 from nfvcl.rest_endpoints.k8s import k8s_router
-from nfvcl.rest_endpoints.osm_rest import osm_router
 from nfvcl.rest_endpoints.rest_callback import RestAnswer202
 from nfvcl.rest_endpoints.topology import topology_router
 from nfvcl.rest_endpoints.blue_ng_router import blue_ng_router as blue_ng_router2
@@ -47,12 +44,10 @@ blue_ng_router.setup_blueprints_routers()
 
 # Including routers for each case. In this part all APIs definitions are loaded.
 app.include_router(topology_router)
-# app.include_router(blue_router)
 app.include_router(blue_ng_router2)
 app.include_router(day2_router)
 app.include_router(k8s_router)
 app.include_router(helm_router)
-app.include_router(osm_router)
 app.include_router(ansible_router)
 
 day2_files = "day2_files"

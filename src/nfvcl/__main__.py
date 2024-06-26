@@ -5,6 +5,7 @@ from nfvcl.utils.log import create_logger
 from nfvcl.utils.util import get_nfvcl_config
 
 
+# ---------- Checking Folders -------------------------------------
 def check_folders():
     """
     Creates empty folders not pushed on GitHub, if not already present.
@@ -13,8 +14,10 @@ def check_folders():
     Path("day2_files").mkdir(parents=True, exist_ok=True)
     Path("logs").mkdir(parents=True, exist_ok=True)
 
+
 check_folders()
-# Main file to run NFVCL
+
+# ---------- Imports and static variables
 from logging import Logger
 import uvicorn
 import sys
@@ -23,6 +26,8 @@ logger: Logger
 PY_MIN_MAJOR = 3
 PY_MIN_MINOR = 11
 
+
+# --------- Functions ---------------------------------------------
 def check_ip() -> NFVCLConfigModel:
     """
     Checks that an IP has been configured for the NFVCL
@@ -46,17 +51,19 @@ def check_py_version():
                      f"You are using the {sys.version}")
         exit(-1)
 
-
 if __name__ == "__main__":
     # Logger must be created after folders!!!
     logger = create_logger("RUN")
     check_py_version()
     nfvcl_conf: NFVCLConfigModel = check_ip()
+    # If the configuration is not none running migrations and then the app
     if nfvcl_conf is not None:
         # Run database migrations
         from nfvcl.utils.db_migration import start_migrations
+
         start_migrations()
 
         # Load the app only if pre-configuration is OK.
         from nfvcl.nnfvcl import app
+
         uvicorn.run(app, host=nfvcl_conf.nfvcl.ip, port=nfvcl_conf.nfvcl.port)

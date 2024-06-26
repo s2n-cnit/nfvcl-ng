@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field, field_validator, field_serializer
+from pydantic import BaseModel, Field, field_validator, field_serializer, IPvAnyAddress, IPvAnyNetwork
 from typing import List, Optional, Union
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
+
+from nfvcl.models.base_model import NFVCLBaseModel
 
 
 class NetworkTypeEnum(str, Enum):
@@ -26,7 +28,7 @@ class IPv4Pool(BaseModel):
         elif isinstance(val, IPv4Address):
             return val
         else:
-            raise ValueError("IPv4Pool validator: The type of >start< field is not recognized ->> {}". format(val))
+            raise ValueError("IPv4Pool validator: The type of >start< field is not recognized ->> {}".format(val))
 
     @field_validator('end')
     def end_val(cls, val):
@@ -39,7 +41,7 @@ class IPv4Pool(BaseModel):
         elif isinstance(val, IPv4Address):
             return val
         else:
-            raise ValueError("IPv4Pool validator: The type of >end< field is not recognized ->> {}". format(val))
+            raise ValueError("IPv4Pool validator: The type of >end< field is not recognized ->> {}".format(val))
 
     @field_serializer('start')
     def serialize_start(self, start: IPv4Address, _info):
@@ -84,7 +86,6 @@ class NetworkModel(BaseModel):
     allocation_pool: List[IPv4Pool] = Field(default=[], description='The list of ranges that are used by the VIM to assign IP addresses to VMs (Reserved to VIM)')
     reserved_ranges: List[IPv4ReservedRange] = Field(default=[], description='The list of ranges that have been reserved by deployed blueprints')
     dns_nameservers: List[IPv4Address] = Field(default=[], description='List of DNS IPs avaiable in this network')
-
 
     @classmethod
     def build_network_model(cls, name: str, type: NetworkTypeEnum, cidr: IPv4Network):
@@ -145,7 +146,7 @@ class NetworkModel(BaseModel):
         self.reserved_ranges.append(reserved_range)
 
     def release_range(self, owner: str, ip_range: IPv4ReservedRange) \
-            -> Union[IPv4ReservedRange, None]:
+        -> Union[IPv4ReservedRange, None]:
         """
         Release a reserved range in a network Model. The removed reservation is the FIRST that match the owner.
         If a range is given, then the removed IP range will be the desired one.
@@ -174,6 +175,7 @@ class NetworkModel(BaseModel):
 
         return None
 
+
 class RouterPortModel(BaseModel):
     net: str
     ip_addr: IPv4Address
@@ -195,12 +197,23 @@ class RouterModel(BaseModel):
         return False
 
 
+class NetworkInterfaceModel(NFVCLBaseModel):
+    """
+    Represents a network interface
+    """
+    name: str = Field(description="The name of the network interface")
+    ip: IPvAnyAddress = Field(description="The IP(v4 or v6) address of the network interface")
+    network: Optional[IPvAnyNetwork] = Field(default=None, description="The network attached to the network interface")
+    gateway: Optional[IPvAnyAddress] = Field(description="The IP(v4 or v6) address of the gateway on the network attached")
+
+
+# TODO remove as soon as OSM is removed
 class PduInterface(BaseModel):
     vld: str
     name: str
     mgt: bool = Field(alias='mgmt')
     intf_type: Optional[str] = Field(default=None)
-    ip_address: Union[str, IPv4Address] = Field(alias='ip-address') # TODO pass to only str???
+    ip_address: Union[str, IPv4Address] = Field(alias='ip-address')  # TODO pass to only str???
     network_name: str = Field(alias='vim-network-name')
     port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
 
@@ -237,18 +250,28 @@ class PduInterface(BaseModel):
         populate_by_name = True
 
 
+class PduType(str, Enum):
+    GNB: str = 'GNB'
+    LWGATEWAY: str = 'LWGATEWAY'
+    RU: str = 'RU'
+
 class PduModel(BaseModel):
-    """Model for a Physical deployment unit"""
-    name: str
-    area: int
-    type: str
-    user: str
-    passwd: str
+    """
+    Model for a Physical deployment unit (PDU) -> RU, gNB...
+    """
+    name: str = Field(description="The name and identifier of the PDU")
+    area: int = Field(description="The area where the PDU is located")
+    pdu_type: Optional[PduType] = Field(default=None, description="The type of PDU. E.g. gnb, RU, Lorawan gateway...")
+    type: str = Field(description="The specific type of PDU like UERANSIM for gnb")
+    user: str = Field(description="The user for accessing the PDU")
+    passwd: str = Field(description="password")
     nfvo_onboarded: bool = False
-    implementation: str
-    config: dict
-    details: str = Field(default="")
-    interface: List[PduInterface] = Field()
+    implementation: str = Field(description="Class of the configurator")
+    config: dict = Field(default={}, description="Additional configuration parameters needed by the PDU to be accessed/configured")
+    last_applied_config: dict = Field(default={}, description="The last configuration used by the configurator to set up the device")
+    details: str = Field(default="", description="???")
+    interface: List[PduInterface] = Field(default=[])
+    network_interfaces: List[NetworkInterfaceModel] = Field(default=[], description="Network interfaces actives on the PDU")
 
     def __eq__(self, other):
         """

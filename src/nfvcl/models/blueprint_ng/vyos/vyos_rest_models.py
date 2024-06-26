@@ -12,5 +12,5 @@ class VyOSCreateModel(BlueprintNGCreateModel):
     This class represents the model for the creation request
     """
     mgmt_net: str = Field()
-    data_nets: List[str] = Field(min_items=1)
+    data_nets: List[str] = Field(min_length=1)
     area: int

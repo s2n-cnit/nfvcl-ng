@@ -5,7 +5,7 @@ from typing import Optional
 import yaml
 from pydantic import Field
 
-from nfvcl.blueprints.blue_oai_cn5g.models.blue_OAI_model import Upfconfig, Snssai, DnnItem
+from nfvcl.models.blueprint_ng.core5g.OAI_Models import Upfconfig, Snssai, DnnItem
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type

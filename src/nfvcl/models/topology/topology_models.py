@@ -2,10 +2,9 @@ from logging import Logger
 from nfvcl.models.network import NetworkModel, RouterModel, PduModel
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl.models.vim import VimModel
-from nfvcl.models.k8s.topology_k8s_model import K8sModel, NfvoStatus
+from nfvcl.models.k8s.topology_k8s_model import K8sModel
 from pydantic import BaseModel, HttpUrl, Field
 from typing import List, Optional
-from nfvcl.nfvo import NbiUtil
 from nfvcl.utils.log import create_logger
 
 logger: Logger = create_logger('Topology model')
@@ -63,11 +62,10 @@ class TopologyModel(BaseModel):
         self.prometheus_srv[index] = prom_server
         return prom_server
 
-    def add_k8s_cluster(self, k8s_cluster: K8sModel, osm_nbi_util: NbiUtil):
+    def add_k8s_cluster(self, k8s_cluster: K8sModel):
         """
         Add a k8s cluster instance to the topology
         Args:
-            osm_nbi_util: The utils to be used for talking with OSM.
             k8s_cluster: The cluster to be added
         """
         if k8s_cluster in self.kubernetes:
@@ -75,67 +73,31 @@ class TopologyModel(BaseModel):
             logger.error(msg_err)
             raise ValueError(msg_err)
 
-        if k8s_cluster.nfvo_onboard:
-            self._k8s_cluster_onboard(k8s_cluster, osm_nbi_util)
-
         self.kubernetes.append(k8s_cluster)
 
-    def _k8s_cluster_onboard(self, k8s_cluster: K8sModel, osm_nbi_util: NbiUtil):
-        """
-        Onboard the K8s cluster on OSM. In this way it is then possible to use OSM for service deploy on kubernetes.
-        Args:
-            k8s_cluster: The cluster to be registered at OSM instance.
-            osm_nbi_util: The utils to be used for talking with OSM.
-        """
-        k8s_cluster.nfvo_status = NfvoStatus.ONBOARDING
-        vims = osm_nbi_util.get_vims()
-        vim_id = next((item['_id'] for item in vims if item['name'] == k8s_cluster.vim_name and '_id' in item), None)
-        if vim_id is None:
-            msg_err = 'VIM (name={}) has not a vim_id'.format(k8s_cluster.vim_name)
-            logger.error(msg_err)
-            raise ValueError(msg_err)
-
-        if osm_nbi_util.add_k8s_cluster_model(vim_id, k8s_cluster):
-            k8s_cluster.nfvo_status = NfvoStatus.ONBOARDED
-        else:
-            k8s_cluster.nfvo_status = NfvoStatus.ERROR
-
-    def del_k8s_cluster(self, k8s_cluster_id: str, osm_nbi_util: NbiUtil) -> K8sModel:
+    def del_k8s_cluster(self, k8s_cluster_id: str) -> K8sModel:
         """
         Delete a k8s cluster instance to the topology. If it was onboarded on OSM it also delete it from there.
         Args:
             k8s_cluster_id: The ID of the cluster to be deleted
-            osm_nbi_util: utils to be used for OSM
         """
         k8s_index = self.find_k8s_cluster_index(k8s_cluster_id)
-        k8s_cluster = self.kubernetes[k8s_index]
-
-        if k8s_cluster.nfvo_status == NfvoStatus.ONBOARDED:
-            osm_nbi_util.delete_k8s_cluster(k8s_cluster.name)
 
         k8s_deleted = self.kubernetes.pop(k8s_index)
 
         return k8s_deleted
 
-    def upd_k8s_cluster(self, k8s_cluster: K8sModel, osm_nbi_util: NbiUtil) -> K8sModel:
+    def upd_k8s_cluster(self, k8s_cluster: K8sModel) -> K8sModel:
         """
 
         """
         k8s_index = self.find_k8s_cluster_index(k8s_cluster.name)
-        old_k8s_cluster = self.kubernetes[k8s_index]
 
-        # Onboarding the updated cluster if requested and previously not onboarded
-        if old_k8s_cluster.nfvo_status == NfvoStatus.NOT_ONBOARDED and k8s_cluster.nfvo_onboard:
-            self._k8s_cluster_onboard(k8s_cluster, osm_nbi_util)
-        elif k8s_cluster.nfvo_onboard:
-            logger.debug(f"The k8s cluster was not onboarded because of its status: {old_k8s_cluster.nfvo_status}. The status must be {NfvoStatus.NOT_ONBOARDED}")
         # Update in the topology information
         self.kubernetes[k8s_index] = k8s_cluster
 
         return k8s_cluster
 
-
-    # -------------------------------------------------------------------------
     def add_pdu(self, pdu: PduModel) -> PduModel:
         """
         Add a pdu instance to the topology

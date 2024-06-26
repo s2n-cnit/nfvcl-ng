@@ -1,6 +1,0 @@
-ADD_TAC_DESCRIPTION: str = "Add TAC to the blueprint instance"
-DEL_TAC_DESCRIPTION: str = "Del TAC from the blueprint instance"
-ADD_SLICE_DESCRIPTION: str = "Add slice to the blueprint instance"
-DEL_SLICE_DESCRIPTION: str = "Del slice from the blueprint instance"
-ADD_SUBSCRIBER_DESCRIPTION: str = "Add subscriber"
-DEL_SUBSCRIBER_DESCRIPTION: str = "Del subscriber"

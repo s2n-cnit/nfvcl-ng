@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from nfvcl.blueprints.blue_vyos import VyOSSourceNATRule
+from nfvcl.models.blueprint_ng.vyos.vyos_models import VyOSSourceNATRule
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.vyos.config.vyos_day0_conf import VmVyOSDay0Configurator

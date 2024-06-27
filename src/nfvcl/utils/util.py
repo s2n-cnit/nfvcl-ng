@@ -30,6 +30,23 @@ def is_config_loaded() -> bool:
 # pre_config_logger = create_logger("PreConfig")
 # logger: Logger | None = None
 
+def check_conf_env_variables(_nfvcl_config: NFVCLConfigModel) -> NFVCLConfigModel:
+    """
+    If variables are present, override configuration parameters loaded from the file with ENV values
+    Args:
+        _nfvcl_config: The configuration loaded from the file
+
+    Returns:
+        The overwritten configuration.
+    """
+    if os.getenv('MONGO_IP'): _nfvcl_config.mongodb.host = os.getenv('MONGO_IP')
+    if os.getenv('MONGO_PORT'): _nfvcl_config.mongodb.port = os.getenv('MONGO_PORT')
+    if os.getenv('REDIS_IP'): _nfvcl_config.redis.host = os.getenv('REDIS_IP')
+    if os.getenv('REDIS_PORT'): _nfvcl_config.redis.port = os.getenv('REDIS_PORT')
+    if os.getenv('NFVCL_IP'): _nfvcl_config.nfvcl.ip = os.getenv('NFVCL_IP')
+    if os.getenv('NFVCL_PORT'): _nfvcl_config.nfvcl.port = os.getenv('NFVCL_PORT')
+    return _nfvcl_config
+
 
 def get_nfvcl_config() -> NFVCLConfigModel:
     """
@@ -42,7 +59,7 @@ def get_nfvcl_config() -> NFVCLConfigModel:
 
     # Using _nfvcl_config is present
     if not _nfvcl_config:
-        _nfvcl_config = _load_nfvcl_config()
+        _nfvcl_config = check_conf_env_variables(_load_nfvcl_config())
         # logger = create_logger("Util", ov_log_level=_nfvcl_config.log_level)
     return _nfvcl_config
 
@@ -91,6 +108,7 @@ def generate_id(length: int = 6, character_set: str = string.ascii_uppercase + s
     """
     return ''.join(random.choice(character_set) for _ in range(length))
 
+
 def generate_blueprint_id() -> str:
     """
     Generate blueprint random ID (6 digits) using characters in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.
@@ -138,6 +156,7 @@ def render_file_from_template_to_file(path: str, render_dict: dict, prefix_to_na
         file.close()
 
     return file.name
+
 
 def render_file_jinja2_to_str(file_to_render: Path, confvar: dict):
     """
@@ -286,6 +305,3 @@ def copytree(src, dst, symlinks=False, ignore=None):
             shutil.copytree(s, d, symlinks, ignore)
         else:
             shutil.copy2(s, d)
-
-
-

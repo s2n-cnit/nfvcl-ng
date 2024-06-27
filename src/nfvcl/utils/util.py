@@ -27,6 +27,23 @@ def is_config_loaded() -> bool:
 # pre_config_logger = create_logger("PreConfig")
 # logger: Logger | None = None
 
+def check_conf_env_variables(_nfvcl_config: NFVCLConfigModel) -> NFVCLConfigModel:
+    """
+    If variables are present, override configuration parameters loaded from the file with ENV values
+    Args:
+        _nfvcl_config: The configuration loaded from the file
+
+    Returns:
+        The overwritten configuration.
+    """
+    if os.getenv('MONGO_IP'): _nfvcl_config.mongodb.host = os.getenv('MONGO_IP')
+    if os.getenv('MONGO_PORT'): _nfvcl_config.mongodb.port = os.getenv('MONGO_PORT')
+    if os.getenv('REDIS_IP'): _nfvcl_config.redis.host = os.getenv('REDIS_IP')
+    if os.getenv('REDIS_PORT'): _nfvcl_config.redis.port = os.getenv('REDIS_PORT')
+    if os.getenv('NFVCL_IP'): _nfvcl_config.nfvcl.ip = os.getenv('NFVCL_IP')
+    if os.getenv('NFVCL_PORT'): _nfvcl_config.nfvcl.port = os.getenv('NFVCL_PORT')
+    return _nfvcl_config
+
 
 def get_nfvcl_config() -> NFVCLConfigModel:
     """

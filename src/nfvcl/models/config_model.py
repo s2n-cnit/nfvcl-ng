@@ -11,7 +11,10 @@ class NFVCLParameters(NFVCLBaseModel):
     ip: str
     port: int
 
-    @field_validator('ip')
+    class Config:
+        validate_assignment = True
+
+    @field_validator('ip', mode='before')
     @classmethod
     def validate_ip(cls, ip: str):
         if ip is None or len(ip) == 0:
@@ -30,14 +33,17 @@ class NFVCLParameters(NFVCLBaseModel):
                 raise ValueError(f">{ip}< is not a valid IPv4 address.")
             return ip
 
-
-class OSMParameters(NFVCLBaseModel):
-    host: str
-    port: str
-    username: str
-    password: str
-    project: str
-    version: int
+    @field_validator('port', mode='before')
+    @classmethod
+    def validate_port(cls, port: int):
+        if isinstance(port, str):
+            try:
+                port = int(port)
+            except ValueError:
+                raise ValueError(f"Config decode error for Mongo PORT: >{port}< cannot be converted to int.")
+        elif not isinstance(port, int):
+            raise ValueError(f"Config decode error for Mongo PORT: >{port}< must be str or int.")
+        return port
 
 
 class MongoParameters(NFVCLBaseModel):
@@ -45,20 +51,68 @@ class MongoParameters(NFVCLBaseModel):
     port: int
     db: str
 
+    class Config:
+        validate_assignment = True
+
+    @field_validator('port', mode='before')
+    @classmethod
+    def validate_mongo_port(cls, port: int):
+        if isinstance(port, str):
+            try:
+                port = int(port)
+            except ValueError:
+                raise ValueError(f"Config decode error for Mongo PORT: >{port}< cannot be converted to int.")
+        elif not isinstance(port, int):
+            raise ValueError(f"Config decode error for Mongo PORT: >{port}< must be str or int.")
+        return port
+
+    @field_validator('host', mode='before')
+    @classmethod
+    def validate_mongo_host(cls, host: int):
+        if isinstance(host, str):
+            return host
+        raise ValueError(f"Config decode error for Mongo DB host: >{host}< is not a valid string.")
+
+    @field_validator('db', mode='before')
+    @classmethod
+    def check_parameters(cls, db):
+        if not isinstance(db, str):
+            raise ValueError(f"Config decode error for Mongo DB name: >{db}< is not a valid string.")
+        return db
+
 
 class RedisParameters(NFVCLBaseModel):
     host: str
     port: int
 
+    class Config:
+        validate_assignment = True
 
-class BlueDescription(NFVCLBaseModel):
-    class_name: str
-    module_name: str
+    @field_validator('port', mode='before')
+    @classmethod
+    def validate_redis_port(cls, port: int):
+        if isinstance(port, str):
+            try:
+                port = int(port)
+            except ValueError:
+                raise ValueError(f"Config decode error for Redis PORT: >{port}< cannot be converted to int.")
+        elif not isinstance(port, int):
+            raise ValueError(f"Config decode error for Redis PORT: >{port}< must be str or int.")
+        return port
+
+    @field_validator('host', mode='before')
+    @classmethod
+    def validate_redis_host(cls, host: int):
+        if isinstance(host, str):
+            return host
+        raise ValueError(f"Config decode error for Redis DB host: >{host}< is not a valid string.")
 
 
 class NFVCLConfigModel(NFVCLBaseModel):
     log_level: int
     nfvcl: NFVCLParameters
-    osm: OSMParameters
     mongodb: MongoParameters
     redis: RedisParameters
+
+    class Config:
+        validate_assignment = True

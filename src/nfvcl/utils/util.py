@@ -49,15 +49,15 @@ def get_nfvcl_config() -> NFVCLConfigModel:
 
 def _load_nfvcl_config() -> NFVCLConfigModel:
     """
-    Read the NFVCL config from the configuration file. If config_dev.yaml is present, this function load from this file,
-    otherwise the function reads the default config.yaml
+    Read the NFVCL config from the configuration file. If config/config_dev.yaml is present, this function load from this file,
+    otherwise the function reads the default config/config.yaml
 
     Returns:
         The NFVCL configuration
     """
 
-    dev_config_file_path = Path("config_dev.yaml")
-    default_config_file_path = Path("config.yaml")
+    dev_config_file_path = Path("config/config_dev.yaml")
+    default_config_file_path = Path("config/config.yaml")
     # Loading develops nfvcl file if present (Not uploaded on Git)
     config_file_path = dev_config_file_path if dev_config_file_path.is_file() else default_config_file_path
 

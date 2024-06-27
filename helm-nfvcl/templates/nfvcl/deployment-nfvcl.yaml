@@ -26,7 +26,6 @@ spec:
       - name: init-wait-for-mongo
         image: alpine
         command: ["/bin/sh", "-c", "for i in $(seq 1 300); do nc -zvw1 mongo-svc {{ .Values.mongoService.port }} && exit 0 || sleep 3; done; exit 1"]
-      initContainers:
       - name: init-wait-for-redis
         image: alpine
         command: ["/bin/sh", "-c", "for i in $(seq 1 300); do nc -zvw1 redis-svc {{ .Values.redisService.port }} && exit 0 || sleep 3; done; exit 1"]
@@ -42,7 +41,7 @@ spec:
           {{- toYaml .Values.nfvclLivenessProbe | nindent 12 }}
         volumeMounts:
           - name: configmap-files
-            mountPath: /app/nfvcl-ng/config.yaml
+            mountPath: /app/nfvcl-ng/config/config.yaml
             subPath: config.yaml
       volumes:
       - name: configmap-files

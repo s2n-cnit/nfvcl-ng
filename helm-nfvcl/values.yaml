@@ -6,9 +6,9 @@ fullnameOverride: ""
 namespace: "nfvcl"
 
 nfvclImage:
-  repository: registry.gitlab.tnt-lab.unige.it/nfvcl/nfvcl-ng
+  repository: registry.tnt-lab.unige.it/nfvcl/nfvcl-ng
   pullPolicy: Always
-  tag: "master"
+  tag: "latest"
 redisImage:
   repository: redis
   pullPolicy: Always

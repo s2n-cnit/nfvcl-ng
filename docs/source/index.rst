@@ -5,6 +5,10 @@ Home
 
    This project is under active development.
 
+The Network Resource Management offered by CNIT is called NFVCL and it is an open-source software[1] devoted to network-oriented meta-orchestration, specifically designed for zeroOps and continuous automation.
+The NFVCL is deploying ecosystem instances using Blueprints (Day-1). The deployment of a Blueprint can be done over a VIM and a Kubernetes cluster (some components may require to be VMs and others Containers). In detail, a network ecosystem is meant to be a complete functional network environment, such as a 5G system, an overlay system for network cybersecurity or a simple application service mesh.
+Once a Blueprint instance has been deployed, the NFVCL is capable of managing Day-2 and Day-N operation, requested by the user, to the specific instance. The supported operations (Day-X) must be supported by the code of the specific Blueprint. In general, it can be said that the NFVCL is managing all the life-cycle of the Blueprint (LCM).
+
 .. contents::
 
 

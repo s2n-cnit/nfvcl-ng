@@ -32,8 +32,22 @@ A more detailed description of the NFVCL will be added to the [Wiki](https://nfv
 ## Key Features
 
 - **Deploy Blueprints that build 5G, Kubernetes, VyOS .... services**
-- **Manage the lifecicle of blueprints**
+- **Manage the lifecicle of Blueprints**
 - **Manage K8S cluster and Machines/VMs**
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Technology used
+
+* Ansible: Configuring deployed VMs
+* Helm: Creating all the required K8S resources in a cluster
+* K8S APIs: Installing plugins on deployed or existing clusters, retrieving information, appling resource definition from yaml
+* Openstack APIs: Creating, connecting and initialising VMs. Creating dedicated networks for the operation of some type of Blueprints
+* Proxmox APIs: used to create, connect and initialise VMs on Proxmox
+* SSH: accessing and upload files on Proxmox hypervisors, required to apply Ansible playbooks on remote VMs
+* Poetry: managing the Python dependencies
+* Redis: used to send log and events
+* MongoDB: storing all the permanent data required to track Blueprints
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -47,21 +61,24 @@ To run the NFVCL you have several possible alternatives:
 
 To get a local copy up and running (point 2), follow these steps.
 
-### Prerequisites
+### Requirements
 
- - An OpenStack instance (you can use all-in-one installation [here](https://docs.openstack.org/devstack/rocky/guides/single-machine.html))
- - An Ubuntu (22.04 LTS) instance where the NFVCL will be installed and run.
- - Having OSM 14 running on a reachable machine, in the following installation procedure,
-   all the services will be installed on the same Ubuntu instance.
- - Python 3.11 (Installation performed in setup.sh)
- - If the NFVCL and OSM are running on the same machine:
-   - **RECOMMENDED**: 
-          4 CPUs, 16 GB RAM, 80GB disk and a single interface with Internet access
-   - **MINIMUM**: 
-          2 CPUs, 8 GB RAM, 50GB disk and a single interface with Internet access
+1. The NFVCL can run on:
+   - A Kubernetes (K8S) cluster, the installation using Helm is available [here](#helm-installation-kubernetes)
+   - Docker engine using the Docker compose file on the GitHub repository[1] or using the NFVCL container image (in the second case MongoDB and Redis must have been installed and configured separately)
+   - A (Virtual) Machine) using Ubuntu 22.04 LTS (In future 24 LTS), using the instructions provided on the GitHub README[1]. MongoDB and Redis, working and configured, are needed. 
+
+2. Performance requirements: The NFVCL is not a software that requires high performance, for a virtual machine is more than enough 2VCPUs, 4GB of RAM and 15GB of disk. The requirements inside Docker and K8S still have to be evaluated.
+
+3. Deploy requirements: The NFVCL at the moment is supporting 2 types of Hypervisors on which it can work: OpenStack and Proxmox. At least one hypervisor, and access to it, is needed by the NFVCL to deploy Blueprints. To fully automate the deployment process a full access to the hypervisor is required, if this is not the case some operations may fail due to insufficient permissions (image creations, disable port security…)
+
+4. Network access to Internet or at least to images.tnt-lab.unige.it and registry.tnt-lab.unige.it to download VM and Container images required by Blueprints
+
+5. Network access to deployed VMs and to K8S clusters to configure resources deployed using Blueprints.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ### Setup
-> [!WARNING]  
-> The instruction for OSM installation is not anymore provided from this project.
 
 Clone this repository to your desired folder:
 ``` bash
@@ -91,7 +108,7 @@ When the NFVCL starts, it loads the cofiguration from *config_dev.yaml* if prese
 
 > [!TIP]
 > The IP of the NFVCL is not mandatory, use it to bind on a specific interface.
-> OSM and Redis **IPs** sould be 127.0.0.1 if they are running on the same machine of NFVCL.
+> Redis **IP** should be 127.0.0.1 if they are running on the same machine of NFVCL.
 
 ```
 {
@@ -206,11 +223,8 @@ for message in redis_pub_sub.listen():
 ### Deployment
 You can deploy this project using **Docker** or **Helm** (Kubernetes)
 
-#### Docker
-The installation using Helm is described in the dedicated [section](https://nfvcl-ng.readthedocs.io/en/latest/docker.html).
-
-#### Helm installation (Kubernetes)
-The installation using Helm is described in the dedicated [section](https://nfvcl-ng.readthedocs.io/en/latest/helm.html).
+- [Docker](https://nfvcl-ng.readthedocs.io/en/latest/docker.html)
+- [Helm installation (Kubernetes)](https://nfvcl-ng.readthedocs.io/en/latest/helm.html)
 
 ### Usage
 The NFVCL usage is described in the dedicated [Wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html) page.

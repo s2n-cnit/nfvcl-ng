@@ -103,8 +103,8 @@ chmod +x ./setup.sh
 
 ### Configuration
 The last step is the NFVCL configuration. 
-In production it is raccomanded to change values in **config.yaml**, while, for developing you can create a copy of the default configuration and call it **config_dev.yaml**. 
-When the NFVCL starts, it loads the cofiguration from *config_dev.yaml* if present, otherwise the configuration is loaded from the default file.
+In production it is raccomanded to change values in `config/config.yaml`, while, for developing you can create a copy of the default configuration and call it `config/onfig_dev.yaml. 
+When the NFVCL starts, it loads the cofiguration from `config/onfig_dev.yaml` if present, otherwise the configuration is loaded from the default file.
 
 > [!TIP]
 > The IP of the NFVCL is not mandatory, use it to bind on a specific interface.

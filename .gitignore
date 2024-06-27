@@ -7,7 +7,7 @@ day2_files/*
 *.log
 /vnf_packages/
 /.idea/
-config_dev.yaml
+config/config_dev.yaml
 main_debug.py
 helm_charts/charts/*
 helm_charts/index.yaml

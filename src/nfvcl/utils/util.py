@@ -56,7 +56,7 @@ def get_nfvcl_config() -> NFVCLConfigModel:
 
     # Using _nfvcl_config is present
     if not _nfvcl_config:
-        _nfvcl_config = _load_nfvcl_config()
+        _nfvcl_config = check_conf_env_variables(_load_nfvcl_config())
         # logger = create_logger("Util", ov_log_level=_nfvcl_config.log_level)
     return _nfvcl_config
 
@@ -105,6 +105,7 @@ def generate_id(length: int = 6, character_set: str = string.ascii_uppercase + s
     """
     return ''.join(random.choice(character_set) for _ in range(length))
 
+
 def generate_blueprint_id() -> str:
     """
     Generate blueprint random ID (6 digits) using characters in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.
@@ -152,6 +153,7 @@ def render_file_from_template_to_file(path: str, render_dict: dict, prefix_to_na
         file.close()
 
     return file.name
+
 
 def render_file_jinja2_to_str(file_to_render: Path, confvar: dict):
     """
@@ -300,6 +302,3 @@ def copytree(src, dst, symlinks=False, ignore=None):
             shutil.copytree(s, d, symlinks, ignore)
         else:
             shutil.copy2(s, d)
-
-
-

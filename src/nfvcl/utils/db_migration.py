@@ -1,17 +1,16 @@
 import importlib
 import os
-
 from pymongo import MongoClient
 
 from nfvcl.models.config_model import NFVCLConfigModel
 from nfvcl.utils.util import get_nfvcl_config
+from nfvcl.utils.database import NFVCLDatabase
 from nfvcl.utils.log import create_logger
 
 logger = create_logger("DB Migrations")
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
-mongo_client: MongoClient = MongoClient("mongodb://{}:{}/".format(nfvcl_config.mongodb.host, nfvcl_config.mongodb.port))
+mongo_client: MongoClient = NFVCLDatabase().mongo_client
 db = mongo_client.get_database(nfvcl_config.mongodb.db)
-
 
 if 'migrations' not in db.list_collection_names():
     db.create_collection('migrations')

@@ -5,27 +5,24 @@ from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl.models.topology import TopologyModel
 from nfvcl.models.topology.topology_worker_model import TopologyWorkerMessage, TopologyWorkerOperation
 from nfvcl.models.vim import UpdateVimModel, VimModel
+from nfvcl.utils.database import NFVCLDatabase
 from nfvcl.utils.log import create_logger
 from multiprocessing import Queue, RLock
 from nfvcl.topology.topology import Topology, build_topology
 import traceback
-from nfvcl.utils.persistency import DB
 
 logger = create_logger('Topology Worker')
 topology_msg_queue: Queue = Queue()
 
+
 class TopologyWorker:
-    db: DB
     topology_msg_queue_local: Queue
     topology_lock: RLock
 
-
-    def __init__(self, db, topology_lock):
+    def __init__(self, topology_lock):
         super().__init__()
-        self.db = db
         self.topology_lock = topology_lock
         self.topology_msg_queue_local = topology_msg_queue
-
 
     def start(self):
         """
@@ -84,7 +81,7 @@ class TopologyWorker:
 
             # NETWORK OPERATION
             case TopologyWorkerOperation.ADD_NET:
-                topology.add_network(NetworkModel.model_validate(worker_message.data),worker_message.optional_data['terraform'])
+                topology.add_network(NetworkModel.model_validate(worker_message.data), worker_message.optional_data['terraform'])
 
             case TopologyWorkerOperation.DEL_NET:
                 topology.del_network_by_name(worker_message.data['network_id'], terraform=worker_message.optional_data['terraform'])

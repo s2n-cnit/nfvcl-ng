@@ -1,10 +1,9 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Union
-from nfvcl.utils.log import create_logger
-from nfvcl.utils.persistency import DB
 
-db = DB()
+from nfvcl.utils.database import NFVCLDatabase
+from nfvcl.utils.log import create_logger
 
 
 class AnsiblePlaybookResult(BaseModel):
@@ -28,7 +27,6 @@ day2_router = APIRouter(
 )
 
 logger = create_logger('Day2 Action')
-
 
 @day2_router.post("/actions", status_code=200)
 def post(msg: ActionResultModel):
@@ -54,7 +52,7 @@ def post(msg: ActionResultModel):
                 'stderr': item.stderr
             }
         )
-    db.insert_DB("action_output", action_item)
+    NFVCLDatabase().insert_in_collection("action_output", action_item)
 
 
 

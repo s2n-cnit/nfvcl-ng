@@ -19,6 +19,8 @@ redis:
 ```
 
 # Configuration using ENV variables
+Using ENV variables every value loaded from the configuration file will be overwritten, this means that you can override
+alse a single value.
 
 ```
 MONGO_IP=127.0.0.1
@@ -26,6 +28,7 @@ MONGO_PORT=27017
 MONGO_PWD=password
 MONGO_USR=admin
 NFVCL_PORT=6589
+NFVCL_IP=0.0.0.0
 REDIS_IP=127.0.0.1
 REDIS_PORT=6379
 ```

@@ -1,4 +1,5 @@
 import socket
+from typing import Optional
 
 from nfvcl.models.base_model import NFVCLBaseModel
 from pydantic import field_validator
@@ -50,6 +51,8 @@ class MongoParameters(NFVCLBaseModel):
     host: str
     port: int
     db: str
+    username: Optional[str] = None
+    password: Optional[str] = None
 
     class Config:
         validate_assignment = True

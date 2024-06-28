@@ -41,6 +41,8 @@ def check_conf_env_variables(_nfvcl_config: NFVCLConfigModel) -> NFVCLConfigMode
     """
     if os.getenv('MONGO_IP'): _nfvcl_config.mongodb.host = os.getenv('MONGO_IP')
     if os.getenv('MONGO_PORT'): _nfvcl_config.mongodb.port = os.getenv('MONGO_PORT')
+    if os.getenv('MONGO_USR'): _nfvcl_config.mongodb.username = os.getenv('MONGO_USR')
+    if os.getenv('MONGO_PWD'): _nfvcl_config.mongodb.password = os.getenv('MONGO_PWD')
     if os.getenv('REDIS_IP'): _nfvcl_config.redis.host = os.getenv('REDIS_IP')
     if os.getenv('REDIS_PORT'): _nfvcl_config.redis.port = os.getenv('REDIS_PORT')
     if os.getenv('NFVCL_IP'): _nfvcl_config.nfvcl.ip = os.getenv('NFVCL_IP')

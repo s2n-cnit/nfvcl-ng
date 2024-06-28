@@ -1,10 +1,9 @@
 import json
 from pathlib import Path
 from typing import List
-
 from pymongo import MongoClient
+from pymongo.database import Database
 from pymongo.results import InsertOneResult
-
 from nfvcl.models.config_model import NFVCLConfigModel
 from nfvcl.utils.patterns import Singleton
 from nfvcl.utils.util import get_nfvcl_config
@@ -16,12 +15,25 @@ BLUE_COLLECTION_V2 = "blue-inst-v2"
 TOPOLOGY_COLLECTION = "topology"
 EXTRA_COLLECTION = "extra"
 
+
 class NFVCLDatabase(object, metaclass=Singleton):
+    mongo_client: MongoClient
+    mongo_database: Database
 
     def __init__(self):
-        self.mongo_client: MongoClient = MongoClient("mongodb://{}:{}/".format(nfvcl_config.mongodb.host, nfvcl_config.mongodb.port))
+        if nfvcl_config.mongodb.username is not None and nfvcl_config.mongodb.password is not None:
+            uri = f"mongodb://{nfvcl_config.mongodb.username}:{nfvcl_config.mongodb.password}@{nfvcl_config.mongodb.host}:{nfvcl_config.mongodb.port}/"
+        else:
+            uri = f"mongodb://{nfvcl_config.mongodb.host}:{nfvcl_config.mongodb.port}/"
+        self.mongo_client: MongoClient = MongoClient(uri)
         self.mongo_database = self.mongo_client[nfvcl_config.mongodb.db]
+        self.test_connection()
 
+    def test_connection(self):
+        self.list_collections()
+
+    def list_collections(self):
+        return self.mongo_database.list_collections()
 
     def insert_in_collection(self, collection_name: str, data: dict) -> InsertOneResult:
         collection = self.mongo_database[collection_name]
@@ -41,6 +53,12 @@ class NFVCLDatabase(object, metaclass=Singleton):
         collection = self.mongo_database[collection]
         return collection.find(data, exclude)
 
+    def find_one_in_collection(self, collection, data, exclude=None):
+        if exclude is None:
+            exclude = {}
+        # dictionary specifying the query to be performed
+        collection = self.mongo_database[collection]
+        return collection.find_one(data, exclude)
 
     def exists_in_collection(self, collection, data):
         collection = self.mongo_database[collection]
@@ -71,7 +89,6 @@ class NFVCLDatabase(object, metaclass=Singleton):
             json.dump(local_database, local_file_opened)
 
 
-
 def get_ng_blue_list(blueprint_type: str = None) -> List[dict]:
     """
     Retrieve all blueprints from the database.
@@ -87,6 +104,7 @@ def get_ng_blue_list(blueprint_type: str = None) -> List[dict]:
     blue_list = NFVCLDatabase().find_collection(BLUE_COLLECTION_V2, blue_filter, {"_id": False})
     return list(blue_list)
 
+
 def get_ng_blue_by_id_filter(blueprint_id: str) -> dict | None:
     """
     Retrieve a blueprint from the database, given the blueprint ID.
@@ -99,7 +117,7 @@ def get_ng_blue_by_id_filter(blueprint_id: str) -> dict | None:
     """
     blue_list = NFVCLDatabase().find_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id}, {"_id": False})
     for blue in blue_list:
-        return blue # Return the first match
+        return blue  # Return the first match
     return None
 
 
@@ -116,9 +134,10 @@ def save_ng_blue(blueprint_id: str, dict_blue: dict):
     """
     database_instance = NFVCLDatabase()
     if database_instance.exists_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id}):
-        return database_instance.update_in_collection(BLUE_COLLECTION_V2, dict_blue,{'id': blueprint_id})
+        return database_instance.update_in_collection(BLUE_COLLECTION_V2, dict_blue, {'id': blueprint_id})
     else:
         return database_instance.insert_in_collection(BLUE_COLLECTION_V2, dict_blue)
+
 
 def destroy_ng_blue(blueprint_id: str):
     """
@@ -143,10 +162,11 @@ def save_topology(dict_topo: dict):
         The result of the operation (saved object)
     """
     database_instance = NFVCLDatabase()
-    if database_instance.exists_in_collection(TOPOLOGY_COLLECTION, {'id': 'topology'}): # TOPO is unique, fixed ID
+    if database_instance.exists_in_collection(TOPOLOGY_COLLECTION, {'id': 'topology'}):  # TOPO is unique, fixed ID
         return database_instance.update_in_collection(TOPOLOGY_COLLECTION, dict_topo, {'id': 'topology'})
     else:
         return database_instance.insert_in_collection(TOPOLOGY_COLLECTION, dict_topo)
+
 
 def delete_topology():
     """

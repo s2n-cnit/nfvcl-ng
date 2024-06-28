@@ -2,7 +2,6 @@ from multiprocessing import Process
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.openstack.openstack_utils import check_openstack_instances
 from nfvcl.utils.util import *
-from nfvcl.utils import persistency
 from nfvcl.topology.topology import topology_lock, build_topology
 from nfvcl.topology.topology_worker import TopologyWorker
 from nfvcl.subscribe_endpoints.k8s_manager import initialize_k8s_man_subscriber
@@ -33,7 +32,6 @@ signal.signal(signal.SIGINT, handle_exit)
 
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 logger = create_logger('Main')
-db = persistency.DB()
 # Start process LCM for blueprint 1.0
 # old_workers = LCMWorkers(topology_lock)
 # # Start process LCM for blueprint 2.0
@@ -41,12 +39,12 @@ db = persistency.DB()
 # pnf_manager = PNFmanager()
 
 # Start process LCM for topology
-topology_worker = TopologyWorker(db, topology_lock)
+topology_worker = TopologyWorker(topology_lock)
 topology_worker.start()
 
 # Starting subscribe managers. ADD here all child process start for sub/pub
 logger.info("Starting subscribers")
-initialize_k8s_man_subscriber(db, topology_lock)
+initialize_k8s_man_subscriber(topology_lock)
 
 # ----------------------- HELM REPO --------------------
 # setup_helm_repo()

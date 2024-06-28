@@ -1,17 +1,15 @@
-{
-  'log_level': 20, # 10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0
-  'nfvcl': {
-    'version': "0.3.0",
-    'port': 5002,
-    'ip': ''
-  },
-  'mongodb': {
-    'host': '127.0.0.1',
-    'port': 27017,
-    'db': 'nfvcl'
-  },
-  'redis': {
-    'host': '127.0.0.1',
-    'port': 6379
-  }
-}
+---
+log_level: "20"
+nfvcl:
+  version: "0.3.0"
+  port: "5002"
+  ip: ""
+mongodb:
+  host: "127.0.0.1"
+  port: "27017"
+  db: "nfvcl"
+  username: "admin"
+  password: "password"
+redis:
+  host: "127.0.0.1"
+  port: "6379"

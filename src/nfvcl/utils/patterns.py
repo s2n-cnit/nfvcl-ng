@@ -1,4 +1,5 @@
 class Singleton(type):
+    # TODO NOT WORKING
     __unique_instance = None
 
     def __call__(cls, *args, **kwargs):

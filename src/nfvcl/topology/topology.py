@@ -1,6 +1,6 @@
 from logging import Logger
 from redis.client import Redis
-from nfvcl.utils.database import save_topology, delete_topology
+from nfvcl.utils.database import save_topology, delete_topology, NFVCLDatabase
 
 from nfvcl.models.event import Event
 from nfvcl.models.k8s.common_k8s_model import LBPool
@@ -9,13 +9,11 @@ from nfvcl.models.network.network_models import RouterPortModel, IPv4ReservedRan
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl.models.vim import VimModel, UpdateVimModel
 from nfvcl.topology.topology_events import TopologyEventType
-from nfvcl.utils import persistency
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.ipam import *
 from nfvcl.utils.util import remove_files_by_pattern
 from nfvcl.models.topology import TopologyModel
 from nfvcl.models.network import PduModel, NetworkModel, RouterModel
-from nfvcl.utils.persistency import OSSdb
 import typing
 import json
 import traceback
@@ -46,8 +44,7 @@ def trigger_event(event_name: TopologyEventType, data: dict):
 class Topology:
     _model: TopologyModel | None
 
-    def __init__(self, topo: Union[dict, None], db: OSSdb, lock: RLock):
-        self.db = db
+    def __init__(self, topo: Union[dict, None], lock: RLock):
         self.lock = lock
         self._os_terraformer = {}
         if topo:
@@ -68,7 +65,7 @@ class Topology:
             logger.warning(msg_err)
 
     @classmethod
-    def from_db(cls, db: OSSdb, lock: RLock):
+    def from_db(cls, lock: RLock):
         """
         Return the topology from the DB as TopologyModel instance.
         Args:
@@ -77,12 +74,13 @@ class Topology:
         Returns:
             Topology: The instance of the topology from the database
         """
-        topo = db.findone_DB("topology", {})
+        db = NFVCLDatabase()
+        topo = db.find_one_in_collection("topology", {})
         if topo:
             data = TopologyModel.model_validate(topo).model_dump()
         else:
             data = None
-        return cls(data, db, lock)
+        return cls(data, lock)
 
     def _save_topology(self) -> None:
         """
@@ -969,5 +967,4 @@ def build_topology() -> Topology:
     Returns:
         A topology object ready to operate on the topology.
     """
-    db = persistency.DB()  # TODO remove
-    return Topology.from_db(db, topology_lock)
+    return Topology.from_db(topology_lock)

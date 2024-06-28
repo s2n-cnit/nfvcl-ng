@@ -5,14 +5,11 @@ from nfvcl.utils.log import create_logger
 import yaml
 import os.path
 import hashlib
-
-from nfvcl.utils.persistency import DB
 from nfvcl.utils.util import get_nfvcl_config
 
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()
 
 logger = create_logger('HelmRepository')
-db = DB()
 REPO_PATH = 'helm_charts/'
 CHART_PATH = REPO_PATH + 'charts/'
 helm_url_prefix = '/helm_repo/'

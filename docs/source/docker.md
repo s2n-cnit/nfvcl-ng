@@ -3,7 +3,39 @@
 ## Requirements
 - Have Docker installed and running
 
-## Installation
+## Running alone
+Using the Docker compose as reference:
+
+```
+  nfvcl:
+    image: registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
+    depends_on:
+      - mongo
+      - redis
+    restart: always
+    ports:
+      - 5002:5002
+    volumes:
+      - ./config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
+      - ./logs/:/app/nfvcl-ng/logs/
+```
+
+Usually you will need to mount the configuration file and the logs to keep track of the activities.
+It is also possible to use environment variables to overwrite the default configuration or the mounted one.
+ENV parameters, with values examples, that can be used are:
+
+```
+MONGO_IP=127.0.0.1
+MONGO_PORT=27017
+MONGO_PWD=password
+MONGO_USR=admin
+NFVCL_PORT=6589
+NFVCL_IP=0.0.0.0
+REDIS_IP=127.0.0.1
+REDIS_PORT=6379
+```
+
+## Running with Docker compose
 ```{image} ../images/NVFCL-diagrams-DockerCompose.drawio.svg
 :alt: Docker topology
 :width: 400px

@@ -107,7 +107,7 @@ chmod +x ./setup.sh
 ```
 
 ### Configuration
-The last step is the NFVCL configuration. 
+The last step is the NFVCL configuration, it can be done though the configuration file or using [ENV variables](config/config.md).
 In production it is raccomanded to change values in `config/config.yaml`, while, for developing you can create a copy of the default configuration and call it `config/onfig_dev.yaml. 
 When the NFVCL starts, it loads the cofiguration from `config/onfig_dev.yaml` if present, otherwise the configuration is loaded from the default file.
 

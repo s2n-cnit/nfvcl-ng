@@ -13,3 +13,4 @@ helm_charts/charts/*
 helm_charts/index.yaml
 /docs/build/*
 *.drawio*.bkp
+config_unitest_dev.yaml

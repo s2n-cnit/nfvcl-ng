@@ -284,23 +284,3 @@ def remove_files_by_pattern(folder: str, name_pattern: str):
         else:
             os.remove(path)
 
-
-def copytree(src, dst, symlinks=False, ignore=None):
-    """
-    TODO complete doc
-    Args:
-        src:
-        dst:
-        symlinks:
-        ignore:
-
-    Returns:
-
-    """
-    for item in os.listdir(src):
-        s = os.path.join(src, item)
-        d = os.path.join(dst, item)
-        if os.path.isdir(s):
-            shutil.copytree(s, d, symlinks, ignore)
-        else:
-            shutil.copy2(s, d)

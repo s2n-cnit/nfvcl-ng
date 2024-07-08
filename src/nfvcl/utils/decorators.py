@@ -30,21 +30,3 @@ def obj_multiprocess_lock(func):
             raise excep
 
     return wrapper
-
-
-def change_arg_type(model: Any):
-    def decorator(function):
-
-        @wraps(function)
-        def wrapper(*args, **kwargs):
-            return function(*args, **kwargs)
-
-        sig = signature(function)
-        param = sig.parameters['model']
-        param._annotation = model
-
-        wrapper.__signature__ = sig
-
-        return wrapper
-
-    return decorator

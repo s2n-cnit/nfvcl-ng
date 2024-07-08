@@ -105,6 +105,8 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
 
     node_exporters: List[PrometheusTargetModel] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
 
+    day_2_call_history: List[dict] = Field(default=[], description="The history of calls that have been made to the blueprint instance")
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**self.fix_types(["state", "provider_data", "create_config"], **kwargs))
 

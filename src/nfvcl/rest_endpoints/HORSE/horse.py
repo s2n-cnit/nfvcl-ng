@@ -118,9 +118,14 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
         except httpx.ConnectError:
             raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
-        return RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
+
+        msg_return = RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
+        logger.info(msg_return.description)
+        return msg_return
     else:
-        return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
+        msg_return = RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
+        logger.error(msg_return.description)
+        return msg_return
 
 
 @horse_router.post("/rtr_request_workaround", response_model=RTRRestAnswer)
@@ -150,7 +155,9 @@ def rtr_request_workaround(target: str, action_type: RTRActionType, username: st
     else:
         doc_mod_info = get_extra("doc_module")
         if doc_mod_info is None:
-            return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="error", status_code=404)
+            msg_return = RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="error", status_code=404)
+            logger.error(msg_return.description)
+            return msg_return
         else:
             if actionID is None: actionID=uuid.uuid4()
             if service is None: service = "DNS" # TODO Workaround
@@ -194,7 +201,9 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
     if vm is None:
         doc_mod_info = get_extra("doc_module")
         if doc_mod_info is None:
-            return RTRRestAnswer(description="The Target has not been found in VMs managed by the ePEM. The request will NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the DOC IP.", status="error", status_code=404)
+            msg_return = RTRRestAnswer(description="The Target has not been found in VMs managed by the ePEM. The request will NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the DOC IP.", status="error", status_code=404)
+            logger.error(msg_return.description)
+            return msg_return
         else:
             body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target_ip, actiontype=actionType, service=service, playbook=payload)
             return forward_request_to_doc(doc_mod_info, body)
@@ -205,7 +214,10 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
             ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, "ubuntu", "testpassword", payload)
         if ansible_runner_result.status == "failed":
             raise HTTPException(status_code=500, detail="Execution of Playbook failed. See NFVCL DEBUG log for more info.")
-        return RTRRestAnswer(description="Playbook applied", status="success")
+
+        msg_return = RTRRestAnswer(description="Playbook applied", status="success")
+        logger.info(msg_return.description)
+        return msg_return
 
 
 @horse_router.post("/set_doc_ip_port", response_model=RTRRestAnswer)
@@ -214,7 +226,9 @@ def set_doc_ip_port(doc_ip: Annotated[str, Query(pattern=IP_PORT_PATTERN)], url_
     Set up and save the URL of HORSE DOC module. The URL is composed by {doc_ip_port}{url_path}
     """
     insert_extra("doc_module", {"url": f"{doc_ip}{url_path}", "ip": doc_ip, "url_path": url_path})
-    return RTRRestAnswer(description="DOC module IP has been set", status="success")
+    msg_return = RTRRestAnswer(description="DOC module IP has been set", status="success")
+    logger.info(msg_return.description)
+    return msg_return
 
 
 @horse_router.get("/get_doc_ip_port", response_model=RTRRestAnswer)

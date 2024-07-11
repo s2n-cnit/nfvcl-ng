@@ -1,14 +1,17 @@
 import logging
 from logging.handlers import RotatingFileHandler
 from typing import Dict
-
 from redis import Redis
 import coloredlogs
 import verboselogs
+from pathlib import Path
 
 from nfvcl.utils.util import is_config_loaded
 
 _log_level = logging.DEBUG
+LOG_FILE_PATH = "logs/nfvcl.log"
+Path('logs').mkdir(parents=True, exist_ok=True)
+Path('logs/nfvcl.log').touch(exist_ok=True)
 
 
 def set_log_level(level):
@@ -130,7 +133,7 @@ def mod_logger(logger: logging.Logger, blueprintid='SYSTEM', log_level=_log_leve
     if disable_propagate:
         logger.propagate = False
 
-    log_file_handler = RotatingFileHandler("logs/nfvcl.log", maxBytes=10000000, backupCount=4)
+    log_file_handler = RotatingFileHandler(Path(LOG_FILE_PATH), maxBytes=10000000, backupCount=4)
     log_file_handler.setLevel(log_level)
     log_file_handler.setFormatter(formatter)
     logger.addHandler(log_file_handler)

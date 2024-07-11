@@ -12,7 +12,6 @@ def check_folders():
     """
     Path("helm_charts/charts/").mkdir(parents=True, exist_ok=True)
     Path("day2_files").mkdir(parents=True, exist_ok=True)
-    Path("logs").mkdir(parents=True, exist_ok=True)
 
 
 check_folders()

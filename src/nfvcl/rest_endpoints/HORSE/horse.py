@@ -159,7 +159,7 @@ def rtr_request_workaround(target: str, action_type: RTRActionType, username: st
             logger.error(msg_return.description)
             return msg_return
         else:
-            if actionID is None: actionID=uuid.uuid4()
+            if actionID is None: actionID=str(uuid.uuid4())
             if service is None: service = "DNS" # TODO Workaround
             body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target, actiontype=action_type, service=service, playbook=payload)
             return forward_request_to_doc(doc_mod_info, body)

@@ -1,12 +1,14 @@
 import json
 from fastapi import APIRouter, HTTPException, Body, status
 from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
-    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota, V1ClusterRoleBinding
+    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota, V1ClusterRoleBinding, V1Node, V1Deployment, V1DeploymentList
 from nfvcl.models.event import Event
 from nfvcl.models.k8s.blueprint_k8s_model import K8sModel
 from nfvcl.main import topology_lock
 from verboselogs import VerboseLogger
 from typing import List
+
+from nfvcl.models.k8s.common_k8s_model import Labels
 from nfvcl.models.k8s.k8s_events import K8sEventType
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sOperationType, K8sPluginName
 from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sQuota
@@ -18,7 +20,7 @@ from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_installed_plug
 from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from nfvcl.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
     k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_over_namespace, \
-    k8s_delete_namespace, k8s_add_quota_to_namespace, k8s_cluster_admin
+    k8s_delete_namespace, k8s_add_quota_to_namespace, k8s_cluster_admin, k8s_add_label_to_k8s_node, k8s_get_nodes, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_deployments
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 
@@ -701,22 +703,115 @@ async def apply_resource_quota_namespace(cluster_id: str, namespace: str, quota_
     return resp
 
 
-@k8s_router.post("/{cluster_id}/sidecar/{namespace}/{pod_name}", response_model=dict)
-async def add_k8s_sidecar_to_pod(cluster_id: str, namespace: str, pod_name: str):
+@k8s_router.get("/{cluster_id}/nodes/", response_model=dict)
+async def get_nodes(cluster_id: str, detailed: bool = False):
     """
-    Add a sidecar to a Pod TESTING
+    Returns a list of nodes belonging to a k8s cluster
+
     Args:
-        cluster_id:
-        namespace:
-        pod_name:
+
+        cluster_id:  The K8s cluster (from the topology) on witch nodes resides
+
+        detailed: If true, a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
 
     Returns:
-
+        If detailed a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
     """
-    # Get k8s cluster and k8s config for client
-    for i in range(0, 1000):
-        logger.info(f"Number is {i}, take note!!!")
-        logger.debug(f"Number is {i}, take note!!!")
-        logger.warning(f"Number is {i}, take note!!!")
-        logger.error(f"Number is {i}, take note!!!")
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+    if detailed:
+        node_list: V1PodList = k8s_get_nodes(k8s_config, detailed=detailed)
+        to_return = node_list.to_dict()
+    else:
+        name_list = k8s_get_nodes(k8s_config, detailed=detailed)
+        to_return = {"nodes": name_list}
+    return to_return
 
+@k8s_router.post("/{cluster_id}/node/{node_name}/", response_model=dict)
+async def add_label_to_k8s_node(cluster_id: str, node_name: str, labels: Labels):
+    """
+    Add labels to a k8s node
+
+    Args:
+
+        cluster_id: The K8s cluster (from the topology) on witch the node resides
+
+        node_name: the name of the node on witch labels is applied
+
+        labels: The labels to be applied
+
+    Returns:
+        The updated node V1Node in dict form
+    """
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+    node: V1Node = k8s_add_label_to_k8s_node(k8s_config, node_name=node_name, labels=labels)
+    return node.to_dict()
+
+@k8s_router.get("/{cluster_id}/deployments/", response_model=dict)
+async def get_deployment(cluster_id: str, namespace: str, detailed: bool = False):
+    """
+    Returns a list of deployments belonging to a k8s cluster
+
+    Args:
+
+        cluster_id: The K8s cluster (from the topology) on witch deployments resides
+
+        namespace: The namespace in which the deployment resides
+
+        detailed: If true, a list with only names is retrieved, otherwise a V1DeploymentList in dict form is retrieved.
+
+    Returns:
+        If detailed a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
+    """
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+    if detailed:
+        deployment_list: V1DeploymentList = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
+        to_return = deployment_list.to_dict()
+    else:
+        name_list = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
+        to_return = {"deployments": name_list}
+    return to_return
+
+@k8s_router.post("/{cluster_id}/deployment/label", response_model=dict)
+async def add_label_to_k8s_deployment(cluster_id: str, namespace: str, deployment_name: str, labels: Labels):
+    """
+    Add labels to a k8s node
+
+    Args:
+
+        cluster_id: The K8s cluster (from the topology) on witch the deployment resides
+
+        deployment_name: the name of the deployment on witch labels is applied
+
+        labels: The labels to be applied
+
+    Returns:
+        The updated node V1Deployment in dict form
+    """
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+    deployment: V1Deployment = k8s_add_label_to_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, labels=labels)
+    return deployment.to_dict()
+
+@k8s_router.post("/{cluster_id}/deployment/scale", response_model=dict)
+async def scale_k8s_deployment(cluster_id: str, namespace: str, deployment_name: str, replica_number: int):
+    """
+    Scale a deployment in the cluster
+
+    Args:
+
+        cluster_id: The K8s cluster (from the topology) on witch the deployment resides
+
+        deployment_name: the name of the deployment that will be scaled
+
+        replica_number: The desired number of pods (scaling)
+
+    Returns:
+        The updated node V1Deployment in dict form
+    """
+    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+    deployment: V1Deployment = k8s_scale_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, replica_num=replica_number)
+    return deployment.to_dict()

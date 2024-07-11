@@ -50,3 +50,6 @@ class LBPool(NFVCLBaseModel):
 
     class Config:
         use_enum_values = True
+
+class Labels(NFVCLBaseModel):
+    labels: dict[str,str] = Field()

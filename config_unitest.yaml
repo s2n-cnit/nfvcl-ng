@@ -1,0 +1,9 @@
+config:
+  networks:
+    mgmt: "dmz-internal"
+    data: ""
+  vim:
+    tenant: ""
+    user: ""
+    password: ""
+    url: "http://os-lab.maas:5000/v3"

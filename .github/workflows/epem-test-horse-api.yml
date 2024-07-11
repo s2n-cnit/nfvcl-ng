@@ -12,8 +12,11 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      mongodb:
+      mongo:
         image: mongo:4.4.6
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: password
         ports:
           - 27017:27017
         options: >-
@@ -23,6 +26,8 @@ jobs:
           --health-retries 5
       redis:
         image: redis
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s

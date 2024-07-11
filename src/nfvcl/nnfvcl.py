@@ -84,7 +84,7 @@ async def startup_event():
     """
     Mod the unicorn loggers to add colors and custom style
     """
-    mod_logger(logging.getLogger('uvicorn'))
-    mod_logger(logging.getLogger('uvicorn.access'))
-    mod_logger(logging.getLogger('uvicorn.error'))
-    mod_logger(logging.getLogger('fastapi'))
+    mod_logger(logging.getLogger('uvicorn'), remove_handlers=True, disable_propagate=True)
+    mod_logger(logging.getLogger('uvicorn.access'), remove_handlers=True, disable_propagate=True)
+    mod_logger(logging.getLogger('uvicorn.error'), remove_handlers=True, disable_propagate=True)
+    mod_logger(logging.getLogger('fastapi'), remove_handlers=True, disable_propagate=True)

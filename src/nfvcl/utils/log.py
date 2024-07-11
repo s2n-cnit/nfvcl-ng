@@ -1,6 +1,5 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 from typing import Dict
 
 from redis import Redis
@@ -112,9 +111,27 @@ def create_logger(name: str, ov_log_level: int = None, blueprintid='SYSTEM') -> 
 
     # Adding file handler to post log into file
     # w = every restart log is cleaned
-    Path("logs/").mkdir(parents=True, exist_ok=True)
+
+    mod_logger(logger, blueprintid=blueprintid, log_level=local_log_level)
+
+    logger_dict[dict_key] = logger
+
+    return logger
+
+
+def mod_logger(logger: logging.Logger, blueprintid='SYSTEM', log_level=_log_level, remove_handlers=False, disable_propagate=False):
+    """
+    This method takes an existing logger and mod it.
+    """
+    if remove_handlers:
+        for old_handler in logger.handlers:
+            logger.removeHandler(old_handler)
+
+    if disable_propagate:
+        logger.propagate = False
+
     log_file_handler = RotatingFileHandler("logs/nfvcl.log", maxBytes=10000000, backupCount=4)
-    log_file_handler.setLevel(local_log_level)
+    log_file_handler.setLevel(log_level)
     log_file_handler.setFormatter(formatter)
     logger.addHandler(log_file_handler)
 
@@ -125,21 +142,10 @@ def create_logger(name: str, ov_log_level: int = None, blueprintid='SYSTEM') -> 
         from nfvcl.utils.redis_utils.redis_manager import get_redis_instance
         _redis_cli: Redis = get_redis_instance()
         redis_handler = RedisLoggingHandler(_redis_cli)
-        redis_handler.setLevel(local_log_level)
+        redis_handler.setLevel(log_level)
         redis_handler.setFormatter(formatter)
         logger.addHandler(redis_handler)
 
-    mod_logger(logger, blueprintid=blueprintid, log_level=local_log_level)
-
-    logger_dict[dict_key] = logger
-
-    return logger
-
-
-def mod_logger(logger: logging.Logger, blueprintid='SYSTEM', log_level=_log_level):
-    """
-    This method takes an existing logger and mod it.
-    """
     coloredlogs.install(
         level=log_level,
         logger=logger,

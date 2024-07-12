@@ -20,6 +20,7 @@ check_folders()
 from logging import Logger
 import uvicorn
 import sys
+import urllib3
 
 logger: Logger
 PY_MIN_MAJOR = 3
@@ -51,6 +52,8 @@ def check_py_version():
         exit(-1)
 
 if __name__ == "__main__":
+    urllib3.disable_warnings()
+
     # Logger must be created after folders!!!
     logger = create_logger("RUN")
     check_py_version()

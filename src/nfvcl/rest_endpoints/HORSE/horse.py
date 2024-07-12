@@ -1,6 +1,8 @@
 import uuid
+from datetime import datetime
 from enum import Enum
 from logging import Logger
+from pathlib import Path
 from typing import Annotated, Optional
 import yaml
 import httpx
@@ -24,6 +26,9 @@ horse_router = APIRouter(
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
 logger: Logger = create_logger("Horse REST")
+
+DUMP_FOLDER = '/tmp/ePEM/received_playbooks/'
+Path(DUMP_FOLDER).mkdir(parents=True, exist_ok=True)
 
 
 class RTRRestAnswer(BaseModel):
@@ -62,7 +67,7 @@ class DOCNorthModel(NFVCLBaseModel):
     ActionDefinition: DOCActionDefinition
 
 
-def extract_action(actionType: RTRActionType, playbook) -> DOCActionDNSLimit | DOCActionDNSstatus:
+def extract_action(actionType: RTRActionType, playbook: str) -> DOCActionDNSLimit | DOCActionDNSstatus:
     """
     Extract action, to be used in DOC request, from playbook
     Args:
@@ -75,12 +80,15 @@ def extract_action(actionType: RTRActionType, playbook) -> DOCActionDNSLimit | D
     data = yaml.safe_load(playbook)
     match actionType:
         case RTRActionType.DNS_RATE_LIMIT:
-            for task in data[0]['tasks']:
-                if 'iptables' in task:
-                    limit = task['iptables']['limit']
-                    action = DOCActionDNSLimit(Zone="", Rate=limit)
-                    return action
-            # If reach this point, 'iptables' was not found.
+            try:
+                for task in data[0]['tasks']:
+                    if 'iptables' in task:
+                        limit = task['iptables']['limit']
+                        action = DOCActionDNSLimit(Zone="", Rate=limit)
+                        return action
+                # If reach this point, 'iptables' was not found.
+            except TypeError as error:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Cannot parse tasks in the playbook: {error}")
             raise HTTPException(status_code=422, detail=f"Field >iptables< not present in the body of the playbook. Cannot parse data for DOC")
         case RTRActionType.DNS_SERV_DISABLE:
             return DOCActionDNSstatus(Zone="", Status='disabled')
@@ -89,6 +97,21 @@ def extract_action(actionType: RTRActionType, playbook) -> DOCActionDNSLimit | D
         case RTRActionType.TEST:
             return DOCActionDNSstatus(Zone="TEST", Status='TEST')
 
+def dump_playbook(playbook: str):
+    """
+    Dump playbook to file to debug application
+    """
+    now = datetime.now()
+    formatted_date = now.strftime("%Y-%m-%d_%H-%M-%S")
+    dump_file_name = f"{formatted_date}_{str(uuid.uuid4())}.yml"
+    dump_file_dest = Path(DUMP_FOLDER, dump_file_name)
+    dump_file_dest.touch(exist_ok=True)
+
+    try:
+        dump_file_dest.write_text(playbook)
+        logger.info("Received playbook dumped successfully.")
+    except IOError as e:
+        logger.error(f"An error while dumping received playbook: {e}")
 
 def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType, service: str, playbook) -> DOCNorthModel:
     """
@@ -113,19 +136,16 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
     if 'url' in doc_mod_info:
         doc_module_url = doc_mod_info['url']
         try:
+            # Trying sending request to DOC
             httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
         except ConnectTimeout:
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
         except httpx.ConnectError:
             raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
 
-        msg_return = RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
-        logger.info(msg_return.description)
-        return msg_return
+        return RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
     else:
-        msg_return = RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
-        logger.error(msg_return.description)
-        return msg_return
+        return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
 
 
 @horse_router.post("/rtr_request_workaround", response_model=RTRRestAnswer)
@@ -147,22 +167,33 @@ def rtr_request_workaround(target: str, action_type: RTRActionType, username: st
 
         payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
     """
+    dump_playbook(playbook=payload)
     if forward_to_doc is False:
+        # No forward to DOC mean that playbook should be applied
+        logger.debug("Started applying ansible playbook")
         ansible_runner_result, fact_cache = run_ansible_playbook(target, username, password, payload)
         if ansible_runner_result.status == "failed":
             raise HTTPException(status_code=500, detail="Execution of Playbook failed. See ePEM DEBUG log for more info.")
-        return RTRRestAnswer(description="Playbook applied", status="success")
+        msg_return = RTRRestAnswer(description="Playbook applied", status="success")
+        logger.debug(msg_return)
+        return msg_return
     else:
+        # Request should be forwarded to DOC
         doc_mod_info = get_extra("doc_module")
         if doc_mod_info is None:
+            # Cannot forward since no DOC module info
             msg_return = RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="error", status_code=404)
             logger.error(msg_return.description)
             return msg_return
         else:
-            if actionID is None: actionID=str(uuid.uuid4())
-            if service is None: service = "DNS" # TODO Workaround
+            if actionID is None:
+                actionID = str(uuid.uuid4())
+            if service is None:
+                service = "DNS"  # TODO Workaround
             body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target, actiontype=action_type, service=service, playbook=payload)
-            return forward_request_to_doc(doc_mod_info, body)
+            msg_return = forward_request_to_doc(doc_mod_info, body)
+            logger.debug(msg_return)
+            return msg_return
 
 
 @horse_router.post("/rtr_request", response_model=RTRRestAnswer)
@@ -189,6 +220,7 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
 
         payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
     """
+    dump_playbook(playbook=payload)
     if not os.environ.get('HORSE_DEBUG'):
         bm = get_blueprint_manager()
         vm: VmResource = bm.get_VM_target_by_ip(target_ip)
@@ -208,6 +240,7 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
             body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target_ip, actiontype=actionType, service=service, playbook=payload)
             return forward_request_to_doc(doc_mod_info, body)
     else:
+        logger.debug("Started applying ansible playbook")
         if not os.environ.get('HORSE_DEBUG'):
             ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, vm.username, vm.password, payload)
         else:
@@ -216,7 +249,7 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
             raise HTTPException(status_code=500, detail="Execution of Playbook failed. See NFVCL DEBUG log for more info.")
 
         msg_return = RTRRestAnswer(description="Playbook applied", status="success")
-        logger.info(msg_return.description)
+        logger.info(msg_return)
         return msg_return
 
 

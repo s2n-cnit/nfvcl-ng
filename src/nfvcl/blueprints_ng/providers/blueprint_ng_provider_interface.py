@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+from typing import Callable, Optional
 
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.topology.topology import build_topology
@@ -19,11 +20,12 @@ class BlueprintNGProviderInterface(abc.ABC):
     area: int
     data: BlueprintNGProviderData
 
-    def __init__(self, area, blueprint):
+    def __init__(self, area: int, blueprint_id: str, persistence_function: Optional[Callable] = None):
         super().__init__()
         self.area = area
-        self.blueprint = blueprint
-        self.logger = create_logger(self.__class__.__name__, blueprintid=self.blueprint.id)
+        self.blueprint_id = blueprint_id
+        self.save_to_db = persistence_function
+        self.logger = create_logger(self.__class__.__name__, blueprintid=self.blueprint_id)
         self.topology = build_topology()
         self.logger.debug(f"Creating {self.__class__.__name__} for area {self.area}")
         self.init()

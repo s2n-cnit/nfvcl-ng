@@ -48,10 +48,6 @@ class VirtualizationProviderProxmoxException(VirtualizationProviderException):
 
 
 class VirtualizationProviderProxmox(VirtualizationProviderInterface):
-
-    def __init__(self, area, blueprint):
-        super().__init__(area, blueprint)
-
     def init(self):
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -96,8 +92,8 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         netwotk_cloud_init: CloudInitNetworkRoot = CloudInitNetworkRoot()
         vmid = self.__get_free_vmid()
 
-        user_cloud_init_path = f"{self.path}/snippets/user_cloud_init_{vmid}_{self.blueprint.id}.yaml"
-        network_cloud_init_path = f"{self.path}/snippets/network_cloud_init_{vmid}_{self.blueprint.id}.yaml"
+        user_cloud_init_path = f"{self.path}/snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml"
+        network_cloud_init_path = f"{self.path}/snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml"
 
         self.__load_cloud_init(cloud_init=user_cloud_init, cloud_init_path=user_cloud_init_path)
 
@@ -119,15 +115,15 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__load_cloud_init(cloud_init=netwotk_cloud_init.build_cloud_config(), cloud_init_path=network_cloud_init_path)
 
         self.data.proxmox_dict[vm_resource.id] = str(vmid)
-        self.blueprint.to_db()
+        self.save_to_db()
         self.__execute_ssh_command(f'qm importdisk {vmid} {self.path}/template/qcow/{vm_resource.image.name}.qcow2 {self.vim.vim_proxmox_storage_volume}')
         self.__execute_ssh_command(f'qm set {vmid} --scsi0 {self.vim.vim_proxmox_storage_volume}:vm-{vmid}-disk-0,discard=on,iothread=on,cache=writethrough')
         self.resize_disk(vmid, int(vm_resource.flavor.storage_gb))
         self.__execute_ssh_command(f'qm set {vmid} --ide2 {self.vim.vim_proxmox_storage_volume}:cloudinit')
         self.__execute_ssh_command(f"qm set {vmid} --boot order=scsi0")
-        self.__execute_ssh_command(f'qm set {vmid} --cicustom "user=local:snippets/user_cloud_init_{vmid}_{self.blueprint.id}.yaml,network=local:snippets/network_cloud_init_{vmid}_{self.blueprint.id}.yaml"')
+        self.__execute_ssh_command(f'qm set {vmid} --cicustom "user=local:snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml,network=local:snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml"')
 
-        self.blueprint.to_db()
+        self.save_to_db()
 
         # Getting detailed info about the networks attached to the machine
         self.__execute_ssh_command(f"qm start {vmid}")
@@ -146,7 +142,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         vm_resource.created = True
 
         self.logger.success(f"Creating VM {vm_resource.name} finished")
-        self.blueprint.to_db()
+        self.save_to_db()
 
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         # The parent method checks if the resource is created and throw an exception if not
@@ -157,10 +153,10 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint.id)
+            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
-        self.blueprint.to_db()
+        self.save_to_db()
 
         return configurator_facts
 
@@ -168,8 +164,8 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         vmid = self.data.proxmox_dict[vm_resource.id]
         self.__execute_ssh_command(f"qm stop {vmid}")
         self.__execute_ssh_command(f"qm destroy {vmid} --purge 1 --destroy-unreferenced-disks 1")
-        self.__execute_ssh_command(f"rm {self.path}/snippets/user_cloud_init_{vmid}_{self.blueprint.id}.yaml")
-        self.__execute_ssh_command(f"rm {self.path}/snippets/network_cloud_init_{vmid}_{self.blueprint.id}.yaml")
+        self.__execute_ssh_command(f"rm {self.path}/snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml")
+        self.__execute_ssh_command(f"rm {self.path}/snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml")
         del self.data.proxmox_dict[vm_resource.id]
 
     def final_cleanup(self):
@@ -202,12 +198,12 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     )
                     netplan_interfaces.append(tmp)
 
-        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces), self.blueprint.id)
+        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces), self.blueprint_id)
 
         self.__parse_proxmox_addresses(vm_resource, vmid)
 
         self.logger.success(f"Network {', '.join(nets_name)} attached to VM {vm_resource.name}")
-        self.blueprint.to_db()
+        self.save_to_db()
 
         ips = []
         for net in nets_name:

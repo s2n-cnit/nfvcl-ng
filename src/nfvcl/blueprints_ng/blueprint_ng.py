@@ -146,7 +146,8 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
         pass
 
     def __init__(self, blueprint):
-        super().__init__(-1, blueprint)
+        super().__init__(-1, blueprint.id)
+        self.blueprint = blueprint
 
         self.virt_providers_impl: Dict[int, VirtualizationProviderInterface] = {}
         self.k8s_providers_impl: Dict[int, K8SProviderInterface] = {}
@@ -155,9 +156,9 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
         vim = self.topology.get_vim_from_area_id_model(area)
         if area not in self.virt_providers_impl:
             if vim.vim_type is VimTypeEnum.OPENSTACK:
-                self.virt_providers_impl[area] = VirtualizationProviderOpenstack(area, self.blueprint)
+                self.virt_providers_impl[area] = VirtualizationProviderOpenstack(area, self.blueprint.id, self.blueprint.to_db)
             elif vim.vim_type is VimTypeEnum.PROXMOX:
-                self.virt_providers_impl[area] = VirtualizationProviderProxmox(area, self.blueprint)
+                self.virt_providers_impl[area] = VirtualizationProviderProxmox(area, self.blueprint.id, self.blueprint.to_db)
 
             self.blueprint.base_model.virt_providers[str(area)] = BlueprintNGProviderModel(
                 provider_type=get_class_path_str_from_obj(self.virt_providers_impl[area]),
@@ -169,7 +170,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
 
     def get_k8s_provider(self, area: int):
         if area not in self.k8s_providers_impl:
-            self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint)
+            self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint.id, self.blueprint.to_db)
 
             self.blueprint.base_model.k8s_providers[str(area)] = BlueprintNGProviderModel(
                 provider_type=get_class_path_str_from_obj(self.k8s_providers_impl[area]),

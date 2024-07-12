@@ -75,14 +75,14 @@ class K8SProviderNative(K8SProviderInterface):
             revision = asyncio.run(release.current_revision())
             print(release.name, release.namespace, revision.revision, str(revision.status))
 
-        self.blueprint.to_db()
+        self.save_to_db()
 
         k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
         services = get_services(kube_client_config=k8s_config, namespace=helm_chart_resource.namespace.lower())
         helm_chart_resource.set_services_from_k8s_api(services)
 
         self.logger.success(f"Installing Helm chart {helm_chart_resource.name} finished")
-        self.blueprint.to_db()
+        self.save_to_db()
 
     def update_values_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         chart = asyncio.run(self.helm_client.get_chart(
@@ -108,7 +108,7 @@ class K8SProviderNative(K8SProviderInterface):
             revision.revision,
             str(revision.status)
         )
-        self.blueprint.to_db()
+        self.save_to_db()
 
     def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
         asyncio.run(self.helm_client.uninstall_release(
@@ -116,7 +116,7 @@ class K8SProviderNative(K8SProviderInterface):
             namespace=helm_chart_resource.namespace.lower(),
             wait=True
         ))
-        self.blueprint.to_db()
+        self.save_to_db()
 
     def final_cleanup(self):
         pass

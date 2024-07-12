@@ -154,7 +154,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         # Register the VM in the provider data, this is needed to be able to delete it using only the vm_resource
         self.data.os_dict[vm_resource.id] = server_obj.id
-        self.blueprint.to_db()
+        self.save_to_db()
 
         self.__update_net_info_vm(vm_resource, server_obj)
         self.__disable_port_security_all_ports(vm_resource, server_obj)
@@ -163,7 +163,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         vm_resource.created = True
 
         self.logger.success(f"Creating VM {vm_resource.name} finished")
-        self.blueprint.to_db()
+        self.save_to_db()
 
     def __update_net_info_vm(self, vm_resource: VmResource, server_obj: Server):
         vm_resource.network_interfaces.clear()
@@ -228,9 +228,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             nics.append(NetplanInterface(nic_name=net_intf.fixed.interface_name, mac_address=net.mac_addr))
             ips.append(net_intf.fixed.ip)
 
-        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics), self.blueprint.id)
+        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics), self.blueprint_id)
         self.logger.success(f"Networks {to_attach} attached to VM {vm_resource.name}")
-        self.blueprint.to_db()
+        self.save_to_db()
 
         return ips
 
@@ -304,7 +304,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def __gather_info_from_vm(self, vm_resource: VmResource):
         self.logger.info(f"Starting VM info gathering")
 
-        facts = configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource), self.blueprint.id)
+        facts = configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource), self.blueprint_id)
 
         mac_name_dict = {}
 
@@ -335,10 +335,10 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint.id)
+            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
-        self.blueprint.to_db()
+        self.save_to_db()
 
         return configurator_facts
 
@@ -349,7 +349,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         else:
             self.logger.warning(f"Unable to find VM id for resource '{vm_resource.id}' with name '{vm_resource.name}', manually check on VIM")
         self.logger.success(f"Destroying VM {vm_resource.name} finished")
-        self.blueprint.to_db()
+        self.save_to_db()
 
     def final_cleanup(self):
         # Delete flavors

@@ -130,10 +130,10 @@ class BlueprintWorker:
                 case WorkerMessageType.DAY2 | WorkerMessageType.DAY2_BY_NAME:
                     self.logger.info(f"Calling function on blueprint")
                     # This is the DAY2 message, getting the function to be called
-                    self.blueprint.base_model.day_2_call_history.append(received_message.message.model_dump_json())
                     self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.RUNNING_DAY2_OP, detail=f"Calling function {received_message.path} on blueprint {self.blueprint.id}")
                     try:
                         if received_message.message_type == WorkerMessageType.DAY2:
+                            self.blueprint.base_model.day_2_call_history.append(received_message.message.model_dump_json())
                             function = blueprint_type.get_function_to_be_called(received_message.path)
                             result = getattr(self.blueprint, function.__name__)(received_message.message)
                         else:

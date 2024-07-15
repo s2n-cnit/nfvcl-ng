@@ -7,8 +7,8 @@ from typing import Annotated, Optional
 import yaml
 import httpx
 from fastapi import APIRouter, status, Body, Query, HTTPException
-from httpx import ConnectTimeout
-from pydantic import BaseModel
+from httpx import ConnectTimeout, Response
+from pydantic import BaseModel, field_validator
 from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
 from nfvcl.blueprints_ng.resources import VmResource
 from nfvcl.models.base_model import NFVCLBaseModel
@@ -16,6 +16,7 @@ from nfvcl.utils.database import insert_extra, get_extra
 from nfvcl.utils.util import IP_PORT_PATTERN, PATH_PATTERN, IP_PATTERN, PORT_PATTERN
 from nfvcl.utils.log import create_logger
 import os
+import re
 
 if not os.environ.get('HORSE_DEBUG'):
     from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
@@ -54,6 +55,17 @@ class DOCActionDNSLimit(NFVCLBaseModel):
     Zone: str
     Rate: int
 
+    @field_validator('Rate', mode='before')
+    @classmethod
+    def validate_limit(cls, limit: str):
+        try:
+            return int(limit)
+        except ValueError:
+            match = re.match("[0-9]*", limit)
+            if match:
+                return match.group(0)
+            else:
+                raise ValueError(f"Invalid limit value in the request: {limit}. Cannot parse. Value should be an integer or '12434/s' or '12331 /s'.")
 
 class DOCActionDefinition(NFVCLBaseModel):
     ActionType: str
@@ -135,10 +147,12 @@ def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType,
 def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
     if 'url' in doc_mod_info:
         doc_module_url = doc_mod_info['url']
+        doc_response: Response
         try:
             # Trying sending request to DOC
             logger.debug(f"Sending request to DOC: \n {doc_request.model_dump_json()}")
-            httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
+            doc_response = httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=10)
+
         except ConnectTimeout:
             logger.debug(f"Connection Timeout to DOC module at http://{doc_module_url}")
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
@@ -146,7 +160,9 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
             logger.debug(f"Connection Error to DOC module (refused at http://{doc_module_url})")
             raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
 
-        return RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)
+        doc_response_debug = f"Url:{doc_response.url}\n Params:{doc_response.headers}\n Body:{doc_response.text}"
+        logger.info(f"DOC response: {doc_response_debug}")
+        return RTRRestAnswer(description=f"The request has been forwarded to DOC module. DOC responce is: \n {doc_response_debug}", status="forwarded", status_code=404)
     else:
         return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
 

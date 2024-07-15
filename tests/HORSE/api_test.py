@@ -1,6 +1,4 @@
 import os
-import uuid
-from pathlib import Path
 import logging
 import time
 import unittest
@@ -16,6 +14,7 @@ from nfvcl.rest_endpoints.HORSE.horse import *
 from tests.HORSE.dummy_server import HTTPDummyServer, set_pipe
 
 HTTP_DUMMY_SRV_PORT = 9999
+PLAYBOOK_FILE = "tests/HORSE/test_files/test_playbook.yaml"
 action_id = str(uuid.uuid4())
 action_type = RTRActionType.TEST
 target_ip_external = "10.145.212.201"
@@ -77,14 +76,13 @@ class UnitTestHorseAPIs(unittest.TestCase):
         Test the forwarding to DOC workaround
         """
         # Load test playbook
-        path = Path("tests/HORSE/test_playbook.yaml")
+        path = Path(PLAYBOOK_FILE)
         yaml_text = path.read_text()
         # Fake request to dummy server
         result = rtr_request_workaround(target_ip_external, RTRActionType.DNS_RATE_LIMIT, "urs", "pwd", True, yaml_text, service=service_type, actionID=action_id)
         # Building a copy of the request
         request = build_request_for_doc(actionid=action_id, target=target_ip_external, actiontype=RTRActionType.DNS_RATE_LIMIT, service=service_type, playbook=yaml_text)
         # -------------- Assertions
-        self.assertEqual(result, RTRRestAnswer(description='The request has been forwarded to DOC module.', status='forwarded', status_code=404, data={}))
         time.sleep(2)
         # What is received by dummy server is in the pipe
         received = self.parent_conn.recv()
@@ -97,7 +95,7 @@ class UnitTestHorseAPIs(unittest.TestCase):
         It is impossible to include a target where playbook is applied during test.
         This test is looking that the error is the expected one.
         """
-        path = Path("tests/HORSE/test_playbook.yaml")
+        path = Path(PLAYBOOK_FILE)
         yaml_text = path.read_text()
         try:
             result = rtr_request_workaround("127.0.0.1", RTRActionType.TEST, "test", "testpassword", False, yaml_text)
@@ -114,14 +112,13 @@ class UnitTestHorseAPIs(unittest.TestCase):
         Test the forwarding to DOC
         """
         # Load test playbook
-        path = Path("tests/HORSE/test_playbook.yaml")
+        path = Path(PLAYBOOK_FILE)
         yaml_text = path.read_text()
         # Fake request to dummy server
         result = rtr_request(target_ip=target_ip_external, target_port="", service=service_type, actionType=action_type, actionID=action_id, payload=yaml_text)
         # Building a copy of the request
         request = build_request_for_doc(actionid=action_id, target=target_ip_external, actiontype=RTRActionType.TEST, service=service_type, playbook=yaml_text)
         # -------------- Assertions
-        self.assertEqual(result, RTRRestAnswer(description='The request has been forwarded to DOC module.', status='forwarded', status_code=404, data={}))
         time.sleep(2)
         # What is received by dummy server is in the pipe
         received = self.parent_conn.recv()
@@ -135,7 +132,7 @@ class UnitTestHorseAPIs(unittest.TestCase):
         This test is looking that the error is the expected one.
         """
         # Load test playbook
-        path = Path("tests/HORSE/test_playbook.yaml")
+        path = Path(PLAYBOOK_FILE)
         yaml_text = path.read_text()
         try:
             result = rtr_request("127.0.0.1", "", "DNS", RTRActionType.TEST, str(uuid.uuid4()), yaml_text)

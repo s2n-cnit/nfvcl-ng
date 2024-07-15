@@ -84,7 +84,7 @@ def extract_action(actionType: RTRActionType, playbook: str) -> DOCActionDNSLimi
                 for task in data[0]['tasks']:
                     if 'iptables' in task:
                         limit = task['iptables']['limit']
-                        action = DOCActionDNSLimit(Zone="", Rate=limit)
+                        action = DOCActionDNSLimit(Zone="0.0.0.0", Rate=limit)
                         return action
                 # If reach this point, 'iptables' was not found.
             except TypeError as error:
@@ -137,10 +137,13 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
         doc_module_url = doc_mod_info['url']
         try:
             # Trying sending request to DOC
+            logger.debug(f"Sending request to DOC: \n {doc_request.model_dump_json()}")
             httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=10)  # TODO TEST
         except ConnectTimeout:
+            logger.debug(f"Connection Timeout to DOC module at http://{doc_module_url}")
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
         except httpx.ConnectError:
+            logger.debug(f"Connection Error to DOC module (refused at http://{doc_module_url})")
             raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
 
         return RTRRestAnswer(description="The request has been forwarded to DOC module.", status="forwarded", status_code=404)

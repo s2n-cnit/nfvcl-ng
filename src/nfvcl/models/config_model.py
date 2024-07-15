@@ -2,7 +2,7 @@ import socket
 from typing import Optional
 
 from nfvcl.models.base_model import NFVCLBaseModel
-from pydantic import field_validator
+from pydantic import field_validator, Field
 
 from nfvcl.utils.ipam import check_ipv4_valid
 
@@ -112,7 +112,7 @@ class RedisParameters(NFVCLBaseModel):
 
 
 class NFVCLConfigModel(NFVCLBaseModel):
-    log_level: int
+    log_level: int = Field(default=20, description="10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0")
     nfvcl: NFVCLParameters
     mongodb: MongoParameters
     redis: RedisParameters

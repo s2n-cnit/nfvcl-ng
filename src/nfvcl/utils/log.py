@@ -11,7 +11,7 @@ from nfvcl.utils.util import is_config_loaded
 _log_level = logging.DEBUG
 LOG_FILE_PATH = "logs/nfvcl.log"
 Path('logs').mkdir(parents=True, exist_ok=True)
-Path('logs/nfvcl.log').touch(exist_ok=True)
+Path(LOG_FILE_PATH).touch(exist_ok=True)
 
 
 def set_log_level(level):

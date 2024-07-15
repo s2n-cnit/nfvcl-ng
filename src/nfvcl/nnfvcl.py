@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # DO NOT MOVE THIS PIECE OF CODE -------
 # Log level must be set before loggers are created!
-from nfvcl.rest_endpoints.ansible import ansible_router
+from nfvcl.rest_endpoints.rest_utils import ansible_router
 from nfvcl.rest_endpoints.day2action import day2_router
 from nfvcl.rest_endpoints.helm import helm_router
 from nfvcl.rest_endpoints.k8s import k8s_router

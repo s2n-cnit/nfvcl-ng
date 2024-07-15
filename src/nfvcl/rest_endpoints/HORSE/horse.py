@@ -162,7 +162,7 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
 
         doc_response_debug = f"Url: {doc_response.url}\nParams: {doc_response.headers}\nBody: {doc_response.text}"
         logger.info(f"DOC response\n{doc_response_debug}")
-        return RTRRestAnswer(description=f"The request has been forwarded to DOC module. DOC responce is: \n {doc_response_debug}", status="forwarded", status_code=404)
+        return RTRRestAnswer(description=f"The request has been forwarded to DOC module. DOC responce is: \n {doc_response_debug}", status="forwarded", status_code=200)
     else:
         return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
 

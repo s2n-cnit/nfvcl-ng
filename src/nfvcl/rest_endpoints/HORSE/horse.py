@@ -152,7 +152,9 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
             # Trying sending request to DOC
             logger.debug(f"Sending request to DOC: \n {doc_request.model_dump_json()}")
             doc_response = httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=10)
-
+            # Returning the code that
+            if doc_response.status_code != 200:
+                raise HTTPException(status_code=doc_response.status_code, detail=f"DOC response code is different from 200: {doc_response.text}")
         except ConnectTimeout:
             logger.debug(f"Connection Timeout to DOC module at http://{doc_module_url}")
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
@@ -160,7 +162,7 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
             logger.debug(f"Connection Error to DOC module (refused at http://{doc_module_url})")
             raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
 
-        doc_response_debug = f"Url: {doc_response.url}\nParams: {doc_response.headers}\nBody: {doc_response.text}"
+        doc_response_debug = f"HTTP Status code: {doc_response.status_code}\nUrl: {doc_response.url}\nParams: {doc_response.headers}\nBody: {doc_response.text}"
         logger.info(f"DOC response\n{doc_response_debug}")
         return RTRRestAnswer(description=f"The request has been forwarded to DOC module. DOC responce is: \n {doc_response_debug}", status="forwarded", status_code=200)
     else:

@@ -13,6 +13,10 @@ from OpenSSL.crypto import PKey
 from jinja2 import Environment, FileSystemLoader
 
 IP_PORT_PATTERN: str = '^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$'
+IP_PATTERN: str = '^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+PORT_PATTERN: str = '^([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$'
+PATH_PATTERN: str = '^[\/]([^\/\s]+\/)+[^\/\s]*'
+PATH_PATTERN_FINAL_SLASH: str = '^[\/]([^\/\s]+\/)+'
 
 # Using _ before name such that cannot be directly accessed from external files.
 _nfvcl_config: NFVCLConfigModel | None = None

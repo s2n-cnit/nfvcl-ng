@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from typing import List
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from nfvcl.models.base_model import NFVCLBaseModel
 
 
-class UacAic(BaseModel):
+class UacAic(NFVCLBaseModel):
     mps: bool
     mcs: bool
 
 
-class UacAcc(BaseModel):
+class UacAcc(NFVCLBaseModel):
     normal_class: int = Field(..., alias='normalClass')
     class11: bool
     class12: bool
@@ -19,45 +21,45 @@ class UacAcc(BaseModel):
     class15: bool
 
 
-class Slice(BaseModel):
+class Slice(NFVCLBaseModel):
     sst: int
     sd: int
 
 
-class Session(BaseModel):
+class Session(NFVCLBaseModel):
     type: str
     apn: str
     slice: Slice
 
 
-class ConfiguredNssaiItem(BaseModel):
+class ConfiguredNssaiItem(NFVCLBaseModel):
     sst: int
     sd: int
 
 
-class DefaultNssaiItem(BaseModel):
+class DefaultNssaiItem(NFVCLBaseModel):
     sst: int
     sd: int
 
 
-class Integrity(BaseModel):
+class Integrity(NFVCLBaseModel):
     ia1: bool = Field(..., alias='IA1')
     ia2: bool = Field(..., alias='IA2')
     ia3: bool = Field(..., alias='IA3')
 
 
-class Ciphering(BaseModel):
+class Ciphering(NFVCLBaseModel):
     ea1: bool = Field(..., alias='EA1')
     ea2: bool = Field(..., alias='EA2')
     ea3: bool = Field(..., alias='EA3')
 
 
-class IntegrityMaxRate(BaseModel):
+class IntegrityMaxRate(NFVCLBaseModel):
     uplink: str
     downlink: str
 
 
-class UEConfig(BaseModel):
+class UEConfig(NFVCLBaseModel):
     supi: str
     mcc: str
     mnc: str

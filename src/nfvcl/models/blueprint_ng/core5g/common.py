@@ -119,13 +119,18 @@ class SubArea(BaseModel):
 
 
 class Create5gModel(BaseModel):
-    type: Literal["5G"]
     callbackURL: Optional[HttpUrl] = Field(
         default=None,
         description='url that will be used to notify when the topology terraform ends'
     )
     config: SubConfig
     areas: List[SubArea] = Field(..., description="Set area")
+
+    def get_area(self, area_id: int):
+        for area in self.areas:
+            if area.id == area_id:
+                return area
+        return None
 
 
 # =========================================== End of main section =====================================================

@@ -144,8 +144,8 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
         return ansible_builder.build()
 
 
-UPF_IMAGE_NAME = "sd-core-upf-v0.4.0-3"
-UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v0.4.0-3.qcow2"
+UPF_IMAGE_NAME = "sd-core-upf-v0.4.0-4"
+UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v0.4.0-4-ubuntu2204.qcow2"
 
 
 @blueprint_type(SDCORE_UPF_BLUE_TYPE)

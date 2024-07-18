@@ -10,7 +10,7 @@ from nfvcl.blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SP
 from nfvcl.blueprints_ng.resources import HelmChartResource
 from nfvcl.models.k8s.topology_k8s_model import K8sModel
 from nfvcl.rest_endpoints.k8s import get_k8s_cluster_by_area
-from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_services
+from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_services, get_deployments
 
 
 class K8SProviderDataNative(BlueprintNGProviderData):
@@ -79,7 +79,9 @@ class K8SProviderNative(K8SProviderInterface):
 
         k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
         services = get_services(kube_client_config=k8s_config, namespace=helm_chart_resource.namespace.lower())
+        deployments = get_deployments(kube_client_config=k8s_config, namespace=helm_chart_resource.namespace.lower())
         helm_chart_resource.set_services_from_k8s_api(services)
+        helm_chart_resource.set_deployments_from_k8s_api(deployments)
 
         self.logger.success(f"Installing Helm chart {helm_chart_resource.name} finished")
         self.save_to_db()

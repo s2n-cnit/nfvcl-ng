@@ -50,3 +50,15 @@ class K8sService(NFVCLBaseModel):
         if v == 'None':
             return None
         return v
+
+class K8sDeployment(NFVCLBaseModel):
+    """
+    https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#deployment-v1-apps
+    """
+    name: str = Field()
+
+class K8sStatefulSet(NFVCLBaseModel):
+    """
+    https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#deployment-v1-apps
+    """
+    name: str = Field()

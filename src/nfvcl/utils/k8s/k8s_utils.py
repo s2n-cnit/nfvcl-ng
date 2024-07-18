@@ -9,7 +9,7 @@ import kubernetes.utils
 import yaml
 from kubernetes import config
 from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, VersionInfo, V1ConfigMap, \
-    V1Namespace, V1ObjectMeta, V1ServiceList
+    V1Namespace, V1ObjectMeta, V1ServiceList, V1DeploymentList
 from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError
 
@@ -179,7 +179,7 @@ def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespa
 
 
 def get_deployments(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
-                    label_selector: str = None) -> V1DaemonSetList:
+                    label_selector: str = None) -> V1DeploymentList:
     """
     Search for all Deployments of a namespace. If a namespace is not specified, it will work on
     all namespaces.
@@ -195,12 +195,12 @@ def get_deployments(kube_client_config: kubernetes.client.Configuration, namespa
     # Enter a context with an instance of the API kubernetes.client
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         # Create an instance of the apps API
-        api_instance_appsV1 = kubernetes.client.AppsV1Api
+        api_instance_appsV1 = kubernetes.client.AppsV1Api(api_client)
         try:
             if namespace:
                 deploy_list = api_instance_appsV1.list_namespaced_deployment(namespace=namespace, label_selector=label_selector)
             else:
-                deploy_list: V1DaemonSetList = api_instance_appsV1.list_deployment_for_all_namespaces(
+                deploy_list: V1DeploymentList = api_instance_appsV1.list_deployment_for_all_namespaces(
                     timeout_seconds=TIMEOUT_SECONDS, label_selector=label_selector)
         except ApiException as error:
             logger.error("Exception when calling appsV1->list_deployments: {}\n".format(error))

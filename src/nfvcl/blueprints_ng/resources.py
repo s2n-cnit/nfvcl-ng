@@ -2,12 +2,12 @@ import abc
 from pathlib import Path
 from typing import Optional, List, Dict, Union
 
-from kubernetes.client import V1ServiceList
+from kubernetes.client import V1ServiceList, V1DeploymentList
 from pydantic import Field
 from typing_extensions import Literal
 
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType
+from nfvcl.models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType, K8sDeployment, K8sStatefulSet
 
 
 class Resource(NFVCLBaseModel):
@@ -253,6 +253,9 @@ class HelmChartResource(ResourceDeployable):
 
     created: bool = Field(default=False)
     services: Optional[Dict[str, K8sService]] = Field(default=None)
+    deployments: Optional[Dict[str, K8sDeployment]] = Field(default=None)
+    statefulsets: Optional[Dict[str, K8sStatefulSet]] = Field(default=None)
+
 
     def set_services_from_k8s_api(self, k8s_services: V1ServiceList):
         self.services = {}
@@ -277,6 +280,16 @@ class HelmChartResource(ResourceDeployable):
             )
 
             self.services[service.name] = service
+
+    def set_deployments_from_k8s_api(self, k8s_deployments: V1DeploymentList):
+        self.deployments = {}
+
+        for k8s_deployment in k8s_deployments.items:
+            deployment = K8sDeployment(
+                name=k8s_deployment.metadata.name,
+            )
+
+            self.deployments[deployment.name] = deployment
 
     def get_chart_converted(self) -> Union[str, Path]:
         if self.chart_as_path:

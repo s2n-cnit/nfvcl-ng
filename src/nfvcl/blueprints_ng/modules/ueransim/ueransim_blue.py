@@ -115,7 +115,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     # RADIO_NET_CIDR_START = '10.168.0.2'
     # RADIO_NET_CIDR_END = '10.168.255.253'
 
-    ueransim_image = VmResourceImage(name="ueransim-v3.2.6-dev", url="https://images.tnt-lab.unige.it/ueransim/ueransim-v3.2.6-dev.qcow2")
+    ueransim_image = VmResourceImage(name="ueransim-v3.2.6-dev-2", url="https://images.tnt-lab.unige.it/ueransim/ueransim-v3.2.6-dev-2-ubuntu2204.qcow2")
     ueransim_flavor = VmResourceFlavor(vcpu_count='2', memory_mb='4096', storage_gb='10')
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = UeransimBlueprintNGState):

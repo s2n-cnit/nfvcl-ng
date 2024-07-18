@@ -1,7 +1,7 @@
 import paramiko
 import socket
 import re
-from time import sleep
+import time
 
 
 class SSH:
@@ -29,16 +29,23 @@ class SSH:
             return stdout
 
     def check_gnb_connection(self):
-        stdout = self.execute_ssh_command(f"journalctl -u ueransim-gnb.service -b", sudo=True)
-        output = ' '.join(stdout.readlines())
-        return re.search("successful", output).group()
+        timeout = time.time() + 60 * 1
+        while True:
+            stdout = self.execute_ssh_command(f"journalctl -u ueransim-gnb.service -b", sudo=True)
+            output = ' '.join(stdout.readlines())
+            output = re.search("successful", output).group()
+            if output == "successful" or time.time() > timeout:
+                return output
 
     def get_ue_TUN_name(self, imsi):
         self.execute_ssh_command(f"systemctl restart ueransim-ue-sim-{imsi}.service", sudo=True)
-        sleep(10)
-        stdout = self.execute_ssh_command(f"journalctl -u ueransim-ue-sim-{imsi}.service -b | grep TUN", sudo=True)
-        output = stdout.readline()
-        return re.search("uesimtun[0-9]", output).group()
+        timeout = time.time() + 60 * 1
+        while True:
+            stdout = self.execute_ssh_command(f"journalctl -u ueransim-ue-sim-{imsi}.service -b | grep TUN", sudo=True)
+            output = stdout.readline()
+            output = re.search("uesimtun[0-9]", output).group()
+            if "uesimtun" in output or time.time() > timeout:
+                return output
 
     def close_connection(self):
         self.ssh.close()

@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import Field
@@ -44,3 +45,19 @@ class Core5GAddDnnModel(SubDataNets):
 
 class Core5GDelDnnModel(NFVCLBaseModel):
     dnn: str = Field()
+
+class NF5GType(str, Enum):
+    AMF = 'AMF'
+    SMF = 'SMF'
+    NSSF = 'NSSF'
+    NEF = 'NEF'
+    NRF = 'NRF'
+    PCF = 'PCF'
+    UDM = 'UDM'
+    UDR = 'UDR'
+    AF = 'AF'
+    AUSF = 'AUSF'
+
+class NetworkFunctionScaling(NFVCLBaseModel):
+    nf: NF5GType = Field()
+    replica_count: int = Field()

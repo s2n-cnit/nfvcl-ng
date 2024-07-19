@@ -1,3 +1,0 @@
-brctl addbr __BRIDGE_NAME__ >/dev/null 2>&1
-ip link set __BRIDGE_NAME__ up >/dev/null 2>&1
-ip address add __OVERLAYIP__/__OVERLAYIPMASK__ dev __BRIDGE_NAME__ >/dev/null 2>&1

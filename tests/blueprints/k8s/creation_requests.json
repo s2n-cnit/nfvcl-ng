@@ -1,0 +1,67 @@
+[
+  {
+    "cni": "flannel",
+    "pod_network_cidr": "10.254.0.0/16",
+    "service_cidr": "10.200.0.0/16",
+    "topology_onboard": true,
+    "password": "ubuntu",
+    "install_plugins": true,
+    "require_port_security_disabled": true,
+    "master_flavors": {
+      "memory_mb": "4096",
+      "storage_gb": "32",
+      "vcpu_count": "8"
+    },
+    "areas": [
+      {
+        "area_id": 1,
+        "is_master_area": true,
+        "mgmt_net": "dmz-internal",
+        "additional_networks": [
+          "data_paolo"
+        ],
+        "load_balancer_pools_ips": [],
+        "worker_replicas": 1,
+        "worker_flavors": {
+          "memory_mb": "4096",
+          "storage_gb": "32",
+          "vcpu_count": "6"
+        }
+      }
+    ]
+  },
+  {
+    "cni": "calico",
+    "pod_network_cidr": "10.254.0.0/16",
+    "service_cidr": "10.200.0.0/16",
+    "topology_onboard": true,
+    "password": "ubuntu",
+    "install_plugins": true,
+    "require_port_security_disabled": true,
+    "master_flavors": {
+      "memory_mb": "4096",
+      "storage_gb": "32",
+      "vcpu_count": "8"
+    },
+    "areas": [
+      {
+        "area_id": 1,
+        "is_master_area": true,
+        "mgmt_net": "dmz-internal",
+        "additional_networks": [
+          "data_paolo"
+        ],
+        "load_balancer_pools_ips": [
+          "192.168.254.23",
+          "192.168.254.54"
+        ],
+        "worker_replicas": 1,
+        "worker_flavors": {
+          "memory_mb": "4096",
+          "storage_gb": "32",
+          "vcpu_count": "6"
+        }
+      }
+    ]
+  }
+]

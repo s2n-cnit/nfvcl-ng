@@ -2,6 +2,7 @@ import tempfile
 import time
 import traceback
 from logging import Logger
+from pathlib import Path
 from typing import List
 
 import kubernetes.client
@@ -15,7 +16,7 @@ from kubernetes.utils import FailToCreateError
 
 import nfvcl.utils.util
 from nfvcl.config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
-from nfvcl.models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName, K8sPluginType
+from nfvcl.models.k8s.plugin_k8s_model import K8sPluginAdditionalData, K8sPluginName, K8sPluginType
 from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sVersion
 from nfvcl.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl.utils.log import create_logger
@@ -325,7 +326,7 @@ def patch_config_map(kube_client_config: kubernetes.client.Configuration, name, 
 
 
 def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, dict_to_be_applied: dict = None,
-                         yaml_file_to_be_applied: str = None):
+                         yaml_file_to_be_applied: Path = None):
     """
     This method can apply a definition (yaml) to a k8s cluster. The data origin to apply can be a dictionary or a yaml file.
 
@@ -345,7 +346,7 @@ def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, di
             if dict_to_be_applied:
                 result_dict = kubernetes.utils.create_from_dict(api_client, dict_to_be_applied)
             if yaml_file_to_be_applied:
-                result_yaml = create_from_yaml_custom(api_client, yaml_file_to_be_applied)
+                result_yaml = create_from_yaml_custom(api_client, str(yaml_file_to_be_applied))
         except ApiException as error:
             logger.error("Exception when calling create_from_yaml: {}\n".format(error))
             raise error
@@ -356,7 +357,7 @@ def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, di
 
 def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configuration,
                                plugins_to_install: List[K8sPluginName],
-                               template_fill_data: K8sTemplateFillData,
+                               template_fill_data: K8sPluginAdditionalData,
                                cluster_id: str,
                                skip_plug_checks: bool = False) -> dict:
     """

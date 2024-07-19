@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from openstack.image.v2.image import Image
 from nfvcl.models.openstack.images import ImageRepo
 from nfvcl.models.vim import VimModel
@@ -44,8 +46,8 @@ class OpenStackClient:
         Args:
             vim: the vim on witch the client is build.
         """
-        filepath = render_file_from_template_to_file("src/nfvcl/config_templates/openstack/clouds.yaml", vim.model_dump(), prefix_to_name=vim.name)
-        os.environ["OS_CLIENT_CONFIG_FILE"] = filepath
+        filepath = render_file_from_template_to_file(Path("src/nfvcl/config_templates/openstack/clouds.yaml"), vim.model_dump(), prefix_to_name=vim.name)
+        os.environ["OS_CLIENT_CONFIG_FILE"] = str(filepath.absolute())
         # Get the client using a singleton pattern
         self.client = _get_client(vim.name)
 

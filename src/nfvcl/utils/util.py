@@ -122,8 +122,7 @@ def generate_blueprint_id() -> str:
     return generate_id(6, string.ascii_uppercase + string.digits)
 
 
-# TODO move to Path, not use str
-def render_file_from_template_to_file(path: str, render_dict: dict, prefix_to_name: str = "") -> str:
+def render_file_from_template_to_file(path: Path, render_dict: dict, prefix_to_name: str = "", extension: str = None) -> Path:
     """
     Render a template file using the render_dict dictionary. Use the keys and their values to give a value at the
     variables present in the template file.
@@ -137,28 +136,33 @@ def render_file_from_template_to_file(path: str, render_dict: dict, prefix_to_na
 
         prefix_to_name: A prefix to be appended to generated file.
 
+        extension: The new extension to be given at the file (e.g '.yaml', '.txt', ...)
+
     Returns:
         the path of the generated file from the template.
     """
-    env_path = ""
-    for folder in path.split('/')[:-1]:
-        env_path += "{}/".format(folder)
-    filename = path.split('/')[-1]
+    if not path.exists():
+        raise ValueError("The file to be rendered does not exist")
+    if not path.is_file():
+        raise ValueError("The file to be rendered is not a file but a folder")
+
+    env_path = path.parent
+    filename = path.name
+
     env = Environment(loader=FileSystemLoader(env_path),
                       extensions=['jinja2_ansible_filters.AnsibleCoreFiltersExtension'])
+
     template = env.get_template(filename)
     data = template.render(confvar=render_dict)
 
-    if prefix_to_name == "":
-        new_name = filename
+    if extension:
+        new_file_path = Path(f"day2_files/{prefix_to_name}{path.stem}{extension}")
     else:
-        new_name = prefix_to_name + '_' + filename
+        new_file_path = Path(f"day2_files/{prefix_to_name}{path.name}")
 
-    with open('day2_files/' + new_name, 'w') as file:
-        file.write(data)
-        file.close()
+    new_file_path.write_text(data)
 
-    return file.name
+    return new_file_path
 
 
 def render_file_jinja2_to_str(file_to_render: Path, confvar: dict):
@@ -177,7 +181,7 @@ def render_file_jinja2_to_str(file_to_render: Path, confvar: dict):
     return template.render(**confvar)
 
 
-def render_files_from_template(paths: List[str], render_dict, files_name_prefix: str = "TEST") -> List[str]:
+def render_files_from_template(paths: List[Path], render_dict, files_name_prefix: str = "TEST") -> List[Path]:
     """
     Render multiple files from their templates. For further details looks at render_file_from_template function.
     Then the list of generated files (paths) is returned
@@ -193,7 +197,7 @@ def render_files_from_template(paths: List[str], render_dict, files_name_prefix:
     Returns:
         A list path representing generated files.
     """
-    to_return: List[str] = []
+    to_return: List[Path] = []
     for file_path in paths:
         to_return.append(render_file_from_template_to_file(path=file_path, render_dict=render_dict,
                                                            prefix_to_name=files_name_prefix))

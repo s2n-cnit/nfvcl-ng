@@ -1,10 +1,10 @@
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, IPvAnyAddress
 
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.k8s.common_k8s_model import LBPool
+from nfvcl.models.network.ipam_models import SerializableIPv4Address
 
 
 class K8sPluginName(str, Enum):
@@ -57,29 +57,21 @@ class K8sPlugin(NFVCLBaseModel):
                                                                       "is correctly installed on the cluster.")
 
 
-class K8sTemplateFillData(NFVCLBaseModel):
+class K8sLoadBalancerPoolArea(NFVCLBaseModel):
     """
-    Model that represent data to be used for filling the plugin template files.
-    CIDR is used by flannel and calico.
-    lb_ipaddresses is used by metal-lb to give of IPs for load balancers (used automatically)
-    lb_ipaddresses is used by metal-lb to give a pool of IPs for load balancers (must be enabled with metal lb call)
+    Represents name and ip_list to be used for a load balancer pool of a load balancer.
+    Hostnames are used to bind L2 advertisement to these hosts.
     """
-    pod_network_cidr: str = Field(default="")
-    lb_ipaddresses: List[str] = Field(default=[])
-    lb_ipaddresses_auto: List[str] = Field(default=[])
-    lb_pools: List[LBPool] = Field(default=[])
+    pool_name: str = Field(pattern=r"^([a-z0-9]+(-[a-z0-9]+)*)$")
+    ip_list: List[SerializableIPv4Address] = Field(description="List of IP addresses for LB")
+    host_names: Optional[List[str]] = Field(default=None, description="List of hostnames enabled to announce al L2 the LB pool, if none announce on all nodes.")
 
-    @field_validator('lb_pools')
-    @classmethod
-    def validate_lb_pools(cls, pool_list: List[LBPool]) -> List[LBPool]:
-        """
-        K8s does not allow '_' in resource names and lower case.
-        """
-        to_ret: List[LBPool]
-        if isinstance(pool_list, list):
-            for pool in pool_list:
-                pool.net_name = pool.net_name.replace("_", "-").lower()
-            return pool_list
+class K8sPluginAdditionalData(NFVCLBaseModel):
+    """
+    Model that represent data to be used for filling the k8s plugin template files.
+    """
+    areas: Optional[List[K8sLoadBalancerPoolArea]] = Field(default=None, description="The list of load balancer pool areas for MetalLB configuration")
+    pod_network_cidr: Optional[str] = Field(default=None, description="The pod network cidr used for Flannel/Calico installation. If None it is retrieved from the cluster.")
 
 
 class K8sPluginsToInstall(NFVCLBaseModel):
@@ -87,7 +79,7 @@ class K8sPluginsToInstall(NFVCLBaseModel):
     Model used to represent a list of plugins to be installed with specific parameters needed by the plugins.
     """
     plugin_list: List[K8sPluginName]
-    template_fill_data: K8sTemplateFillData = Field(default=K8sTemplateFillData())
+    template_fill_data: K8sPluginAdditionalData = Field(default=K8sPluginAdditionalData())
     skip_plug_checks: bool = Field(default=False)
 
 

@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field, field_validator, field_serializer, IPvAnyAddress, IPvAnyNetwork
+from pydantic import BaseModel, Field, field_validator, field_serializer, IPvAnyNetwork, IPvAnyAddress
 from typing import List, Optional, Union
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
-
 from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 
 
 class NetworkTypeEnum(str, Enum):
@@ -202,9 +202,9 @@ class NetworkInterfaceModel(NFVCLBaseModel):
     Represents a network interface
     """
     name: str = Field(description="The name of the network interface")
-    ip: IPvAnyAddress = Field(description="The IP(v4 or v6) address of the network interface")
-    network: Optional[IPvAnyNetwork] = Field(default=None, description="The network attached to the network interface")
-    gateway: Optional[IPvAnyAddress] = Field(description="The IP(v4 or v6) address of the gateway on the network attached")
+    ip: SerializableIPv4Address = Field(description="The IP(v4 or v6) address of the network interface")
+    network: Optional[SerializableIPv4Network] = Field(default=None, description="The network attached to the network interface")
+    gateway: Optional[SerializableIPv4Address] = Field(description="The IP(v4 or v6) address of the gateway on the network attached")
 
 
 # TODO remove as soon as OSM is removed

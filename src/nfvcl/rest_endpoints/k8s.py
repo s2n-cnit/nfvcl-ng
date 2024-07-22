@@ -1,13 +1,15 @@
 import json
-from fastapi import APIRouter, HTTPException, Body, status
-from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
-    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota, V1ClusterRoleBinding, V1Node, V1Deployment, V1DeploymentList
-from nfvcl.models.event import Event
-from nfvcl.models.k8s.blueprint_k8s_model import K8sModel
-from nfvcl.main import topology_lock
-from verboselogs import VerboseLogger
 from typing import List
 
+from fastapi import APIRouter, HTTPException, Body, status
+from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
+    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota, V1ClusterRoleBinding, \
+    V1Node, V1Deployment, V1DeploymentList, V1NodeList
+from verboselogs import VerboseLogger
+
+from nfvcl.main import topology_lock
+from nfvcl.models.event import Event
+from nfvcl.models.k8s.blueprint_k8s_model import K8sModel
 from nfvcl.models.k8s.common_k8s_model import Labels
 from nfvcl.models.k8s.k8s_events import K8sEventType
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sOperationType, K8sPluginName
@@ -17,11 +19,14 @@ from nfvcl.rest_endpoints.rest_callback import RestAnswer202
 from nfvcl.topology.topology import Topology
 from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_installed_plugins, \
     get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
-from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
-from nfvcl.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
-    k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_over_namespace, \
-    k8s_delete_namespace, k8s_add_quota_to_namespace, k8s_cluster_admin, k8s_add_label_to_k8s_node, k8s_get_nodes, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_deployments
+from nfvcl.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, \
+    k8s_admin_role_to_sa, \
+    k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, \
+    k8s_admin_role_over_namespace, \
+    k8s_delete_namespace, k8s_add_quota_to_namespace, k8s_cluster_admin, k8s_add_label_to_k8s_node, k8s_get_nodes, \
+    k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_deployments
 from nfvcl.utils.log import create_logger
+from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from nfvcl.utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 
 k8s_router = APIRouter(
@@ -720,7 +725,7 @@ async def get_nodes(cluster_id: str, detailed: bool = False):
     cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
     if detailed:
-        node_list: V1PodList = k8s_get_nodes(k8s_config, detailed=detailed)
+        node_list: V1NodeList = k8s_get_nodes(k8s_config, detailed=detailed)
         to_return = node_list.to_dict()
     else:
         name_list = k8s_get_nodes(k8s_config, detailed=detailed)

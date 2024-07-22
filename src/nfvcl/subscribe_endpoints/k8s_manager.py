@@ -3,18 +3,19 @@ import json
 import os
 import signal
 import threading
-from logging import Logger
+import traceback
 from multiprocessing import Process, RLock
 from typing import List
-import kubernetes
+
 import redis
-import traceback
 import yaml
 from kubernetes.utils import FailToCreateError
 from pydantic import ValidationError
 from redis.client import PubSub
-from nfvcl.models.k8s.blueprint_k8s_model import LBPool
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sPluginAdditionalData, K8sOperationType, K8sPluginName, K8sLoadBalancerPoolArea
+from verboselogs import VerboseLogger
+
+from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sPluginAdditionalData, K8sOperationType, \
+    K8sPluginName, K8sLoadBalancerPoolArea
 from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sModel
 from nfvcl.topology.topology import Topology
 from nfvcl.utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, \
@@ -27,7 +28,7 @@ from nfvcl.utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 class K8sManager:
     redis_cli: redis.Redis = get_redis_instance()
     subscriber: PubSub = redis_cli.pubsub()
-    logger: Logger
+    logger: VerboseLogger
     lock: RLock
     stop: bool
 
@@ -164,14 +165,16 @@ class K8sManager:
 
         # Extracting names from K8sPluginToInstall list
         plugin_names_raw_list: List[K8sPluginName] = plug_to_install_list.plugin_list
-        # Extracting additional data from K8sPluginToInstall list
-        template_fill_data: K8sPluginAdditionalData = plug_to_install_list.template_fill_data
-
         # Converting List[str] to List[K8sPluginNames]
         plugin_name_list: List[K8sPluginName] = convert_str_list_2_plug_name(plugin_names_raw_list)
 
-        # Get k8s cluster and k8s config for client
+        lb_pool: K8sLoadBalancerPoolArea = plug_to_install_list.load_balancer_pool
+        # Get the k8s pod network cidr
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+        pod_network_cidr = get_k8s_cidr_info(k8s_config)
+
+        # Create additional data for plugins (lbpool and cidr)
+        template_fill_data = K8sPluginAdditionalData(areas=[lb_pool], pod_network_cidr=pod_network_cidr)
 
         # Try to install plugins to cluster
         installation_result: dict = install_plugins_to_cluster(kube_client_config=k8s_config,
@@ -185,7 +188,7 @@ class K8sManager:
         for plugin_result in installation_result:
             to_print.append(plugin_result)
 
-        self.logger.info("Plugins {} have been installed".format(to_print))
+        self.logger.success(f"Plugins {to_print} have been installed")
 
     def apply_to_k8s(self, cluster_id: str, body):
         """
@@ -218,7 +221,7 @@ class K8sManager:
         for element in result[0]:
             list_to_ret.append(element.to_dict())
 
-        self.logger.info("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
+        self.logger.success("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
 
 
 # ----- Global functions for multiprocessing compatibility -----

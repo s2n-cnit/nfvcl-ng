@@ -1,28 +1,30 @@
 import re
 from typing import Optional, List
+
 from netaddr.ip import IPNetwork
 from pydantic import Field
+
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day2_configurator import VmK8sDay2Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
     KarmadaInstallModel, K8sDelNodeModel
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.k8s.common_k8s_model import Cni
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData, K8sLoadBalancerPoolArea
 from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sVersion
+from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl.topology.topology import Topology, build_topology
 from nfvcl.utils.k8s import get_k8s_config_from_file_content, install_plugins_to_cluster, get_k8s_cidr_info, \
     get_config_map, patch_config_map
 
 K8S_BLUE_TYPE = "k8s"
-BASE_IMAGE_MASTER = "k8s-base-v0.0.3"
-BASE_IMAGE_WORKER = "k8s-base-v0.0.3"
-BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.0.3.qcow2"
+BASE_IMAGE_MASTER = "u24-k8s-base-v0.0.4"
+BASE_IMAGE_WORKER = "u24-k8s-base-v0.0.4"
+BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.0.4-ubuntu2404.qcow2"
 DUMMY_NET_INT_NAME = "eth99"
 POD_NET_CIDR = SerializableIPv4Network("10.254.0.0/16")
 POD_SERVICE_CIDR = SerializableIPv4Network("10.200.0.0/16")
@@ -437,7 +439,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         else:
             base_dict = super().to_dict(detailed)
             if self.base_model.state.vm_master:
-                ip_list = [f"Controller: {self.base_model.state.vm_master.access_ip}"]
-                ip_list.extend([f"Worker: {vm.access_ip}" for vm in self.base_model.state.vm_workers])
+                ip_list = [f"Controller {self.base_model.state.vm_master.name}: {self.base_model.state.vm_master.access_ip}"]
+                ip_list.extend([f"Worker {vm.name}: {vm.access_ip}" for vm in self.base_model.state.vm_workers])
                 base_dict['node_list'] = ip_list
             return base_dict

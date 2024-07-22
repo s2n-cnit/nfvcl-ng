@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import Field, IPvAnyAddress
+from pydantic import Field
 
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.network.ipam_models import SerializableIPv4Address
@@ -66,6 +66,7 @@ class K8sLoadBalancerPoolArea(NFVCLBaseModel):
     ip_list: List[SerializableIPv4Address] = Field(description="List of IP addresses for LB")
     host_names: Optional[List[str]] = Field(default=None, description="List of hostnames enabled to announce al L2 the LB pool, if none announce on all nodes.")
 
+
 class K8sPluginAdditionalData(NFVCLBaseModel):
     """
     Model that represent data to be used for filling the k8s plugin template files.
@@ -78,9 +79,9 @@ class K8sPluginsToInstall(NFVCLBaseModel):
     """
     Model used to represent a list of plugins to be installed with specific parameters needed by the plugins.
     """
-    plugin_list: List[K8sPluginName]
-    template_fill_data: K8sPluginAdditionalData = Field(default=K8sPluginAdditionalData())
-    skip_plug_checks: bool = Field(default=False)
+    plugin_list: List[K8sPluginName] = Field(description="The list of plugins to be installed")
+    load_balancer_pool: Optional[K8sLoadBalancerPoolArea] = Field(description="The pool to be used by the Load Balancer to expose LB services.")
+    skip_plug_checks: bool = Field(default=False, description="If True do not check for plugin compatibility")
 
 
 class K8sOperationType(str, Enum):

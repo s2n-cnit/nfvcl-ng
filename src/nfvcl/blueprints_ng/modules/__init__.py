@@ -7,3 +7,4 @@ from .sdcore import *
 from .sdcore_upf import *
 from .ueransim import *
 from .vyos import *
+from .ubuntu import *

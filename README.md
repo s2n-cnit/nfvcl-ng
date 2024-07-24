@@ -8,11 +8,14 @@
   - [Key Features](#key-features)
 - [💻 Getting Started](#-getting-started)
   - [Setup](#setup)
-  - [Prerequisites](#prerequisites)
+  - [Requirements](#requirements)
+  - [Setup](#setup)
   - [Install](#install)
-  - [Running](#running)
-  - [Deployment](#deployment)
-  - [Usage](#usage)
+  - [Configuration](#configuration)
+  - [Running🏃](#running-)
+  - [Deployment🎈 (Docker+Helm)](#deployment)
+  - [Usage📖](#usage-)
+  - [Debug🧪](#debug-)
 - [👥 Authors](#-authors)
 - [🤝 Contributing](#-contributing)
 - [⭐️ Show your support](#-show-your-support)
@@ -56,8 +59,8 @@ A more detailed description of the NFVCL will be added to the [Wiki](https://nfv
 ## 💻 Getting Started
 To run the NFVCL you have several possible alternatives:
  1. [RECOMMENDED] Use the provided docker compose (skip to [Deployment](#deployment) part)
- 2. Install requirements and run on your machine (follow next instructions)
- 3. Use the provided helm chart (STILL TO BE UPLOADED)
+ 2. Use the provided helm chart
+ 3. Install requirements and run on your machine (follow next instructions)
 
 To get a local copy up and running (point 2), follow these steps.
 
@@ -66,7 +69,7 @@ To get a local copy up and running (point 2), follow these steps.
 1. The NFVCL can run on:
    - A Kubernetes (K8S) cluster, the installation using Helm is available [here](#helm-installation-kubernetes)
    - Docker engine using the Docker compose file on the GitHub repository[1] or using the NFVCL container image (in the second case MongoDB and Redis must have been installed and configured separately)
-   - A (Virtual) Machine) using Ubuntu 22.04 LTS (In future 24 LTS), using the instructions provided on the GitHub README[1]. MongoDB and Redis, working and configured, are needed. 
+   - A (Virtual) Machine using Ubuntu 22.04 LTS (In future 24 LTS), using the instructions provided on the GitHub README[1]. MongoDB and Redis, working and configured, are needed. 
 
 2. Performance requirements: The NFVCL is not a software that requires high performance, for a virtual machine is more than enough 2VCPUs, 4GB of RAM and 15GB of disk. The requirements inside Docker and K8S still have to be evaluated.
 
@@ -80,20 +83,21 @@ To get a local copy up and running (point 2), follow these steps.
 
 ### Setup
 
-Clone this repository to your desired folder:
-``` bash
-git clone --depth 1 https://github.com/s2n-cnit/nfvcl-ng
-```
+The first step to run the software locally is to clone the repository. We have 3 main different branches:
+- The `stable` one, updated less frequently but should not include unstable features.
+- The `master` is updated as soon as a cycle of improvements has been made and partially tested
+- The `dev` branch is the one updated as soon as new features/fix are implemented. It is the branch used for development.
 
+Clone the desired branch to your desired folder:
+``` bash
+git clone https://github.com/s2n-cnit/nfvcl-ng
+```
 
 ### Install
 
 Enter NFVCL folder and run setup.sh, this script will:
 - Install uvicorn, Poetry, Redis and MongoDB.
 - Configure Redis to listen from all interfaces
-- Fix PodSecurity for VNFM
-- Setting up a local Docker registry
-- Build and upload the VNFM image to local registry
 - Install dependencies using Poetry
 ``` 
 cd nfvcl-ng
@@ -103,8 +107,8 @@ chmod +x ./setup.sh
 
 ### Configuration
 The last step is the NFVCL configuration, it can be done though the configuration file or using [ENV variables](config/config.md).
-In production it is raccomanded to change values in `config/config.yaml`, while, for developing you can create a copy of the default configuration and call it `config/onfig_dev.yaml. 
-When the NFVCL starts, it loads the cofiguration from `config/onfig_dev.yaml` if present, otherwise the configuration is loaded from the default file.
+In production, it is suggested to change values in `config/config.yaml`, while, for developing you can create a copy of the default configuration and call it `config/config_dev.yaml`. 
+When the NFVCL starts, it loads the configuration from `config/config_dev.yaml` if present, otherwise the configuration is loaded from the default file.
 
 > [!TIP]
 > The IP of the NFVCL is not mandatory, use it to bind on a specific interface.
@@ -139,8 +143,7 @@ When the NFVCL starts, it loads the cofiguration from `config/onfig_dev.yaml` if
 ```
 
 
-### Running
-
+### Running 🏃
 You can use `screen` or create a service to run the NFVCL in the background
 
 #### Using Screen
@@ -150,7 +153,7 @@ Once configuration is done you can run the NFVCL in the background using **scree
 screen -S nfvcl
 poetry run python -m nfvcl
 ```
-> :warning: To deatach from screen press **CTRL+a** then **d**.
+> :warning: To detach from screen press **CTRL+a** then **d**.
 > To resume the screen run `screen -r nfvcl`.
 
 #### Using a service
@@ -183,8 +186,25 @@ sudo systemctl status nfvcl.service
 sudo systemctl enable nfvcl.service
 ```
 
-#### Debug
-The NFVCL main output is contained in the **console output**, but additionally it is possible to observe it's output in:
+### Deployment🎈
+You can deploy this project using **Docker** or **Helm** (Kubernetes)
+
+- [Docker](https://nfvcl-ng.readthedocs.io/en/latest/docker.html)
+- [Helm installation (Kubernetes)](https://nfvcl-ng.readthedocs.io/en/latest/helm.html)
+
+### Usage 📖
+The NFVCL usage is described in the dedicated [Wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html) page.
+
+### Debug 🧪
+The NFVCL main output is contained in the **console output**, but additionally it is possible to observe it's output in log files and 
+published on Redis events.
+
+##### Screen
+Resume the console using `screen -r`
+
+##### Service
+`journalctl -u nfvcl`
+
 ##### Log file
 The file can be found in the logs folder of NFVCL, it's called nfvcl.log. 
 It is a rotating log with 4 backup files that are rotated when the main one reach 50Kbytes.
@@ -219,15 +239,6 @@ for message in redis_pub_sub.listen():
     else:
         print(message['data'])
 ```
-
-### Deployment
-You can deploy this project using **Docker** or **Helm** (Kubernetes)
-
-- [Docker](https://nfvcl-ng.readthedocs.io/en/latest/docker.html)
-- [Helm installation (Kubernetes)](https://nfvcl-ng.readthedocs.io/en/latest/helm.html)
-
-### Usage
-The NFVCL usage is described in the dedicated [Wiki](https://nfvcl-ng.readthedocs.io/en/latest/index.html) page.
 
 ## 👥 Authors
 ### Original Authors

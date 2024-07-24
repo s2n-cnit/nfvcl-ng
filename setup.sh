@@ -38,9 +38,6 @@ sudo sed -i '/bindIp/ s/127\.0\.0\.1/0\.0\.0\.0/' /etc/mongod.conf
 echo "Restarting mongod..."
 sudo systemctl restart mongod
 
-echo "Fixing PodSecurity issue for VNFM"
-kubectl set env deployment -n osm lcm OSMLCM_VCA_EEGRPC_POD_ADMISSION_POLICY=privileged
-
 # Needed by some python packages (netifaces)
 echo "Installing build essential tools"
 sudo apt install -y build-essential sshpass

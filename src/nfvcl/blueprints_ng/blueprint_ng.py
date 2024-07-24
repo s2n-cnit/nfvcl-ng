@@ -21,6 +21,7 @@ from nfvcl.blueprints_ng.utils import get_class_from_path, get_class_path_str_fr
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.prometheus.prometheus_model import PrometheusTargetModel
 from nfvcl.models.vim import VimTypeEnum
+from nfvcl.topology.topology import build_topology
 from nfvcl.utils.database import save_ng_blue, destroy_ng_blue
 from nfvcl.utils.log import create_logger
 
@@ -247,6 +248,8 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             created=datetime.now()
         )
 
+        self.topology = build_topology()
+
         self.provider = ProvidersAggregator(self)
 
     def register_resource(self, resource: Resource):
@@ -259,6 +262,12 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             raise BlueprintNGException(f"Already registered")
         if not resource.id:
             resource.id = str(uuid.uuid4())
+        if isinstance(resource, ResourceDeployable):
+            resource_dep: ResourceDeployable = resource
+            try:
+                self.topology.get_vim_from_area_id_model(resource_dep.area)
+            except ValueError as e:
+                raise BlueprintNGException("Unable to register resource, the area has no associated VIM")
         self.base_model.registered_resources[resource.id] = RegisteredResource(type=get_class_path_str_from_obj(resource), value=resource)
 
     def deregister_resource(self, resource: Resource):
@@ -389,7 +398,11 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             for key in path[:-1]:  # This is done because cannot perform path[:-1][a][b][c].... dynamically
                 current = current[key]
             # Replacing the object with its reference ID
-            current[path[-1]] = f'REF={current[path[-1]]["id"]}'
+            current_id = current[path[-1]]["id"]
+            if current_id in self.base_model.registered_resources:
+                current[path[-1]] = f'REF={current[path[-1]]["id"]}'
+            else:
+                raise BlueprintNGException(f"Resource {current_id} not registered")
 
     def __override_variables_in_dict_ref(self, obj, obj_dict, registered_resource):
         occ = self.__find_field_occurrences(obj, type_to_find=str, check_fun=lambda x: x.startswith('REF='))
@@ -402,13 +415,17 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
     def __serialize_content(self) -> dict:
         serialized_dict = self.base_model.model_dump()
 
-        # Find every occurrence of type Resource in the state amd replace them with a reference
-        self.__override_variables_in_dict(self.base_model.state, serialized_dict["state"], Resource)
+        try:
+            # Find every occurrence of type Resource in the state amd replace them with a reference
+            self.__override_variables_in_dict(self.base_model.state, serialized_dict["state"], Resource)
 
-        # Find every occurrence of type ResourceConfiguration in the registered_resources and replace the ResourceDeployable field with a reference
-        for key, value in self.base_model.registered_resources.items():
-            if isinstance(value.value, ResourceConfiguration):
-                self.__override_variables_in_dict(value.value, serialized_dict["registered_resources"][key]["value"], ResourceDeployable)
+            # Find every occurrence of type ResourceConfiguration in the registered_resources and replace the ResourceDeployable field with a reference
+            for key, value in self.base_model.registered_resources.items():
+                if isinstance(value.value, ResourceConfiguration):
+                    self.__override_variables_in_dict(value.value, serialized_dict["registered_resources"][key]["value"], ResourceDeployable)
+        except BlueprintNGException as e:
+            self.logger.error(f"Error serializing blueprint: {str(e)}")
+            serialized_dict["corrupted"] = True
 
         return serialized_dict
 

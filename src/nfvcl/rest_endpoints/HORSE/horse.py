@@ -21,12 +21,23 @@ import re
 if not os.environ.get('HORSE_DEBUG'):
     from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 
+logger: Logger = create_logger("Horse REST")
+if os.environ.get('HORSE_TIMEOUT'):
+    try:
+        TIMEOUT = int(os.environ.get('HORSE_TIMEOUT'))
+    except ValueError:
+        logger.error("Cannot correctly read HORSE_TIMEOUT env variable, setting it to 90")
+        TIMEOUT = 90
+else:
+    TIMEOUT = 60
+logger.info(f"Horse DOC timeout set to {TIMEOUT}")
+
 horse_router = APIRouter(
     prefix="/v2/horse",
     tags=["Horse"],
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
-logger: Logger = create_logger("Horse REST")
+
 
 DUMP_FOLDER = '/tmp/ePEM/received_playbooks/'
 Path(DUMP_FOLDER).mkdir(parents=True, exist_ok=True)
@@ -151,11 +162,11 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
         try:
             # Trying sending request to DOC
             logger.debug(f"Sending request to DOC: \n {doc_request.model_dump_json()}")
-            doc_response = httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=10)
+            doc_response = httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
             # Returning the code that
             if doc_response.status_code != 200:
                 raise HTTPException(status_code=doc_response.status_code, detail=f"DOC response code is different from 200: {doc_response.text}")
-        except ConnectTimeout:
+        except ConnectTimeout | httpx.ReadTimeout:
             logger.debug(f"Connection Timeout to DOC module at http://{doc_module_url}")
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
         except httpx.ConnectError:
@@ -244,7 +255,7 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
     dump_playbook(playbook=payload)
     if not os.environ.get('HORSE_DEBUG'):
         bm = get_blueprint_manager()
-        vm: VmResource = bm.get_VM_target_by_ip(target_ip)
+        vm: VmResource = bm.get_vm_target_by_ip(target_ip)
     else:
         if target_ip == "127.0.0.1":
             vm = "not_none"

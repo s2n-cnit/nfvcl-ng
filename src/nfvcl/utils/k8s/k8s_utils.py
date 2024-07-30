@@ -460,6 +460,30 @@ def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, na
 
         return namespace
 
+def k8s_delete_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str) -> V1Namespace:
+    """
+    delete a namespace in a k8s cluster.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace_name: The name of the namespace
+    Returns:
+        The deleted namespace
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        try:
+            namespace = api_instance_core.delete_namespace(namespace_name)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>delete_namespace: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return namespace
+
 
 def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins_to_install: List[K8sPluginName]):
     """

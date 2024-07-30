@@ -2,12 +2,12 @@ import abc
 from pathlib import Path
 from typing import Optional, List, Dict, Union
 
-from kubernetes.client import V1ServiceList, V1DeploymentList
+from kubernetes.client import V1ServiceList, V1DeploymentList, V1PodList
 from pydantic import Field
 from typing_extensions import Literal
 
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType, K8sDeployment, K8sStatefulSet
+from nfvcl.models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType, K8sDeployment, K8sStatefulSet, K8sPod
 
 
 class Resource(NFVCLBaseModel):
@@ -281,12 +281,18 @@ class HelmChartResource(ResourceDeployable):
 
             self.services[service.name] = service
 
-    def set_deployments_from_k8s_api(self, k8s_deployments: V1DeploymentList):
+    def set_deployments_from_k8s_api(self, k8s_deployments: V1DeploymentList, deployments_pods: Dict[str, V1PodList]):
         self.deployments = {}
 
         for k8s_deployment in k8s_deployments.items:
+            pods = []
+
+            for pod in deployments_pods[k8s_deployment.metadata.name].items:
+                pods.append(K8sPod(name=pod.metadata.name))
+
             deployment = K8sDeployment(
                 name=k8s_deployment.metadata.name,
+                pods=pods
             )
 
             self.deployments[deployment.name] = deployment

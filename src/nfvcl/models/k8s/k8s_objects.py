@@ -51,11 +51,19 @@ class K8sService(NFVCLBaseModel):
             return None
         return v
 
+class K8sPod(NFVCLBaseModel):
+    """
+    https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#deployment-v1-apps
+    """
+    name: str = Field()
+
 class K8sDeployment(NFVCLBaseModel):
     """
     https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#deployment-v1-apps
     """
     name: str = Field()
+    pods: List[K8sPod] = Field(default_factory=list)
+
 
 class K8sStatefulSet(NFVCLBaseModel):
     """

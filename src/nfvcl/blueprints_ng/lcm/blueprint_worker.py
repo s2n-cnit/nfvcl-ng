@@ -133,9 +133,13 @@ class BlueprintWorker:
                     self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.RUNNING_DAY2_OP, detail=f"Calling function {received_message.path} on blueprint {self.blueprint.id}")
                     try:
                         if received_message.message_type == WorkerMessageType.DAY2:
-                            self.blueprint.base_model.day_2_call_history.append(received_message.message.model_dump_json())
+                            if received_message.message:
+                                self.blueprint.base_model.day_2_call_history.append(received_message.message.model_dump_json())
                             function = blueprint_type.get_function_to_be_called(received_message.path)
-                            result = getattr(self.blueprint, function.__name__)(received_message.message)
+                            if received_message.message:
+                                result = getattr(self.blueprint, function.__name__)(received_message.message)
+                            else:
+                                result = getattr(self.blueprint, function.__name__)()
                         else:
                             result = getattr(self.blueprint, received_message.path)(*received_message.message[0], **received_message.message[1])
                         # Starting processing the request.

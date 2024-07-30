@@ -9,6 +9,7 @@ from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.utils import clone_function_and_patch_types
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
+from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.response_model import OssCompliantResponse, OssStatus
 from nfvcl.rest_endpoints.nfvcl_callback import callback_router
 from nfvcl.utils.log import create_logger
@@ -47,7 +48,10 @@ def add_fake_endpoints(cls: BlueprintNG, prefix: str) -> List[BlueprintNGFunctio
         if len(typing.get_type_hints(day2_route.function)) > 0:
             type_overrides["msg"] = next(iter(typing.get_type_hints(day2_route.function).values()))
         patched_name = f"patched_{day2_route.function.__name__}"
-        setattr(cls, patched_name, classmethod(clone_function_and_patch_types(update_blueprint, type_overrides, doc=day2_route.function.__doc__)))
+        if HttpRequestType.GET in day2_route.methods:
+            setattr(cls, patched_name, classmethod(clone_function_and_patch_types(get_from_blueprint, type_overrides, doc=day2_route.function.__doc__)))
+        else:
+            setattr(cls, patched_name, classmethod(clone_function_and_patch_types(update_blueprint, type_overrides, doc=day2_route.function.__doc__)))
         function_list.append(BlueprintNGFunction(path=f"{day2_route.final_path}", bound_method=getattr(cls, patched_name), rest_method=day2_route.get_methods_str()))
         # print("GenericItem[str]:", inspect.signature(getattr(cls, patched_name)))
     return function_list
@@ -134,6 +138,24 @@ def update_blueprint(cls, msg: dict, blue_id: str, request: Request):
     blue_worker = blue_man.get_worker(blue_id)
     blue_worker.put_message(WorkerMessageType.DAY2, path, msg)
     return OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint day2 message for {blue_id} given to the worker...")
+
+def get_from_blueprint(cls, blue_id: str, request: Request):
+    """
+    Get data from an existing blueprint in the NFVCL (day 2 request).
+    This function receives ALL get (day2) requests of all the blueprints!
+
+    Args:
+        blue_id (str): The ID of the blueprint from which the data will be retrieved.
+        request: The details about the request, used to retrieve the path, can be used for request info.
+
+    Returns:
+        The response for the request
+    """
+    blue_man = get_blueprint_manager()
+    path = "/".join(request.url.path.split('/')[-2:]) # Takes only the last 2 paths "abc/bcd/fde/have" -> fde/have
+    blue_worker = blue_man.get_worker(blue_id)
+    response = blue_worker.put_message_sync(WorkerMessageType.DAY2, path, {})
+    return response
 
 @blue_ng_router.delete('/{blueprint_id}', response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED, callbacks=callback_router.routes)
 def delete(blueprint_id: str):

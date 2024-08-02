@@ -161,11 +161,12 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
             elif vim.vim_type is VimTypeEnum.PROXMOX:
                 self.virt_providers_impl[area] = VirtualizationProviderProxmox(area, self.blueprint.id, self.blueprint.to_db)
 
-            self.blueprint.base_model.virt_providers[str(area)] = BlueprintNGProviderModel(
-                provider_type=get_class_path_str_from_obj(self.virt_providers_impl[area]),
-                provider_data_type=get_class_path_str_from_obj(self.virt_providers_impl[area].data),
-                provider_data=self.virt_providers_impl[area].data
-            )
+            if str(area) not in self.blueprint.base_model.virt_providers:
+                self.blueprint.base_model.virt_providers[str(area)] = BlueprintNGProviderModel(
+                    provider_type=get_class_path_str_from_obj(self.virt_providers_impl[area]),
+                    provider_data_type=get_class_path_str_from_obj(self.virt_providers_impl[area].data),
+                    provider_data=self.virt_providers_impl[area].data
+                )
 
         return self.virt_providers_impl[area]
 
@@ -173,11 +174,12 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
         if area not in self.k8s_providers_impl:
             self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint.id, self.blueprint.to_db)
 
-            self.blueprint.base_model.k8s_providers[str(area)] = BlueprintNGProviderModel(
-                provider_type=get_class_path_str_from_obj(self.k8s_providers_impl[area]),
-                provider_data_type=get_class_path_str_from_obj(self.k8s_providers_impl[area].data),
-                provider_data=self.k8s_providers_impl[area].data
-            )
+            if str(area) not in self.blueprint.base_model.k8s_providers:
+                self.blueprint.base_model.k8s_providers[str(area)] = BlueprintNGProviderModel(
+                    provider_type=get_class_path_str_from_obj(self.k8s_providers_impl[area]),
+                    provider_data_type=get_class_path_str_from_obj(self.k8s_providers_impl[area].data),
+                    provider_data=self.k8s_providers_impl[area].data
+                )
 
         return self.k8s_providers_impl[area]
 
@@ -475,10 +477,14 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         # Loading the providers data
         # get_virt_provider is used to create a new instance of the provider for the area
         for area, virt_provider in deserialized_dict["virt_providers"].items():
-            instance.provider.get_virt_provider(int(area)).data = instance.provider.get_virt_provider(int(area)).data.model_validate(virt_provider["provider_data"])
+            provider_data = instance.provider.get_virt_provider(int(area)).data.model_validate(virt_provider["provider_data"])
+            instance.provider.get_virt_provider(int(area)).data = provider_data
+            instance.base_model.virt_providers[str(area)].provider_data = provider_data
 
         for area, k8s_provider in deserialized_dict["k8s_providers"].items():
-            instance.provider.get_k8s_provider(int(area)).data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
+            provider_data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
+            instance.provider.get_k8s_provider(int(area)).data = provider_data
+            instance.base_model.k8s_providers[str(area)].provider_data = provider_data
 
         return instance
 

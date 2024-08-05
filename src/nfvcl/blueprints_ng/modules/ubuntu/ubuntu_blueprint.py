@@ -53,7 +53,7 @@ class UbuntuBlueprint(BlueprintNG[UbuntuBlueprintNGState, UbuntuCreateModel]):
 
         self.state.vm = VmResource(
             area=create_model.area,
-            name=f"{self.id}_VM_DNS_SERVER",
+            name=f"{self.id}_VM_UBUNTU",
             image=VmResourceImage(name=image_name, url=image_url),
             flavor=create_model.flavor,
             username="ubuntu",

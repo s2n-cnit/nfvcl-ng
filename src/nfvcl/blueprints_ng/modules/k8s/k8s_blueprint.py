@@ -22,8 +22,9 @@ from nfvcl.utils.k8s import get_k8s_config_from_file_content, install_plugins_to
     get_config_map, patch_config_map
 
 K8S_BLUE_TYPE = "k8s"
-BASE_IMAGE_MASTER = "u24-k8s-base-v0.0.4"
-BASE_IMAGE_WORKER = "u24-k8s-base-v0.0.4"
+K8S_VERSION = K8sVersion.V1_30
+BASE_IMAGE_MASTER = "u24-k8s-base-v0.0.4-rev"
+BASE_IMAGE_WORKER = "u24-k8s-base-v0.0.4-rev"
 BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.0.4-ubuntu2404.qcow2"
 DUMMY_NET_INT_NAME = "eth99"
 POD_NET_CIDR = SerializableIPv4Network("10.254.0.0/16")
@@ -39,11 +40,12 @@ class K8sBlueprintNGState(BlueprintNGState):
     State of K8S blueprint
     """
     # Values coming from the request
-    version: K8sVersion = Field(default=K8sVersion.V1_29, description="Indicates the K8S version")
+    version: K8sVersion = Field(default=K8S_VERSION, description="Indicates the K8S version")
 
     cni: Cni = Field(default=Cni.flannel, description="The network plugin used by the cluster")
     pod_network_cidr: SerializableIPv4Network = Field(default=POD_NET_CIDR, description="The internal network used for PODs by the cluster")
     pod_service_cidr: SerializableIPv4Network = Field(default=POD_SERVICE_CIDR, description="The internal network used for Services by the cluster")
+    cadvisor_node_port: int = Field(default=30080, description="The node port on which the cadvisor service is exposed")
 
     password: str = Field(default=K8S_DEFAULT_PASSWORD, description="The password set in master and workers node")
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Indicates if the blueprint will require port security disabled (on openstack)")
@@ -150,6 +152,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.state.pod_service_cidr = create_model.service_cidr
         self.state.cni = create_model.cni
         self.state.password = create_model.password
+        self.state.cadvisor_node_port = create_model.cadvisor_node_port
 
         area: K8sAreaDeployment
         for area in create_model.areas:  # In each area we deploy workers and in the core area also the master (there is always a core area containing the master)
@@ -288,7 +291,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                                    vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id),
                                    # For the constraint on the model, there is always a master area.
                                    k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list,
-                                   cni="", nfvo_onboard=False,
+                                   cni="", nfvo_onboard=False, cadvisor_node_port=self.state.cadvisor_node_port,
                                    anti_spoofing_enabled=not self.state.require_port_security_disabled)
             topo.add_k8scluster(k8s_cluster)
             self.state.topology_onboarded = topology_onboard
@@ -324,11 +327,12 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             plug_list.append(K8sPluginName.CALICO)
         plug_list.append(K8sPluginName.METALLB)
         plug_list.append(K8sPluginName.OPEN_EBS)
+        plug_list.append(K8sPluginName.CADVISOR)
 
         # Get the k8s pod network cidr
         pod_network_cidr = get_k8s_cidr_info(client_config)
         # Create additional data for plugins (lbpool and cidr)
-        add_data = K8sPluginAdditionalData(areas=self.state.load_balancer_pools, pod_network_cidr=pod_network_cidr)
+        add_data = K8sPluginAdditionalData(areas=self.state.load_balancer_pools, pod_network_cidr=pod_network_cidr, cadvisor_node_port=self.state.cadvisor_node_port)
 
         install_plugins_to_cluster(kube_client_config=client_config, plugins_to_install=plug_list,
                                    template_fill_data=add_data, cluster_id=self.base_model.id)

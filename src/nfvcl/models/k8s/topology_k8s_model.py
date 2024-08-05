@@ -56,6 +56,7 @@ class K8sModel(NFVCLBaseModel):
     networks: List[str] = Field(description="List of attached networks", min_length=1)
     areas: List[int] = Field(description="Competence areas", min_length=1)
     cni: Optional[str] = Field(default=None)
+    cadvisor_node_port: Optional[int] = Field(default=None, description="The node port on which the cadvisor service is exposed")
     nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED)
     nfvo_onboard: bool = Field(default=False)
     anti_spoofing_enabled: Optional[bool] = Field(default=False)

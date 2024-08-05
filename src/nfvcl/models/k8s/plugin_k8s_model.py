@@ -18,6 +18,7 @@ class K8sPluginName(str, Enum):
     METRIC_SERVER = 'metric-server'
     MULTUS = 'multus-cni'
     ISTIO = 'istio'
+    CADVISOR = 'cadvisor'
 
 
 class K8sPluginType(str, Enum):
@@ -29,6 +30,7 @@ class K8sPluginType(str, Enum):
     STORAGE = 'storage'
     METALLB = 'metallb'
     GENERIC = 'generic'
+    MONITORING = 'monitoring'
 
 
 class K8sPluginLabel(NFVCLBaseModel):
@@ -73,6 +75,7 @@ class K8sPluginAdditionalData(NFVCLBaseModel):
     """
     areas: Optional[List[K8sLoadBalancerPoolArea]] = Field(default=None, description="The list of load balancer pool areas for MetalLB configuration")
     pod_network_cidr: Optional[str] = Field(default=None, description="The pod network cidr used for Flannel/Calico installation. If None it is retrieved from the cluster.")
+    cadvisor_node_port: Optional[int] = Field(default=None, description="The node port used by the service to expose the DaemonSet")
 
 
 class K8sPluginsToInstall(NFVCLBaseModel):

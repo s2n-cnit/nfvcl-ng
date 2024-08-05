@@ -38,6 +38,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     topology_onboard: bool = Field(default=True, description="If true the K8S cluster, once ready, will be added to the Topology of NFVCL to be used for Blueprint, that requires k8s, creation.")
     password: str = Field(default="ubuntu", description="The password to be set, in every vm, for user ubuntu", pattern=r'^[a-zA-Z0-9_.-]*$')
     install_plugins: bool = Field(default=True, description="Whether to install default plugin list on blueprint deployment (default Flannel, MetalLb, OpenEBS)")
+    cadvisor_node_port: int = Field(default=30080, ge=30000, le=32767, description="The node port on which the cadvisor service is exposed")
     master_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="2048", storage_gb='16', vcpu_count='2')
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Global port security disable, override port security in nodes flavors, required for MetalLB (multiple IP not declared on openstack)")
     areas: List[K8sAreaDeployment] = Field(min_length=1, description="List of areas in witch deployment is made (with requirements)")

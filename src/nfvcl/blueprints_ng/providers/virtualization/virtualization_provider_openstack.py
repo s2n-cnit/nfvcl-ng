@@ -173,10 +173,11 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.__parse_os_addresses(vm_resource, server_obj.addresses, subnet_detailed)
 
         # Find the IP to use for configuring the VM, floating if present or the fixed one from the management interface if not
-        if server_obj.access_ipv4 and len(server_obj.access_ipv4) > 0:
-            vm_resource.access_ip = server_obj.access_ipv4
+        mgt_interface = vm_resource.network_interfaces[vm_resource.management_network][0]
+        if mgt_interface.floating:
+            vm_resource.access_ip = mgt_interface.floating.ip
         else:
-            vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network][0].fixed.ip
+            vm_resource.access_ip = mgt_interface.fixed.ip
 
         # Run an Ansible playbook to gather information
         self.__gather_info_from_vm(vm_resource)
@@ -373,7 +374,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                     floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"], cidr=subnet_details[network_name].cidr)
                 if network_name not in vm_resource.network_interfaces:
                     vm_resource.network_interfaces[network_name] = []
-                vm_resource.network_interfaces[network_name].append(VmResourceNetworkInterface(fixed=fixed, floating=floating))
+            vm_resource.network_interfaces[network_name].append(VmResourceNetworkInterface(fixed=fixed, floating=floating))
 
     def __disable_port_security(self, conn: Connection, port_id):
         try:

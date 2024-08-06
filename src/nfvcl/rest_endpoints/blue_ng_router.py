@@ -1,6 +1,8 @@
 import typing
+from functools import partial
 from typing import List, Optional, Callable
 
+import httpx
 from fastapi import APIRouter, Query, status, Request
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG
@@ -8,7 +10,7 @@ from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.utils import clone_function_and_patch_types
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
+from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType, BlueprintOperationCallbackModel
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.response_model import OssCompliantResponse, OssStatus
 from nfvcl.rest_endpoints.nfvcl_callback import callback_router
@@ -67,6 +69,30 @@ def setup_blueprints_routers():
             module_router.add_api_route(function.path, function.bound_method, methods=function.rest_method)
         blue_ng_router.include_router(module_router)
 
+def get_callback_function(request: Request):
+    """
+    Generate a callback function
+    Args:
+        request: The HTTP request that may contain a 'callback' query parameter.
+
+    Returns: Generated callback function
+    """
+    callback_function = None
+    if "callback" in request.query_params:
+        callback_url = request.query_params["callback"]
+        callback_function = partial(call_callback_url, callback_url)
+    return callback_function
+
+def call_callback_url(url: str, msg: BlueprintOperationCallbackModel):
+    """
+    Function that make the request to the callback url
+    """
+    logger.debug(f"Calling callback url: {url}, msg: {msg}")
+    try:
+        httpx.post(url, json=msg.model_dump_json(exclude_none=True))
+    except Exception as e:
+        logger.error(f"Error calling callback: {str(e)}")
+
 @blue_ng_router.get("/", response_model=List[dict])
 async def get_blueprints(blue_type: Optional[str] = Query(default=None), detailed: bool = Query(default=False)) -> List[dict]:
     """
@@ -116,7 +142,7 @@ def create_blueprint(cls, msg: dict, request: Request):
     """
     blue_man = get_blueprint_manager()
     blue_type = request.url.path.split('/')[-1]
-    blue_id = blue_man.create_blueprint(msg, blue_type)
+    blue_id = blue_man.create_blueprint(msg, blue_type, callback=get_callback_function(request))
     return OssCompliantResponse(status=OssStatus.deploying, detail=f"Blueprint {blue_id} is being deployed...")
 
 
@@ -136,7 +162,7 @@ def update_blueprint(cls, msg: dict, blue_id: str, request: Request):
     blue_man = get_blueprint_manager()
     path = "/".join(request.url.path.split('/')[-2:]) # Takes only the last 2 paths "abc/bcd/fde/have" -> fde/have
     blue_worker = blue_man.get_worker(blue_id)
-    blue_worker.put_message(WorkerMessageType.DAY2, path, msg)
+    blue_worker.put_message(WorkerMessageType.DAY2, path, msg, callback=get_callback_function(request))
     return OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint day2 message for {blue_id} given to the worker...")
 
 def get_from_blueprint(cls, blue_id: str, request: Request):

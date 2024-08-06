@@ -167,7 +167,7 @@ class OpenAirInterface(BlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
 
         for sub_area in self.state.config_model.areas:
 
-            ip_upf = self.call_external_function(self.state.upf_dict[str(sub_area.id)], "get_ip")
+            ip_upf = self.call_external_function(self.state.upf_dict[str(sub_area.id)], "get_ip").result
             oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, ip_upf)
             oai_utils.add_available_upf(self.state.oai_config_values.coreconfig, sub_area.id)
 

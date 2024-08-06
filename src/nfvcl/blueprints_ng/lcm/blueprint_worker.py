@@ -6,14 +6,14 @@ from typing import Any
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGStatus, CurrentOperation
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
-from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage
+from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage, BlueprintOperationCallbackModel
 from nfvcl.utils.log import create_logger
 
 
 # multiprocessing_manager = multiprocessing.Manager()
 
 
-def callback_function(event, namespace, msg):
+def callback_function(event, namespace, msg: BlueprintOperationCallbackModel):
     namespace["msg"] = msg
     event.set()
 
@@ -35,7 +35,7 @@ class BlueprintWorker:
     def stop_listening(self):
         self.logger.info("Blueprint worker stopping listening.")
 
-    def call_function_sync(self, function_name, *args, **kwargs):
+    def call_function_sync(self, function_name, *args, **kwargs) -> BlueprintOperationCallbackModel:
         """
         Call a function synchronously
         Args:
@@ -119,12 +119,14 @@ class BlueprintWorker:
                         self.blueprint.base_model.status = BlueprintNGStatus.deploying(self.blueprint.id)
                         self.blueprint.create(received_message.message)
                         if received_message.callback:
-                            received_message.callback(self.blueprint.id)
+                            received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), status="OK"))
                         self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
                         self.logger.success(f"Blueprint created")
                     except Exception as e:
                         self.blueprint.base_model.status.error = True
                         self.blueprint.base_model.status.detail = str(e)
+                        if received_message.callback:
+                            received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), status="ERROR", detailed_status=str(e)))
                         self.logger.error(f"Error creating blueprint", exc_info=e)
                     self.blueprint.to_db()
                 case WorkerMessageType.DAY2 | WorkerMessageType.DAY2_BY_NAME:
@@ -144,12 +146,14 @@ class BlueprintWorker:
                             result = getattr(self.blueprint, received_message.path)(*received_message.message[0], **received_message.message[1])
                         # Starting processing the request.
                         if received_message.callback:
-                            received_message.callback(result)
+                            received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), result=result, status="OK"))
                         self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
                         self.logger.success(f"Function called on blueprint")
                     except Exception as e:
                         self.blueprint.base_model.status.error = True
                         self.blueprint.base_model.status.detail = str(e)
+                        if received_message.callback:
+                            received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), status="ERROR", detailed_status=str(e)))
                         self.logger.error(f"Error calling function on blueprint", exc_info=e)
                     self.blueprint.to_db()
                 case WorkerMessageType.STOP:

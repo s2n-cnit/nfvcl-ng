@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any, List
+from typing import Any, List, Callable, Optional
 
 from verboselogs import VerboseLogger
 
@@ -119,7 +119,7 @@ class BlueprintManager(metaclass=Singleton):
             blue_list.append(BlueprintNG.from_db(item))
         return blue_list
 
-    def create_blueprint(self, msg: Any, path: str, wait: bool = False, parent_id: str | None = None) -> str:
+    def create_blueprint(self, msg: Any, path: str, wait: bool = False, parent_id: str | None = None, callback: Optional[Callable] = None) -> str:
         """
         Create a base, EMPTY, blueprint given the type of the blueprint.
         Then create a dedicated worker for the blueprint that spawns (ASYNC) the blueprint on the VIM.
@@ -128,6 +128,7 @@ class BlueprintManager(metaclass=Singleton):
             path: The blueprint-specific path, the last part of the URL for the creation request (e.g., /nfvcl/v2/api/blue/vyos ----> path='vyos')
             wait: True to wait for blueprint creation, False otherwise
             parent_id: ID of the parent blueprint
+            callback: Function to be called when the blueprint is created.
 
         Returns:
             The ID of the created blueprint.
@@ -152,7 +153,7 @@ class BlueprintManager(metaclass=Singleton):
             if wait:
                 worker.put_message_sync(WorkerMessageType.DAY0, f'{path}', msg)
             else:
-                worker.put_message(WorkerMessageType.DAY0, f'{path}', msg)
+                worker.put_message(WorkerMessageType.DAY0, f'{path}', msg, callback=callback)
             return blue_id
 
     def delete_blueprint(self, blueprint_id: str, wait: bool = False) -> str:

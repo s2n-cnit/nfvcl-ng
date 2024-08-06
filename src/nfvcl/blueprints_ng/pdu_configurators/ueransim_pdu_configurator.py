@@ -13,4 +13,4 @@ class UERANSIMPDUConfigurator(PDUConfigurator):
         get_blueprint_manager().get_worker(self.pdu_model.config["blue_id"]).call_function_sync("configure_gnb", config)
 
     def get_n3_info(self):
-        return get_blueprint_manager().get_worker(self.pdu_model.config["blue_id"]).call_function_sync("get_n3_info", self.pdu_model.area)
+        return get_blueprint_manager().get_worker(self.pdu_model.config["blue_id"]).call_function_sync("get_n3_info", self.pdu_model.area).result

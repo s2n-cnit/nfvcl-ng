@@ -19,6 +19,7 @@ from nfvcl.blueprints_ng.resources import Resource, ResourceConfiguration, Resou
     HelmChartResource, VmResourceConfiguration, NetResource
 from nfvcl.blueprints_ng.utils import get_class_from_path, get_class_path_str_from_obj
 from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.blueprint_ng.worker_message import BlueprintOperationCallbackModel
 from nfvcl.models.prometheus.prometheus_model import PrometheusTargetModel
 from nfvcl.models.vim import VimTypeEnum
 from nfvcl.topology.topology import build_topology
@@ -506,7 +507,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 dict_to_ret["corrupted"] = "True"
             return dict_to_ret
 
-    def call_external_function(self, external_blue_id: str, function_name: str, *args, **kwargs):
+    def call_external_function(self, external_blue_id: str, function_name: str, *args, **kwargs) -> BlueprintOperationCallbackModel:
         """
         Call a function on another blueprint
         Args:

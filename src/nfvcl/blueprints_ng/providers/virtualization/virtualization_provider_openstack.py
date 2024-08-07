@@ -61,14 +61,20 @@ def get_os_client_from_vim(vim: VimModel, area: int):
     if area not in os_clients_dict:
         os_clients_dict[area] = OpenStackClient(vim)
 
-    return os_clients_dict[area].client
+    return os_clients_dict[area]
 
 
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
+    vim: VimModel
+    os_client: OpenStackClient
+    conn: Connection
+    vim_need_floating_ip: bool
+
     def init(self):
         self.data: VirtualizationProviderDataOpenstack = VirtualizationProviderDataOpenstack()
         self.vim = self.topology.get_vim_from_area_id_model(self.area)
-        self.conn = get_os_client_from_vim(self.vim, self.area)
+        self.os_client = get_os_client_from_vim(self.vim, self.area)
+        self.conn = self.os_client.client
         self.vim_need_floating_ip = self.vim.config.use_floating_ip
 
     def __create_image_from_url(self, vm_resource: VmResource):
@@ -98,7 +104,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         Returns: True if everything is as expected, False otherwise
         """
         for net in vm_resource.get_all_connected_network_names():
-            if self.conn.get_network(net) is None:
+            if self.os_client.get_network(net) is None:
                 raise VirtualizationProviderOpenstackException(f"Network >{net}< not found on vim")
 
 
@@ -145,7 +151,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             auto_ip=auto_ip,
             nat_destination=vm_resource.management_network,
             ip_pool=floating_ip_net,
-            network=vm_resource.get_all_connected_network_names(),
+            network=self.os_client.network_names_to_ids(vm_resource.get_all_connected_network_names()),
             userdata=cloudin
         )
 
@@ -168,7 +174,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def __update_net_info_vm(self, vm_resource: VmResource, server_obj: Server):
         vm_resource.network_interfaces.clear()
         # Getting detailed info about the networks attached to the machine
-        subnet_detailed = self.__get_network_details(self.conn, vm_resource.get_all_connected_network_names())
+        subnet_detailed = self.__get_network_details(vm_resource.get_all_connected_network_names())
         # Parse the OS output and create a structured network_interfaces dictionary
         self.__parse_os_addresses(vm_resource, server_obj.addresses, subnet_detailed)
 
@@ -212,7 +218,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         for net in to_attach:
             # Get the OS SDK network object
-            network = self.conn.get_network(net)
+            network = self.os_client.get_network(net)
             # Connect the network to the instance
             new_server_interface: ServerInterface = self.conn.compute.create_server_interface(self.data.os_dict[vm_resource.id], net_id=network.id)
             self.logger.debug(f"OS network '{net}' attached to VM {vm_resource.name}")
@@ -238,9 +244,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def create_net(self, net_resource: NetResource):
         self.logger.info(f"Creating NET {net_resource.name}")
 
-        if self.conn.get_network(net_resource.name):
+        if self.os_client.get_network(net_resource.name):
             raise VirtualizationProviderOpenstackException(f"Network {net_resource.name} already exist")
-        if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name}):
+        if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name, "project_id": self.os_client.project_id}):
             raise VirtualizationProviderOpenstackException(f"Subnet with cidr {net_resource.cidr} already exist")
 
         network: Network = self.conn.create_network(net_resource.name, port_security_enabled=False)
@@ -382,7 +388,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         except Exception as e:
             raise e
 
-    def __get_network_details(self, connection: Connection, network_names: List[str]) -> Dict[str, Subnet]:
+    def __get_network_details(self, network_names: List[str]) -> Dict[str, Subnet]:
         """
         Given the network names, it retrieves the details of the first subnet of every network
         Args:
@@ -394,6 +400,6 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         """
         subnet_detail_list = {}
         for network_name in network_names:
-            network_detail: Network = connection.get_network(network_name)
-            subnet_detail_list[network_name] = connection.get_subnet(network_detail.subnet_ids[0])
+            network_detail: Network = self.os_client.get_network(network_name)
+            subnet_detail_list[network_name] = self.conn.get_subnet(network_detail.subnet_ids[0])
         return subnet_detail_list

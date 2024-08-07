@@ -1,6 +1,9 @@
 from pathlib import Path
+from typing import Optional, List, Dict
 
 from openstack.image.v2.image import Image
+from openstack.network.v2.network import Network
+
 from nfvcl.models.openstack.images import ImageRepo
 from nfvcl.models.vim import VimModel
 from nfvcl.utils.log import create_logger
@@ -39,6 +42,7 @@ class OpenStackClient:
     Client that interacts with an Openstack instance
     """
     client: Connection
+    project_id: str
 
     def __init__(self, vim: VimModel):
         """
@@ -50,7 +54,38 @@ class OpenStackClient:
         os.environ["OS_CLIENT_CONFIG_FILE"] = str(filepath.absolute())
         # Get the client using a singleton pattern
         self.client = _get_client(vim.name)
+        self.project_id = self.client.identity.find_project(vim.vim_tenant_name).id
 
+    def get_available_networks(self) -> Dict[str, Network]:
+        shared_networks = list(self.client.network.networks(shared=True))
+        project_networks = list(self.client.network.networks(project_id=self.project_id))
+        all_networks: Dict[str, Network] = {network.name: network for network in shared_networks}
+        all_networks.update({network.name: network for network in project_networks})
+        return all_networks
+
+    def get_network(self, network_name: str) -> Optional[Network]:
+        """
+        Get a OS network from the ones that the project can access
+        Args:
+            network_name: The name of the network
+
+        Returns: The Network object or None if a network with the given name does not exist.
+        """
+        all_networks = self.get_available_networks()
+        return all_networks[network_name] if network_name in all_networks else None
+
+    def network_names_to_ids(self, network_names: List[str]) -> List[str]:
+        """
+        Convert a list of network names to a list of network ids.
+        Args:
+            network_names: Names of the networks to convert.
+        Returns: List of network ids.
+        """
+        id_list = []
+        all_networks = self.get_available_networks()
+        for network_name in network_names:
+            id_list.append(all_networks[network_name].id)
+        return id_list
 
     def find_image(self, image_name: str) -> Image | None:
         """

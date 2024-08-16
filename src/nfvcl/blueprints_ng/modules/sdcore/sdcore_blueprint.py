@@ -109,7 +109,7 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG, BlueprintNG[SdCoreBlueprintNGSt
 
         sdcore_upf_id = get_blueprint_manager().create_blueprint(sdcore_upf_create_model, "sdcore_upf", wait=True, parent_id=self.id)
         self.register_children(sdcore_upf_id)
-        upf_n4_ip = self.call_external_function(sdcore_upf_id, "get_n4_info")
+        upf_n4_ip = self.call_external_function(sdcore_upf_id, "get_n4_info").result
         sdcore_edge_info = SDCoreEdgeInfo(blue_id=sdcore_upf_id, n4_ip=upf_n4_ip)
 
         area_dict = self.state.edge_areas[str(area_id)]

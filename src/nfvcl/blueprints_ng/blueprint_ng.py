@@ -20,6 +20,7 @@ from nfvcl.blueprints_ng.resources import Resource, ResourceConfiguration, Resou
 from nfvcl.blueprints_ng.utils import get_class_from_path, get_class_path_str_from_obj
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.worker_message import BlueprintOperationCallbackModel
+from nfvcl.models.http_models import BlueprintNotFoundException
 from nfvcl.models.prometheus.prometheus_model import PrometheusTargetModel
 from nfvcl.models.vim import VimTypeEnum
 from nfvcl.topology.topology import build_topology
@@ -330,7 +331,10 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 
         for children_id in self.base_model.children_blue_ids.copy():
-            get_blueprint_manager().delete_blueprint(children_id, wait=True)
+            try:
+                get_blueprint_manager().delete_blueprint(children_id, wait=True)
+            except BlueprintNotFoundException:
+                self.logger.warning(f"The children blueprint {children_id} has not been found. Could be deleted before, skipping...")
             self.deregister_children(children_id)
 
         for key, value in self.base_model.registered_resources.items():

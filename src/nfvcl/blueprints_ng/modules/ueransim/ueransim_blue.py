@@ -312,3 +312,26 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             ip=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.ip,
             mac=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.mac
         )
+
+    def to_dict(self, detailed: bool) -> dict:
+        """
+        OVERRIDE
+        Return a dictionary representation of the UERANSIM blueprint instance.
+        Use the father function to generate the dict, if not detailed, add the node list.
+
+        Args:
+            detailed: Return the same content saved in the database containing all the details of the blueprint.
+
+        Returns:
+
+        """
+        if detailed:
+            return super().to_dict(detailed)
+        else:
+            base_dict = super().to_dict(detailed)
+            base_dict['gnbs'] = {}
+            for area in self.state.areas.items():
+                base_dict['gnbs'][area[0]] = {}
+                base_dict['gnbs'][area[0]]["gnb"] = area[1].vm_gnb.access_ip
+                base_dict['gnbs'][area[0]]["ues"] = [ue.vm_ue.access_ip for ue in area[1].ues]
+            return base_dict

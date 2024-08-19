@@ -133,7 +133,12 @@ def mod_logger(logger: logging.Logger, blueprintid='SYSTEM', log_level=_log_leve
     if disable_propagate:
         logger.propagate = False
 
-    log_file_handler = RotatingFileHandler(Path(LOG_FILE_PATH), maxBytes=10000000, backupCount=4)
+    rotating_log_file_path = Path(LOG_FILE_PATH)
+    if not rotating_log_file_path.exists():
+        rotating_log_file_path.touch()
+    if not rotating_log_file_path.is_file():
+        raise FileNotFoundError(f"{LOG_FILE_PATH} is a folder! It should be a file.")
+    log_file_handler = RotatingFileHandler(rotating_log_file_path, maxBytes=10000000, backupCount=4)
     log_file_handler.setLevel(log_level)
     log_file_handler.setFormatter(formatter)
     logger.addHandler(log_file_handler)

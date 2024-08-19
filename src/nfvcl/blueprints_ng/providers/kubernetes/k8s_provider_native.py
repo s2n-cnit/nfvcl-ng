@@ -3,6 +3,8 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
+import pyhelm3.errors
+import yaml
 from kubernetes.client import V1PodList
 from pydantic import Field
 from pyhelm3 import Client, ReleaseRevisionStatus
@@ -12,7 +14,11 @@ from nfvcl.blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SP
 from nfvcl.blueprints_ng.resources import HelmChartResource
 from nfvcl.models.k8s.topology_k8s_model import K8sModel
 from nfvcl.rest_endpoints.k8s import get_k8s_cluster_by_area
-from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_services, get_deployments, k8s_delete_namespace, get_pods_for_k8s_namespace
+from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_services, get_deployments, k8s_delete_namespace, \
+    get_pods_for_k8s_namespace
+
+HELM_TMP_FOLDER_PATH = Path(tempfile.gettempdir()) / 'nfvcl/helm'
+HELM_TMP_FOLDER_PATH.mkdir(exist_ok=True)
 
 
 class K8SProviderDataNative(BlueprintNGProviderData):
@@ -26,12 +32,20 @@ class K8SProviderNativeException(K8SProviderException):
 helm_client_dict: Dict[int, Client] = {}
 
 
-def get_helm_client_by_area(area: int):
+def get_helm_client_by_area(area: int) -> Client:
+    """
+    Returns the helm client for the K8S cluster in the given area
+    Args:
+        area: The area in which the client is built
+
+    Returns:
+        The client for the K8S cluster in the given area
+    """
     global helm_client_dict
 
     if area not in helm_client_dict:
         k8s_cluster: K8sModel = get_k8s_cluster_by_area(area)
-        k8s_credential_file_path = Path(tempfile.gettempdir(), f"k8s_credential_{k8s_cluster.name}")
+        k8s_credential_file_path = HELM_TMP_FOLDER_PATH / f"k8s_credential_{k8s_cluster.name}"
         with open(k8s_credential_file_path, mode="w") as k8s_credential_file:
             k8s_credential_file.write(k8s_cluster.credentials)
 
@@ -54,17 +68,22 @@ class K8SProviderNative(K8SProviderInterface):
             repo=helm_chart_resource.repo,
             version=helm_chart_resource.version
         ))
+
         self.logger.debug(f"Helm chart internal name: {chart.metadata.name}, version: {chart.metadata.version}")
 
-        # Install or upgrade a release
-        revision = asyncio.run(self.helm_client.install_or_upgrade_release(
-            helm_chart_resource.name.lower(),
-            chart,
-            values,
-            namespace=helm_chart_resource.namespace.lower(),
-            atomic=True,
-            wait=True
-        ))
+        # Install or upgrade a release, if fails print debug cmd to reproduce locally the error with debug option. Pyhelm3 does not support debug option.
+        try:
+            revision = asyncio.run(self.helm_client.install_or_upgrade_release(
+                helm_chart_resource.name.lower(),
+                chart,
+                values,
+                namespace=helm_chart_resource.namespace.lower(),
+                atomic=True,
+                wait=True
+            ))
+        except pyhelm3.errors.Error as helmError:
+            self.logger.error(f"Helm chart deployment failed. You can debug installation in this way from nfvcl folder:\n{self._generate_debug_cmd_cli(helm_chart_resource, values, chart.metadata.version)}")
+            raise helmError
 
         if helm_chart_resource.namespace.lower() not in self.data.namespaces:
             self.data.namespaces.append(helm_chart_resource.namespace.lower())
@@ -92,6 +111,23 @@ class K8SProviderNative(K8SProviderInterface):
 
         self.logger.success(f"Installing Helm chart {helm_chart_resource.name} finished")
         self.save_to_db()
+
+    def _generate_debug_cmd_cli(self, helm_chart_resource, values, version):
+        """
+        Generates a shell cmd to reproduce and debug the helm chart installation on NFVCL machine
+        Args:
+            helm_chart_resource: the chart
+            values: helm chart values
+            version: The version of the chart
+
+        Returns:
+            The command to be executed in the NFVCL folder
+        """
+        values_path = HELM_TMP_FOLDER_PATH / f"{helm_chart_resource.namespace.lower()}_{helm_chart_resource.name}.yaml"
+        yaml_content = yaml.dump(values)
+        values_path.write_text(yaml_content)
+        k8s_credential_path = HELM_TMP_FOLDER_PATH / f"k8s_credential_{self.k8s_cluster.name}"
+        return f"helm upgrade {helm_chart_resource.name} {helm_chart_resource.get_chart_converted()} --history-max 10 --install --output json --timeout 5m --values '{values_path.absolute()}' --debug --atomic --create-namespace --namespace {helm_chart_resource.namespace.lower()} --version {version} --wait --wait-for-jobs --kubeconfig {k8s_credential_path.absolute()}"
 
     def _check_if_helm_chart_installed(self, release_name: str, release_namespace: str):
         releases = asyncio.run(self.helm_client.list_releases(all=True, all_namespaces=True))

@@ -177,7 +177,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         # Defining Master node. Should be executed only once.
         self.state.vm_master = VmResource(
             area=area.area_id,
-            name=f"{self.id.lower()}_vm_k8s_c",
+            name=f"{self.id.lower()}-vm-k8s-c",
             image=VmResourceImage(name=BASE_IMAGE_MASTER, url=BASE_IMAGE_URL),
             flavor=master_flavors,
             username="ubuntu",
@@ -202,7 +202,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             worker_number = self.state.reserve_worker_number()
             vm = VmResource(
                 area=area.area_id,
-                name=f"{self.id.lower()}_vm_w_{worker_number}",
+                name=f"{self.id.lower()}-vm-w-{worker_number}",
                 image=VmResourceImage(name=BASE_IMAGE_WORKER, url=BASE_IMAGE_URL),
                 flavor=area.worker_flavors,
                 username="ubuntu",

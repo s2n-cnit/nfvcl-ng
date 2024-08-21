@@ -19,7 +19,7 @@ from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_services, get_
     get_pods_for_k8s_namespace
 
 HELM_TMP_FOLDER_PATH = Path(tempfile.gettempdir()) / 'nfvcl/helm'
-HELM_TMP_FOLDER_PATH.mkdir(exist_ok=True)
+HELM_TMP_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
 
 
 class K8SProviderDataNative(BlueprintNGProviderData):

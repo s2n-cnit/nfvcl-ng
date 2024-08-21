@@ -12,8 +12,9 @@ from pyhelm3 import Client, ReleaseRevisionStatus
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from nfvcl.blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface, K8SProviderException
 from nfvcl.blueprints_ng.resources import HelmChartResource
-from nfvcl.models.k8s.topology_k8s_model import K8sModel
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
 from nfvcl.rest_endpoints.k8s import get_k8s_cluster_by_area
+from nfvcl.topology.topology import build_topology
 from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_services, get_deployments, k8s_delete_namespace, \
     get_pods_for_k8s_namespace
 
@@ -43,8 +44,11 @@ def get_helm_client_by_area(area: int) -> Client:
     """
     global helm_client_dict
 
-    if area not in helm_client_dict:
-        k8s_cluster: K8sModel = get_k8s_cluster_by_area(area)
+    k8s_cluster: TopologyK8sModel = get_k8s_cluster_by_area(area)
+    k8s_credential_file_path = HELM_TMP_FOLDER_PATH / f"k8s_credential_{k8s_cluster.name}"
+    # If helm client does not exist for an area or the cluster for the area have changed without restart of NFVCL
+    if area not in helm_client_dict or not (helm_client_dict[area]._command._kubeconfig == k8s_credential_file_path):
+        k8s_cluster: TopologyK8sModel = get_k8s_cluster_by_area(area)
         k8s_credential_file_path = HELM_TMP_FOLDER_PATH / f"k8s_credential_{k8s_cluster.name}"
         with open(k8s_credential_file_path, mode="w") as k8s_credential_file:
             k8s_credential_file.write(k8s_cluster.credentials)
@@ -57,7 +61,7 @@ def get_helm_client_by_area(area: int) -> Client:
 class K8SProviderNative(K8SProviderInterface):
     def init(self):
         self.data: K8SProviderDataNative = K8SProviderDataNative()
-        self.k8s_cluster: K8sModel = get_k8s_cluster_by_area(self.area)
+        self.k8s_cluster: TopologyK8sModel = get_k8s_cluster_by_area(self.area)
         self.helm_client = get_helm_client_by_area(self.area)
 
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
@@ -95,6 +99,12 @@ class K8SProviderNative(K8SProviderInterface):
         if not self._check_helm_chart_status(revision.release.name, revision.release.namespace, ReleaseRevisionStatus.DEPLOYED):
             self.logger.error(f"The helm chart '{helm_chart_resource.name}' is not in the DEPLOYED state")
             raise K8SProviderNativeException(f"The helm chart '{helm_chart_resource.name}' is not in the DEPLOYED state")
+
+        # Adding this blueprint to the deployed list on the cluster
+        topo = build_topology()
+        cluster = topo.get_k8s_cluster_by_area(self.area)
+        cluster.deployed_blueprints.append(self.blueprint_id)
+        topo.update_k8scluster(cluster)
 
         k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
         services = get_services(kube_client_config=k8s_config, namespace=helm_chart_resource.namespace.lower())
@@ -185,6 +195,15 @@ class K8SProviderNative(K8SProviderInterface):
         if self._check_if_helm_chart_installed(helm_chart_resource.name.lower(), helm_chart_resource.namespace.lower()):
             self.logger.error(f"The helm chart '{helm_chart_resource.name}' was not uninstalled successfully")
             raise K8SProviderNativeException(f"The helm chart '{helm_chart_resource.name}' was not uninstalled successfully")
+
+        # Removing this blueprint to the deployed list on the cluster
+        try:
+            topo = build_topology()
+            cluster = topo.get_k8s_cluster_by_area(self.area)
+            cluster.deployed_blueprints.remove(self.blueprint_id)
+            topo.update_k8scluster(cluster)
+        except ValueError as e:
+            self.logger.warning("Blueprint has not been found in the cluster deployed blueprints")
 
         self.logger.success(f"Uninstalled Helm chart {helm_chart_resource.name}")
 

@@ -17,7 +17,7 @@ from kubernetes.utils import FailToCreateError
 import nfvcl.utils.util
 from nfvcl.config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginAdditionalData, K8sPluginName, K8sPluginType
-from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sVersion
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
 from nfvcl.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl.utils.log import create_logger
 
@@ -607,7 +607,7 @@ def read_namespaced_config_map(kube_client_config: kubernetes.client.Configurati
         return config_map
 
 
-def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[K8sModel]:
+def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[TopologyK8sModel]:
     """
     From a k8s cluster list in dictionary form returns a list of corresponding k8s models.
 
@@ -618,14 +618,14 @@ def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[K8sModel]:
 
         a list of K8sModel objects
     """
-    k8s_obj_list: List[K8sModel] = []
+    k8s_obj_list: List[TopologyK8sModel] = []
     for k8s in k8s_list:
-        k8s_object = K8sModel.model_validate(k8s)
+        k8s_object = TopologyK8sModel.model_validate(k8s)
         k8s_obj_list.append(k8s_object)
     return k8s_obj_list
 
 
-def find_k8s_from_list_by_id(cluster_list: List[K8sModel], cluster_id: str) -> K8sModel:
+def find_k8s_from_list_by_id(cluster_list: List[TopologyK8sModel], cluster_id: str) -> TopologyK8sModel:
     """
     Get the k8s corresponding cluster from the list.
 

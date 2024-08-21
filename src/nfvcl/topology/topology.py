@@ -1,26 +1,27 @@
+import json
+import traceback
+import typing
 from logging import Logger
+from multiprocessing import RLock
+
 from redis.client import Redis
-from nfvcl.utils.database import save_topology, delete_topology, NFVCLDatabase
 
 from nfvcl.models.event import Event
 from nfvcl.models.k8s.common_k8s_model import LBPool
-from nfvcl.models.k8s.topology_k8s_model import K8sModel
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
+from nfvcl.models.network import PduModel, NetworkModel, RouterModel
 from nfvcl.models.network.network_models import RouterPortModel, IPv4ReservedRange
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
+from nfvcl.models.topology import TopologyModel
 from nfvcl.models.vim import VimModel, UpdateVimModel
 from nfvcl.topology.topology_events import TopologyEventType
-from nfvcl.utils.log import create_logger
-from nfvcl.utils.ipam import *
-from nfvcl.utils.util import remove_files_by_pattern
-from nfvcl.models.topology import TopologyModel
-from nfvcl.models.network import PduModel, NetworkModel, RouterModel
-import typing
-import json
-import traceback
-from multiprocessing import RLock
+from nfvcl.utils.database import save_topology, delete_topology, get_nfvcl_database
 from nfvcl.utils.decorators import obj_multiprocess_lock
+from nfvcl.utils.ipam import *
+from nfvcl.utils.log import create_logger
 from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from nfvcl.utils.redis_utils.topic_list import TOPOLOGY_TOPIC
+from nfvcl.utils.util import remove_files_by_pattern
 
 topology_lock = RLock()
 
@@ -69,12 +70,11 @@ class Topology:
         """
         Return the topology from the DB as TopologyModel instance.
         Args:
-            db: the database
             lock: the resource lock
         Returns:
             Topology: The instance of the topology from the database
         """
-        db = NFVCLDatabase()
+        db = get_nfvcl_database()
         topo = db.find_one_in_collection("topology", {})
         if topo:
             data = TopologyModel.model_validate(topo).model_dump()
@@ -831,29 +831,43 @@ class Topology:
         """
         return self._model.get_pdus()
 
-    def get_k8s_clusters(self) -> List[K8sModel]:
+    def get_k8s_clusters(self) -> List[TopologyK8sModel]:
         """
         Get the k8s cluster list from the topology as List[K8sModel]
 
         Returns:
-            List[K8sModel]: the k8s cluster list
+            List[TopologyK8sModel]: the k8s cluster list
         """
         return self._model.kubernetes
 
-    def get_k8s_cluster(self, cluster_name: str) -> K8sModel:
+    def get_k8s_cluster(self, cluster_name: str) -> TopologyK8sModel:
         """
         Get the k8s cluster from the topology
 
         Returns:
-            K8sModel: the desired k8s cluster
+            TopologyK8sModel: the desired k8s cluster
 
         Raises:
             ValueError if not found.
         """
         return self._model.find_k8s_cluster(cluster_name)
 
+    def get_k8s_cluster_by_area(self, area_id: int) -> TopologyK8sModel:
+        """
+        Get the first k8s cluster from the topology given the area id.
+
+        Args:
+
+            area_id: the area id in of the cluster to get.
+
+        Returns:
+
+            The FIRST matching k8s cluster or Throw ValueError if NOT found.
+        """
+        return self._model.find_k8s_cluster_by_area(area_id)
+
     @obj_multiprocess_lock
-    def add_k8scluster(self, data: K8sModel):
+    def add_k8scluster(self, data: TopologyK8sModel):
         """
         Add the k8s cluster to the topology. If specified it onboard the cluster on OSM
         Args:
@@ -879,7 +893,7 @@ class Topology:
         trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_deleted_cluster.model_dump())
 
     @obj_multiprocess_lock
-    def update_k8scluster(self, cluster: K8sModel):
+    def update_k8scluster(self, cluster: TopologyK8sModel):
         """
         Update a topology K8s cluster
         Args:

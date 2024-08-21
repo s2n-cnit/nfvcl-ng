@@ -13,13 +13,13 @@ from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
 from nfvcl.models.http_models import BlueprintNotFoundException, BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl.utils.database import get_ng_blue_by_id_filter, get_ng_blue_list
 from nfvcl.utils.log import create_logger
-from nfvcl.utils.patterns import Singleton
 from nfvcl.utils.util import generate_blueprint_id
 
 BLUEPRINTS_MODULE_FOLDER: str = "nfvcl.blueprints_ng.modules"
 logger: VerboseLogger = create_logger("BlueprintNGManager")
 
 __blueprint_manager: BlueprintManager | None = None
+
 
 def get_blueprint_manager() -> BlueprintManager:
     """
@@ -35,7 +35,7 @@ def get_blueprint_manager() -> BlueprintManager:
         return __blueprint_manager
 
 
-class BlueprintManager(metaclass=Singleton):
+class BlueprintManager:
     """
     This class is responsible for managing blueprints.
     This class will manage all blueprints that have been created.

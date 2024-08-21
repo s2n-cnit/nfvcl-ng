@@ -46,10 +46,11 @@ class K8sVersion(str, Enum):
         return float(this_version) < float(other_version)
 
 
-class K8sModel(NFVCLBaseModel):
+class TopologyK8sModel(NFVCLBaseModel):
     name: str = Field(title="Name of k8s cluster", description="It must be unique for each k8s cluster")
     provided_by: str = Field(default="NFVCL", description="The provider of the cluster")
     blueprint_ref: str = Field(default="", description="Reference blueprint, empty if k8s cluster is external")
+    deployed_blueprints: List[str] = Field(default=[], description="The list of Blueprints deployed in k8s cluster")
     credentials: str = Field(title="Content of k8s crediential file (example admin.conf)")
     vim_name: Optional[str] = Field(default=None, description="Reference VIM, where k8s cluster is deployed.")
     k8s_version: K8sVersion = Field(default=K8sVersion.V1_24)
@@ -66,7 +67,7 @@ class K8sModel(NFVCLBaseModel):
         Overrides the default equals implementation. In this way it is possible to directly compare objects
         of this type on a given criteria (in this case the 'name')
         """
-        if isinstance(other, K8sModel):
+        if isinstance(other, TopologyK8sModel):
             return self.name == other.name
         return False
 

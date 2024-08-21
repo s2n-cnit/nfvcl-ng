@@ -16,7 +16,7 @@ from verboselogs import VerboseLogger
 
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sPluginAdditionalData, K8sOperationType, \
     K8sPluginName, K8sLoadBalancerPoolArea
-from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sModel
+from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, TopologyK8sModel
 from nfvcl.topology.topology import Topology
 from nfvcl.utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, \
     convert_str_list_2_plug_name, apply_def_to_cluster, get_k8s_cidr_info
@@ -69,7 +69,7 @@ class K8sManager:
         self.logger.debug("Killing K8S manager...")
         os.kill(os.getpid(), signal.SIGKILL)
 
-    def get_k8s_cluster_by_id(self, cluster_id: str) -> K8sModel:
+    def get_k8s_cluster_by_id(self, cluster_id: str) -> TopologyK8sModel:
         """
         Get the k8s cluster from the topology. This method could be duplicated but in this case handle HTTP exceptions
         that give API user an idea of what is going wrong.
@@ -83,7 +83,7 @@ class K8sManager:
             The matching k8s cluster or Throw ValueError if NOT found.
         """
         topology = Topology.from_db(self.lock)
-        k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
+        k8s_clusters: List[TopologyK8sModel] = topology.get_k8s_clusters()
         match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
         if match:
@@ -198,7 +198,7 @@ class K8sManager:
             cluster_id: The target cluster
             body: The yaml content to be applied at the cluster.
         """
-        cluster: K8sModel = self.get_k8s_cluster_by_id(cluster_id)
+        cluster: TopologyK8sModel = self.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
         # Loading a yaml in this way result in a dictionary

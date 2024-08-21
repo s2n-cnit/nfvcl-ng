@@ -94,15 +94,3 @@ class KarmadaInstallModel(BlueprintNGCreateModel):
     karmada_control_plane: str = Field(description="The IP and port of Karmada")
     karmada_token: str = Field(description="The Karmada token")
     discovery_token_hash: str = Field(description="Discovery token hash")
-
-# class CreateVxLanModel(NFVCLBaseModel):
-#     """
-#     Model used to request a VxLan tunnel to interact with internal k8s networks if needed.
-#     """
-#     vx_name: str = Field(description="The name of the VxLan")
-#     vxid: str = Field(description="The VxLan ID")
-#     vx_client_ip: str = Field(description="The remote IP that want to be connected with the K8S internal network")
-#     vx_server_ip: Optional[str] = Field(default=None, description="The local IP on the K8S side where the VxLAN is listening")
-#     vx_server_ext_device: Optional[str] = Field(default=None, description="The name of the interface where the VxLan is listening")
-#     vx_server_ext_port: str = Field(default="4789")
-#     vxlan_server_int_cidr: str = Field(description="The CIDR of the VxLan, e.g. 10.234.154.0/24")

@@ -1,15 +1,15 @@
+import traceback
+from multiprocessing import Queue, RLock
 from threading import Thread
-from nfvcl.models.k8s.topology_k8s_model import K8sModel
+
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
 from nfvcl.models.network import NetworkModel, RouterModel, PduModel
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl.models.topology import TopologyModel
 from nfvcl.models.topology.topology_worker_model import TopologyWorkerMessage, TopologyWorkerOperation
 from nfvcl.models.vim import UpdateVimModel, VimModel
-from nfvcl.utils.database import NFVCLDatabase
-from nfvcl.utils.log import create_logger
-from multiprocessing import Queue, RLock
 from nfvcl.topology.topology import Topology, build_topology
-import traceback
+from nfvcl.utils.log import create_logger
 
 logger = create_logger('Topology Worker')
 topology_msg_queue: Queue = Queue()
@@ -103,13 +103,13 @@ class TopologyWorker:
 
             # K8S
             case TopologyWorkerOperation.ADD_K8S:
-                topology.add_k8scluster(K8sModel.model_validate(worker_message.data))
+                topology.add_k8scluster(TopologyK8sModel.model_validate(worker_message.data))
 
             case TopologyWorkerOperation.DEL_K8S:
                 topology.del_k8scluster(worker_message.data['cluster_name'])
 
             case TopologyWorkerOperation.UPDATE_K8S:
-                topology.update_k8scluster(K8sModel.model_validate(worker_message.data))
+                topology.update_k8scluster(TopologyK8sModel.model_validate(worker_message.data))
 
             # PROMETHEUS
             case TopologyWorkerOperation.ADD_PROM:

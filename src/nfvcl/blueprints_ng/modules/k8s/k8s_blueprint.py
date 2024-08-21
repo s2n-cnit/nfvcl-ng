@@ -15,8 +15,9 @@ from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAre
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.k8s.common_k8s_model import Cni
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData, K8sLoadBalancerPoolArea
-from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sVersion
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
 from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl.models.topology.topology_models import TopoK8SHasBlueprintException
 from nfvcl.topology.topology import Topology, build_topology
 from nfvcl.utils.k8s import get_k8s_config_from_file_content, install_plugins_to_cluster, get_k8s_cidr_info, \
     get_config_map, patch_config_map
@@ -166,12 +167,27 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         # Start initial configuration, first it get network list ready. Set self.state.reserved_pools
         self.setup_load_balancer_pool()
-        self.day0conf(create_model.topology_onboard, configure_master=True)
+        self.day0conf(configure_master=True)
         # Fix DNS Problem
         self.fix_dns_problem()
         # Install K8s Plugins if required (default=yes)
         if create_model.install_plugins:
             self.install_default_plugins()
+
+        # If required, onboarding the cluster in the topology
+        if create_model.topology_onboard:
+            topo: Topology = build_topology()
+            area_list = [item.area_id for item in self.state.area_list]
+
+            k8s_cluster = TopologyK8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id,
+                                           credentials=self.state.master_credentials,
+                                           vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id),
+                                           # For the constraint on the model, there is always a master area.
+                                           k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list,
+                                           cni="", nfvo_onboard=False, cadvisor_node_port=self.state.cadvisor_node_port,
+                                           anti_spoofing_enabled=not self.state.require_port_security_disabled)
+            topo.add_k8scluster(k8s_cluster)
+            self.state.topology_onboarded = create_model.topology_onboard
 
     def deploy_master_node(self, area: K8sAreaDeployment, master_flavors: VmResourceFlavor):
         # Defining Master node. Should be executed only once.
@@ -253,7 +269,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         self.state.load_balancer_pools = lb_area_list
 
-    def day0conf(self, topology_onboard: bool, configure_master: bool = False):
+    def day0conf(self, configure_master: bool = False):
         """
         Perform Day 0 configuration for master or worker.
         Args:
@@ -280,21 +296,6 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             self.provider.configure_vm(configurator)
 
         self.state.day_0_workers_configurators_tobe_exec = []
-
-        # If required, onboarding the cluster in the topology
-        if topology_onboard:
-            topo: Topology = build_topology()
-            area_list = [item.area_id for item in self.state.area_list]
-
-            k8s_cluster = K8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id,
-                                   credentials=self.state.master_credentials,
-                                   vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id),
-                                   # For the constraint on the model, there is always a master area.
-                                   k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list,
-                                   cni="", nfvo_onboard=False, cadvisor_node_port=self.state.cadvisor_node_port,
-                                   anti_spoofing_enabled=not self.state.require_port_security_disabled)
-            topo.add_k8scluster(k8s_cluster)
-            self.state.topology_onboarded = topology_onboard
 
     def fix_dns_problem(self):
         """
@@ -415,16 +416,18 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         Destroy the blueprints. Calls super destroy that destroy VMs and configurators.
         Then release all the reserved resources in the topology.
         """
-        # TODO check if there is something deployed on the cluster -> MAKE IMPOSSIBLE TO REMOVE IT OR REQUIRE OVERRIDE.
-        super().destroy()
-        # Remove reserved IP range
-        build_topology().release_ranges(self.id)  # Remove all reserved ranges in the networks
-        # If it was onboarded on the topology (as a usable k8s cluster), remove it.
         if self.state.topology_onboarded:
             try:
                 build_topology().del_k8scluster(self.id)
             except ValueError:
                 self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")
+            except TopoK8SHasBlueprintException as e:
+                self.logger.error(f"Blueprint {self.id} will not be destroyed")
+                raise e
+        super().destroy()
+        # Remove reserved IP range
+        build_topology().release_ranges(self.id)  # Remove all reserved ranges in the networks
+        # If it was onboarded on the topology (as a usable k8s cluster), remove it.
 
     def to_dict(self, detailed: bool) -> dict:
         """

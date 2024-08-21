@@ -2,7 +2,7 @@ from logging import Logger
 from nfvcl.models.network import NetworkModel, RouterModel, PduModel
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl.models.vim import VimModel
-from nfvcl.models.k8s.topology_k8s_model import K8sModel
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
 from pydantic import BaseModel, HttpUrl, Field
 from typing import List, Optional
 from nfvcl.utils.log import create_logger
@@ -10,18 +10,25 @@ from nfvcl.utils.log import create_logger
 logger: Logger = create_logger('Topology model')
 
 
+class TopoK8SHasBlueprintException(Exception):
+    pass
+
+
+class TopoK8SNotFoundException(Exception):
+    pass
+
+
 class TopologyModel(BaseModel):
     id: Optional[str] = Field(default='topology')
     callback: Optional[HttpUrl] = Field(default=None)
     vims: List[VimModel] = []
-    kubernetes: List[K8sModel] = []
+    kubernetes: List[TopologyK8sModel] = []
     networks: List[NetworkModel] = []
     routers: List[RouterModel] = []
     pdus: List[PduModel] = []
     # "The list of prometheus server that can be used by the NFVCL (blueprints) to pull data from node exporter" \
     # " installed deployed services. When needed the NFVCL will add a new job to the server in order to pull data."
     prometheus_srv: List[PrometheusServerModel] = Field(default=[])
-
 
     def add_prometheus_srv(self, prom_srv: PrometheusServerModel):
         """
@@ -62,7 +69,7 @@ class TopologyModel(BaseModel):
         self.prometheus_srv[index] = prom_server
         return prom_server
 
-    def add_k8s_cluster(self, k8s_cluster: K8sModel):
+    def add_k8s_cluster(self, k8s_cluster: TopologyK8sModel):
         """
         Add a k8s cluster instance to the topology
         Args:
@@ -75,7 +82,7 @@ class TopologyModel(BaseModel):
 
         self.kubernetes.append(k8s_cluster)
 
-    def del_k8s_cluster(self, k8s_cluster_id: str) -> K8sModel:
+    def del_k8s_cluster(self, k8s_cluster_id: str) -> TopologyK8sModel:
         """
         Delete a k8s cluster instance to the topology. If it was onboarded on OSM it also delete it from there.
         Args:
@@ -83,11 +90,16 @@ class TopologyModel(BaseModel):
         """
         k8s_index = self.find_k8s_cluster_index(k8s_cluster_id)
 
+        # If some blueprint is deployed on the cluster it is not possible to delete it from the topology
+        k8s_cluster = self.kubernetes[k8s_index]
+        if len(k8s_cluster.deployed_blueprints) > 0:
+            raise TopoK8SHasBlueprintException('The cluster has blueprints deployed in it.')
+
         k8s_deleted = self.kubernetes.pop(k8s_index)
 
         return k8s_deleted
 
-    def upd_k8s_cluster(self, k8s_cluster: K8sModel) -> K8sModel:
+    def upd_k8s_cluster(self, k8s_cluster: TopologyK8sModel) -> TopologyK8sModel:
         """
 
         """
@@ -403,7 +415,7 @@ class TopologyModel(BaseModel):
 
         return prom_srv
 
-    def find_k8s_cluster(self, cluster_name: str) -> K8sModel:
+    def find_k8s_cluster(self, cluster_name: str) -> TopologyK8sModel:
         """
         Find the desired k8s cluster instance in the list and retrieve it.
         Args:
@@ -412,6 +424,17 @@ class TopologyModel(BaseModel):
         Returns: The desired k8s cluster instance
         """
         index = self.find_k8s_cluster_index(cluster_name)
+        return self.kubernetes[index]
+
+    def find_k8s_cluster_by_area(self, area_id: int) -> TopologyK8sModel:
+        """
+        Find the desired k8s cluster instance in the list and retrieve it, given the area id.
+        Args:
+            area_id: The identifier of the area for k8s cluster.
+
+        Returns: The desired k8s cluster instance
+        """
+        index = self.find_k8s_cluster_index_by_area(area_id)
         return self.kubernetes[index]
 
     def find_k8s_cluster_index(self, cluster_name: str) -> int:
@@ -427,7 +450,24 @@ class TopologyModel(BaseModel):
         if k8s_cluster_index < 0:
             msg_err = "The K8s cluster ->{}<- was not found in the topology.".format(cluster_name)
             logger.debug(msg_err)
-            raise ValueError(msg_err)
+            raise TopoK8SNotFoundException(msg_err)
+
+        return k8s_cluster_index
+
+    def find_k8s_cluster_index_by_area(self, area_id: int) -> int:
+        """
+        Find the index of first k8s cluster in the topology list, given the area id.
+        Args:
+            area_id: The identifier of the area for the k8s cluster.
+
+        Returns:
+            The position of the k8s cluster in the list
+        """
+        k8s_cluster_index = next((index for index, item in enumerate(self.kubernetes) if area_id in item.areas), -1)
+        if k8s_cluster_index < 0:
+            msg_err = f"No K8S cluster has been found for area {area_id}"
+            logger.debug(msg_err)
+            raise TopoK8SNotFoundException(msg_err)
 
         return k8s_cluster_index
 

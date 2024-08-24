@@ -446,6 +446,33 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
     @classmethod
     def from_db(cls, deserialized_dict: dict):
+        """
+        Load a blueprint from the dictionary and initialize providers.
+        Args:
+            deserialized_dict: The dictionary coming from the database
+
+        Returns:
+            A complete blueprint instance that can operate on the blueprint.
+        """
+        instance = cls.__from_db(deserialized_dict, provider_initialization=True)
+        return instance
+
+    @classmethod
+    def from_db_no_prov_init(cls, deserialized_dict: dict):
+        """
+        Load a blueprint from the dictionary but does not initialize the providers. The blueprint cannot be used to perform actions.
+        It is useful when a representation to display information is needed, like blueprint list for user.
+        Args:
+            deserialized_dict: The dictionary coming from the database
+
+        Returns:
+            A blueprint instance for display purposes.
+        """
+        instance = cls.__from_db(deserialized_dict, provider_initialization=False)
+        return instance
+
+    @classmethod
+    def __from_db(cls, deserialized_dict: dict, provider_initialization: bool = True):
         BlueSavedClass = get_class_from_path(deserialized_dict['type'])
         instance = BlueSavedClass(deserialized_dict['id'])
 
@@ -479,17 +506,18 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             instance.base_model.corrupted = True
             instance.logger.error(f"Blueprint set as corrupted")
 
-        # Loading the providers data
-        # get_virt_provider is used to create a new instance of the provider for the area
-        for area, virt_provider in deserialized_dict["virt_providers"].items():
-            provider_data = instance.provider.get_virt_provider(int(area)).data.model_validate(virt_provider["provider_data"])
-            instance.provider.get_virt_provider(int(area)).data = provider_data
-            instance.base_model.virt_providers[str(area)].provider_data = provider_data
+        if provider_initialization:
+            # Loading the providers data
+            # get_virt_provider is used to create a new instance of the provider for the area
+            for area, virt_provider in deserialized_dict["virt_providers"].items():
+                provider_data = instance.provider.get_virt_provider(int(area)).data.model_validate(virt_provider["provider_data"])
+                instance.provider.get_virt_provider(int(area)).data = provider_data
+                instance.base_model.virt_providers[str(area)].provider_data = provider_data
 
-        for area, k8s_provider in deserialized_dict["k8s_providers"].items():
-            provider_data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
-            instance.provider.get_k8s_provider(int(area)).data = provider_data
-            instance.base_model.k8s_providers[str(area)].provider_data = provider_data
+            for area, k8s_provider in deserialized_dict["k8s_providers"].items():
+                provider_data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
+                instance.provider.get_k8s_provider(int(area)).data = provider_data
+                instance.base_model.k8s_providers[str(area)].provider_data = provider_data
 
         return instance
 

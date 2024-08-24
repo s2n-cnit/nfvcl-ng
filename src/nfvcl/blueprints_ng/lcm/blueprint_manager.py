@@ -104,11 +104,12 @@ class BlueprintManager:
         """
         return get_ng_blue_list(blueprint_type)
 
-    def _load_all_blue_from_db(self, blueprint_type: str = None) -> List[BlueprintNG]:
+    def _load_all_blue_from_db(self, blueprint_type: str = None, provider_initialization: bool = True) -> List[BlueprintNG]:
         """
         Load all the blueprints (ojb) from the database
         Args:
             blueprint_type (Optional[str]): The type of the blueprint to be retrieved
+            provider_initialization (bool=True): If providers have to be initialized. If false -> blueprint cannot be used, it is just a reference from db.
 
         Returns:
             The blueprint list (List[BlueprintNG]).
@@ -116,8 +117,12 @@ class BlueprintManager:
         blue_list = []
         for item in self._load_all_blue_dict_from_db(blueprint_type):
             logger.debug(f"Deserializing Blueprint {item['id']}")
-            blue_list.append(BlueprintNG.from_db(item))
+            if provider_initialization:
+                blue_list.append(BlueprintNG.from_db(item))
+            else:
+                blue_list.append(BlueprintNG.from_db_no_prov_init(item))
         return blue_list
+
 
     def create_blueprint(self, msg: Any, path: str, wait: bool = False, parent_id: str | None = None, callback: Optional[Callable] = None) -> str:
         """
@@ -220,7 +225,7 @@ class BlueprintManager:
         Returns:
             The summary/details of all blueprints that satisfy the given filter.
         """
-        blue_list = self._load_all_blue_from_db(blue_type)
+        blue_list = self._load_all_blue_from_db(blue_type, provider_initialization=False)
         blue_mem_id_list = self.worker_collection.keys()
         # Replace blueprints from DB with the ones that are present in the memory.
         for i in range(len(blue_list)):

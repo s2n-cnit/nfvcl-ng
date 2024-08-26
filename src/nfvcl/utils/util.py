@@ -292,12 +292,14 @@ def remove_files_by_pattern(folder: str, name_pattern: str):
         else:
             os.remove(path)
 
+
 def get_from_nested_dict(d, keys):
     if "." in keys:
         key, rest = keys.split(".", 1)
         return get_from_nested_dict(d[key], rest)
     else:
         return d[keys]
+
 
 def put_in_nested_dict(d, keys, item):
     if "." in keys:

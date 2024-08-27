@@ -11,7 +11,6 @@ from nfvcl.main import topology_lock
 from nfvcl.models.event import Event
 from nfvcl.models.k8s.blueprint_k8s_model import TopologyK8sModel
 from nfvcl.models.k8s.common_k8s_model import Labels
-from nfvcl.models.k8s.k8s_events import K8sEventType
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sOperationType, K8sPluginName
 from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sQuota
 from nfvcl.models.response_model import OssCompliantResponse, OssStatus
@@ -26,6 +25,7 @@ from nfvcl.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, 
     k8s_delete_namespace, k8s_add_quota_to_namespace, k8s_cluster_admin, k8s_add_label_to_k8s_node, k8s_get_nodes, \
     k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_deployments
 from nfvcl.utils.log import create_logger
+from nfvcl.utils.redis_utils.event_types import K8sEventType
 from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from nfvcl.utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 
@@ -128,11 +128,9 @@ async def install_k8s_plugin(cluster_id: str, message: K8sPluginsToInstall):
         subscribing to NFVCL log at the redis instance.
     """
 
-    request = K8sModelManagement(k8s_ops=K8sOperationType.INSTALL_PLUGIN, cluster_id=cluster_id,
-                                 data=json.dumps(message.model_dump()))
+    request = K8sModelManagement(k8s_ops=K8sOperationType.INSTALL_PLUGIN, cluster_id=cluster_id, data=json.dumps(message.model_dump()))
 
-    event: Event = Event(operation=K8sEventType.PLUGIN_INSTALLED, data=request.model_dump())
-    trigger_redis_event(redis_cli=redis_cli, topic=K8S_MANAGEMENT_TOPIC, event=event)
+    trigger_redis_event(topic=K8S_MANAGEMENT_TOPIC, event_type=K8sEventType.PLUGIN_INSTALLED, data=request.model_dump())
 
     return RestAnswer202(id='K8s management')
 
@@ -150,11 +148,9 @@ async def apply_to_k8s(cluster_id: str, body=Body(...)):
         body: The yaml content to apply at the cluster
 
     """
-    request = K8sModelManagement(k8s_ops=K8sOperationType.APPLY_YAML, cluster_id=cluster_id,
-                                 data=body.decode('utf-8'))
+    request = K8sModelManagement(k8s_ops=K8sOperationType.APPLY_YAML, cluster_id=cluster_id, data=body.decode('utf-8'))
 
-    event: Event = Event(operation=K8sEventType.DEFINITION_APPLIED, data=request.model_dump())
-    trigger_redis_event(redis_cli=redis_cli, topic=K8S_MANAGEMENT_TOPIC, event=event)
+    trigger_redis_event(topic=K8S_MANAGEMENT_TOPIC, event_type=K8sEventType.DEFINITION_APPLIED, data=request.model_dump())
 
     return RestAnswer202(id='K8s management')
 
@@ -165,8 +161,7 @@ async def uninstall_k8s_plugin(cluster_id: str, message: List[K8sPluginName]):
     # TODO
     Still not implemented
     """
-    return RestAnswer202(id='K8s management', description="This operation is still not implemented",
-                         status="NOT IMPLEMENTED")
+    return RestAnswer202(id='K8s management', description="This operation is still not implemented", status="NOT IMPLEMENTED")
 
 
 @k8s_router.get("/{cluster_id}/cidr", response_model=dict)

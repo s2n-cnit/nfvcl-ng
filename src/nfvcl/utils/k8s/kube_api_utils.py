@@ -586,7 +586,7 @@ def k8s_add_quota_to_namespace(kube_client_config: kubernetes.client.Configurati
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         api_instance_core = kubernetes.client.CoreV1Api(api_client)
 
-        spec = quota.dict(by_alias=True)
+        spec = quota.model_dump(by_alias=True)
         res_spec = V1ResourceQuotaSpec(hard=spec)
         metadata = V1ObjectMeta(name=quota_name)
         res_quota = V1ResourceQuota(metadata=metadata, spec=res_spec)

@@ -261,6 +261,7 @@ async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = B
     resp = OssCompliantResponse(status=OssStatus.ready, detail="Namespace created", result=created_namespace.to_dict())
     return resp
 
+
 @k8s_router.delete("/{cluster_id}/namespace/{name}", response_model=dict)
 async def delete_k8s_namespace(cluster_id: str, name: str = ""):
     """
@@ -577,7 +578,7 @@ async def get_secrets(cluster_id: str, namespace: str = "", secret_name: str = "
 
     try:
         auth_response: V1SecretList = k8s_get_secrets(kube_client_config=k8s_config,
-                                                  namespace=namespace, secret_name=secret_name, owner=owner)
+                                                      namespace=namespace, secret_name=secret_name, owner=owner)
 
     except (ValueError, ApiException) as val_err:
         logger.error(val_err)
@@ -618,10 +619,10 @@ async def create_admin_sa_for_namespace(cluster_id: str, namespace: str, usernam
         # Creating SA
         sa = k8s_create_service_account(kube_client_config=k8s_config, namespace=namespace, username=username)
         # Creating role binding to be admin
-        binding_name = "rolebinding_admin_"+username
+        binding_name = "rolebinding_admin_" + username
         role = k8s_admin_role_to_sa(kube_client_config=k8s_config, namespace=namespace, username=username, role_binding_name=binding_name)
         # Create secret
-        secret_name = username+"-secret"
+        secret_name = username + "-secret"
         secret = k8s_create_secret_for_user(kube_client_config=k8s_config, namespace=namespace, username=username, secret_name=secret_name)
         # Returning secret WITH token included
         detailed_secret = k8s_get_secrets(kube_client_config=k8s_config, namespace=namespace, secret_name=secret.metadata.name)
@@ -692,7 +693,7 @@ async def apply_resource_quota_namespace(cluster_id: str, namespace: str, quota_
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
-        quota_resp: V1ResourceQuota = k8s_add_quota_to_namespace(kube_client_config=k8s_config,namespace_name=namespace,
+        quota_resp: V1ResourceQuota = k8s_add_quota_to_namespace(kube_client_config=k8s_config, namespace_name=namespace,
                                                                  quota_name=quota_name, quota=quota)
 
     except (ValueError, ApiException) as val_err:
@@ -728,6 +729,7 @@ async def get_nodes(cluster_id: str, detailed: bool = False):
         to_return = {"nodes": name_list}
     return to_return
 
+
 @k8s_router.post("/{cluster_id}/node/{node_name}/", response_model=dict)
 async def add_label_to_k8s_node(cluster_id: str, node_name: str, labels: Labels):
     """
@@ -748,6 +750,7 @@ async def add_label_to_k8s_node(cluster_id: str, node_name: str, labels: Labels)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
     node: V1Node = k8s_add_label_to_k8s_node(k8s_config, node_name=node_name, labels=labels)
     return node.to_dict()
+
 
 @k8s_router.get("/{cluster_id}/deployments/", response_model=dict)
 async def get_deployment(cluster_id: str, namespace: str, detailed: bool = False):
@@ -775,6 +778,7 @@ async def get_deployment(cluster_id: str, namespace: str, detailed: bool = False
         to_return = {"deployments": name_list}
     return to_return
 
+
 @k8s_router.post("/{cluster_id}/deployment/label", response_model=dict)
 async def add_label_to_k8s_deployment(cluster_id: str, namespace: str, deployment_name: str, labels: Labels):
     """
@@ -795,6 +799,7 @@ async def add_label_to_k8s_deployment(cluster_id: str, namespace: str, deploymen
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
     deployment: V1Deployment = k8s_add_label_to_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, labels=labels)
     return deployment.to_dict()
+
 
 @k8s_router.post("/{cluster_id}/deployment/scale", response_model=dict)
 async def scale_k8s_deployment(cluster_id: str, namespace: str, deployment_name: str, replica_number: int):

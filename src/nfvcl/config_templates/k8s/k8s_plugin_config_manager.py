@@ -113,9 +113,9 @@ def get_plugin_config_files(k8s_version: K8sVersion, plugin_folder_path: str) ->
         cluster_version = float(k8s_version.value[1:])
 
         # Check if k8s version is not too low
-        if lower_version < cluster_version:
+        if lower_version <= cluster_version:
             # Check if k8s version is not too high
-            if cluster_version < upper_version or no_upper_limit:
+            if cluster_version <= upper_version or no_upper_limit:
                 target_modules.append((plugin_folder_path + '/' + path, module_name))
 
     if len(target_modules) > 0:

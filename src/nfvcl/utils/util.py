@@ -160,6 +160,8 @@ def render_file_from_template_to_file(path: Path, render_dict: dict, prefix_to_n
     else:
         new_file_path = Path(f"day2_files/{prefix_to_name}{path.name}")
 
+    new_file_path.parent.mkdir(parents=True, exist_ok=True)
+    new_file_path.touch(exist_ok=True)
     new_file_path.write_text(data)
 
     return new_file_path

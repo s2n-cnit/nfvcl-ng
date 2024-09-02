@@ -6,7 +6,9 @@ from typing import Any
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGStatus, CurrentOperation
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl.blueprints_ng.lcm.performance_manager import get_performance_manager
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage, BlueprintOperationCallbackModel
+from nfvcl.models.performance import BlueprintPerformanceType
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.redis_utils.redis_manager import trigger_redis_event
 from nfvcl.utils.redis_utils.topic_list import BLUEPRINT_TOPIC
@@ -119,7 +121,9 @@ class BlueprintWorker:
                     trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_STARTED_DAY0, self.blueprint.base_model.model_dump())
                     self.blueprint.to_db()
                     try:
+                        performance_operation_id = get_performance_manager().start_operation(self.blueprint.id, BlueprintPerformanceType.DAY0, "create")
                         self.blueprint.create(received_message.message)
+                        get_performance_manager().end_operation(performance_operation_id)
                         if received_message.callback:
                             received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), status="OK"))
                         self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
@@ -146,10 +150,12 @@ class BlueprintWorker:
                             if received_message.message:
                                 self.blueprint.base_model.day_2_call_history.append(received_message.message.model_dump_json())
                             function = blueprint_type.get_function_to_be_called(received_message.path)
+                            performance_operation_id = get_performance_manager().start_operation(self.blueprint.id, BlueprintPerformanceType.DAY2, received_message.path.split("/")[-1])
                             if received_message.message:
                                 result = getattr(self.blueprint, function.__name__)(received_message.message)
                             else:
                                 result = getattr(self.blueprint, function.__name__)()
+                            get_performance_manager().end_operation(performance_operation_id)
                         else:
                             result = getattr(self.blueprint, received_message.path)(*received_message.message[0], **received_message.message[1])
                         # Starting processing the request.
@@ -172,7 +178,9 @@ class BlueprintWorker:
                     self.logger.info(f"Destroying blueprint")
                     self.blueprint.base_model.status = BlueprintNGStatus.destroying(blue_id=self.blueprint.id)
                     trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_START_DAYN, self.blueprint.base_model.model_dump())
+                    performance_operation_id = get_performance_manager().start_operation(self.blueprint.id, BlueprintPerformanceType.DELETION, "delete")
                     self.blueprint.destroy()
+                    get_performance_manager().end_operation(performance_operation_id)
                     if received_message.callback:
                         received_message.callback(self.blueprint.id)
                     self.logger.success(f"Blueprint destroyed")

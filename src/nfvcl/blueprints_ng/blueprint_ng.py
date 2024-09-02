@@ -9,6 +9,7 @@ from typing import TypeVar, Generic, Optional, List, Any, Dict
 
 from pydantic import SerializeAsAny, Field, ConfigDict, ValidationError
 
+from nfvcl.blueprints_ng.lcm.performance_manager import get_performance_manager
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from nfvcl.blueprints_ng.providers.kubernetes import K8SProviderNative
 from nfvcl.blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface
@@ -151,6 +152,22 @@ class BlueprintNGState(NFVCLBaseModel):
 class BlueprintNGException(Exception):
     pass
 
+performance_manager = get_performance_manager()
+
+def register_performance(method):
+    def wrapper(*args):
+        provider_aggregator_instance: ProvidersAggregator = args[0]
+        info = {}
+        if len(args) > 1:
+            if isinstance(args[1], ResourceDeployable):
+                info["name"] = args[1].name
+            if isinstance(args[1], ResourceConfiguration):
+                info["name"] = args[1].vm_resource.name
+        provider_call_id = performance_manager.start_provider_call(performance_manager.get_pending_operation_id(provider_aggregator_instance.blueprint.id), method.__name__, info)
+        res = method(*args)
+        performance_manager.end_provider_call(provider_call_id)
+        return res
+    return wrapper
 
 class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface):
     def init(self):
@@ -193,9 +210,11 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
 
         return self.k8s_providers_impl[area]
 
+    @register_performance
     def create_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).create_vm(vm_resource)
 
+    @register_performance
     def attach_nets(self, vm_resource: VmResource, nets_name: List[str]):
         """
         Attach a network to an already running VM
@@ -209,27 +228,34 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
         """
         return self.get_virt_provider(vm_resource.area).attach_nets(vm_resource, nets_name)
 
+    @register_performance
     def create_net(self, net_resource: NetResource):
         return self.get_virt_provider(net_resource.area).create_net(net_resource)
 
+    @register_performance
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         return self.get_virt_provider(vm_resource_configuration.vm_resource.area).configure_vm(vm_resource_configuration)
 
+    @register_performance
     def destroy_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).destroy_vm(vm_resource)
 
+    @register_performance
     def final_cleanup(self):
         for virt_provider_impl in self.virt_providers_impl.values():
             virt_provider_impl.final_cleanup()
         for k8s_provider_impl in self.k8s_providers_impl.values():
             k8s_provider_impl.final_cleanup()
 
+    @register_performance
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         return self.get_k8s_provider(helm_chart_resource.area).install_helm_chart(helm_chart_resource, values)
 
+    @register_performance
     def update_values_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         return self.get_k8s_provider(helm_chart_resource.area).update_values_helm_chart(helm_chart_resource, values)
 
+    @register_performance
     def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
         return self.get_k8s_provider(helm_chart_resource.area).uninstall_helm_chart(helm_chart_resource)
 

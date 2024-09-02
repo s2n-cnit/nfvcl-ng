@@ -8,6 +8,7 @@ from verboselogs import VerboseLogger
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.lcm.blueprint_worker import BlueprintWorker
+from nfvcl.blueprints_ng.lcm.performance_manager import get_performance_manager
 from nfvcl.blueprints_ng.resources import VmResource
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
 from nfvcl.models.http_models import BlueprintNotFoundException, BlueprintAlreadyExisting, BlueprintProtectedException
@@ -153,6 +154,9 @@ class BlueprintManager:
             # Creating and starting the worker
             worker = BlueprintWorker(created_blue)
             worker.start_listening()  # Start another THREAD
+
+            get_performance_manager().add_blueprint(blue_id, path)
+
             self.worker_collection[blue_id] = worker
             # Putting the creation message into the worker (the spawn happens asynch)
             if wait:

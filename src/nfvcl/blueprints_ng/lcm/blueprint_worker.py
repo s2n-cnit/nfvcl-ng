@@ -157,7 +157,10 @@ class BlueprintWorker:
                                 result = getattr(self.blueprint, function.__name__)()
                             get_performance_manager().end_operation(performance_operation_id)
                         else:
+                            performance_operation_id = get_performance_manager().start_operation(self.blueprint.id, BlueprintPerformanceType.DAY2, received_message.path.split("/")[-1])
                             result = getattr(self.blueprint, received_message.path)(*received_message.message[0], **received_message.message[1])
+                            get_performance_manager().end_operation(performance_operation_id)
+
                         # Starting processing the request.
                         if received_message.callback:
                             received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), result=result, status="OK"))

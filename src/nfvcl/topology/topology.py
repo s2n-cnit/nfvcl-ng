@@ -4,9 +4,6 @@ import typing
 from logging import Logger
 from multiprocessing import RLock
 
-from redis.client import Redis
-
-from nfvcl.models.event import Event
 from nfvcl.models.k8s.common_k8s_model import LBPool
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
 from nfvcl.models.network import PduModel, NetworkModel, RouterModel
@@ -14,14 +11,15 @@ from nfvcl.models.network.network_models import RouterPortModel, IPv4ReservedRan
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl.models.topology import TopologyModel
 from nfvcl.models.vim import VimModel, UpdateVimModel
-from nfvcl.utils.redis_utils.event_types import TopologyEventType
 from nfvcl.utils.database import save_topology, delete_topology, get_nfvcl_database
 from nfvcl.utils.decorators import obj_multiprocess_lock
+from nfvcl.utils.file_utils import remove_files_by_pattern
 from nfvcl.utils.ipam import *
 from nfvcl.utils.log import create_logger
-from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
+from nfvcl.utils.redis_utils.event_types import TopologyEventType
+from nfvcl.utils.redis_utils.redis_manager import trigger_redis_event
 from nfvcl.utils.redis_utils.topic_list import TOPOLOGY_TOPIC
-from nfvcl.utils.util import remove_files_by_pattern
+from nfvcl.utils.util import get_nfvcl_config
 
 topology_lock = RLock()
 
@@ -914,7 +912,7 @@ class Topology:
         """
         deleted_prom_instance = self._model.del_prometheus_srv(prom_srv_id, force)
 
-        remove_files_by_pattern("day2_files", 'prometheus_{}'.format(prom_srv_id))
+        remove_files_by_pattern(get_nfvcl_config().nfvcl.tmp_folder, f"prometheus_{prom_srv_id}*")
 
         self._save_topology_from_model()
         trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETE_PROM_SRV, data=deleted_prom_instance.model_dump())

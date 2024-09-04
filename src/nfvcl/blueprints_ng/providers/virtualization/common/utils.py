@@ -7,12 +7,15 @@ from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansibl
 from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
+from nfvcl.utils.file_utils import create_tmp_folder
 from nfvcl.utils.log import create_logger
 
 logger = create_logger('Providers_Utils')
 
+
 class VirtualizationConfiguratorException(VirtualizationProviderException):
     pass
+
 
 def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeout: int, retry_interval: float) -> bool:
     logger.debug(f"Starting SSH connection to {host}:{port} as user <{user}> and passwd <{passwd}>. Timeout is {timeout}, retry interval is {retry_interval}")
@@ -39,8 +42,7 @@ def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeo
 
 
 def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfiguration, blueprint_id: str) -> dict:
-    nfvcl_tmp_dir = Path("/tmp/nfvcl/playbook")
-    nfvcl_tmp_dir.mkdir(exist_ok=True, parents=True)
+    nfvcl_tmp_dir = create_tmp_folder("nfvcl/playbook")  # Path("/tmp/nfvcl/playbook")
 
     playbook_str = vm_resource_configuration.dump_playbook()
 

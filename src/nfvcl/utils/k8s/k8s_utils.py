@@ -14,6 +14,7 @@ from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, Version
 from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError
 
+import nfvcl.utils.file_utils
 import nfvcl.utils.util
 from nfvcl.config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginAdditionalData, K8sPluginName, K8sPluginType
@@ -397,9 +398,9 @@ def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configurati
         # Yaml files to be applied to the cluster for each plugin
         yaml_file_configs_templates = get_yaml_files_for_plugin(version, plugin)
 
-        rendered_files_list = nfvcl.utils.util.render_files_from_template(paths=yaml_file_configs_templates,
-                                                                          render_dict=template_fill_data.model_dump(),
-                                                                          files_name_prefix=cluster_id)
+        rendered_files_list = nfvcl.utils.file_utils.render_files_from_template(paths=yaml_file_configs_templates,
+                                                                                render_dict=template_fill_data.model_dump(),
+                                                                                files_name_prefix=cluster_id)
 
         result_list = []
         logger.info("Plugin <{}> installation is starting.".format(plugin.name))

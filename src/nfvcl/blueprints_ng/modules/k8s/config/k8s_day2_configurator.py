@@ -1,9 +1,5 @@
-from netaddr import IPNetwork
-
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
-from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.utils.util import render_file_jinja2_to_str
 
 
 class VmK8sDay2Configurator(VmResourceAnsibleConfiguration):

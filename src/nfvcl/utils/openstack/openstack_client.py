@@ -10,7 +10,7 @@ from nfvcl.utils.log import create_logger
 import openstack
 import os
 from openstack.connection import Connection
-from nfvcl.utils.util import render_file_from_template_to_file
+from nfvcl.utils.file_utils import render_file_from_template_to_file
 
 # Logger
 logger = create_logger("OpenStack Client")

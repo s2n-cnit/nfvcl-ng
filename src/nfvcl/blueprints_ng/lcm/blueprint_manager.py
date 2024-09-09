@@ -209,6 +209,18 @@ class BlueprintManager:
         Returns:
             The summary/details of a blueprint
         """
+        return self.get_blueprint_instance_by_id(blueprint_id).to_dict(detailed)
+
+    def get_blueprint_instance_by_id(self, blueprint_id: str) -> BlueprintNG:
+        """
+        Retrieves the blueprint summary for the given blueprint ID. If the blueprint is present in memory, returns it from there instead of DB.
+        Args:
+            blueprint_id: The blueprint to be retrieved.
+            detailed: If true, return all the info saved in the database about the blueprints.
+
+        Returns:
+            The summary/details of a blueprint
+        """
         # If the blueprint is active and loaded in memory, then use the one in memory
         if blueprint_id in self.worker_collection:
             blueprint: BlueprintNG = self.worker_collection[blueprint_id].blueprint
@@ -217,7 +229,7 @@ class BlueprintManager:
             blueprint: BlueprintNG = self._load_blue_from_db(blueprint_id)
         if blueprint is None:
             raise BlueprintNotFoundException(blueprint_id)
-        return blueprint.to_dict(detailed)
+        return blueprint
 
     def get_blueprint_summary_list(self, blue_type: str, detailed: bool = False) -> List[dict]:
         """

@@ -99,7 +99,7 @@ class TopologyWorker:
                 topology.add_pdu(pdu_model, pdu_model.nfvo_onboarded)
 
             case TopologyWorkerOperation.DEL_PDU:
-                topology.del_router(worker_message.data['pdu_id'])
+                topology.del_pdu(worker_message.data['pdu_id'])
 
             # K8S
             case TopologyWorkerOperation.ADD_K8S:

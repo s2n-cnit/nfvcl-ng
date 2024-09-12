@@ -121,7 +121,8 @@ class PerformanceManager:
         self.performance_dict[blueprint_id].operations.append(blueprint_operation)
         self.operations[op_id] = blueprint_operation
         if blueprint_id in self.pending_operations:
-            raise Exception("Multiple operation pending")
+            #raise Exception("Multiple operation pending")
+            logger.error("Multiple operation pending, replacing with newer one")
         self.pending_operations[blueprint_id] = op_id
         return op_id
 

@@ -95,7 +95,7 @@ class blueprint_type:
             raise ValueError(f"Duplicate path found. The route {final_path} cannot be added since is already pointing function {method.__qualname__}")
 
         param_num = len(signature(method).parameters)
-        if param_num != 2:
+        if request_type[0] != HttpRequestType.GET and param_num != 2:
             logger.warning(f"Day2 function must have 2 arguments. {method.__qualname__} has {param_num}")
 
         # Recreate the complete endpoint path that is given by type + final path. E.g., 'vyos'+'/test_api_path' --> 'vyos/test_api_path'

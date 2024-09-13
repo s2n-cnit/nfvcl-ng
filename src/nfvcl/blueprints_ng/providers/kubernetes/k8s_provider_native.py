@@ -16,7 +16,7 @@ from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
 from nfvcl.rest_endpoints.k8s import get_k8s_cluster_by_area
 from nfvcl.topology.topology import build_topology
 from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_services, get_deployments, k8s_delete_namespace, \
-    get_pods_for_k8s_namespace
+    get_pods_for_k8s_namespace, get_logs_for_pod
 
 HELM_TMP_FOLDER_PATH = Path(tempfile.gettempdir()) / 'nfvcl/helm'
 HELM_TMP_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
@@ -213,3 +213,7 @@ class K8SProviderNative(K8SProviderInterface):
         for ns in self.data.namespaces:
             self.logger.debug(f"Deleting k8s namespace '{ns}'")
             k8s_delete_namespace(k8s_config, ns)
+
+    def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
+        k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
+        return get_logs_for_pod(k8s_config, helm_chart_resource.namespace.lower(), pod_name, tail_lines=tail_lines)

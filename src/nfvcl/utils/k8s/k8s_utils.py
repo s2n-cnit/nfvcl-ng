@@ -144,6 +144,20 @@ def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configurati
 
         return pod_list
 
+def get_logs_for_pod(kube_client_config: kubernetes.client.Configuration, namespace: str, pod_name: str, tail_lines=None):
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        pod_log: str
+        try:
+            pod_log = api_instance_core.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=tail_lines)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>read_namespaced_pod_log: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return pod_log
 
 def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
                     label_selector: str = None) -> V1DaemonSetList:

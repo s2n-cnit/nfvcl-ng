@@ -155,7 +155,7 @@ class BlueprintNGException(Exception):
 performance_manager = get_performance_manager()
 
 def register_performance(method):
-    def wrapper(*args):
+    def wrapper(*args, **kwargs):
         provider_aggregator_instance: ProvidersAggregator = args[0]
         info = {}
         if len(args) > 1:
@@ -164,7 +164,7 @@ def register_performance(method):
             if isinstance(args[1], ResourceConfiguration):
                 info["name"] = args[1].vm_resource.name
         provider_call_id = performance_manager.start_provider_call(performance_manager.get_pending_operation_id(provider_aggregator_instance.blueprint.id), method.__name__, info)
-        res = method(*args)
+        res = method(*args, **kwargs)
         performance_manager.end_provider_call(provider_call_id)
         return res
     return wrapper
@@ -259,6 +259,10 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
     def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
         return self.get_k8s_provider(helm_chart_resource.area).uninstall_helm_chart(helm_chart_resource)
 
+    @register_performance
+    def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
+        return self.get_k8s_provider(helm_chart_resource.area).get_pod_log(helm_chart_resource, pod_name, tail_lines)
+
 
 class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
     base_model: BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar]
@@ -318,6 +322,17 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             raise BlueprintNGException(f"The ID of the resource to be deleted is None")
         if resource.id in self.base_model.registered_resources:
             self.base_model.registered_resources.pop(resource.id)
+        else:
+            raise BlueprintNGException(f"The resource to be deleted is not present in registered resources")
+
+    def deregister_resource_by_id(self, resource_id: str):
+        """
+        Remove a resource in the blueprint registered resources using its id
+        Args:
+            resource_id: the id of the resource to be deregistered
+        """
+        if resource_id in self.base_model.registered_resources:
+            self.base_model.registered_resources.pop(resource_id)
         else:
             raise BlueprintNGException(f"The resource to be deleted is not present in registered resources")
 

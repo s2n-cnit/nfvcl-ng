@@ -1,7 +1,9 @@
 import time
 from pathlib import Path
+from typing import Optional
 
 import paramiko
+import verboselogs
 
 from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
 from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import \
@@ -10,14 +12,19 @@ from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
 from nfvcl.utils.file_utils import create_tmp_folder
 from nfvcl.utils.log import create_logger
 
-logger = create_logger('Providers_Utils')
+logger_pu = create_logger('Providers_Utils')
 
 
 class VirtualizationConfiguratorException(VirtualizationProviderException):
     pass
 
 
-def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeout: int, retry_interval: float) -> bool:
+def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeout: int, retry_interval: float, logger_override: Optional[verboselogs.VerboseLogger] = None) -> bool:
+    if logger_override:
+        logger = logger_override
+    else:
+        logger = logger_pu
+
     logger.debug(f"Starting SSH connection to {host}:{port} as user <{user}> and passwd <{passwd}>. Timeout is {timeout}, retry interval is {retry_interval}")
     client = paramiko.client.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -41,7 +48,12 @@ def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeo
     return False
 
 
-def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfiguration, blueprint_id: str) -> dict:
+def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfiguration, blueprint_id: str, logger_override: Optional[verboselogs.VerboseLogger] = None) -> dict:
+    if logger_override:
+        logger = logger_override
+    else:
+        logger = logger_pu
+
     nfvcl_tmp_dir = create_tmp_folder("nfvcl/playbook")  # Path("/tmp/nfvcl/playbook")
 
     playbook_str = vm_resource_configuration.dump_playbook()
@@ -56,7 +68,8 @@ def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfigurati
         vm_resource_configuration.vm_resource.username,
         vm_resource_configuration.vm_resource.password,
         300,
-        5
+        5,
+        logger_override=logger_override
     )
 
     ansible_runner_result, fact_cache = run_ansible_playbook(

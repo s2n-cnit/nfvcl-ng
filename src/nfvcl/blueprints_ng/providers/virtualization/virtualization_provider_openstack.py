@@ -235,7 +235,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             nics.append(NetplanInterface(nic_name=net_intf.fixed.interface_name, mac_address=net.mac_addr))
             ips.append(net_intf.fixed.ip)
 
-        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics), self.blueprint_id)
+        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics), self.blueprint_id, logger_override=self.logger)
         self.logger.success(f"Networks {to_attach} attached to VM {vm_resource.name}")
         self.save_to_db()
 
@@ -311,7 +311,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def __gather_info_from_vm(self, vm_resource: VmResource):
         self.logger.info(f"Starting VM info gathering")
 
-        facts = configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource), self.blueprint_id)
+        facts = configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource), self.blueprint_id, logger_override=self.logger)
 
         mac_name_dict = {}
 
@@ -342,7 +342,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id)
+            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id, logger_override=self.logger)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
         self.save_to_db()

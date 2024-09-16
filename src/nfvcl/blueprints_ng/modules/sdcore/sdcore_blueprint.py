@@ -54,7 +54,7 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCo
         self.state.core_helm_chart = HelmChartResource(
             area=list(filter(lambda x: x.core == True, self.state.current_config.areas))[0].id,
             name=f"sdcore",
-            chart="helm_charts/charts/sdcore-0.13.2.tgz",
+            chart="helm_charts/charts/sdcore-1.0.0.tgz",
             chart_as_path=True,
             namespace=self.id
         )

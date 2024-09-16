@@ -68,8 +68,8 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
         return ansible_builder.build()
 
 
-UPF_IMAGE_NAME = "sd-core-upf-v0.4.0-5"
-UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v0.4.0-5-ubuntu2204.qcow2"
+UPF_IMAGE_NAME = "sd-core-upf-v1.4.0-2"
+UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v1.4.0-2-ubuntu2404.qcow2"
 
 
 @blueprint_type(SDCORE_UPF_BLUE_TYPE)
@@ -85,7 +85,7 @@ class SdCoreUPFBlueprintNG(Generic5GUPFBlueprintNG[SdCoreUPFBlueprintNGState, UP
         self.update_deployments()
 
     def update_upf(self):
-        self.logger.critical("UPDATE_UPF")
+        self.logger.debug("SdCoreBlueprintNG update")
         self.update_deployments()
 
     def update_deployments(self):

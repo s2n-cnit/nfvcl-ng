@@ -1,2 +1,7 @@
 #!/bin/bash
 ethtool --offload {{ n3_if }} rx off tx off
+{% if additional_routes is defined %}
+{%- for line in additional_routes %}
+{{ line }}
+{% endfor %}
+{% endif %}

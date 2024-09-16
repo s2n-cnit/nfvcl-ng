@@ -3,7 +3,7 @@ services:
     oai-upf{{ upf_id }}:
         container_name: "oai-upf{{ upf_id }}"
         image: oaisoftwarealliance/oai-upf:v2.0.0
-        restart: always
+        restart: on-failure
         expose:
             - 2152/udp
             - 8805/udp

@@ -7,7 +7,6 @@ import httpx
 from pydantic import Field
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
@@ -19,17 +18,16 @@ from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubArea, SubS
 from nfvcl.models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
     Core5GUpdateSliceModel, NF5GType, Core5GAddSubscriberModel
-from nfvcl.models.blueprint_ng.g5.upf import UpfPayloadModel, SliceModel, DnnModel, UPFBlueCreateModel, \
-    BlueCreateModelNetworks
+from nfvcl.models.blueprint_ng.g5.upf import DnnModel
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.utils.log import create_logger
 
-OAI_CORE_BLUE_TYPE = "OpenAirInterface"
+OAI_CORE_BLUE_TYPE = "oai"
 logger = create_logger('OpenAirInterface')
 
 
 class OAIBlueCreateModel(Create5gModel):
-    type: str = OAI_CORE_BLUE_TYPE
+    pass
 
 
 class OAIBlueprintNGState(Generic5GK8sBlueprintNGState):
@@ -45,12 +43,9 @@ class OAIBlueprintNGState(Generic5GK8sBlueprintNGState):
     """
     oai_config_values: Optional[OaiCoreValuesModel] = Field(default=None)
     ue_dict: Dict[str, List[Snssai]] = {}
-    upf_dict: Dict[str, str] = {}
-    #    current_config: Optional[OAIBlueCreateModel] = Field(default=None)
     mcc: Optional[str] = Field(default=None)
     mnc: Optional[str] = Field(default=None)
 
-    #    core_helm_chart: Optional[HelmChartResource] = Field(default=None)
     udr_ip: Optional[str] = Field(default=None)
     nrf_ip: Optional[str] = Field(default=None)
     amf_ip: Optional[str] = Field(default=None)
@@ -98,7 +93,6 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.state.mcc = create_model.config.plmn[0:3]
         self.state.mnc = create_model.config.plmn[-2:]
 
-        self.update_upfs_deployments()
         self.update_core_values()
 
         # In the chart installation a dict containing the values overrides can be passed
@@ -113,24 +107,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         self.state.base_udr_url = f"http://{self.state.udr_ip}:80/nudr-dr/v1/subscription-data"
 
-        self.update_upfs_config()
-        self.update_gnb_config()
-
         for subscriber in create_model.config.subscribers.copy():
             self.add_ues(subscriber)
-
-    def update_upfs_deployments(self):
-        """
-        Check for every area, if some UPF need to be created or delete.
-
-        """
-        area_ids = list(map(lambda x: str(x.id), self.state.current_config.areas))
-        temp = list(set(area_ids).symmetric_difference(set(self.state.upf_dict.keys())))
-        for el in temp:
-            if el not in self.state.upf_dict.keys():
-                self._create_new_upf(int(el))
-            else:
-                self._destroy_upf(int(el))
 
     def update_core_values(self):
         """
@@ -149,9 +127,9 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.state.oai_config_values.coreconfig.dnns.clear()
 
         for sub_area in self.state.current_config.areas:
-
-            ip_upf = self.call_external_function(self.state.upf_dict[str(sub_area.id)], "get_ip").result
-            oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, ip_upf)
+            # TODO this work only for oai UPF, with the sdcore one multiple UPFs may be deployed for a single area
+            deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
+            oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, deployed_upf_info.network_info.n4_ip.exploded)
             oai_utils.add_available_upf(self.state.oai_config_values.coreconfig, sub_area.id)
 
             for _slice in sub_area.slices:
@@ -183,80 +161,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             self.state.oai_config_values.model_dump(exclude_none=True, by_alias=True)
         )
 
-    def _create_new_upf(self, area_id: int):
-        """
-        Create a UPF in a specified area.
-        Args:
-            area_id: area id to create UPF in.
-
-        Returns: Blueprint ID of new UPF.
-
-        """
-        if str(area_id) not in self.state.upf_dict.keys():
-            upfpayload = UPFBlueCreateModel(
-                area_id=area_id,
-                networks=BlueCreateModelNetworks(
-                    mgt=self.state.current_config.config.network_endpoints.mgt,
-                    n6=self.state.current_config.config.network_endpoints.mgt,
-                    n3=self.state.current_config.config.network_endpoints.wan,
-                    n4=self.state.current_config.config.network_endpoints.wan
-                )
-            )
-            bp_manager = get_blueprint_manager()
-            upf_id = bp_manager.create_blueprint(msg=upfpayload, path="OpenAirInterfaceUpf", wait=True, parent_id=self.id)
-            self.register_children(upf_id)
-            self.state.upf_dict[str(area_id)] = upf_id
-
-            return upf_id
-        raise BlueprintNGException(f"UPF in area {area_id} already exists")
-
-    def _destroy_upf(self, area_id: int):
-        """
-        Destroy the UPF in a specified area.
-        Args:
-            area_id: id of the UPF area to be destroyed.
-
-        """
-        if str(area_id) in self.state.upf_dict.keys():
-            upf_id = self.state.upf_dict[str(area_id)]
-            bp_manager = get_blueprint_manager()
-            bp_manager.delete_blueprint(blueprint_id=upf_id)
-            self.deregister_children(upf_id)
-            del self.state.upf_dict[str(area_id)]
-        else:
-            raise BlueprintNGException(f"UPF in area {area_id} does not exist")
-
-    def update_upfs_config(self):
-        """
-        Restart all UPFs with new config.
-
-        """
-        for area in self.state.current_config.areas:
-            upf_payload = UpfPayloadModel(
-                nrf_ip=self.state.nrf_ip,
-                slices=[]
-            )
-            for _slice in area.slices:
-
-                slice_payload = SliceModel(
-                    id=_slice.sliceId,
-                    type=_slice.sliceType,
-                    dnnList=[]
-                )
-
-                sub_slice = self.get_slice(_slice.sliceId)
-                for dnn in sub_slice.dnnList:
-                    dnn_payload = DnnModel()
-
-                    dnn_info = self.get_dnn(dnn)
-
-                    dnn_payload.name = dnn_info.net_name
-                    dnn_payload.cidr = dnn_info.pools[0].cidr
-                    slice_payload.dnnList.append(dnn_payload)
-
-                upf_payload.slices.append(slice_payload)
-
-            self.call_external_function(self.state.upf_dict[str(area.id)], "configure", upf_payload)
+    def wait_core_ready(self):
+        pass
 
     def add_dnn_to_conf(self, new_dnn: SubDataNets):
         """
@@ -272,10 +178,9 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         self.state.current_config.config.network_endpoints.data_nets.append(new_dnn)
 
-        self.update_upfs_deployments()
         self.update_core_values()
         self.update_core()
-        self.update_upfs_config()
+        self.update_edge_areas()
         self.update_gnb_config()
 
     def del_dnn_from_conf(self, old_dnn: str):
@@ -295,10 +200,9 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         self.state.current_config.config.network_endpoints.data_nets.remove(dnn)
 
-        self.update_upfs_deployments()
         self.update_core_values()
         self.update_core()
-        self.update_upfs_config()
+        self.update_edge_areas()
         self.update_gnb_config()
 
     def add_subscriber_to_conf(self, new_subscriber: SubSubscribers):
@@ -404,10 +308,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                 if len(self.state.ue_dict[imsi]) == 0:
                     del self.state.ue_dict[imsi]
 
-        self.update_upfs_deployments()
         self.update_core_values()
         self.update_core()
-        self.update_upfs_config()
         self.update_gnb_config()
 
     def update_slice(self, update_slice_model: Core5GUpdateSliceModel):
@@ -437,10 +339,9 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             self.disassociating_subscriber_from_slice(subscriber.imsi)
             self.associating_subscriber_with_slice(subscriber.imsi)
 
-        self.update_upfs_deployments()
         self.update_core_values()
         self.update_core()
-        self.update_upfs_config()
+        self.update_edge_areas()
         self.update_gnb_config()
 
     def get_slice(self, slice_id: str) -> SubSliceProfiles:
@@ -536,10 +437,10 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.del_subscriber_to_conf(subscriber_model.imsi)
 
     def add_slice(self, add_slice_model: Core5GAddSliceModel, oss: bool):
-        self.update_upfs_deployments()
+        self.update_edge_areas()
         self.update_core_values()
         self.update_core()
-        self.update_upfs_config()
+        self.update_edge_areas()
         self.update_gnb_config()
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
@@ -554,10 +455,10 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                 if del_slice_model.sliceId == ue_slice.sd:
                     self.disassociating_subscriber_from_slice(imsi)
 
-        self.update_upfs_deployments()
+        self.update_edge_areas()
         self.update_core_values()
         self.update_core()
-        self.update_upfs_config()
+        self.update_edge_areas()
         self.update_gnb_config()
 
     def add_tac(self, area: Core5GAddTacModel):
@@ -568,10 +469,10 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         """
 
-        self.update_upfs_deployments()
+        self.update_edge_areas()
         self.update_core_values()
         self.update_core()
-        self.update_upfs_config()
+        self.update_edge_areas()
         self.update_gnb_config()
 
     def del_tac(self, area: Core5GDelTacModel):
@@ -582,10 +483,10 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         """
 
-        self.update_upfs_deployments()
+        self.update_edge_areas()
         self.update_core_values()
         self.update_core()
-        self.update_upfs_config()
+        self.update_edge_areas()
         self.update_gnb_config()
 
     @day2_function("/add_dnn", [HttpRequestType.PUT])

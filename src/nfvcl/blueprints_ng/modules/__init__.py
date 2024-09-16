@@ -3,8 +3,9 @@ from .example import *
 from .k8s import *
 from .oai.oai_core import *
 from .oai.oai_upf import *
+from .router_5g import *
 from .sdcore import *
 from .sdcore_upf import *
+from .ubuntu import *
 from .ueransim import *
 from .vyos import *
-from .ubuntu import *

@@ -1,0 +1,14 @@
+#!/bin/bash
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+{% if additional_routes is defined %}
+{%- for line in additional_routes %}
+{{ line }}
+{% endfor %}
+{% endif %}
+
+ethtool --offload {{ n6_if }} rx off tx off
+
+iptables -t nat -C POSTROUTING -o {{ internet_if }} -j MASQUERADE || iptables -t nat -A POSTROUTING -o {{ internet_if }} -j MASQUERADE
+iptables -C FORWARD -i {{ n6_if }} -o {{ internet_if }} -j ACCEPT || iptables -A FORWARD -i {{ n6_if }} -o {{ internet_if }} -j ACCEPT
+iptables -C FORWARD -i {{ internet_if }} -o {{ n6_if }} -m state --state RELATED,ESTABLISHED -j ACCEPT || iptables -A FORWARD -i {{ internet_if }} -o {{ n6_if }} -m state --state RELATED,ESTABLISHED -j ACCEPT

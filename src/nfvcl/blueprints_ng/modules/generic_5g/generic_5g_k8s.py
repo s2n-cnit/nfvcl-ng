@@ -59,10 +59,15 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
                 service=self.state.core_helm_chart.services[ttuple[1]] if ttuple[1] is not None else None
             )
             self.state.k8s_network_functions[nftype] = k8s5gnf
+        self.state.core_deployed = True
 
     @final
     def get_amf_ip(self) -> str:
         return self.state.k8s_network_functions[NF5GType.AMF].service.external_ip[0]
+
+    @final
+    def get_nrf_ip(self) -> str:
+        return self.state.k8s_network_functions[NF5GType.NRF].service.external_ip[0]
 
     @day2_function("/scale_nf", [HttpRequestType.PUT])
     def day2_scale_nf(self, nf_scaling: NetworkFunctionScaling):

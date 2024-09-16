@@ -1,55 +1,325 @@
 import copy
 from abc import abstractmethod
-from typing import Generic, TypeVar, Optional, List, final
+from typing import Generic, TypeVar, Optional, List, final, Dict, Set
 
 from pydantic import Field
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
+from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import day2_function
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
+from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel, Router5GCreateModelNetworks, \
+    Router5GAddRouteModel
 from nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator import UERANSIMPDUConfigurator
 from nfvcl.blueprints_ng.utils import get_class_from_path
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, SstConvertion
+from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
+    SstConvertion, Router5GNetworkInfo
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel
-from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, UeransimSlice
+from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, UeransimSlice, Route
+from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, SliceModel
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.network import PduModel
-
+from nfvcl.models.network.ipam_models import SerializableIPv4Address
 from nfvcl.topology.topology import build_topology
+
+
+class UPFInfo(NFVCLBaseModel):
+    blue_id: str = Field()
+    external: bool = Field()
+    router_gnb_ip: SerializableIPv4Address = Field()
+    upf_list: List[DeployedUPFInfo] = Field(default_factory=list)
+    current_config: UPFBlueCreateModel = Field()
+
+
+class Router5GInfo(NFVCLBaseModel):
+    blue_id: Optional[str] = Field(default=None)
+    external: bool = Field()
+    network: Router5GNetworkInfo = Field()
+
+
+class EdgeAreaInfo(NFVCLBaseModel):
+    area: int = Field()
+    upf: Optional[UPFInfo] = Field(default=None)
+    router: Optional[Router5GInfo] = Field(default=None)
 
 
 class Generic5GBlueprintNGState(BlueprintNGState):
     current_config: Optional[Create5gModel] = Field(default=None)
+    edge_areas: Dict[str, EdgeAreaInfo] = Field(default_factory=dict)
+    core_deployed: bool = Field(default=False)
+
 
 StateTypeVar5G = TypeVar("StateTypeVar5G", bound=Generic5GBlueprintNGState)
 CreateConfigTypeVar5G = TypeVar("CreateConfigTypeVar5G")
+
+ROUTER_BLUEPRINT_TYPE = "router_5g"
+ROUTER_GET_INFO_FUNCTION = "get_router_info"
+ROUTER_ADD_ROUTES = "add_routes"
 
 
 class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel], Generic[StateTypeVar5G, CreateConfigTypeVar5G]):
     def __init__(self, blueprint_id: str, state_type: type[Generic5GBlueprintNGState] = StateTypeVar5G):
         super().__init__(blueprint_id, state_type)
 
+    @property
+    def state(self) -> StateTypeVar5G:
+        return super().state
+
     @final
     def create(self, create_model: Create5gModel):
         super().create(create_model)
         self.state.current_config = copy.deepcopy(create_model)
         self.pre_creation_checks()
+
+        # Update the edge areas creating the router (if needed) and the UPFs
+        self.update_edge_areas()
+        # Deploy the 5G core itself
         self.create_5g(create_model)
+        # Wait for the core to be ready
+        self.wait_core_ready()
+        # Update the UPFs with new data gathered after the core deployment (like the NRF ip)
+        self.update_edge_areas()
+        # Update the attached GNBs
+        self.update_gnb_config()
+        self.logger.success("5G Blueprint completely deployed")
+
+    def pre_creation_checks(self):
+        """
+        Make sure that the prerequisites for the blueprint are met
+        This method should raise an exception if the prerequisites are not met
+        """
+        self.get_gnb_pdus()
 
     @abstractmethod
     def create_5g(self, create_model: Create5gModel):
         pass
 
     @abstractmethod
+    def update_core(self):
+        pass
+
+    @abstractmethod
     def get_amf_ip(self) -> str:
         pass
 
-    @property
-    def state(self) -> StateTypeVar5G:
-        return super().state
+    @abstractmethod
+    def get_nrf_ip(self) -> str:
+        pass
 
-    def pre_creation_checks(self):
-        self.get_gnb_pdus()
+    @abstractmethod
+    def wait_core_ready(self):
+        """
+        Wait for the core to be ready for incoming GNB/UPF connections
+        """
+        pass
+
+    ################################################################
+    ####                  START EDGE SECTION                    ####
+    ################################################################
+
+    def update_edge_areas(self):
+        """
+        Deploy new edge areas
+        Delete edge areas not needed anymore
+        If necessary send update to changed edge areas
+        """
+
+        for area in self.state.current_config.areas:
+            if str(area.id) not in self.state.edge_areas:
+                # Deploy everything that this edge area need
+
+                self.state.edge_areas[str(area.id)] = EdgeAreaInfo(area=area.id)
+
+                # Router deployment for this area
+                router_info: Router5GInfo
+                if not area.networks.external_router:
+                    router_info = self.deploy_router_blueprint(area.id)
+                else:
+                    router_info = Router5GInfo(external=True, network=area.networks.external_router)
+                self.state.edge_areas[str(area.id)].router = router_info
+
+                # UPF deployment for this area
+                upf_info = self.deploy_upf_blueprint(area.id, area.upf.type)
+                self.state.edge_areas[str(area.id)].upf = upf_info
+            else:
+                # The edge area is already deployed but MAY need to be updated with a new configuration
+                edge_info = self.state.edge_areas[str(area.id)]
+
+                # Updating UPF configuration (move to a new method in the future?)
+                updated_config = self._create_upf_config(area.id)
+                if edge_info.upf.current_config != updated_config:
+                    edge_info.upf.current_config = updated_config
+                    self.logger.info(f"Updating UPF for area {area.id}")
+                    self.call_external_function(edge_info.upf.blue_id, "update", updated_config)
+
+            # The router need to route the traffic for the DNN ip pool through the UPF N6 interface
+            for deployed_upf in self.state.edge_areas[str(area.id)].upf.upf_list:
+                for slice in deployed_upf.served_slices:
+                    for dnn in slice.dnn_list:
+                        self.add_route_to_router(area.id, dnn.cidr, deployed_upf.network_info.n6_ip.exploded)
+
+        # Deleting edge areas that are not in the current configuration (deleted by del_tac day2)
+        currently_existing_areas: Set[str] = set(map(lambda x: str(x.id), self.state.current_config.areas))
+        currently_deployed_edge_areas = set(self.state.edge_areas.keys())
+        areas_to_delete = currently_deployed_edge_areas - currently_existing_areas
+        for edge_area_id in areas_to_delete:
+            # Get information about the area that need to be deleted
+            edge_area_info = self.state.edge_areas[edge_area_id]
+
+            # Undeploy router blueprint
+            if not edge_area_info.router.external:
+                self.undeploy_router_blueprint(int(edge_area_id))
+
+            # Undeploy upf blueprint
+            self.undeploy_upf_blueprint(int(edge_area_id))
+
+            # Delete edge area from state
+            del self.state.edge_areas[edge_area_id]
+
+    def deploy_router_blueprint(self, area_id: int) -> Router5GInfo:
+        """
+        Deploy a router in the given area
+        Args:
+            area_id: Area id
+
+        Returns: Router5GInfo for the deployed router
+        """
+        self.logger.info(f"Deploying router for area {area_id}")
+
+        area = self.state.current_config.get_area(area_id)
+
+        router_5g_create_model = Router5GCreateModel(
+            area_id=area.id,
+            networks=Router5GCreateModelNetworks(
+                mgt=self.state.current_config.config.network_endpoints.mgt,
+                gnb=area.networks.gnb,
+                core=self.state.current_config.config.network_endpoints.wan,
+                n3=area.networks.n3,
+                n6=area.networks.n6
+            )
+        )
+
+        router_id = get_blueprint_manager().create_blueprint(router_5g_create_model, ROUTER_BLUEPRINT_TYPE, wait=True, parent_id=self.id)
+        self.register_children(router_id)
+        # After the router has been deployed gather the network information
+        router_info: Router5GNetworkInfo = self.call_external_function(router_id, ROUTER_GET_INFO_FUNCTION).result
+        self.logger.info(f"Deployed router for area {area_id}")
+        return Router5GInfo(external=False, blue_id=router_id, network=router_info)
+
+    def undeploy_router_blueprint(self, area_id: int):
+        """
+        Remove a deployed router
+        Args:
+            area_id: Area of the router to undeploy
+        """
+        self.logger.info(f"Deleting router for area {area_id}")
+        area = self.state.current_config.get_area(area_id)
+        edge_area = self.state.edge_areas[str(area_id)]
+        get_blueprint_manager().delete_blueprint(edge_area.router.blue_id, wait=True)
+        self.deregister_children(edge_area.router.blue_id)
+        self.logger.info(f"Deleted router for area {area_id}")
+
+    def add_route_to_router(self, area_id: int, cidr: str, nexthop: str):
+        """
+        Add a route to the router in the specified area
+        Args:
+            area_id: The area of the router where the route will be added
+            cidr: The network cidr of the network to route
+            nexthop: The nexthop of the route
+        """
+        router_info = self.state.edge_areas[str(area_id)].router
+        if router_info.external:
+            # TODO in the future the external router may be configured by NFVCL calling metalcl/netcl
+            self.logger.warning(f"The router for area {area_id} is external, manually add the following route:")
+            self.logger.warning(f"ip r add {cidr} via {nexthop}")
+        else:
+            self.logger.info(f"Adding route '{cidr}' via '{nexthop}' to router {router_info.blue_id}")
+            self.call_external_function(router_info.blue_id, ROUTER_ADD_ROUTES, Router5GAddRouteModel(additional_routes=[
+                Route(network_cidr=cidr, next_hop=nexthop)
+            ]))
+
+    def _create_upf_config(self, area_id: int) -> UPFBlueCreateModel:
+        """
+        Create the UPF configuration for a specific area and dnn
+        Args:
+            area_id: Area of the UPF
+        Returns: Model for the creation or update of an UPF blueprint
+        """
+        slices: List[SliceModel] = []
+
+        for slice_profile in self.state.current_config.get_slices_profiles_for_area(area_id):
+            slices.append(SliceModel.from_slice_profile(slice_profile, self.state.current_config.config.network_endpoints.data_nets))
+
+        upf_create_model = UPFBlueCreateModel(
+            area_id=area_id,
+            networks=BlueCreateModelNetworks(
+                mgt=self.state.current_config.config.network_endpoints.mgt,
+                n4=self.state.current_config.config.network_endpoints.wan,
+                n3=self.state.current_config.get_area(area_id).networks.n3,
+                n6=self.state.current_config.get_area(area_id).networks.n6
+            ),
+            slices=slices,
+            start=True,
+            n3_gateway_ip=self.state.edge_areas[str(area_id)].router.network.n3_ip.exploded,
+            n6_gateway_ip=self.state.edge_areas[str(area_id)].router.network.n6_ip.exploded,
+            gnb_cidr=self.state.edge_areas[str(area_id)].router.network.gnb_cidr.exploded,
+            nrf_ip=SerializableIPv4Address(self.get_nrf_ip()) if self.state.core_deployed else None
+        )
+        return upf_create_model
+
+    def deploy_upf_blueprint(self, area_id: int, upf_type: str) -> UPFInfo:
+        """
+        Deploy a UPF in the given area
+        Args:
+            area_id: Area in which the UPF will be deployed
+            upf_type: Type of the UPF blueprint to deploy
+        """
+        self.logger.info(f"Deploying UPF for area {area_id}")
+        upf_create_model = self._create_upf_config(area_id)
+        upf_id = get_blueprint_manager().create_blueprint(upf_create_model, upf_type, wait=True, parent_id=self.id)
+        self.register_children(upf_id)
+
+        upf_deployed_info: List[DeployedUPFInfo] = self.call_external_function(upf_id, "get_upfs_info").result
+        upf_info = UPFInfo(
+            blue_id=upf_id,
+            router_gnb_ip=self.state.edge_areas[str(area_id)].router.network.gnb_ip.exploded,
+            external=False,
+            upf_list=upf_deployed_info,
+            current_config=upf_create_model
+        )
+        self.logger.info(f"Deployed UPF for area {area_id}")
+
+        return upf_info
+
+    def undeploy_upf_blueprint(self, area_id: int):
+        """
+        Remove a deployed UPF
+        Args:
+            area_id: Area of the UPF to undeploy
+        """
+        self.logger.info(f"Deleting UPF for area {area_id}")
+        blue_id = self.state.edge_areas[str(area_id)].upf.blue_id
+        get_blueprint_manager().delete_blueprint(blue_id, wait=True)
+        self.deregister_children(blue_id)
+        self.logger.info(f"Deleted UPF for area {area_id}")
+
+    def get_upfs_for_slice(self, slice_id: str) -> List[DeployedUPFInfo]:
+        upf_list_for_slice: List[DeployedUPFInfo] = []
+        for edge_area in self.state.edge_areas.values():
+            for upf_deployed in edge_area.upf.upf_list:
+                if len(list(filter(lambda x: x.id == slice_id, upf_deployed.served_slices))) > 0:
+                    upf_list_for_slice.append(upf_deployed)
+        return upf_list_for_slice
+
+    ################################################################
+    ####                   END EDGE SECTION                     ####
+    ################################################################
+
+    ################################################################
+    ####                   START RAN SECTION                    ####
+    ################################################################
 
     def get_gnb_pdus(self) -> List[PduModel]:
         """
@@ -75,19 +345,28 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         return pdus_to_return
 
+    def _additional_routes_for_gnb(self, area: str) -> Optional[List[Route]]:
+        """
+        Generate a list of routes that need to be added to the GNB in the area
+        Args:
+            area: Area of the GNB
+        Returns: List of routes to be added to the GNB
+        """
+        return [Route(
+            network_cidr=self.state.edge_areas[area].upf.upf_list[0].network_info.n3_cidr.exploded,
+            next_hop=self.state.edge_areas[area].upf.router_gnb_ip.exploded
+        )]
+
     def update_gnb_config(self):
+        """
+        Update the GNBs config
+        """
         pdus = self.get_gnb_pdus()
         for pdu in pdus:
             GNBConfigurator = get_class_from_path(pdu.implementation)
             configurator_instance: UERANSIMPDUConfigurator = GNBConfigurator(pdu)
 
-            gnb_n3_info = configurator_instance.get_n3_info()
-
-            for upf_info in self.state.edge_areas[str(pdu.area)].values():
-                self.call_external_function(upf_info.blue_id, "set_gnb_info", gnb_n3_info)
-
             # TODO nci is calculated with tac, is this correct?
-
             slices = []
             for slice in list(filter(lambda x: x.id == pdu.area, self.state.current_config.areas))[0].slices:
                 slices.append(UeransimSlice(sd=slice.sliceId, sst=SstConvertion.to_int(slice.sliceType)))
@@ -98,18 +377,30 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                 tac=pdu.area,
                 amf_ip=self.get_amf_ip(),
                 amf_port=38412,
-                nssai=slices
+                nssai=slices,
+                additional_routes=self._additional_routes_for_gnb(str(pdu.area))
             )
 
             configurator_instance.configure(gnb_configuration_request)
 
+    ################################################################
+    ####                    END RAN SECTION                     ####
+    ################################################################
 
-    @abstractmethod
+    ################################################################
+    ####                   START DAY2 SECTION                   ####
+    ################################################################
+
     def add_ues(self, subscriber_model: Core5GAddSubscriberModel):
-        pass
+        self.update_core()
 
     @day2_function("/add_ues", [HttpRequestType.PUT])
     def day2_add_ues(self, subscriber_model: Core5GAddSubscriberModel):
+        """
+        Add a new UE to the core
+        Args:
+            subscriber_model: Model of the UE to add
+        """
         self.logger.info(f"Adding UE with IMSI: {subscriber_model.imsi}")
 
         # Check if the subscriber already present
@@ -134,12 +425,16 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         self.logger.success(f"Added UE with IMSI: {subscriber_model.imsi}")
 
-    @abstractmethod
     def del_ues(self, subscriber_model: Core5GDelSubscriberModel):
-        pass
+        self.update_core()
 
     @day2_function("/del_ues", [HttpRequestType.PUT])
     def day2_del_ues(self, subscriber_model: Core5GDelSubscriberModel):
+        """
+        Delete a UE from the core
+        Args:
+            subscriber_model: Model of the UE to be deleted
+        """
         self.logger.info(f"Deleting UE with IMSI: {subscriber_model.imsi}")
 
         # Check if the subscriber is present
@@ -191,12 +486,18 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         self.state.current_config.config.sliceProfiles.append(new_slice)
 
-    @abstractmethod
     def add_slice(self, add_slice_model: Core5GAddSliceModel, oss: bool):
-        pass
+        self.update_edge_areas()
+        self.update_gnb_config()
+        self.update_core()
 
     @day2_function("/add_slice_oss", [HttpRequestType.PUT])
     def day2_add_slice_oss(self, add_slice_model: Core5GAddSliceModel):
+        """
+        Add a new slice to the core, the area is required
+        Args:
+            add_slice_model: Model of the slice to add
+        """
         self.logger.info(f"Adding Slice with ID: {add_slice_model.sliceId}")
         backup_config = copy.deepcopy(self.state.current_config)
 
@@ -212,6 +513,11 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     @day2_function("/add_slice_operator", [HttpRequestType.PUT])
     def day2_add_slice_operator(self, add_slice_model: Core5GAddSliceModel):
+        """
+        Add a new slice to the core, the area is not required
+        Args:
+            add_slice_model: Model of the slice to add
+        """
         self.logger.info(f"Adding Slice with ID: {add_slice_model.sliceId}")
 
         backup_config = copy.deepcopy(self.state.current_config)
@@ -226,12 +532,18 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         self.logger.success(f"Added Slice with ID: {add_slice_model.sliceId}")
 
-    @abstractmethod
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
-        pass
+        self.update_edge_areas()
+        self.update_gnb_config()
+        self.update_core()
 
     @day2_function("/del_slice", [HttpRequestType.PUT])
     def day2_del_slice(self, del_slice_model: Core5GDelSliceModel):
+        """
+        Delete a slice from the core
+        Args:
+            del_slice_model: Model of the slice to be deleted
+        """
         self.logger.info(f"Deleting Slice with ID: {del_slice_model.sliceId}")
 
         backup_config = copy.deepcopy(self.state.current_config)
@@ -254,13 +566,18 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         self.logger.success(f"Deleted Slice with ID: {del_slice_model.sliceId}")
 
-
-    @abstractmethod
     def add_tac(self, add_area_model: Core5GAddTacModel):
-        pass
+        self.update_edge_areas()
+        self.update_gnb_config()
+        self.update_core()
 
     @day2_function("/add_tac", [HttpRequestType.PUT])
     def day2_add_tac(self, add_area_model: Core5GAddTacModel):
+        """
+        Add a new area to the core
+        Args:
+            add_area_model: Model of the area to add
+        """
         self.logger.info(f"Adding Area with ID: {add_area_model.id}")
 
         backup_config = copy.deepcopy(self.state.current_config)
@@ -279,12 +596,18 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         self.logger.success(f"Added Area with ID: {add_area_model.id}")
 
-    @abstractmethod
     def del_tac(self, del_area_model: Core5GDelTacModel):
-        pass
+        self.update_edge_areas()
+        self.update_gnb_config()
+        self.update_core()
 
     @day2_function("/del_tac", [HttpRequestType.PUT])
     def day2_del_tac(self, del_area_model: Core5GDelTacModel):
+        """
+        Delete an area from the core
+        Args:
+            del_area_model: Model of the area to be deleted
+        """
         self.logger.info(f"Deleting Area with ID: {del_area_model.areaId}")
 
         backup_config = copy.deepcopy(self.state.current_config)
@@ -303,4 +626,6 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         self.logger.success(f"Deleted Area with ID: {del_area_model.areaId}")
 
-
+    ################################################################
+    ####                    END DAY2 SECTION                    ####
+    ################################################################

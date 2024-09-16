@@ -5,6 +5,8 @@ from pydantic import Field
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGCreateModel
 from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.blueprint_ng.core5g.common import SubSliceProfiles, SubDataNets
+from nfvcl.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 
 
 class BlueCreateModelNetworks(NFVCLBaseModel):
@@ -13,10 +15,23 @@ class BlueCreateModelNetworks(NFVCLBaseModel):
     n3: str = Field()
     n6: str = Field()
 
+class UPFNetworkInfo(NFVCLBaseModel):
+    n4_cidr: SerializableIPv4Network = Field()
+    n3_cidr: SerializableIPv4Network = Field()
+    n6_cidr: SerializableIPv4Network = Field()
+    n4_ip: SerializableIPv4Address = Field()
+    n3_ip: SerializableIPv4Address = Field()
+    n6_ip: SerializableIPv4Address = Field()
 
 class UPFBlueCreateModel(BlueprintNGCreateModel):
     area_id: int = Field()
     networks: BlueCreateModelNetworks = Field()
+    nrf_ip: Optional[SerializableIPv4Address] = Field(default=None)
+    slices: List[SliceModel] = Field(default_factory=list)
+    start: Optional[bool] = Field(default=True)
+    n3_gateway_ip: SerializableIPv4Address = Field()
+    n6_gateway_ip: SerializableIPv4Address = Field()
+    gnb_cidr: SerializableIPv4Network = Field()
 
 #####################################################
 class DnnModel(NFVCLBaseModel):
@@ -25,10 +40,17 @@ class DnnModel(NFVCLBaseModel):
 
 
 class SliceModel(NFVCLBaseModel):
-    id: Optional[str] = Field(default=None)
+    id: str = Field()
     type: Literal["EMBB", "URLLC", "MMTC"] = Field(default="EMBB")
-    dnnList: Optional[List[DnnModel]] = Field(default=None)
+    dnn_list: List[DnnModel] = Field(default_factory=list)
 
+    @classmethod
+    def from_slice_profile(cls, slice_profile: SubSliceProfiles, all_dnns: List[SubDataNets]) -> SliceModel:
+        dnn_list: List[DnnModel] = []
+        for dnn in all_dnns:
+            if dnn.dnn in slice_profile.dnnList:
+                dnn_list.append(DnnModel(name=dnn.dnn, cidr=dnn.pools[0].cidr))
+        return SliceModel(id=slice_profile.sliceId, type=slice_profile.sliceType, dnn_list=dnn_list)
 
 class UpfPayloadModel(NFVCLBaseModel):
     slices: Optional[List[SliceModel]] = Field(default=None)

@@ -1,4 +1,5 @@
 import tempfile
+from typing import Optional
 
 import ansible_runner
 from ansible_runner import Runner
@@ -7,13 +8,13 @@ from nfvcl.blueprints_ng.providers.utils import create_ansible_inventory
 from nfvcl.utils.log import create_logger
 
 
-def run_ansible_playbook(host: str, username: str, password: str, playbook: str, logger=create_logger("Ansible Configurator")) -> (Runner, dict):
+def run_ansible_playbook(host: str, username: str, password: str, playbook: str, logger=create_logger("Ansible Configurator"), become_password: Optional[str] = None) -> (Runner, dict):
     tmp_playbook = tempfile.NamedTemporaryFile(mode="w")
     tmp_inventory = tempfile.NamedTemporaryFile(mode="w")
     tmp_private_data_dir = tempfile.TemporaryDirectory()
 
     # Write the inventory and playbook to files
-    tmp_inventory.write(create_ansible_inventory(host, username, password))
+    tmp_inventory.write(create_ansible_inventory(host, username, password, become_password=become_password))
     tmp_playbook.write(playbook)
     tmp_playbook.flush()
     tmp_inventory.flush()

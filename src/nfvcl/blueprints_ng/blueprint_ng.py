@@ -5,14 +5,16 @@ import enum
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import TypeVar, Generic, Optional, List, Any, Dict
+from typing import TypeVar, Generic, Optional, List, Any, Dict, Type
 
 from pydantic import SerializeAsAny, Field, ConfigDict, ValidationError
 
 from nfvcl.blueprints_ng.lcm.performance_manager import get_performance_manager
+from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUConfigurator
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from nfvcl.blueprints_ng.providers.kubernetes import K8SProviderNative
 from nfvcl.blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface
+from nfvcl.blueprints_ng.providers.pdu.pdu_provider import PDUProvider
 from nfvcl.blueprints_ng.providers.virtualization import VirtualizationProviderOpenstack, VirtualizationProviderProxmox
 from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderInterface
@@ -22,6 +24,8 @@ from nfvcl.blueprints_ng.utils import get_class_from_path, get_class_path_str_fr
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.worker_message import BlueprintOperationCallbackModel
 from nfvcl.models.http_models import BlueprintNotFoundException
+from nfvcl.models.network import PduModel
+from nfvcl.models.network.network_models import PduType
 from nfvcl.models.prometheus.prometheus_model import PrometheusTargetModel
 from nfvcl.models.vim import VimTypeEnum
 from nfvcl.topology.topology import build_topology
@@ -109,6 +113,7 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
     # Providers (the key is str because MongoDB doesn't support int as key for dictionary)
     virt_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
     k8s_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
+    pdu_provider: Optional[BlueprintNGProviderModel] = Field(default=None)
 
     created: Optional[datetime] = Field(default=None)
     corrupted: bool = Field(default=False)
@@ -169,7 +174,7 @@ def register_performance(method):
         return res
     return wrapper
 
-class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface):
+class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface, PDUProvider):
     def init(self):
         pass
 
@@ -179,6 +184,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
 
         self.virt_providers_impl: Dict[int, VirtualizationProviderInterface] = {}
         self.k8s_providers_impl: Dict[int, K8SProviderInterface] = {}
+        self.pdu_provider_impl: Optional[PDUProvider] = None
 
     def get_virt_provider(self, area: int):
         vim = self.topology.get_vim_from_area_id_model(area)
@@ -209,6 +215,19 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
                 )
 
         return self.k8s_providers_impl[area]
+
+    def get_pdu_provider(self):
+        # The area is -1 because there is only one PDUProvider
+        if not self.pdu_provider_impl:
+            self.pdu_provider_impl = PDUProvider(area=-1, blueprint_id=self.blueprint.id, persistence_function=self.blueprint.to_db)
+
+            if not self.blueprint.base_model.k8s_providers:
+                self.blueprint.base_model.pdu_provider = BlueprintNGProviderModel(
+                    provider_type=get_class_path_str_from_obj(self.pdu_provider_impl),
+                    provider_data_type=get_class_path_str_from_obj(self.pdu_provider_impl.data),
+                    provider_data=self.pdu_provider_impl.data
+                )
+        return self.pdu_provider_impl
 
     @register_performance
     def create_vm(self, vm_resource: VmResource):
@@ -246,6 +265,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
             virt_provider_impl.final_cleanup()
         for k8s_provider_impl in self.k8s_providers_impl.values():
             k8s_provider_impl.final_cleanup()
+        self.get_pdu_provider().final_cleanup()
 
     @register_performance
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
@@ -262,6 +282,24 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
     @register_performance
     def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
         return self.get_k8s_provider(helm_chart_resource.area).get_pod_log(helm_chart_resource, pod_name, tail_lines)
+
+    def find_pdu(self, area: int, pdu_type: PduType, name: Optional[str] = None) -> PduModel:
+        return self.get_pdu_provider().find_pdu(area, pdu_type, name)
+
+    def is_pdu_locked(self, pdu_model: PduModel) -> bool:
+        return self.get_pdu_provider().is_pdu_locked(pdu_model)
+
+    def is_pdu_locked_by_current_blueprint(self, pdu_model: PduModel) -> bool:
+        return self.get_pdu_provider().is_pdu_locked_by_current_blueprint(pdu_model)
+
+    def lock_pdu(self, pdu_model: PduModel) -> PduModel:
+        return self.get_pdu_provider().lock_pdu(pdu_model)
+
+    def unlock_pdu(self, pdu_model: PduModel) -> PduModel:
+        return self.get_pdu_provider().unlock_pdu(pdu_model)
+
+    def get_pdu_configurator(self, pdu_model: PduModel) -> Any:
+        return self.get_pdu_provider().get_pdu_configurator(pdu_model)
 
 
 class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
@@ -567,6 +605,13 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 provider_data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
                 instance.provider.get_k8s_provider(int(area)).data = provider_data
                 instance.base_model.k8s_providers[str(area)].provider_data = provider_data
+
+            if "pdu_provider" in deserialized_dict:
+                pdu_provider = deserialized_dict["pdu_provider"]
+                if pdu_provider:
+                    provider_data = instance.provider.get_pdu_provider().data.model_validate(pdu_provider["provider_data"])
+                    instance.provider.get_pdu_provider().data = provider_data
+                    instance.base_model.pdu_provider.provider_data = provider_data
 
         return instance
 

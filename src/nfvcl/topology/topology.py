@@ -749,15 +749,13 @@ class Topology:
             return removed_range
 
     @obj_multiprocess_lock
-    def add_pdu(self, pdu_input: PduModel, nfvo_onboard: bool = False):
+    def add_pdu(self, pdu_input: PduModel):
         """
         Add PDU to the topology
         Args:
             pdu_input: The PDU to be added to the topology
         """
-        pdu_input.nfvo_onboarded = False
         try:
-            pdu_input.details = ""
             self._model.add_pdu(pdu_input)
 
             # Saving changes to the topology
@@ -808,7 +806,7 @@ class Topology:
         """
         return self._model.get_pdu(pdu_name)
 
-    def get_pdus(self):
+    def get_pdus(self) -> List[PduModel]:
         """
         Returns a list of PDUs
         """

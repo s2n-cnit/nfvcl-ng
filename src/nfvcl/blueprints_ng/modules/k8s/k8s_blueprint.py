@@ -273,7 +273,6 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         Perform Day 0 configuration for master or worker.
         Args:
-            topology_onboard: true if the kubernetes cluster will be added to the topology clusters.
             configure_master: if the master has to be configured. This value is False for day2 request (Master has been already configured), while it should be true only on creation.
         """
         if configure_master:
@@ -353,7 +352,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             # THERE ARE NO MASTER AREAS in the request -> THERE IS A CONSTRAINT IN THE REQUEST MODEL
             self.deploy_area(area)
 
-        self.day0conf(topology_onboard=False, configure_master=False)
+        self.day0conf(configure_master=False)
 
     @day2_function("/del_workers", [HttpRequestType.DELETE])
     def del_workers(self, model: K8sDelNodeModel):

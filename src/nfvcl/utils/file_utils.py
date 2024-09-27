@@ -1,6 +1,7 @@
 import glob
 import os
 import shutil
+from hashlib import sha512
 from pathlib import Path
 from typing import List
 
@@ -211,3 +212,24 @@ def remove_files_by_pattern(folder: str, name_pattern: str):
             shutil.rmtree(path)
         else:
             os.remove(path)
+
+
+def file_sha512sum(file: Path) -> str:
+    """
+    Check that file exists and compute its SHA512sum reading 4096 bytes at a time
+    Args:
+        file: The file on which the hash is to be computed
+
+    Returns:
+        The hash of the file
+    """
+    if file.exists() and file.is_file():
+        sha512_hash = sha512()
+
+        with file.open("rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha512_hash.update(byte_block)
+
+        return sha512_hash.hexdigest()
+    else:
+        raise FileNotFoundError(f"File {file.absolute()} does not exists: sha512sum cannot be computed")

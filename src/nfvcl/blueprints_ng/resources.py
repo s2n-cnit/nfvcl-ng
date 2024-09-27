@@ -44,9 +44,11 @@ class VmResourceImage(NFVCLBaseModel):
     Attributes:
         name (str): The name of the VM image.
         url (str, optional): The URL from witch the image is downloaded if necessary.
+        check_sha512sum: bool: If the sha512sum needs to be compared with the remote image if the image is already existing.
     """
     name: str = Field()
     url: Optional[str] = Field(default=None)
+    check_sha512sum: bool = Field(default=False, description="If true the provider should check if the image at URL has the same hash, if not a new image with different name is created.")
 
 
 class VmResourceFlavor(NFVCLBaseModel):

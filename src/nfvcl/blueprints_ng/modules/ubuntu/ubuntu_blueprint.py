@@ -40,10 +40,10 @@ class UbuntuBlueprint(BlueprintNG[UbuntuBlueprintNGState, UbuntuCreateModel]):
 
         # Ubuntu 22 or 24?
         match create_model.version:
-            case UbuntuVersion.UBU24:
+            case UbuntuVersion.UBU24.value:
                 image_name = UBU24_IMAGE_NAME
                 image_url = UBU24_BASE_IMAGE_URL
-            case UbuntuVersion.UBU22:
+            case UbuntuVersion.UBU22.value:
                 image_name = UBU22_IMAGE_NAME
                 image_url = UBU22_BASE_IMAGE_URL
             case _:
@@ -54,7 +54,7 @@ class UbuntuBlueprint(BlueprintNG[UbuntuBlueprintNGState, UbuntuCreateModel]):
         self.state.vm = VmResource(
             area=create_model.area,
             name=f"{self.id}_VM_UBUNTU",
-            image=VmResourceImage(name=image_name, url=image_url),
+            image=VmResourceImage(name=image_name, url=image_url, check_sha512sum=True),
             flavor=create_model.flavor,
             username="ubuntu",
             password=create_model.password,

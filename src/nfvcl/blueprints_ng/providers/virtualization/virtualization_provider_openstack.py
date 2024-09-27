@@ -1,5 +1,7 @@
+import hashlib
 from typing import List, Dict
 
+import requests
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.compute.v2.server_interface import ServerInterface
@@ -18,7 +20,7 @@ from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interf
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
-    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor
+    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
 from nfvcl.models.vim import VimModel
 from nfvcl.utils.openstack.openstack_client import OpenStackClient
 
@@ -77,9 +79,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.conn = self.os_client.client
         self.vim_need_floating_ip = self.vim.config.use_floating_ip
 
-    def __create_image_from_url(self, vm_resource: VmResource):
+    def __create_image_from_url(self, vm_image: VmResourceImage):
         image_attrs = {
-            'name': vm_resource.image.name,
+            'name': vm_image.name,
             'disk_format': 'qcow2',
             'container_format': 'bare',
             'visibility': 'public',
@@ -91,7 +93,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             image_attrs['visibility'] = "private"
             image = self.conn.image.create_image(**image_attrs)
 
-        self.conn.image.import_image(image, method="web-download", uri=vm_resource.image.url)
+        self.conn.image.import_image(image, method="web-download", uri=vm_image.url)
         self.conn.wait_for_image(image)
         return image
 
@@ -107,20 +109,64 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             if self.os_client.get_network(net) is None:
                 raise VirtualizationProviderOpenstackException(f"Network >{net}< not found on vim")
 
+    def __get_checksum(self, vm_image: VmResourceImage) -> str:
+        self.logger.debug(f"Downloading {vm_image.url} image on NFVCL machine to compute its hash 512...")
+        response = requests.get(vm_image.url, stream=True)
 
-    def create_vm(self, vm_resource: VmResource):
+        if response.status_code == 200:
+            file_hash = hashlib.sha512(response.content).hexdigest()
+            self.logger.debug(f"Downloading of {vm_image.url} finished")
+            return file_hash
+        else:
+            self.logger.error(f"Failed to download file. Status code: {response.status_code}")
+            raise ValueError("The URL is not valid")
+
+    def __prepare_image(self, vm_image: VmResourceImage):
+        """
+        Download the image if it is not present on the VIM.
+        If the image requires to check if the hash 512 coincides, the nfvcl downloads the file and compare the hash: if it
+        differs than it creates a new image with a different name.
+        N.B. The old image cannot be deleted since it can be used by other VMs
+        Args:
+            vm_image: The image to be prepared
+
+        Returns:
+            The existing image on the VIM.
+        """
+        image = self.conn.get_image(vm_image.name)
+        if image is None:
+            if vm_image.url:
+                self.logger.info(f"Image {vm_image.name} not found on VIM, downloading from {vm_image.url}")
+                image = self.__create_image_from_url(vm_image)
+                self.logger.info(f"Image {vm_image.name} download completed")
+            else:
+                raise VirtualizationProviderOpenstackException(f"Image >{vm_image.name}< not found")
+        elif vm_image.check_sha512sum and vm_image.check_sha512sum:
+            os_remote_image = self.conn.get_image(vm_image.name)
+            os_remote_image_hash512 = os_remote_image.hash_value
+            new_image_hash512 = self.__get_checksum(vm_image)
+            # If sha does not coincide, image needs to be updated
+            if new_image_hash512 != os_remote_image_hash512:
+                # WE NEED TO CHANGE NAME SINCE WE CANNOT DELETE THE OLD ONE BECAUSE IT CAN BE USED BY OTHER INSTANCES
+                # We are using the HASH to compute the new name soo we can identify if it is already present
+                vm_image.name = vm_image.name+new_image_hash512[0:12]
+                image = self.conn.get_image(vm_image.name)
+                if image is None:
+                    self.logger.info(f"Updated image {vm_image.name} not found on VIM, downloading on VIM from {vm_image.url}")
+                    image = self.__create_image_from_url(vm_image)
+                    self.logger.info(f"Image {vm_image.name} download completed on VIM")
+                else:
+                    self.logger.info("Updated image has been found on VIM, download will be skipped")
+            else:
+                self.logger.info(f"Image {vm_image.name} on Openstack sha512 coincides with the one of the remote image")
+        return image
+
+    def create_vm(self, vm_resource: VmResource, check_image_hash: bool = False):
         self.logger.info(f"Creating VM {vm_resource.name}")
 
         self._pre_creation_checks(vm_resource)
 
-        image = self.conn.get_image(vm_resource.image.name)
-        if image is None:
-            if vm_resource.image.url:
-                self.logger.info(f"Image {vm_resource.image.name} not found on VIM, downloading from {vm_resource.image.url}")
-                image = self.__create_image_from_url(vm_resource)
-                self.logger.info(f"Image {vm_resource.image.name} download completed")
-            else:
-                raise VirtualizationProviderOpenstackException(f"Image >{vm_resource.image.name}< not found")
+        image = self.__prepare_image(vm_resource.image)
 
         flavor: Flavor = self.create_get_flavor(vm_resource.flavor, vm_resource.name)
 
@@ -392,7 +438,6 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         """
         Given the network names, it retrieves the details of the first subnet of every network
         Args:
-            connection: The connection to openstack
             network_names: The network names
 
         Returns:

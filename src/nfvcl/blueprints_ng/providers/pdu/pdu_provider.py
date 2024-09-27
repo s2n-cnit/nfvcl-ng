@@ -2,6 +2,7 @@ from typing import Optional, Any, List
 
 from pydantic import Field
 
+from nfvcl.blueprints_ng.lcm.pdu_manager import get_pdu_manager
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData, BlueprintNGProviderInterface
 from nfvcl.blueprints_ng.utils import get_class_from_path
 from nfvcl.models.network import PduModel
@@ -127,31 +128,8 @@ class PDUProvider(BlueprintNGProviderInterface):
         """
         if self.is_pdu_locked(pdu_model):
             if pdu_model.locked_by == self.blueprint_id:
-                return get_class_from_path(pdu_model.implementation)(pdu_model)
+                return get_class_from_path(get_pdu_manager().get_implementation(pdu_model.instance_type))(pdu_model)
         raise PDUProviderException(f"The PDU is not locked or locked by another blueprint: {pdu_model.locked_by}")
-
-
-    # def configure_pdu(self, pdu_configuration: PDUResourceConfiguration) -> dict:
-    #     self.logger.info(f"Configuring PDU id: {pdu_configuration.pdu_resource.id}, type: {pdu_configuration.type}")
-    #
-    #     # Different handlers for different configuration types
-    #     if isinstance(pdu_configuration, PDUResourceAnsibleConfiguration):
-    #         configurator_facts = configure_machine_ansible(
-    #             pdu_configuration.pdu_resource.ip,
-    #             pdu_configuration.pdu_resource.username,
-    #             pdu_configuration.pdu_resource.password,
-    #             pdu_configuration.dump_playbook(),
-    #             logger_override=self.logger,
-    #             become_password=pdu_configuration.pdu_resource.become_password
-    #         )
-    #     else:
-    #         raise PDUProviderException("This PDU Configurator is not supported")
-    #
-    #     self.logger.success(f"Configuring PDU id: {pdu_configuration.pdu_resource.id}, type: {pdu_configuration.type} finished")
-    #
-    #     self.save_to_db()
-    #
-    #     return configurator_facts
 
     def final_cleanup(self):
         for pdu_to_unlock in self.data.locked_pdus:

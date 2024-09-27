@@ -149,7 +149,6 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             area=area_id,
             type=PduType.GNB,
             instance_type="UERANSIM",
-            implementation=UERANSIMPDUConfigurator.get_class_path(),
             config={"blue_id": self.id}
         ))
 

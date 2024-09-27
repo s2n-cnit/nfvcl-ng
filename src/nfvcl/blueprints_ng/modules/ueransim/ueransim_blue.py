@@ -7,15 +7,17 @@ from pydantic import Field
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl.blueprints_ng.pdu_configurators.implementations.gnb.ueransim_pdu_configurator import UERANSIMPDUConfigurator
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
 from nfvcl.blueprints_ng.utils import rel_path
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, \
-    UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
-    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, GNBN3Info, Route
+from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
+    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, Route
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.network import PduModel
+from nfvcl.models.network.network_models import PduType
+from nfvcl.models.pdu.gnb import GNBPDUConfigure
 from nfvcl.models.ueransim.blueprint_ueransim_model import UeransimSim, UeransimUe
 from nfvcl.topology.topology import build_topology
 
@@ -40,7 +42,7 @@ class UeransimBlueprintNGState(BlueprintNGState):
 
 
 class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
-    configuration: UeransimBlueprintRequestConfigureGNB = Field()
+    configuration: GNBPDUConfigure = Field()
     radio_addr: str = Field()
     ngap_addr: str = Field()
     gtp_addr: str = Field()
@@ -142,20 +144,19 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         super().destroy()
 
     def add_gnb_to_topology(self, area_id: int):
-        name = f"UERANSIM_GNB_{self.id}_{area_id}"
         build_topology().add_pdu(PduModel(
-            name=name,
+            name=f"UERANSIM_GNB_{self.id}_{area_id}",
             area=area_id,
-            type="UERANSIM",
-            user="",
-            passwd="",
-            implementation="nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator.UERANSIMPDUConfigurator",  # TODO this should be dynamic
-            config={"blue_id": self.id},
-            interface=[]
+            type=PduType.GNB,
+            instance_type="UERANSIM",
+            config={"blue_id": self.id}
         ))
 
     def del_gnb_from_topology(self, area_id: int):
-        build_topology().del_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
+        try:
+            build_topology().del_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
+        except Exception as e:
+            self.logger.warning(f"Error deleting PDU: {str(e)}")
 
     def _create_gnb(self, area_id: str):
         if area_id not in self.state.areas:
@@ -280,7 +281,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         self._create_gnb(model.area_id)
 
     @day2_function("/configure_gnb", [HttpRequestType.POST])
-    def configure_gnb(self, model: UeransimBlueprintRequestConfigureGNB):
+    def configure_gnb(self, model: GNBPDUConfigure):
         area = self.state.areas[str(model.area)]
         area.vm_gnb_configurator = UeransimGNBConfigurator(
             vm_resource=area.vm_gnb,
@@ -314,12 +315,6 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     @day2_function("/del_sim", [HttpRequestType.DELETE])
     def del_sim(self, model: UeransimBlueprintRequestDelSim):
         self._del_sim(model.area_id, model.ue_id, model.imsi)
-
-    def get_n3_info(self, area_id: int) -> GNBN3Info:
-        return GNBN3Info(
-            ip=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.ip,
-            mac=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.mac
-        )
 
     def to_dict(self, detailed: bool) -> dict:
         """

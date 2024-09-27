@@ -48,6 +48,26 @@ def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeo
     return False
 
 
+def configure_machine_ansible(ip: str, username: str, password: str, playbook: str, logger_override: Optional[verboselogs.VerboseLogger] = None, become_password: Optional[str] = None) -> dict:
+    if logger_override:
+        logger = logger_override
+    else:
+        logger = logger_pu
+
+    ansible_runner_result, fact_cache = run_ansible_playbook(
+        ip,
+        username,
+        password,
+        playbook,
+        logger,
+        become_password=become_password
+    )
+
+    if ansible_runner_result.status == "failed":
+        raise VirtualizationConfiguratorException("Error running ansible configurator")
+
+    return fact_cache
+
 def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfiguration, blueprint_id: str, logger_override: Optional[verboselogs.VerboseLogger] = None) -> dict:
     if logger_override:
         logger = logger_override
@@ -72,15 +92,12 @@ def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfigurati
         logger_override=logger_override
     )
 
-    ansible_runner_result, fact_cache = run_ansible_playbook(
+    fact_cache = configure_machine_ansible(
         vm_resource_configuration.vm_resource.access_ip,
         vm_resource_configuration.vm_resource.username,
         vm_resource_configuration.vm_resource.password,
         playbook_str,
         logger
     )
-
-    if ansible_runner_result.status == "failed":
-        raise VirtualizationConfiguratorException("Error running ansible configurator")
 
     return fact_cache

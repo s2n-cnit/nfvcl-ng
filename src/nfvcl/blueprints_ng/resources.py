@@ -306,18 +306,18 @@ class HelmChartResource(ResourceDeployable):
             return self.chart
 
 
-class HardwareResource(Resource):
-    ip: str = Field()
-    username: str = Field()
-    password: str = Field()
-    become_password: Optional[str] = Field(default=None)
+# class PDUResource(Resource):
+#     ip: str = Field()
+#     username: str = Field()
+#     password: str = Field()
+#     become_password: Optional[str] = Field(default=None)
+#
+#
+# class PDUResourceConfiguration(ResourceConfiguration):
+#     pdu_resource: PDUResource = Field()
 
 
-class HardwareResourceConfiguration(ResourceConfiguration):
-    hardware_resource: HardwareResource = Field()
-
-
-class HardwareResourceAnsibleConfiguration(HardwareResourceConfiguration):
+class PDUResourceAnsibleConfiguration(ResourceConfiguration):
     @abc.abstractmethod
     def dump_playbook(self) -> str:
         pass

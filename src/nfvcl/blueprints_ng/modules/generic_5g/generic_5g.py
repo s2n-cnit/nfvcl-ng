@@ -10,19 +10,19 @@ from nfvcl.blueprints_ng.lcm.blueprint_type_manager import day2_function
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel, Router5GCreateModelNetworks, \
     Router5GAddRouteModel
-from nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator import UERANSIMPDUConfigurator
-from nfvcl.blueprints_ng.utils import get_class_from_path
+from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
     SstConvertion, Router5GNetworkInfo
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel
-from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, UeransimSlice, Route
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, SliceModel
 from nfvcl.models.http_models import HttpRequestType
+from nfvcl.models.linux.ip import Route
 from nfvcl.models.network import PduModel
 from nfvcl.models.network.ipam_models import SerializableIPv4Address
-from nfvcl.topology.topology import build_topology
+from nfvcl.models.network.network_models import PduType
+from nfvcl.models.pdu.gnb import GNBPDUConfigure, GNBPDUSlice
 
 
 class UPFInfo(NFVCLBaseModel):
@@ -38,6 +38,9 @@ class Router5GInfo(NFVCLBaseModel):
     external: bool = Field()
     network: Router5GNetworkInfo = Field()
 
+class RANAreaInfo(NFVCLBaseModel):
+    area: int = Field()
+    pdu_name: str = Field()
 
 class EdgeAreaInfo(NFVCLBaseModel):
     area: int = Field()
@@ -48,6 +51,7 @@ class EdgeAreaInfo(NFVCLBaseModel):
 class Generic5GBlueprintNGState(BlueprintNGState):
     current_config: Optional[Create5gModel] = Field(default=None)
     edge_areas: Dict[str, EdgeAreaInfo] = Field(default_factory=dict)
+    ran_areas: Dict[str, RANAreaInfo] = Field(default_factory=dict)
     core_deployed: bool = Field(default=False)
 
 
@@ -327,31 +331,26 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         Returns: List of PDUs
         """
-        # TODO it only support UERANSIM now
-        pdus = build_topology().get_pdus()
-        ueransim_pdus = list(filter(lambda x: x.type == "UERANSIM", pdus))
-
         areas = list(map(lambda x: x.id, self.state.current_config.areas))
 
         pdus_to_return = []
 
         for area in areas:
-            found_pdus = list(filter(lambda x: x.area == area, ueransim_pdus))
-            if len(found_pdus) == 0:
-                raise BlueprintNGException(f"No GNB PDU found for area '{area}'")
-            if len(found_pdus) > 1:
-                raise BlueprintNGException(f"More than 1 GNB PDU found for area '{area}'")
-            pdus_to_return.append(found_pdus[0])
+            pdu_model = self.provider.find_pdu(area, PduType.GNB)
+            if not self.provider.is_pdu_locked_by_current_blueprint(pdu_model):
+                self.provider.lock_pdu(pdu_model)
+            pdus_to_return.append(pdu_model)
 
         return pdus_to_return
 
-    def _additional_routes_for_gnb(self, area: str) -> Optional[List[Route]]:
+    def _additional_routes_for_gnb(self, area: str) -> List[Route]:
         """
         Generate a list of routes that need to be added to the GNB in the area
         Args:
             area: Area of the GNB
         Returns: List of routes to be added to the GNB
         """
+        # upf_list[0] here is ok because every UPF deployed in the same area have the same n3 network
         return [Route(
             network_cidr=self.state.edge_areas[area].upf.upf_list[0].network_info.n3_cidr.exploded,
             next_hop=self.state.edge_areas[area].upf.router_gnb_ip.exploded
@@ -361,17 +360,15 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         """
         Update the GNBs config
         """
-        pdus = self.get_gnb_pdus()
-        for pdu in pdus:
-            GNBConfigurator = get_class_from_path(pdu.implementation)
-            configurator_instance: UERANSIMPDUConfigurator = GNBConfigurator(pdu)
+        for pdu in self.get_gnb_pdus():
+            configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu)
 
             # TODO nci is calculated with tac, is this correct?
             slices = []
             for slice in list(filter(lambda x: x.id == pdu.area, self.state.current_config.areas))[0].slices:
-                slices.append(UeransimSlice(sd=slice.sliceId, sst=SstConvertion.to_int(slice.sliceType)))
+                slices.append(GNBPDUSlice(sd=slice.sliceId, sst=SstConvertion.to_int(slice.sliceType)))
 
-            gnb_configuration_request = UeransimBlueprintRequestConfigureGNB(
+            gnb_configuration_request = GNBPDUConfigure(
                 area=pdu.area,
                 plmn=self.state.current_config.config.plmn,
                 tac=pdu.area,
@@ -382,6 +379,20 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             )
 
             configurator_instance.configure(gnb_configuration_request)
+            self.state.ran_areas[str(pdu.area)] = RANAreaInfo(area=pdu.area, pdu_name=pdu.name)
+
+        # Unlock PDUs for removed areas
+        currently_existing_areas: Set[str] = set(map(lambda x: str(x.id), self.state.current_config.areas))
+        currently_deployed_ran_areas = set(self.state.ran_areas.keys())
+        areas_to_delete = currently_deployed_ran_areas - currently_existing_areas
+        for ran_area_id in areas_to_delete:
+            # Get information about the area that need to be deleted
+            ran_area_info = self.state.ran_areas[ran_area_id]
+
+            self.provider.unlock_pdu(self.provider.find_by_name(ran_area_info.pdu_name))
+
+            # Delete edge area from state
+            del self.state.ran_areas[ran_area_id]
 
     ################################################################
     ####                    END RAN SECTION                     ####

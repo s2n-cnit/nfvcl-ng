@@ -1,5 +1,6 @@
 from .dns import *
 from .example import *
+from .example_pdu import *
 from .k8s import *
 from .oai.oai_core import *
 from .oai.oai_upf import *

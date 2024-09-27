@@ -1,5 +1,5 @@
 ---
-log_level: "20"
+log_level: "20" # 20 is info, 10 is debug
 nfvcl:
   version: "0.3.0"
   port: "5002"
@@ -8,8 +8,8 @@ mongodb:
   host: "127.0.0.1"
   port: "27017"
   db: "nfvcl"
-  username: "admin"
-  password: "password"
+#  username: "admin"
+#  password: "password"
 redis:
   host: "127.0.0.1"
   port: "6379"

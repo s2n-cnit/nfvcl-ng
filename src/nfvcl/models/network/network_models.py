@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, field_serializer, IPvAnyNetwork, IPvAnyAddress
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
 from nfvcl.models.base_model import NFVCLBaseModel
@@ -197,16 +197,6 @@ class RouterModel(BaseModel):
         return False
 
 
-class NetworkInterfaceModel(NFVCLBaseModel):
-    """
-    Represents a network interface
-    """
-    name: str = Field(description="The name of the network interface")
-    ip: SerializableIPv4Address = Field(description="The IP(v4 or v6) address of the network interface")
-    network: Optional[SerializableIPv4Network] = Field(default=None, description="The network attached to the network interface")
-    gateway: Optional[SerializableIPv4Address] = Field(description="The IP(v4 or v6) address of the gateway on the network attached")
-
-
 # TODO remove as soon as OSM is removed
 class PduInterface(BaseModel):
     vld: str
@@ -250,10 +240,24 @@ class PduInterface(BaseModel):
         populate_by_name = True
 
 
+class NetworkInterfaceModel(NFVCLBaseModel):
+    """
+    Represents a network interface
+    """
+    name: str = Field(description="The name of the network interface to be used inside NFVCL to find the correct interface")
+    mgmt: bool = Field(default=False, description="True if this interface is the management one, there shouldn't be more than one")
+    interface_name: Optional[str] = Field(default=None, description="The name of the network interface like ens18")
+    ip: SerializableIPv4Address = Field(description="The IP(v4 or v6) address of the network interface")
+    network: Optional[SerializableIPv4Network] = Field(default=None, description="The network attached to the network interface")
+    gateway: Optional[SerializableIPv4Address] = Field(default=None, description="The IPv4 address of the gateway on the network attached")
+
+
 class PduType(str, Enum):
+    LINUX: str = 'LINUX'
     GNB: str = 'GNB'
     LWGATEWAY: str = 'LWGATEWAY'
     RU: str = 'RU'
+    CUDU: str = 'CUDU'
 
 class PduModel(BaseModel):
     """
@@ -261,17 +265,19 @@ class PduModel(BaseModel):
     """
     name: str = Field(description="The name and identifier of the PDU")
     area: int = Field(description="The area where the PDU is located")
-    pdu_type: Optional[PduType] = Field(default=None, description="The type of PDU. E.g. gnb, RU, Lorawan gateway...")
-    type: str = Field(description="The specific type of PDU like UERANSIM for gnb")
-    user: str = Field(description="The user for accessing the PDU")
-    passwd: str = Field(description="password")
-    nfvo_onboarded: bool = False
-    implementation: str = Field(description="Class of the configurator")
-    config: dict = Field(default={}, description="Additional configuration parameters needed by the PDU to be accessed/configured")
-    last_applied_config: dict = Field(default={}, description="The last configuration used by the configurator to set up the device")
-    details: str = Field(default="", description="???")
-    interface: List[PduInterface] = Field(default=[])
+    type: PduType = Field(description="The type of PDU. E.g. gnb, RU, Lorawan gateway...")
+    instance_type: str = Field(description="The specific type of PDU like UERANSIM for gnb, used to find the class to configure the PDU")
+    description: Optional[str] = Field(default=None, description="A description of the PDU")
+
     network_interfaces: List[NetworkInterfaceModel] = Field(default=[], description="Network interfaces actives on the PDU")
+    username: Optional[str] = Field(default=None, description="The username for accessing the PDU")
+    password: Optional[str] = Field(default=None, description="The password of the management user")
+    become_password: Optional[str] = Field(default=None, description="Password for privilege escalation if needed")
+
+    config: dict = Field(default={}, description="Additional configuration parameters needed by the PDU to be accessed/configured")
+
+    locked_by: Optional[str] = Field(default=None, description="The id of the blueprint who locked the PDU")
+    # last_applied_config: dict = Field(default={}, description="The last configuration used by the configurator to set up the device")
 
     def __eq__(self, other):
         """
@@ -281,3 +287,13 @@ class PduModel(BaseModel):
         if isinstance(other, PduModel):
             return self.name == other.name
         return False
+
+    def get_mgmt_ip(self) -> str:
+        """
+        Get the management ip address for this PDU
+
+        Returns: IP address of the management interface
+        """
+        for interface in self.network_interfaces:
+            if interface.mgmt:
+                return interface.ip.exploded

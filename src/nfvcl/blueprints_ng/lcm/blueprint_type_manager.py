@@ -176,7 +176,7 @@ class blueprint_type:
         """
         module_routes = []
         for key in cls.path_function_mapping.keys():
-            if key.startswith(module_name):
+            if key.split("/")[0] == module_name:
                 module_routes.append(cls.path_function_mapping[key])
         return module_routes
 

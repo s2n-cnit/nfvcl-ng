@@ -7,6 +7,11 @@ a specific core check the following pages:
 - [SD-Core Blueprint](../../ueransim/ueransim_blue_creation.md)
 - [OpenAirInterface Blueprint](../../ueransim/ueransim_blue_creation.md)
 
+```{image} ../../../images/blueprint/5g/Topology-5G.svg
+:alt: 5G topology
+:align: center
+```
+
 ## Requirements
 
 > ⚠️ **Check the requirements carefully**
@@ -31,7 +36,7 @@ a specific core check the following pages:
 
 In the following example `{{ blueprint_type }}` need to be replaced with the type of the blueprint that you want to deploy, for example:
 - sdcore
-- OpenAirInterface
+- oai
 
 > API (POST): *{{ base_url }}/nfvcl/v2/api/blue/{{ blueprint_type }}*
 
@@ -41,14 +46,16 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
       "network_endpoints":{
          "mgt":"dmz-internal",
          "wan":"alderico-net",
-         "n3":"n3",
-         "n6":"n6",
          "data_nets":[
             {
                "net_name":"internet",
                "dnn":"internet",
                "dns":"8.8.8.8",
-               "pools":[{"cidr":"10.250.0.0/16"}],
+               "pools":[
+                  {
+                     "cidr":"10.250.0.0/16"
+                  }
+               ],
                "uplinkAmbr":"100 Mbps",
                "downlinkAmbr":"100 Mbps",
                "default5qi":"9"
@@ -98,7 +105,7 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
       ],
       "subscribers":[
          {
-            "imsi":"001014000000002",
+            "imsi":"001014000000001",
             "k":"814BCB2AEBDA557AEEF021BB21BEFE25",
             "opc":"9B5DA0D4EC1E2D091A6B47E3B91D2496",
             "authenticationMethod":"5G_AKA",
@@ -122,6 +129,14 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
          "nci":"0x00000005",
          "idLength":32,
          "core":true,
+         "upf":{
+            "type":"sdcore_upf"
+         },
+         "networks":{
+            "n3":"alderico-n3",
+            "n6":"alderico-n6",
+            "gnb":"alderico-gnb"
+         },
          "slices":[
             {
                "sliceType":"EMBB",
@@ -135,12 +150,20 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
 
 - In the `network_endpoints` section:
   - `mgt` is the management network.
-  - `wan` is the network on which the K8s load balancer will assign the addresses to the core components.
+  - `wan` is the network on which the K8s load balancer will assign the addresses to the core network functions.
   - `n3` the N3 network for UPF <-> gNB connection.
   - `n6` the N6 network for UPF <-> internet connection.
 - The `dnn` and `net_name` fields in `data_nets` section can be chosen as desired, but it must be the same for both.
   Furthermore, when you create a UERANSIM blueprint you must set the field `apn` equal to `dnn` and `net_name` value.
 - Dnn `cidrs` must not overlap.
+- In the `areas` section for each are you need to set:
+  - `upf.type`: the UPF implementation to deploy in this area, currently you can choose between `sdcore_upf` and `oai_upf`, beware that using an UPF implementation different from the core may not work.
+  - `networks`:
+    - `n3`: The network to use for user plane data between gNB and UPF (going through the router)
+    - `n6`: The network to use for user plane data between UPF and internet (going through the router)
+    - `gnb`: The network between gNB and Router
+
+For more details about the networks check 5G topology TODO
 
 Example payload for two areas, two slice and two subscribers.
 
@@ -150,14 +173,16 @@ Example payload for two areas, two slice and two subscribers.
       "network_endpoints":{
          "mgt":"dmz-internal",
          "wan":"alderico-net",
-         "n3":"n3",
-         "n6":"n6",
          "data_nets":[
             {
                "net_name":"internet",
                "dnn":"internet",
                "dns":"8.8.8.8",
-               "pools":[{"cidr":"10.250.0.0/16"}],
+               "pools":[
+                  {
+                     "cidr":"10.250.0.0/16"
+                  }
+               ],
                "uplinkAmbr":"100 Mbps",
                "downlinkAmbr":"100 Mbps",
                "default5qi":"9"
@@ -166,7 +191,11 @@ Example payload for two areas, two slice and two subscribers.
                "net_name":"tim",
                "dnn":"tim",
                "dns":"8.8.8.8",
-               "pools":[{"cidr":"10.251.0.0/16"}],
+               "pools":[
+                  {
+                     "cidr":"10.251.0.0/16"
+                  }
+               ],
                "uplinkAmbr":"100 Mbps",
                "downlinkAmbr":"100 Mbps",
                "default5qi":"9"
@@ -254,7 +283,7 @@ Example payload for two areas, two slice and two subscribers.
       ],
       "subscribers":[
          {
-            "imsi":"001014000000002",
+            "imsi":"001014000000001",
             "k":"814BCB2AEBDA557AEEF021BB21BEFE25",
             "opc":"9B5DA0D4EC1E2D091A6B47E3B91D2496",
             "authenticationMethod":"5G_AKA",
@@ -271,7 +300,7 @@ Example payload for two areas, two slice and two subscribers.
             ]
          },
          {
-            "imsi":"001014000000003",
+            "imsi":"001014000000004",
             "k":"814BCB2AEBDA557AEEF021BB21BEFE25",
             "opc":"9B5DA0D4EC1E2D091A6B47E3B91D2496",
             "authenticationMethod":"5G_AKA",
@@ -292,9 +321,17 @@ Example payload for two areas, two slice and two subscribers.
    "areas":[
       {
          "id":0,
-         "nci":"0x00000000",
+         "nci":"0x00000005",
          "idLength":32,
          "core":true,
+         "upf":{
+            "type":"sdcore_upf"
+         },
+         "networks":{
+            "n3":"alderico-n3",
+            "n6":"alderico-n6",
+            "gnb":"alderico-gnb"
+         },
          "slices":[
             {
                "sliceType":"EMBB",
@@ -304,9 +341,17 @@ Example payload for two areas, two slice and two subscribers.
       },
       {
          "id":1,
-         "nci":"0x00000001",
+         "nci":"0x00000005",
          "idLength":32,
          "core":false,
+         "upf":{
+            "type":"sdcore_upf"
+         },
+         "networks":{
+            "n3":"alderico-n3",
+            "n6":"alderico-n6",
+            "gnb":"alderico-gnb"
+         },
          "slices":[
             {
                "sliceType":"EMBB",

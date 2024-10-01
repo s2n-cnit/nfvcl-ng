@@ -1,0 +1,61 @@
+---
+- hosts: all
+  become: true
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: s2n_cnit.nfvcl.liteon
+  tasks:
+  - name: Enter config mode
+    cli_command:
+      command: configure terminal
+
+  - name: Set gNB ID
+    cli_command:
+      command: gnbid {{ gnbid }}
+
+  - name: Set TAC
+    cli_command:
+      command: tac {{ tac }}
+
+  - name: Set MCC and MNC
+    cli_command:
+      command: mcc-mnc set {{ mcc }} {{ mnc }}
+
+  - name: Set NCI
+    cli_command:
+      command: nci {{ nci }}
+
+  - name: Set PCI
+    cli_command:
+      command: pci {{ pci }}
+
+  - name: Set SST
+    cli_command:
+      command: sst {{ sst }}
+
+  - name: Set SD
+    cli_command:
+      command: sd {{ sd }}
+
+  - name: Set remote NGC IP (AMF)
+    cli_command:
+      command: ngc-remote {{ amf_ip }}
+
+  - name: Set remote NGU IP (UPF)
+    cli_command:
+      command: ngu-remote {{ upf_ip }}
+
+# RADIO
+
+  - name: Set frequency
+    cli_command:
+      command: frequency set-frequency-{{ frequency }}
+
+  - name: Commit changes
+    cli_command:
+      command: commit
+
+  - name: Exit configuration mode
+    cli_command:
+      command: exit
+...

@@ -17,6 +17,7 @@ class GNBPDUConfigure(NFVCLBaseModel):
     tac: int = Field()
 
     amf_ip: str = Field()
+    upf_ip: str = Field()
     amf_port: int = Field()
 
     nssai: List[GNBPDUSlice] = Field()

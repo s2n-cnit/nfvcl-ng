@@ -44,7 +44,7 @@ class CloudInitDhcpOverride(NFVCLBaseModel):
 
 
 # class CloudInitSubnet(NFVCLBaseModel):
-#     type: str = Field(default="dhcp")
+#     type___: str = Field(default="dhcp") # added ___ because otherwise this being a comment break mypy
 #     dhcp4_overrides: Optional[CloudInitDhcpOverride] = Field(default=None, alias='dhcp4-overrides')
 
 

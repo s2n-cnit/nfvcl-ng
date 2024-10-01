@@ -17,6 +17,7 @@ def LS(s):
 class AnsiblePlaybook(NFVCLBaseModel):
     name: Optional[str] = Field(default=None)
     hosts: str = Field()
+    connection: Optional[str] = Field(default=None)
     become: bool = Field()
     gather_facts: str = Field()
     tasks: List[Dict[str, Any]] = Field()
@@ -87,7 +88,7 @@ class AnsibleServiceTask(AnsibleTask):
 
 
 class AnsiblePlaybookBuilder:
-    def __init__(self, name, become=True, gather_facts=False):
+    def __init__(self, name, become=True, gather_facts=False, connection=None):
         """
         Create a new Ansible Playbook builder
         Args:
@@ -100,6 +101,7 @@ class AnsiblePlaybookBuilder:
             name=self.name,
             hosts="all",
             become=become,
+            connection=connection,
             gather_facts="yes" if gather_facts else "no",
             vars={},
             tasks=[],

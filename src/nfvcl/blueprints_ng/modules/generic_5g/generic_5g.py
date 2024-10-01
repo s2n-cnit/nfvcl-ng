@@ -313,7 +313,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         upf_list_for_slice: List[DeployedUPFInfo] = []
         for edge_area in self.state.edge_areas.values():
             for upf_deployed in edge_area.upf.upf_list:
-                if len(list(filter(lambda x: x.id == slice_id, upf_deployed.served_slices))) > 0:
+                if len(list(filter(lambda x: x.id == slice_id.rjust(6, "0"), upf_deployed.served_slices))) > 0:
                     upf_list_for_slice.append(upf_deployed)
         return upf_list_for_slice
 
@@ -373,6 +373,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                 plmn=self.state.current_config.config.plmn,
                 tac=pdu.area,
                 amf_ip=self.get_amf_ip(),
+                upf_ip=self.get_upfs_for_slice(str(slices[0].sd))[0].network_info.n3_ip.exploded, # This is not really right, but it's needed for LiteON AIO
                 amf_port=38412,
                 nssai=slices,
                 additional_routes=self._additional_routes_for_gnb(str(pdu.area))

@@ -13,7 +13,7 @@ sudo apt install -y python3.11 python3.11-dev python3.11-venv python3.11-distuti
 
 echo "Installing Ansible"
 sudo apt install -y ansible
-sudo mkdir /etc/ansible
+sudo mkdir -p /etc/ansible
 sudo touch /etc/ansible/ansible.cfg
 echo -e '[defaults]\nhost_key_checking = False' | sudo tee -a /etc/ansible/ansible.cfg
 
@@ -53,6 +53,6 @@ echo "Installing Python project dependencies"
 /home/ubuntu/.local/bin/poetry install
 
 echo "Installing Ansible Collections"
-sudo ansible-galaxy collection install vyos.vyos
-sudo ansible-galaxy collection install prometheus.prometheus
-sudo ansible-galaxy collection install git+https://github.com/s2n-cnit/nfvcl-ansible-collection.git,v0.0.1
+ansible-galaxy collection install vyos.vyos
+ansible-galaxy collection install prometheus.prometheus
+ansible-galaxy collection install git+https://github.com/s2n-cnit/nfvcl-ansible-collection.git,v0.0.1

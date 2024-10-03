@@ -13,9 +13,9 @@ from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel,
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
-    SstConvertion, Router5GNetworkInfo
+    SstConvertion, Router5GNetworkInfo, SubDataNets
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
-    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel
+    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, SliceModel
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.linux.ip import Route
@@ -478,6 +478,69 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             raise e
 
         self.logger.success(f"Deleted UE with IMSI: {subscriber_model.imsi}")
+
+    @day2_function("/add_dnn", [HttpRequestType.PUT])
+    def day2_add_dnn(self, dnn_model: Core5GAddDnnModel):
+        """
+        Add a new DNN to the core
+        Args:
+            dnn_model: Model of the DNN to add
+        """
+        self.logger.info(f"Adding DNN: {dnn_model.dnn}")
+
+        # Check if the DNN already present
+        if any(dnn.dnn == dnn_model.dnn for dnn in self.state.current_config.config.network_endpoints.data_nets):
+            raise BlueprintNGException(f"DNN {dnn_model.dnn} already exist")
+
+        backup_config = copy.deepcopy(self.state.current_config)
+
+        self.state.current_config.config.network_endpoints.data_nets.append(SubDataNets.model_validate(dnn_model.model_dump(by_alias=True)))
+
+        try:
+            self.add_dnn(dnn_model)
+        except Exception as e:
+            self.logger.exception(f"Error adding DNN: {dnn_model.dnn}", exc_info=e)
+            self.state.current_config = backup_config
+            raise e
+
+        self.logger.success(f"Added DNN: {dnn_model.dnn}")
+
+    def add_dnn(self, dnn_model: Core5GAddDnnModel):
+        self.update_core()
+
+    @day2_function("/del_dnn", [HttpRequestType.PUT])
+    def day2_del_dnn(self, del_dnn_model: Core5GDelDnnModel):
+        """
+        Delete a DNN from the core
+        Args:
+            del_dnn_model: Model of the UE to be deleted
+        """
+        self.logger.info(f"Deleting DNN: {del_dnn_model.dnn}")
+
+        # Check if the DNN is present
+        if not any(dnn.dnn == del_dnn_model.dnn for dnn in self.state.current_config.config.network_endpoints.data_nets):
+            raise BlueprintNGException(f"DNN {del_dnn_model.dnn} not found")
+
+        # Check if DNN is used by some slice
+        for slice in self.state.current_config.config.sliceProfiles:
+            if del_dnn_model.dnn in slice.dnnList:
+                raise BlueprintNGException(f"DNN {del_dnn_model.dnn} present in slice {slice.sliceId}")
+
+        backup_config = copy.deepcopy(self.state.current_config)
+
+        self.state.current_config.config.network_endpoints.data_nets = list(filter(lambda x: x.dnn != del_dnn_model.dnn, self.state.current_config.config.network_endpoints.data_nets))
+
+        try:
+            self.del_dnn(del_dnn_model)
+        except Exception as e:
+            self.logger.exception(f"Error deleting DNN: {del_dnn_model.dnn}", exc_info=e)
+            self.state.current_config = backup_config
+            raise e
+
+        self.logger.success(f"Deleted DNN: {del_dnn_model.dnn}")
+
+    def del_dnn(self, del_dnn_model: Core5GDelDnnModel):
+        self.update_core()
 
     def day2_add_slice_generic(self, add_slice_model: Core5GAddSliceModel, oss: bool):
         new_slice: SubSliceProfiles = SubSliceProfiles.model_validate(add_slice_model.model_dump(by_alias=True))

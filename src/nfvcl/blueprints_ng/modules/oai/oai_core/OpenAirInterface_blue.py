@@ -489,22 +489,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.update_edge_areas()
         self.update_gnb_config()
 
-    @day2_function("/add_dnn", [HttpRequestType.PUT])
     def add_dnn(self, dnn: Core5GAddDnnModel):
-        """
-        Add new SubDataNets to conf.
-        Args:
-            dnn:SubDataNets to add.
-
-        """
         self.add_dnn_to_conf(dnn)
 
-    @day2_function("/del_dnn", [HttpRequestType.PUT])
     def del_dnn(self, dnn: Core5GDelDnnModel):
-        """
-        Delete SubDataNets from conf.
-        Args:
-            dnn: SubDataNets to delete.
-
-        """
         self.del_dnn_from_conf(dnn.dnn)

@@ -154,9 +154,9 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                 # Updating UPF configuration (move to a new method in the future?)
                 updated_config = self._create_upf_config(area.id)
                 if edge_info.upf.current_config != updated_config:
-                    edge_info.upf.current_config = updated_config
                     self.logger.info(f"Updating UPF for area {area.id}")
                     self.call_external_function(edge_info.upf.blue_id, "update", updated_config)
+                    self.state.edge_areas[str(area.id)].upf = self.get_upfs_info(area.id, edge_info.upf.blue_id, updated_config)
 
             # The router need to route the traffic for the DNN ip pool through the UPF N6 interface
             for deployed_upf in self.state.edge_areas[str(area.id)].upf.upf_list:
@@ -285,16 +285,29 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         upf_id = get_blueprint_manager().create_blueprint(upf_create_model, upf_type, wait=True, parent_id=self.id)
         self.register_children(upf_id)
 
+        upf_info = self.get_upfs_info(area_id, upf_id, upf_create_model)
+        self.logger.info(f"Deployed UPF for area {area_id}")
+
+        return upf_info
+
+    def get_upfs_info(self, area_id: int, upf_id: str, current_config: UPFBlueCreateModel) -> UPFInfo:
+        """
+        Get the current upfs info from the deployed blueprint
+        Args:
+            area_id: Area of the UPF
+            upf_id: Blueprint ID of the UPF
+            current_config: Current config of the UPF
+
+        Returns: UPFInfo
+        """
         upf_deployed_info: List[DeployedUPFInfo] = self.call_external_function(upf_id, "get_upfs_info").result
         upf_info = UPFInfo(
             blue_id=upf_id,
             router_gnb_ip=self.state.edge_areas[str(area_id)].router.network.gnb_ip.exploded,
             external=False,
             upf_list=upf_deployed_info,
-            current_config=upf_create_model
+            current_config=current_config
         )
-        self.logger.info(f"Deployed UPF for area {area_id}")
-
         return upf_info
 
     def undeploy_upf_blueprint(self, area_id: int):

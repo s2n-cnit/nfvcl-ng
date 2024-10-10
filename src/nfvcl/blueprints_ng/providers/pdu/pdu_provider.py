@@ -1,3 +1,4 @@
+import copy
 from typing import Optional, Any, List
 
 from pydantic import Field
@@ -132,7 +133,10 @@ class PDUProvider(BlueprintNGProviderInterface):
         raise PDUProviderException(f"The PDU is not locked or locked by another blueprint: {pdu_model.locked_by}")
 
     def final_cleanup(self):
-        for pdu_to_unlock in self.data.locked_pdus:
-            updated_model = self.find_by_name(pdu_to_unlock.name)
-            self.unlock_pdu(updated_model)
+        for pdu_to_unlock in copy.copy(self.data.locked_pdus):
+            try:
+                updated_model = self.find_by_name(pdu_to_unlock.name)
+                self.unlock_pdu(updated_model)
+            except Exception as e:
+                self.logger.warning(f"Error unlocking PDU '{pdu_to_unlock.name}': {e}")
         self.save_to_db()

@@ -1,0 +1,12 @@
+---
+- hosts: all
+  tasks:
+  - name: stop upf container
+    shell: |
+       cd /root/Free5GC_UPF
+       docker compose down
+  - name: start upf container
+    shell: |
+       cd /root/Free5GC_UPF
+       docker compose up -d
+...

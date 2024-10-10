@@ -1,0 +1,17 @@
+[Unit]
+Description=FREE5GC UPF
+After=network.target
+After=docker.service
+BindsTo=docker.service
+ReloadPropagatedFrom=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/Free5GC_UPF/
+ExecStart=/root/Free5GC_UPF/start.sh
+RemainAfterExit=true
+ExecStop=/root/Free5GC_UPF/stop.sh
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

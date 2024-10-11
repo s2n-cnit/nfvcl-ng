@@ -81,6 +81,19 @@ class PerformanceManager:
         for blueid in self.performance_dict.keys():
             self.performance_collection.update_one({ "blueprint_id": blueid }, { "$set": self.performance_dict[blueid].model_dump()}, upsert=True)
 
+    def get_blue_performance(self, blueprint_id: str) -> BlueprintPerformance:
+        """
+        Get the performance metrics for the blueprint
+        Args:
+            blueprint_id: Blueprint id
+
+        Returns: A BlueprintPerformance instance for the blueprint
+        """
+        element = self.performance_collection.find_one({"blueprint_id": blueprint_id})
+        if element:
+            return BlueprintPerformance.model_validate(element)
+        raise ValueError(f"No performance metrics found for blueprint '{blueprint_id}'")
+
     def get_pending_operation_id(self, blueprint_id: str) -> Optional[str]:
         """
         Get the current pending operation id for a blueprint

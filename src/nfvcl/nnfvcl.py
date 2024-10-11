@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # DO NOT MOVE THIS PIECE OF CODE -------
 # Log level must be set before loggers are created!
+from nfvcl.rest_endpoints.performance import performance_router
 from nfvcl.rest_endpoints.rest_utils import ansible_router
 from nfvcl.rest_endpoints.day2action import day2_router
 from nfvcl.rest_endpoints.k8s import k8s_router
@@ -48,6 +49,7 @@ app.include_router(blue_ng_router2)
 app.include_router(day2_router)
 app.include_router(k8s_router)
 app.include_router(ansible_router)
+app.include_router(performance_router)
 
 # Making repositories available for external access. Configuration files will be served from here.
 accessible_folder = _nfvcl_config.nfvcl.mounted_folder

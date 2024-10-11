@@ -25,12 +25,13 @@ class PDUProvider(BlueprintNGProviderInterface):
     def init(self):
         self.data: PDUProviderData = PDUProviderData()
 
-    def find_pdu(self, area: int, pdu_type: PduType, name: Optional[str] = None) -> PduModel:
+    def find_pdu(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None, name: Optional[str] = None) -> PduModel:
         """
         Find a PDU given the search parameters
         Args:
             area: Area of the PDU
             pdu_type: Type of the PDU
+            instance_type: Instance type of the PDU, optional
             name: Name of the PDU, optional, may be needed if there are multiple PDUs of the same type in the same area
 
         Returns: The PDU if exactly one is found
@@ -40,10 +41,13 @@ class PDUProvider(BlueprintNGProviderInterface):
         filtered_by_area = list(filter(lambda x: x.area == area, all_pdus))
         filtered_by_type = list(filter(lambda x: x.type == pdu_type, filtered_by_area))
 
-        if name:
-            found = list(filter(lambda x: x.name == name, filtered_by_type))
+        if instance_type:
+            found = list(filter(lambda x: x.instance_type == instance_type, filtered_by_type))
         else:
             found = filtered_by_type
+
+        if name:
+            found = list(filter(lambda x: x.name == name, found))
 
         if len(found) == 0:
             raise PDUProviderException(f"No PDU found with area {area} of type {pdu_type} and with name '{name}' (None mean that the name was not used to find the PDU)")

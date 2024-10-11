@@ -283,8 +283,8 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
         return self.get_k8s_provider(helm_chart_resource.area).get_pod_log(helm_chart_resource, pod_name, tail_lines)
 
-    def find_pdu(self, area: int, pdu_type: PduType, name: Optional[str] = None) -> PduModel:
-        return self.get_pdu_provider().find_pdu(area, pdu_type, name)
+    def find_pdu(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None, name: Optional[str] = None) -> PduModel:
+        return self.get_pdu_provider().find_pdu(area, pdu_type, instance_type, name)
 
     def is_pdu_locked(self, pdu_model: PduModel) -> bool:
         return self.get_pdu_provider().is_pdu_locked(pdu_model)

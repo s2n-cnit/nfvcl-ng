@@ -2,6 +2,8 @@ import abc
 
 from nfvcl.models.network import PduModel
 
+class PDUException(Exception):
+    pass
 
 class PDUConfigurator(abc.ABC):
     def __init__(self, pdu_model: PduModel):

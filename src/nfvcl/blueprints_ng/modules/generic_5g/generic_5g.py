@@ -75,6 +75,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
     def create(self, create_model: Create5gModel):
         super().create(create_model)
         self.state.current_config = copy.deepcopy(create_model)
+        self.configuration_feasibility_check(create_model)
         self.pre_creation_checks()
 
         # Update the edge areas creating the router (if needed) and the UPFs
@@ -95,6 +96,19 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         This method should raise an exception if the prerequisites are not met
         """
         self.get_gnb_pdus()
+
+    def configuration_feasibility_check(self, config_model: Create5gModel):
+        """
+        Check if the config is feasible
+        Args:
+            config_model: Config model of which to check for feasibility
+        """
+        # Check multiple slices with the same DNN
+        ddns = []
+        for slice in config_model.config.sliceProfiles:
+            ddns.extend(slice.dnnList)
+        if len(list(set(ddns))) < len(ddns):
+            raise BlueprintNGException("Cannot have multiple slices with the same DNN")
 
     @abstractmethod
     def create_5g(self, create_model: Create5gModel):
@@ -544,6 +558,12 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def day2_add_slice_generic(self, add_slice_model: Core5GAddSliceModel, oss: bool):
         new_slice: SubSliceProfiles = SubSliceProfiles.model_validate(add_slice_model.model_dump(by_alias=True))
+
+        # Create a copy of the config and update it to check if it's still correct
+        tmp_updated_config = copy.deepcopy(self.state.current_config)
+        tmp_updated_config.config.sliceProfiles.append(new_slice)
+        self.configuration_feasibility_check(tmp_updated_config)
+
         if any(sub_slice.sliceId == new_slice.sliceId for sub_slice in self.state.current_config.config.sliceProfiles):
             raise BlueprintNGException(f"Slice {new_slice.sliceId} already exist")
 

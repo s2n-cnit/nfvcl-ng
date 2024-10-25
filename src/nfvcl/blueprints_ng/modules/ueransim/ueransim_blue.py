@@ -7,7 +7,6 @@ from pydantic import Field
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
-from nfvcl.blueprints_ng.pdu_configurators.implementations.gnb.ueransim_pdu_configurator import UERANSIMPDUConfigurator
 from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
 from nfvcl.blueprints_ng.utils import rel_path

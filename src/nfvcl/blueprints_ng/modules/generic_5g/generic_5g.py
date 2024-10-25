@@ -5,7 +5,6 @@ from typing import Generic, TypeVar, Optional, List, final, Dict, Set
 from pydantic import Field
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import day2_function
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel, Router5GCreateModelNetworks, \
@@ -169,7 +168,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                 updated_config = self._create_upf_config(area.id)
                 if edge_info.upf.current_config != updated_config:
                     self.logger.info(f"Updating UPF for area {area.id}")
-                    self.call_external_function(edge_info.upf.blue_id, "update", updated_config)
+                    self.provider.call_blueprint_function(edge_info.upf.blue_id, "update", updated_config)
                     self.state.edge_areas[str(area.id)].upf = self.get_upfs_info(area.id, edge_info.upf.blue_id, updated_config)
 
             # The router need to route the traffic for the DNN ip pool through the UPF N6 interface
@@ -219,10 +218,10 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             )
         )
 
-        router_id = get_blueprint_manager().create_blueprint(router_5g_create_model, ROUTER_BLUEPRINT_TYPE, wait=True, parent_id=self.id)
+        router_id = self.provider.create_blueprint(router_5g_create_model, ROUTER_BLUEPRINT_TYPE)
         self.register_children(router_id)
         # After the router has been deployed gather the network information
-        router_info: Router5GNetworkInfo = self.call_external_function(router_id, ROUTER_GET_INFO_FUNCTION).result
+        router_info: Router5GNetworkInfo = self.provider.call_blueprint_function(router_id, ROUTER_GET_INFO_FUNCTION).result
         self.logger.info(f"Deployed router for area {area_id}")
         return Router5GInfo(external=False, blue_id=router_id, network=router_info)
 
@@ -235,7 +234,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         self.logger.info(f"Deleting router for area {area_id}")
         area = self.state.current_config.get_area(area_id)
         edge_area = self.state.edge_areas[str(area_id)]
-        get_blueprint_manager().delete_blueprint(edge_area.router.blue_id, wait=True)
+        self.provider.delete_blueprint(edge_area.router.blue_id)
         self.deregister_children(edge_area.router.blue_id)
         self.logger.info(f"Deleted router for area {area_id}")
 
@@ -254,7 +253,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             self.logger.warning(f"ip r add {cidr} via {nexthop}")
         else:
             self.logger.info(f"Adding route '{cidr}' via '{nexthop}' to router {router_info.blue_id}")
-            self.call_external_function(router_info.blue_id, ROUTER_ADD_ROUTES, Router5GAddRouteModel(additional_routes=[
+            self.provider.call_blueprint_function(router_info.blue_id, ROUTER_ADD_ROUTES, Router5GAddRouteModel(additional_routes=[
                 Route(network_cidr=cidr, next_hop=nexthop)
             ]))
 
@@ -296,7 +295,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         """
         self.logger.info(f"Deploying UPF for area {area_id}")
         upf_create_model = self._create_upf_config(area_id)
-        upf_id = get_blueprint_manager().create_blueprint(upf_create_model, upf_type, wait=True, parent_id=self.id)
+        upf_id = self.provider.create_blueprint(upf_create_model, upf_type)
         self.register_children(upf_id)
 
         upf_info = self.get_upfs_info(area_id, upf_id, upf_create_model)
@@ -314,7 +313,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         Returns: UPFInfo
         """
-        upf_deployed_info: List[DeployedUPFInfo] = self.call_external_function(upf_id, "get_upfs_info").result
+        upf_deployed_info: List[DeployedUPFInfo] = self.provider.call_blueprint_function(upf_id, "get_upfs_info").result
         upf_info = UPFInfo(
             blue_id=upf_id,
             router_gnb_ip=self.state.edge_areas[str(area_id)].router.network.gnb_ip.exploded,
@@ -332,7 +331,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         """
         self.logger.info(f"Deleting UPF for area {area_id}")
         blue_id = self.state.edge_areas[str(area_id)].upf.blue_id
-        get_blueprint_manager().delete_blueprint(blue_id, wait=True)
+        self.provider.delete_blueprint(blue_id)
         self.deregister_children(blue_id)
         self.logger.info(f"Deleted UPF for area {area_id}")
 

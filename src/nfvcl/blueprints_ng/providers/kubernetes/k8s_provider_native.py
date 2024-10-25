@@ -212,7 +212,10 @@ class K8SProviderNative(K8SProviderInterface):
         k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
         for ns in self.data.namespaces:
             self.logger.debug(f"Deleting k8s namespace '{ns}'")
-            k8s_delete_namespace(k8s_config, ns)
+            try:
+                k8s_delete_namespace(k8s_config, ns)
+            except Exception as e:
+                self.logger.error(f"Error deleting k8s namespace '{ns}': {str(e)}")
 
     def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
         k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)

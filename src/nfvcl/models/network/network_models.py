@@ -258,6 +258,7 @@ class PduType(str, Enum):
     LWGATEWAY: str = 'LWGATEWAY'
     RU: str = 'RU'
     CUDU: str = 'CUDU'
+    CORE5G: str = 'CORE5G'
 
 class PduModel(BaseModel):
     """

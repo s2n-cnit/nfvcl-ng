@@ -12,3 +12,4 @@ from .sdcore_upf import *
 from .ubuntu import *
 from .ueransim import *
 from .vyos import *
+from .athonet import *

@@ -4,6 +4,10 @@ on:
   push:
     branches: [ "HORSE" ]
 
+env:
+  MONGO_PWD: password
+  MONGO_USR: admin
+
 permissions:
   contents: read
 

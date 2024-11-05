@@ -13,7 +13,7 @@ os.environ.get('HORSE_DEBUG')
 from nfvcl.rest_endpoints.HORSE.horse import *
 from tests.HORSE.dummy_server import HTTPDummyServer, set_pipe
 
-HTTP_DUMMY_SRV_PORT = 9999
+HTTP_DUMMY_SRV_PORT = 9995
 PLAYBOOK_FILE = "tests/HORSE/test_files/test_playbook.yaml"
 action_id = str(uuid.uuid4())
 action_type = RTRActionType.TEST

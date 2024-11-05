@@ -143,6 +143,8 @@ def send_callback_http(url: HttpUrl, actionid: str, callback_code: CallbackCode,
         callback_code: The status code of the performed action
         description: The description of the performed action, describes the error in detail, if any.
     """
+    if not url:
+        return
     callback_data = CallbackModel(actionid=actionid, code=callback_code, description=description)
     try:
         # Trying sending a request to the callback URL

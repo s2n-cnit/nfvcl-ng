@@ -1,5 +1,0 @@
-#!/bin/bash
-echo 1 > /proc/sys/net/ipv4/ip_forward
-
-ethtool --offload {{ n3_if }} rx off tx off
-ip r add {{ ue_ip_pool_cidr }} via {{ gnb_ip }} dev {{ gnb_if }}

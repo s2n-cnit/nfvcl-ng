@@ -1,15 +1,16 @@
 import json
-from fastapi import APIRouter, HTTPException, Body, status
-from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
-    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota, V1ClusterRoleBinding, V1Node, V1Deployment, V1DeploymentList
-from nfvcl.models.event import Event
-from nfvcl.models.k8s.blueprint_k8s_model import K8sModel
-from nfvcl.main import topology_lock
-from verboselogs import VerboseLogger
 from typing import List
 
+from fastapi import APIRouter, HTTPException, Body, status
+from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ServiceAccount, \
+    V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1Secret, V1SecretList, V1ResourceQuota, V1ClusterRoleBinding, \
+    V1Node, V1Deployment, V1DeploymentList, V1NodeList
+from verboselogs import VerboseLogger
+
+from nfvcl.main import topology_lock
+from nfvcl.models.event import Event
+from nfvcl.models.k8s.blueprint_k8s_model import TopologyK8sModel
 from nfvcl.models.k8s.common_k8s_model import Labels
-from nfvcl.models.k8s.k8s_events import K8sEventType
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sOperationType, K8sPluginName
 from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sQuota
 from nfvcl.models.response_model import OssCompliantResponse, OssStatus
@@ -17,11 +18,15 @@ from nfvcl.rest_endpoints.rest_callback import RestAnswer202
 from nfvcl.topology.topology import Topology
 from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_installed_plugins, \
     get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
-from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
-from nfvcl.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, \
-    k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, k8s_admin_role_over_namespace, \
-    k8s_delete_namespace, k8s_add_quota_to_namespace, k8s_cluster_admin, k8s_add_label_to_k8s_node, k8s_get_nodes, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_deployments
+from nfvcl.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, \
+    k8s_admin_role_to_sa, \
+    k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, \
+    k8s_admin_role_over_namespace, \
+    k8s_delete_namespace, k8s_add_quota_to_namespace, k8s_cluster_admin, k8s_add_label_to_k8s_node, k8s_get_nodes, \
+    k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_deployments
 from nfvcl.utils.log import create_logger
+from nfvcl.utils.redis_utils.event_types import K8sEventType
+from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
 from nfvcl.utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 
 k8s_router = APIRouter(
@@ -33,7 +38,7 @@ logger: VerboseLogger = create_logger('K8s Management REST endpoint')
 redis_cli = get_redis_instance()
 
 
-def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
+def get_k8s_cluster_by_id(cluster_id: str) -> TopologyK8sModel:
     """
     Get the k8s cluster from the topology. This method could be duplicated but in this case handle HTTP exceptions
     that give API user an idea of what is going wrong.
@@ -47,7 +52,7 @@ def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
         The matching k8s cluster or Throw HTTPException if NOT found.
     """
     topology = Topology.from_db(topology_lock)
-    k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
+    k8s_clusters: List[TopologyK8sModel] = topology.get_k8s_clusters()
     match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
     if match:
@@ -57,7 +62,8 @@ def get_k8s_cluster_by_id(cluster_id: str) -> K8sModel:
         raise HTTPException(status_code=404, detail="K8s cluster {} not found".format(cluster_id))
 
 
-def get_k8s_cluster_by_area(area_id: int) -> K8sModel:
+def get_k8s_cluster_by_area(area_id: int) -> TopologyK8sModel:
+    # TODO move in topology.py
     """
     Get the k8s cluster from the topology. This method could be duplicated but in this case handle HTTP exceptions
     that give API user an idea of what is going wrong.
@@ -71,7 +77,7 @@ def get_k8s_cluster_by_area(area_id: int) -> K8sModel:
         The matching k8s cluster or Throw HTTPException if NOT found.
     """
     topology = Topology.from_db(topology_lock)
-    k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
+    k8s_clusters: List[TopologyK8sModel] = topology.get_k8s_clusters()
     match = next((x for x in k8s_clusters if area_id in x.areas), None)
 
     if match:
@@ -96,7 +102,7 @@ async def get_k8s_installed_plugins(cluster_id: str):
         A list of installed plugins
     """
 
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     installed_plugins = get_installed_plugins(kube_client_config=k8s_config)
@@ -122,11 +128,9 @@ async def install_k8s_plugin(cluster_id: str, message: K8sPluginsToInstall):
         subscribing to NFVCL log at the redis instance.
     """
 
-    request = K8sModelManagement(k8s_ops=K8sOperationType.INSTALL_PLUGIN, cluster_id=cluster_id,
-                                 data=json.dumps(message.model_dump()))
+    request = K8sModelManagement(k8s_ops=K8sOperationType.INSTALL_PLUGIN, cluster_id=cluster_id, data=json.dumps(message.model_dump()))
 
-    event: Event = Event(operation=K8sEventType.PLUGIN_INSTALLED, data=request.model_dump())
-    trigger_redis_event(redis_cli=redis_cli, topic=K8S_MANAGEMENT_TOPIC, event=event)
+    trigger_redis_event(topic=K8S_MANAGEMENT_TOPIC, event_type=K8sEventType.PLUGIN_INSTALLED, data=request.model_dump())
 
     return RestAnswer202(id='K8s management')
 
@@ -144,11 +148,9 @@ async def apply_to_k8s(cluster_id: str, body=Body(...)):
         body: The yaml content to apply at the cluster
 
     """
-    request = K8sModelManagement(k8s_ops=K8sOperationType.APPLY_YAML, cluster_id=cluster_id,
-                                 data=body.decode('utf-8'))
+    request = K8sModelManagement(k8s_ops=K8sOperationType.APPLY_YAML, cluster_id=cluster_id, data=body.decode('utf-8'))
 
-    event: Event = Event(operation=K8sEventType.DEFINITION_APPLIED, data=request.model_dump())
-    trigger_redis_event(redis_cli=redis_cli, topic=K8S_MANAGEMENT_TOPIC, event=event)
+    trigger_redis_event(topic=K8S_MANAGEMENT_TOPIC, event_type=K8sEventType.DEFINITION_APPLIED, data=request.model_dump())
 
     return RestAnswer202(id='K8s management')
 
@@ -159,8 +161,7 @@ async def uninstall_k8s_plugin(cluster_id: str, message: List[K8sPluginName]):
     # TODO
     Still not implemented
     """
-    return RestAnswer202(id='K8s management', description="This operation is still not implemented",
-                         status="NOT IMPLEMENTED")
+    return RestAnswer202(id='K8s management', description="This operation is still not implemented", status="NOT IMPLEMENTED")
 
 
 @k8s_router.get("/{cluster_id}/cidr", response_model=dict)
@@ -178,7 +179,7 @@ async def get_k8s_cidr(cluster_id: str):
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -209,7 +210,7 @@ async def get_k8s_pods(cluster_id: str, namespace: str = ""):
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -245,7 +246,7 @@ async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = B
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -259,6 +260,7 @@ async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = B
 
     resp = OssCompliantResponse(status=OssStatus.ready, detail="Namespace created", result=created_namespace.to_dict())
     return resp
+
 
 @k8s_router.delete("/{cluster_id}/namespace/{name}", response_model=dict)
 async def delete_k8s_namespace(cluster_id: str, name: str = ""):
@@ -276,7 +278,7 @@ async def delete_k8s_namespace(cluster_id: str, name: str = ""):
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -309,7 +311,7 @@ async def get_k8s_service_account(cluster_id: str, username: str = "", namespace
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -341,7 +343,7 @@ async def get_k8s_roles(cluster_id: str, rolename: str = "", namespace: str = ""
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -371,7 +373,7 @@ async def get_k8s_namespace_list(cluster_id: str, namespace: str = ""):
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -403,7 +405,7 @@ async def give_admin_rights_to_sa(cluster_id: str, namespace: str, s_account: st
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -439,7 +441,7 @@ async def give_admin_rights_to_user_namespaced(cluster_id: str, namespace: str, 
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -472,7 +474,7 @@ async def give_cluster_admin_rights(cluster_id: str, user: str, cluster_role_bin
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -502,7 +504,7 @@ async def create_service_account(cluster_id: str, namespace: str, user: str):
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -536,7 +538,7 @@ async def create_secret_for_sa(cluster_id: str, namespace: str, user: str, secre
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -571,12 +573,12 @@ async def get_secrets(cluster_id: str, namespace: str = "", secret_name: str = "
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
         auth_response: V1SecretList = k8s_get_secrets(kube_client_config=k8s_config,
-                                                  namespace=namespace, secret_name=secret_name, owner=owner)
+                                                      namespace=namespace, secret_name=secret_name, owner=owner)
 
     except (ValueError, ApiException) as val_err:
         logger.error(val_err)
@@ -610,17 +612,17 @@ async def create_admin_sa_for_namespace(cluster_id: str, namespace: str, usernam
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
         # Creating SA
         sa = k8s_create_service_account(kube_client_config=k8s_config, namespace=namespace, username=username)
         # Creating role binding to be admin
-        binding_name = "rolebinding_admin_"+username
+        binding_name = "rolebinding_admin_" + username
         role = k8s_admin_role_to_sa(kube_client_config=k8s_config, namespace=namespace, username=username, role_binding_name=binding_name)
         # Create secret
-        secret_name = username+"-secret"
+        secret_name = username + "-secret"
         secret = k8s_create_secret_for_user(kube_client_config=k8s_config, namespace=namespace, username=username, secret_name=secret_name)
         # Returning secret WITH token included
         detailed_secret = k8s_get_secrets(kube_client_config=k8s_config, namespace=namespace, secret_name=secret.metadata.name)
@@ -655,7 +657,7 @@ async def create_k8s_kubectl_user(cluster_id: str, username: str, expire_seconds
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
@@ -687,11 +689,11 @@ async def apply_resource_quota_namespace(cluster_id: str, namespace: str, quota_
     """
 
     # Get k8s cluster and k8s config for client
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
     try:
-        quota_resp: V1ResourceQuota = k8s_add_quota_to_namespace(kube_client_config=k8s_config,namespace_name=namespace,
+        quota_resp: V1ResourceQuota = k8s_add_quota_to_namespace(kube_client_config=k8s_config, namespace_name=namespace,
                                                                  quota_name=quota_name, quota=quota)
 
     except (ValueError, ApiException) as val_err:
@@ -717,15 +719,16 @@ async def get_nodes(cluster_id: str, detailed: bool = False):
     Returns:
         If detailed a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
     """
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
     if detailed:
-        node_list: V1PodList = k8s_get_nodes(k8s_config, detailed=detailed)
+        node_list: V1NodeList = k8s_get_nodes(k8s_config, detailed=detailed)
         to_return = node_list.to_dict()
     else:
         name_list = k8s_get_nodes(k8s_config, detailed=detailed)
         to_return = {"nodes": name_list}
     return to_return
+
 
 @k8s_router.post("/{cluster_id}/node/{node_name}/", response_model=dict)
 async def add_label_to_k8s_node(cluster_id: str, node_name: str, labels: Labels):
@@ -743,10 +746,11 @@ async def add_label_to_k8s_node(cluster_id: str, node_name: str, labels: Labels)
     Returns:
         The updated node V1Node in dict form
     """
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
     node: V1Node = k8s_add_label_to_k8s_node(k8s_config, node_name=node_name, labels=labels)
     return node.to_dict()
+
 
 @k8s_router.get("/{cluster_id}/deployments/", response_model=dict)
 async def get_deployment(cluster_id: str, namespace: str, detailed: bool = False):
@@ -764,7 +768,7 @@ async def get_deployment(cluster_id: str, namespace: str, detailed: bool = False
     Returns:
         If detailed a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
     """
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
     if detailed:
         deployment_list: V1DeploymentList = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
@@ -773,6 +777,7 @@ async def get_deployment(cluster_id: str, namespace: str, detailed: bool = False
         name_list = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
         to_return = {"deployments": name_list}
     return to_return
+
 
 @k8s_router.post("/{cluster_id}/deployment/label", response_model=dict)
 async def add_label_to_k8s_deployment(cluster_id: str, namespace: str, deployment_name: str, labels: Labels):
@@ -790,10 +795,11 @@ async def add_label_to_k8s_deployment(cluster_id: str, namespace: str, deploymen
     Returns:
         The updated node V1Deployment in dict form
     """
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
     deployment: V1Deployment = k8s_add_label_to_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, labels=labels)
     return deployment.to_dict()
+
 
 @k8s_router.post("/{cluster_id}/deployment/scale", response_model=dict)
 async def scale_k8s_deployment(cluster_id: str, namespace: str, deployment_name: str, replica_number: int):
@@ -811,7 +817,7 @@ async def scale_k8s_deployment(cluster_id: str, namespace: str, deployment_name:
     Returns:
         The updated node V1Deployment in dict form
     """
-    cluster: K8sModel = get_k8s_cluster_by_id(cluster_id)
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
     k8s_config = get_k8s_config_from_file_content(cluster.credentials)
     deployment: V1Deployment = k8s_scale_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, replica_num=replica_number)
     return deployment.to_dict()

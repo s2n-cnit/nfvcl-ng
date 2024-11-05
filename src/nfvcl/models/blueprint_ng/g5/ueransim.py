@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import Field
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGCreateModel
 from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.linux.ip import Route
 from nfvcl.models.ueransim.blueprint_ueransim_model import UeransimArea, UeransimConfig, UeransimUe, UeransimSim
-
-class GNBN3Info(NFVCLBaseModel):
-    ip: str = Field()
-    mac: str = Field()
 
 class UeransimBlueprintRequestInstance(BlueprintNGCreateModel):
     config: UeransimConfig
@@ -67,22 +64,6 @@ class UeransimBlueprintRequestInstance(BlueprintNGCreateModel):
             }
         }"""
 
-
-class UeransimSlice(NFVCLBaseModel):
-    sst: int = Field()
-    sd: int = Field()
-
-
-class UeransimBlueprintRequestConfigureGNB(NFVCLBaseModel):
-    area: int = Field()
-
-    plmn: str = Field()
-    tac: int = Field()
-
-    amf_ip: str = Field()
-    amf_port: int = Field()
-
-    nssai: List[UeransimSlice] = Field()
 
 
 class UeransimBlueprintRequestAddDelGNB(NFVCLBaseModel):

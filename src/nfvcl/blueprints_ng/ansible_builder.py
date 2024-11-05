@@ -1,7 +1,7 @@
 import textwrap
 from enum import Enum
 from pathlib import Path
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict, Optional, Union
 
 from pydantic import Field
 from ruamel.yaml.scalarstring import LiteralScalarString
@@ -17,6 +17,7 @@ def LS(s):
 class AnsiblePlaybook(NFVCLBaseModel):
     name: Optional[str] = Field(default=None)
     hosts: str = Field()
+    connection: Optional[str] = Field(default=None)
     become: bool = Field()
     gather_facts: str = Field()
     tasks: List[Dict[str, Any]] = Field()
@@ -87,7 +88,7 @@ class AnsibleServiceTask(AnsibleTask):
 
 
 class AnsiblePlaybookBuilder:
-    def __init__(self, name, become=True, gather_facts=False):
+    def __init__(self, name, become=True, gather_facts=False, connection=None):
         """
         Create a new Ansible Playbook builder
         Args:
@@ -100,6 +101,7 @@ class AnsiblePlaybookBuilder:
             name=self.name,
             hosts="all",
             become=become,
+            connection=connection,
             gather_facts="yes" if gather_facts else "no",
             vars={},
             tasks=[],
@@ -160,7 +162,7 @@ class AnsiblePlaybookBuilder:
             for task in plays_[0]["tasks"]:
                 self.playbook.tasks.append(task)
 
-    def add_task(self, name: str, task_module: str, task_content: AnsibleTask, register_output_as: str | None = None, task_vars: Optional[Dict[str, Any]] = None):
+    def add_task(self, name: str, task_module: str, task_content: Union[AnsibleTask, Dict], register_output_as: str | None = None, task_vars: Optional[Dict[str, Any]] = None):
         """
         Add a single task to the playbook
         Args:
@@ -317,6 +319,19 @@ class AnsiblePlaybookBuilder:
             AnsiblePauseTask(seconds=seconds)
         )
 
+    def add_set_fact(self, fact_name: str, value: str):
+        """
+        Set an Ansible fact
+        Args:
+            fact_name: The name of the fact to set
+            value: Value to give to the fact, can be an Ansible template
+        """
+        self.add_task(
+            f"Set {fact_name} fact",
+            "set_fact",
+            {fact_name: value}
+        )
+
     def add_run_command_and_gather_output_tasks(self, command, output_var_name):
         """
         Add a simple shell task to run a command and gather the stdout to a variable
@@ -325,6 +340,7 @@ class AnsiblePlaybookBuilder:
             output_var_name: Variable name to store the stdout of the command
         """
         self.add_shell_task(command, register_output_as="tmp_reg")
+        self.add_set_fact(output_var_name, "{{ tmp_reg.stdout }}")
         self.add_gather_template_result_task(output_var_name, "{{ tmp_reg.stdout }}")
 
     def build(self) -> str:

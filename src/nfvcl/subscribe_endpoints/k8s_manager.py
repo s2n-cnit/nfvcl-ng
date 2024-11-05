@@ -3,19 +3,20 @@ import json
 import os
 import signal
 import threading
-from logging import Logger
+import traceback
 from multiprocessing import Process, RLock
 from typing import List
-import kubernetes
+
 import redis
-import traceback
 import yaml
 from kubernetes.utils import FailToCreateError
 from pydantic import ValidationError
 from redis.client import PubSub
-from nfvcl.models.k8s.blueprint_k8s_model import LBPool
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sTemplateFillData, K8sOperationType, K8sPluginName
-from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sModel
+from verboselogs import VerboseLogger
+
+from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sPluginAdditionalData, K8sOperationType, \
+    K8sPluginName, K8sLoadBalancerPoolArea
+from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, TopologyK8sModel
 from nfvcl.topology.topology import Topology
 from nfvcl.utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, \
     convert_str_list_2_plug_name, apply_def_to_cluster, get_k8s_cidr_info
@@ -27,7 +28,7 @@ from nfvcl.utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
 class K8sManager:
     redis_cli: redis.Redis = get_redis_instance()
     subscriber: PubSub = redis_cli.pubsub()
-    logger: Logger
+    logger: VerboseLogger
     lock: RLock
     stop: bool
 
@@ -68,7 +69,7 @@ class K8sManager:
         self.logger.debug("Killing K8S manager...")
         os.kill(os.getpid(), signal.SIGKILL)
 
-    def get_k8s_cluster_by_id(self, cluster_id: str) -> K8sModel:
+    def get_k8s_cluster_by_id(self, cluster_id: str) -> TopologyK8sModel:
         """
         Get the k8s cluster from the topology. This method could be duplicated but in this case handle HTTP exceptions
         that give API user an idea of what is going wrong.
@@ -82,7 +83,7 @@ class K8sManager:
             The matching k8s cluster or Throw ValueError if NOT found.
         """
         topology = Topology.from_db(self.lock)
-        k8s_clusters: List[K8sModel] = topology.get_k8s_clusters()
+        k8s_clusters: List[TopologyK8sModel] = topology.get_k8s_clusters()
         match = next((x for x in k8s_clusters if x.name == cluster_id), None)
 
         if match:
@@ -164,18 +165,16 @@ class K8sManager:
 
         # Extracting names from K8sPluginToInstall list
         plugin_names_raw_list: List[K8sPluginName] = plug_to_install_list.plugin_list
-        # Extracting additional data from K8sPluginToInstall list
-        template_fill_data: K8sTemplateFillData = plug_to_install_list.template_fill_data
-
         # Converting List[str] to List[K8sPluginNames]
         plugin_name_list: List[K8sPluginName] = convert_str_list_2_plug_name(plugin_names_raw_list)
 
-        # Get k8s cluster and k8s config for client
+        lb_pool: K8sLoadBalancerPoolArea = plug_to_install_list.load_balancer_pool
+        # Get the k8s pod network cidr
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+        pod_network_cidr = get_k8s_cidr_info(k8s_config)
 
-        # Checking data that will be used to fill file templates. Setting default values if empty.
-        template_fill_data = self.check_and_reserve_template_data(template_fill_data, plugin_name_list, k8s_config,
-                                                                  cluster_id=cluster_id)
+        # Create additional data for plugins (lbpool and cidr)
+        template_fill_data = K8sPluginAdditionalData(areas=[lb_pool], pod_network_cidr=pod_network_cidr)
 
         # Try to install plugins to cluster
         installation_result: dict = install_plugins_to_cluster(kube_client_config=k8s_config,
@@ -189,7 +188,7 @@ class K8sManager:
         for plugin_result in installation_result:
             to_print.append(plugin_result)
 
-        self.logger.info("Plugins {} have been installed".format(to_print))
+        self.logger.success(f"Plugins {to_print} have been installed")
 
     def apply_to_k8s(self, cluster_id: str, body):
         """
@@ -199,7 +198,7 @@ class K8sManager:
             cluster_id: The target cluster
             body: The yaml content to be applied at the cluster.
         """
-        cluster: K8sModel = self.get_k8s_cluster_by_id(cluster_id)
+        cluster: TopologyK8sModel = self.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
         # Loading a yaml in this way result in a dictionary
@@ -222,62 +221,7 @@ class K8sManager:
         for element in result[0]:
             list_to_ret.append(element.to_dict())
 
-        self.logger.info("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
-
-    def check_and_reserve_template_data(self, template_data: K8sTemplateFillData, plugin_to_install: List[K8sPluginName],
-                                        kube_client_config: kubernetes.client.Configuration,
-                                        cluster_id: str) -> K8sTemplateFillData:
-        """
-        Check the data to fill the template with.
-        It is not possible to reserve the desire range of LBpool but only the range e the net name should be present.
-
-        Args:
-            template_data: The data that will be checked
-            plugin_to_install: The list of plugins that will be installed (plugins templates require different data)
-            kube_client_config: The config of cluster on witch we are working. (Used to retrieve pod cidr if not specified in the
-            template data).
-            cluster_id: The ID of cluster on witch we are working
-
-        Returns:
-            The checked template data, filled with missing information.
-        """
-
-        # Flannel and calico require pod_network_cidr to be configured
-        if K8sPluginName.FLANNEL in plugin_to_install or K8sPluginName.CALICO in plugin_to_install:
-            if not template_data.pod_network_cidr:
-                template_data.pod_network_cidr = get_k8s_cidr_info(kube_client_config)
-
-        # Metallb require an IP pool to be assigned at the load balancers
-        if K8sPluginName.METALLB in plugin_to_install:
-            cluster: K8sModel = self.get_k8s_cluster_by_id(cluster_id)
-
-            topology: Topology = Topology.from_db(lock=self.lock)
-
-            if not template_data.lb_pools:
-                # If no load balancer pool is given
-                # Taking the FIRST network of the k8s cluster and reserving 20 addresses. THERE SHOULD BE AT LEAST 1.
-                network_name = cluster.networks[0]
-                reserved_range = topology.reserve_range(net_name=network_name, range_length=20,
-                                                        owner=cluster_id)
-                lb_pool = LBPool(mode='layer2', net_name=network_name, ip_start=reserved_range.start, ip_end=reserved_range.end, range_length=20)
-                template_data.lb_pools = [lb_pool]
-            else:
-                # Checking that every single network is in k8s cluster and reserving the desired range length.
-                # Ignoring ip_start and ip_end if present. If no range length, 20 is assumed.
-                for pool in template_data.lb_pools:
-                    network_name = pool.net_name
-                    if network_name in cluster.networks:
-                        if not pool.range_length:
-                            pool.range_length = 20
-                        reserved_range = topology.reserve_range(net_name=network_name, range_length=pool.range_length,
-                                                                owner=cluster_id)
-                        pool.ip_start = reserved_range.start
-                        pool.ip_end = reserved_range.end
-                    else:
-                        raise ValueError("The network {} is not present inside k8s {} cluster.".format(network_name,
-                                                                                                       cluster.name))
-        # Returning checked template data
-        return template_data
+        self.logger.success("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
 
 
 # ----- Global functions for multiprocessing compatibility -----

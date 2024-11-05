@@ -1,4 +1,5 @@
 from logging import Logger
+from pathlib import Path
 from typing import List
 import os
 import json
@@ -112,9 +113,9 @@ def get_plugin_config_files(k8s_version: K8sVersion, plugin_folder_path: str) ->
         cluster_version = float(k8s_version.value[1:])
 
         # Check if k8s version is not too low
-        if lower_version < cluster_version:
+        if lower_version <= cluster_version:
             # Check if k8s version is not too high
-            if cluster_version < upper_version or no_upper_limit:
+            if cluster_version <= upper_version or no_upper_limit:
                 target_modules.append((plugin_folder_path + '/' + path, module_name))
 
     if len(target_modules) > 0:
@@ -157,7 +158,7 @@ def check_order_files_for_plugin(required_module_order: List[str], found_module_
         return ordered_list
 
 
-def get_yaml_files_for_plugin(k8s_version: K8sVersion, plugin: K8sPluginName) -> List[str]:
+def get_yaml_files_for_plugin(k8s_version: K8sVersion, plugin: K8sPluginName) -> List[Path]:
     """
     Get yaml file paths to be applied for installing a plugin on a cluster.
     Checks if the plugin is enabled.
@@ -171,10 +172,10 @@ def get_yaml_files_for_plugin(k8s_version: K8sVersion, plugin: K8sPluginName) ->
         plugin: the plugin whose configuration files we want to retrieve
 
     Returns:
-        A ordered List[str] representing path of files to be applied at a k8s cluster, in the correct order, to install
+        A ordered List[Path] representing path of files to be applied at a k8s cluster, in the correct order, to install
         the desired plugin.
     """
-    # Checking between enabled plugins if there is the desired one
+    # ------------ Checking between enabled plugins if there is the desired one --------------------
     enable_plugins = get_enabled_plugins()
     enable_compatible_plugins = [enabled_plug for enabled_plug in enable_plugins if enabled_plug.name == plugin.value]
     if len(enable_compatible_plugins) <= 0:
@@ -202,7 +203,7 @@ def get_yaml_files_for_plugin(k8s_version: K8sVersion, plugin: K8sPluginName) ->
             found_modules_paths = check_order_files_for_plugin(required_module_order=target_plugin.installation_modules,
                                                                found_module_order=found_modules,
                                                                module_file_list=found_modules_paths)
-            return found_modules_paths
+            return [Path(filename) for filename in found_modules_paths]
     else:
         raise ValueError("Compatible found modules number for {} plugin and k8s version {} does not match required"
                          " number of modules.".format(plugin, k8s_version))

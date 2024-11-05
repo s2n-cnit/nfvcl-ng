@@ -13,9 +13,16 @@ sudo apt install -y python3.11 python3.11-dev python3.11-venv python3.11-distuti
 
 echo "Installing Ansible"
 sudo apt install -y ansible
-sudo mkdir /etc/ansible
+sudo mkdir -p /etc/ansible
 sudo touch /etc/ansible/ansible.cfg
 echo -e '[defaults]\nhost_key_checking = False' | sudo tee -a /etc/ansible/ansible.cfg
+
+echo "Installing Helm"
+curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+sudo apt-get install apt-transport-https --yes
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
 
 echo "Installing Poetry"
 curl -sSL https://install.python-poetry.org | python3 -
@@ -38,9 +45,6 @@ sudo sed -i '/bindIp/ s/127\.0\.0\.1/0\.0\.0\.0/' /etc/mongod.conf
 echo "Restarting mongod..."
 sudo systemctl restart mongod
 
-echo "Fixing PodSecurity issue for VNFM"
-kubectl set env deployment -n osm lcm OSMLCM_VCA_EEGRPC_POD_ADMISSION_POLICY=privileged
-
 # Needed by some python packages (netifaces)
 echo "Installing build essential tools"
 sudo apt install -y build-essential sshpass
@@ -49,6 +53,6 @@ echo "Installing Python project dependencies"
 /home/ubuntu/.local/bin/poetry install
 
 echo "Installing Ansible Collections"
-sudo ansible-galaxy collection install vyos.vyos
-sudo ansible-galaxy collection install prometheus.prometheus
-sudo ansible-galaxy collection install git+https://github.com/s2n-cnit/nfvcl-ansible-collection.git,v0.0.1
+ansible-galaxy collection install vyos.vyos
+ansible-galaxy collection install prometheus.prometheus
+ansible-galaxy collection install git+https://github.com/s2n-cnit/nfvcl-ansible-collection.git,v0.0.1

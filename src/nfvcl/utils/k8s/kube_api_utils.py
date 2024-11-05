@@ -348,8 +348,8 @@ def k8s_admin_role_over_namespace(kube_client_config: kubernetes.client.Configur
 
         return role_bind_res
 
-def k8s_cluster_admin(kube_client_config: kubernetes.client.Configuration, username: str,
-                                  role_binding_name: str) -> V1ClusterRoleBinding:
+
+def k8s_cluster_admin(kube_client_config: kubernetes.client.Configuration, username: str, role_binding_name: str) -> V1ClusterRoleBinding:
     """
     This function is specific to give CLUSTER admin rights on a user.
 
@@ -521,7 +521,7 @@ def k8s_cert_sign_req(kube_client_config: kubernetes.client.Configuration, usern
 
             ############ GET cluster certificate ##########
             cm_list = api_instance_secrets.list_namespaced_config_map(namespace="default")
-            ca_root = [item for item in cm_list.items if item.metadata.name=='kube-root-ca.crt']
+            ca_root = [item for item in cm_list.items if item.metadata.name == 'kube-root-ca.crt']
             if len(ca_root) <= 0:
                 logger.error("No kube-root-ca.crt found in the cluster")
 
@@ -586,7 +586,7 @@ def k8s_add_quota_to_namespace(kube_client_config: kubernetes.client.Configurati
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         api_instance_core = kubernetes.client.CoreV1Api(api_client)
 
-        spec = quota.dict(by_alias=True)
+        spec = quota.model_dump(by_alias=True)
         res_spec = V1ResourceQuotaSpec(hard=spec)
         metadata = V1ObjectMeta(name=quota_name)
         res_quota = V1ResourceQuota(metadata=metadata, spec=res_spec)
@@ -601,39 +601,48 @@ def k8s_add_quota_to_namespace(kube_client_config: kubernetes.client.Configurati
 
         return created_quota
 
-def k8s_add_sidecar_namespaced_pod(kube_client_config: kubernetes.client.Configuration, namespace_name: str,
-                                   pod_name: str) -> V1Namespace:
+
+def k8s_add_container_to_namespaced_deployment(kube_client_config: kubernetes.client.Configuration, namespace_name: str, deployment_name: str, container: V1Container) -> V1Namespace:
     """
-        Still to be implemented
+    Add a container to the deployment. Can be used to inject sidecars into Pods of a Deployment
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace_name: The namespace in which the deployment resides
+        deployment_name: The name of the deployment
+        container: The container to be added to the deployment
+    References:
+        https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/AppsV1Api.md#patch_namespaced_deployment
+        https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/AppsV1Api.md#read_namespaced_deployment
+    Returns:
+        The patched deployment.
     """
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
-        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        api_instance_app = kubernetes.client.AppsV1Api(api_client)
 
-        pod_to_be_patched: V1Pod = api_instance_core.read_namespaced_pod(name=pod_name, namespace=namespace_name)
-
-        pod_spec: V1PodSpec = pod_to_be_patched.spec
-        pod_containers : List[V1Container] = pod_spec.containers
-        pod_containers.append() # TODO finire
+        deployment_to_be_patched: V1Pod = api_instance_app.read_namespaced_deployment(name=deployment_name, namespace=namespace_name)
+        pod_spec: V1DeploymentSpec = deployment_to_be_patched.spec
+        deployment_containers: List[V1Container] = pod_spec.template.spec.containers
+        deployment_containers.append(container)
 
         try:
-            patched_pod = api_instance_core.patch_namespaced_pod(name=pod_name, namespace=namespace_name, body=None) # TODO replace body with updated pod
+            patched_deployment = api_instance_app.patch_namespaced_deployment(name=deployment_name, namespace=namespace_name, body=deployment_to_be_patched)
         except ApiException as error:
-            logger.error("Exception when calling CoreV1Api>patch_namespaced_pod: {}\n".format(error))
+            logger.error("Exception when calling AppsV1Api>patch_namespaced_deployment: {}\n".format(error))
             raise error
         finally:
             api_client.close()
 
-        return patched_pod
+        return patched_deployment
 
 
 def k8s_get_nodes(kube_client_config: kubernetes.client.Configuration, detailed: bool = False) -> V1NodeList | List[str]:
     """
     Return a list of nodes
-    https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/CoreV1Api.md#list_node
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
         detailed: if true, return all nodes details
-
+    References:
+        https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/CoreV1Api.md#list_node
     Returns:
         The list of nodes or the list of names if detailed is false.
     """
@@ -648,15 +657,15 @@ def k8s_get_nodes(kube_client_config: kubernetes.client.Configuration, detailed:
                 name_list.append(item.metadata.name)
             return name_list
 
+
 def k8s_add_label_to_k8s_node(kube_client_config: kubernetes.client.Configuration, node_name: str, labels: Labels) -> V1Node:
     """
     Add labels to a node
     https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/CoreV1Api.md#read_node
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
-        node_name: The name of the node to be labeled
+        node_name: The name of the node to be labeled in the cluster
         labels: labels to be applied to the node (can already exist and are overwritten)
-
     Returns:
         The patched node
     """
@@ -665,12 +674,13 @@ def k8s_add_label_to_k8s_node(kube_client_config: kubernetes.client.Configuratio
         node: V1Node = api_instance_core.read_node(name=node_name)
 
         metadata: V1ObjectMeta = node.metadata
-        existing_labels: dict[str,str] = metadata.labels
+        existing_labels: dict[str, str] = metadata.labels
         existing_labels.update(labels.labels)
 
         patched_node = api_instance_core.patch_node(node_name, node)
 
         return patched_node
+
 
 def k8s_get_deployments(kube_client_config: kubernetes.client.Configuration, namespace: str, detailed: bool = False) -> V1DeploymentList | List[str]:
     """
@@ -678,7 +688,6 @@ def k8s_get_deployments(kube_client_config: kubernetes.client.Configuration, nam
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
         detailed: if true, return all deployments details
-
     Returns:
         The list of deployments or the list of names if detailed is false.
     """
@@ -693,14 +702,14 @@ def k8s_get_deployments(kube_client_config: kubernetes.client.Configuration, nam
                 name_list.append(item.metadata.name)
             return name_list
 
+
 def k8s_add_label_to_k8s_deployment(kube_client_config: kubernetes.client.Configuration, namespace: str, deployment_name: str, labels: Labels) -> V1Deployment:
     """
     Add labels to a deployment
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
-        deployment_name: The name of the deployment to be labeled
+        deployment_name: The name of the deployment to be labeled in the cluster
         labels: labels to be applied to the deployment (can already exist and are overwritten)
-
     Returns:
         The patched deployment
     """
@@ -709,12 +718,13 @@ def k8s_add_label_to_k8s_deployment(kube_client_config: kubernetes.client.Config
         node: V1Deployment = api_instance_app.read_namespaced_deployment(namespace=namespace, name=deployment_name)
 
         metadata: V1ObjectMeta = node.metadata
-        existing_labels: dict[str,str] = metadata.labels
+        existing_labels: dict[str, str] = metadata.labels
         existing_labels.update(labels.labels)
 
         patched_node = api_instance_app.patch_namespaced_deployment(namespace=namespace, name=deployment_name, body=node)
 
         return patched_node
+
 
 def k8s_scale_k8s_deployment(kube_client_config: kubernetes.client.Configuration, namespace: str, deployment_name: str, replica_num: int) -> V1Deployment:
     """
@@ -723,7 +733,6 @@ def k8s_scale_k8s_deployment(kube_client_config: kubernetes.client.Configuration
         kube_client_config: the configuration of K8s on which the client is built.
         deployment_name: The name of the deployment to be labeled
         replica_num: the number of instances for the deployment
-
     Returns:
         The patched deployment
     """

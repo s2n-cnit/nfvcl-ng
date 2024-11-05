@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import List
@@ -15,8 +17,24 @@ BLUE_COLLECTION_V2 = "blue-inst-v2"
 TOPOLOGY_COLLECTION = "topology"
 EXTRA_COLLECTION = "extra"
 
+__database: NFVCLDatabase | None = None
 
-class NFVCLDatabase(object, metaclass=Singleton):
+
+def get_nfvcl_database() -> NFVCLDatabase:
+    """
+    Allow to retrieve the NFVCL Database (that can have only one instance)
+    Returns:
+        The NFVCL Database
+    """
+    global __database
+    if __database is not None:
+        return __database
+    else:
+        __database = NFVCLDatabase()
+        return __database
+
+
+class NFVCLDatabase:
     mongo_client: MongoClient
     mongo_database: Database
 
@@ -101,7 +119,7 @@ def get_ng_blue_list(blueprint_type: str = None) -> List[dict]:
     blue_filter = {}
     if blueprint_type:
         blue_filter = {'type': blueprint_type}
-    blue_list = NFVCLDatabase().find_collection(BLUE_COLLECTION_V2, blue_filter, {"_id": False})
+    blue_list = get_nfvcl_database().find_collection(BLUE_COLLECTION_V2, blue_filter, {"_id": False})
     return list(blue_list)
 
 
@@ -115,7 +133,7 @@ def get_ng_blue_by_id_filter(blueprint_id: str) -> dict | None:
     Returns:
         The FIRST MATCH of blueprint (dict) if found, None otherwise.
     """
-    blue_list = NFVCLDatabase().find_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id}, {"_id": False})
+    blue_list = get_nfvcl_database().find_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id}, {"_id": False})
     for blue in blue_list:
         return blue  # Return the first match
     return None
@@ -132,7 +150,7 @@ def save_ng_blue(blueprint_id: str, dict_blue: dict):
     Returns:
         The result of the operation (saved object)
     """
-    database_instance = NFVCLDatabase()
+    database_instance = get_nfvcl_database()
     if database_instance.exists_in_collection(BLUE_COLLECTION_V2, {'id': blueprint_id}):
         return database_instance.update_in_collection(BLUE_COLLECTION_V2, dict_blue, {'id': blueprint_id})
     else:
@@ -148,7 +166,7 @@ def destroy_ng_blue(blueprint_id: str):
     Returns:
         The destroyed blueprint.
     """
-    return NFVCLDatabase().delete_from_collection(BLUE_COLLECTION_V2, {'id': blueprint_id})
+    return get_nfvcl_database().delete_from_collection(BLUE_COLLECTION_V2, {'id': blueprint_id})
 
 
 def save_topology(dict_topo: dict):
@@ -161,7 +179,7 @@ def save_topology(dict_topo: dict):
     Returns:
         The result of the operation (saved object)
     """
-    database_instance = NFVCLDatabase()
+    database_instance = get_nfvcl_database()
     if database_instance.exists_in_collection(TOPOLOGY_COLLECTION, {'id': 'topology'}):  # TOPO is unique, fixed ID
         return database_instance.update_in_collection(TOPOLOGY_COLLECTION, dict_topo, {'id': 'topology'})
     else:
@@ -175,7 +193,7 @@ def delete_topology():
     Returns:
         The destroyed topology.
     """
-    return NFVCLDatabase().delete_from_collection(TOPOLOGY_COLLECTION, {'id': 'topology'})
+    return get_nfvcl_database().delete_from_collection(TOPOLOGY_COLLECTION, {'id': 'topology'})
 
 def insert_extra(object_id: str, object_dict: dict):
     """

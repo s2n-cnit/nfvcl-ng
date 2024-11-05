@@ -2,6 +2,7 @@ config:
   networks:
     mgmt: "dmz-internal"
     data: ""
+    k8s_controller: ""
   vim:
     tenant: ""
     user: ""

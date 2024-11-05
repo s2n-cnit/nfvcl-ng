@@ -6,14 +6,16 @@ from typing import Any
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGStatus, CurrentOperation
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
-from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage
+from nfvcl.blueprints_ng.lcm.performance_manager import get_performance_manager
+from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType, WorkerMessage, BlueprintOperationCallbackModel
+from nfvcl.models.performance import BlueprintPerformanceType
 from nfvcl.utils.log import create_logger
+from nfvcl.utils.redis_utils.redis_manager import trigger_redis_event
+from nfvcl.utils.redis_utils.topic_list import BLUEPRINT_TOPIC
+from nfvcl.utils.redis_utils.event_types import BlueEventType
 
 
-# multiprocessing_manager = multiprocessing.Manager()
-
-
-def callback_function(event, namespace, msg):
+def callback_function(event, namespace, msg: BlueprintOperationCallbackModel):
     namespace["msg"] = msg
     event.set()
 
@@ -35,7 +37,7 @@ class BlueprintWorker:
     def stop_listening(self):
         self.logger.info("Blueprint worker stopping listening.")
 
-    def call_function_sync(self, function_name, *args, **kwargs):
+    def call_function_sync(self, function_name, *args, **kwargs) -> BlueprintOperationCallbackModel:
         """
         Call a function synchronously
         Args:
@@ -112,49 +114,80 @@ class BlueprintWorker:
             received_message: WorkerMessage = self.message_queue.get()  # Thread safe
             self.logger.debug(f"Received message: {received_message.message}")
             match received_message.message_type:
+                # ------------------------ This is the case of blueprint creation (create and start VMs, Dockers, ...)
                 case WorkerMessageType.DAY0:
-                    # This is the case of blueprint creation (create and start VMs, Dockers, ...)
                     self.logger.info(f"Creating blueprint")
+                    self.blueprint.base_model.status = BlueprintNGStatus.deploying(self.blueprint.id)
+                    trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_STARTED_DAY0, self.blueprint.base_model.model_dump())
+                    self.blueprint.to_db()
                     try:
-                        self.blueprint.base_model.status = BlueprintNGStatus.deploying(self.blueprint.id)
+                        performance_operation_id = get_performance_manager().start_operation(self.blueprint.id, BlueprintPerformanceType.DAY0, "create")
                         self.blueprint.create(received_message.message)
+                        get_performance_manager().end_operation(performance_operation_id)
                         if received_message.callback:
-                            received_message.callback(self.blueprint.id)
+                            received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), status="OK"))
                         self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
+                        trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_CREATED, self.blueprint.base_model.model_dump())
                         self.logger.success(f"Blueprint created")
                     except Exception as e:
                         self.blueprint.base_model.status.error = True
                         self.blueprint.base_model.status.detail = str(e)
+                        if received_message.callback:
+                            received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), status="ERROR", detailed_status=str(e)))
                         self.logger.error(f"Error creating blueprint", exc_info=e)
+                        trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_ERROR, self.blueprint.base_model.model_dump())
+
                     self.blueprint.to_db()
+                # ------------------------- This is the case of blueprint day 2
                 case WorkerMessageType.DAY2 | WorkerMessageType.DAY2_BY_NAME:
-                    self.logger.info(f"Calling function on blueprint")
-                    # This is the DAY2 message, getting the function to be called
-                    self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.RUNNING_DAY2_OP, detail=f"Calling function {received_message.path} on blueprint {self.blueprint.id}")
+                    self.logger.info(f"Calling DAY2 function on blueprint")
+                    self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.RUNNING_DAY2_OP, detail=f"Calling DAY2 function {received_message.path} on blueprint {self.blueprint.id}")
+                    trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_STARTED_DAY2, self.blueprint.base_model.model_dump())
+                    self.blueprint.to_db()
                     try:
+                        # This is the DAY2 message, getting the function to be called
                         if received_message.message_type == WorkerMessageType.DAY2:
-                            self.blueprint.base_model.day_2_call_history.append(received_message.message.model_dump_json())
+                            if received_message.message:
+                                self.blueprint.base_model.day_2_call_history.append(received_message.message.model_dump_json())
                             function = blueprint_type.get_function_to_be_called(received_message.path)
-                            result = getattr(self.blueprint, function.__name__)(received_message.message)
+                            performance_operation_id = get_performance_manager().start_operation(self.blueprint.id, BlueprintPerformanceType.DAY2, received_message.path.split("/")[-1])
+                            if received_message.message:
+                                result = getattr(self.blueprint, function.__name__)(received_message.message)
+                            else:
+                                result = getattr(self.blueprint, function.__name__)()
+                            get_performance_manager().end_operation(performance_operation_id)
                         else:
+                            performance_operation_id = get_performance_manager().start_operation(self.blueprint.id, BlueprintPerformanceType.DAY2, received_message.path.split("/")[-1])
                             result = getattr(self.blueprint, received_message.path)(*received_message.message[0], **received_message.message[1])
+                            get_performance_manager().end_operation(performance_operation_id)
+
                         # Starting processing the request.
                         if received_message.callback:
-                            received_message.callback(result)
+                            received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), result=result, status="OK"))
+
                         self.blueprint.base_model.status = BlueprintNGStatus(current_operation=CurrentOperation.IDLE)
-                        self.logger.success(f"Function called on blueprint")
+                        trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_END_DAY2, self.blueprint.base_model.model_dump())
+                        self.logger.success(f"Function DAY2 {received_message.path} on blueprint {self.blueprint.id} called.")
                     except Exception as e:
                         self.blueprint.base_model.status.error = True
                         self.blueprint.base_model.status.detail = str(e)
+                        if received_message.callback:
+                            received_message.callback(BlueprintOperationCallbackModel(id=self.blueprint.id, operation=str(CurrentOperation.IDLE), status="ERROR", detailed_status=str(e)))
                         self.logger.error(f"Error calling function on blueprint", exc_info=e)
+                        trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_ERROR, self.blueprint.base_model.model_dump())
                     self.blueprint.to_db()
+                # ------------------------- This is the case of blueprint destroy
                 case WorkerMessageType.STOP:
                     self.logger.info(f"Destroying blueprint")
                     self.blueprint.base_model.status = BlueprintNGStatus.destroying(blue_id=self.blueprint.id)
+                    trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_START_DAYN, self.blueprint.base_model.model_dump())
+                    performance_operation_id = get_performance_manager().start_operation(self.blueprint.id, BlueprintPerformanceType.DELETION, "delete")
                     self.blueprint.destroy()
+                    get_performance_manager().end_operation(performance_operation_id)
                     if received_message.callback:
                         received_message.callback(self.blueprint.id)
                     self.logger.success(f"Blueprint destroyed")
+                    trigger_redis_event(BLUEPRINT_TOPIC, BlueEventType.BLUE_DELETED, self.blueprint.base_model.model_dump())
                     break
                 case _:
                     raise ValueError("Worker message type not recognized")

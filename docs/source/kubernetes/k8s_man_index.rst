@@ -8,4 +8,5 @@ by the NFVCL.
 
 .. toctree::
     k8s_create_clu_admin.md
+    k8s_man_plugin.md
     k8s_man_apis_example.md

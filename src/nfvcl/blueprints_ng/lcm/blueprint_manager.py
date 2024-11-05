@@ -1,25 +1,26 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any, List
+from typing import Any, List, Callable, Optional
 
 from verboselogs import VerboseLogger
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.lcm.blueprint_worker import BlueprintWorker
+from nfvcl.blueprints_ng.lcm.performance_manager import get_performance_manager
 from nfvcl.blueprints_ng.resources import VmResource
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
 from nfvcl.models.http_models import BlueprintNotFoundException, BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl.utils.database import get_ng_blue_by_id_filter, get_ng_blue_list
 from nfvcl.utils.log import create_logger
-from nfvcl.utils.patterns import Singleton
 from nfvcl.utils.util import generate_blueprint_id
 
 BLUEPRINTS_MODULE_FOLDER: str = "nfvcl.blueprints_ng.modules"
 logger: VerboseLogger = create_logger("BlueprintNGManager")
 
 __blueprint_manager: BlueprintManager | None = None
+
 
 def get_blueprint_manager() -> BlueprintManager:
     """
@@ -35,7 +36,7 @@ def get_blueprint_manager() -> BlueprintManager:
         return __blueprint_manager
 
 
-class BlueprintManager(metaclass=Singleton):
+class BlueprintManager:
     """
     This class is responsible for managing blueprints.
     This class will manage all blueprints that have been created.
@@ -104,11 +105,12 @@ class BlueprintManager(metaclass=Singleton):
         """
         return get_ng_blue_list(blueprint_type)
 
-    def _load_all_blue_from_db(self, blueprint_type: str = None) -> List[BlueprintNG]:
+    def _load_all_blue_from_db(self, blueprint_type: str = None, provider_initialization: bool = True) -> List[BlueprintNG]:
         """
         Load all the blueprints (ojb) from the database
         Args:
             blueprint_type (Optional[str]): The type of the blueprint to be retrieved
+            provider_initialization (bool=True): If providers have to be initialized. If false -> blueprint cannot be used, it is just a reference from db.
 
         Returns:
             The blueprint list (List[BlueprintNG]).
@@ -116,10 +118,14 @@ class BlueprintManager(metaclass=Singleton):
         blue_list = []
         for item in self._load_all_blue_dict_from_db(blueprint_type):
             logger.debug(f"Deserializing Blueprint {item['id']}")
-            blue_list.append(BlueprintNG.from_db(item))
+            if provider_initialization:
+                blue_list.append(BlueprintNG.from_db(item))
+            else:
+                blue_list.append(BlueprintNG.from_db_no_prov_init(item))
         return blue_list
 
-    def create_blueprint(self, msg: Any, path: str, wait: bool = False, parent_id: str | None = None) -> str:
+
+    def create_blueprint(self, msg: Any, path: str, wait: bool = False, parent_id: str | None = None, callback: Optional[Callable] = None) -> str:
         """
         Create a base, EMPTY, blueprint given the type of the blueprint.
         Then create a dedicated worker for the blueprint that spawns (ASYNC) the blueprint on the VIM.
@@ -128,6 +134,7 @@ class BlueprintManager(metaclass=Singleton):
             path: The blueprint-specific path, the last part of the URL for the creation request (e.g., /nfvcl/v2/api/blue/vyos ----> path='vyos')
             wait: True to wait for blueprint creation, False otherwise
             parent_id: ID of the parent blueprint
+            callback: Function to be called when the blueprint is created.
 
         Returns:
             The ID of the created blueprint.
@@ -147,12 +154,15 @@ class BlueprintManager(metaclass=Singleton):
             # Creating and starting the worker
             worker = BlueprintWorker(created_blue)
             worker.start_listening()  # Start another THREAD
+
+            get_performance_manager().add_blueprint(blue_id, path)
+
             self.worker_collection[blue_id] = worker
             # Putting the creation message into the worker (the spawn happens asynch)
             if wait:
                 worker.put_message_sync(WorkerMessageType.DAY0, f'{path}', msg)
             else:
-                worker.put_message(WorkerMessageType.DAY0, f'{path}', msg)
+                worker.put_message(WorkerMessageType.DAY0, f'{path}', msg, callback=callback)
             return blue_id
 
     def delete_blueprint(self, blueprint_id: str, wait: bool = False) -> str:
@@ -199,6 +209,18 @@ class BlueprintManager(metaclass=Singleton):
         Returns:
             The summary/details of a blueprint
         """
+        return self.get_blueprint_instance_by_id(blueprint_id).to_dict(detailed)
+
+    def get_blueprint_instance_by_id(self, blueprint_id: str) -> BlueprintNG:
+        """
+        Retrieves the blueprint summary for the given blueprint ID. If the blueprint is present in memory, returns it from there instead of DB.
+        Args:
+            blueprint_id: The blueprint to be retrieved.
+            detailed: If true, return all the info saved in the database about the blueprints.
+
+        Returns:
+            The summary/details of a blueprint
+        """
         # If the blueprint is active and loaded in memory, then use the one in memory
         if blueprint_id in self.worker_collection:
             blueprint: BlueprintNG = self.worker_collection[blueprint_id].blueprint
@@ -207,7 +229,7 @@ class BlueprintManager(metaclass=Singleton):
             blueprint: BlueprintNG = self._load_blue_from_db(blueprint_id)
         if blueprint is None:
             raise BlueprintNotFoundException(blueprint_id)
-        return blueprint.to_dict(detailed)
+        return blueprint
 
     def get_blueprint_summary_list(self, blue_type: str, detailed: bool = False) -> List[dict]:
         """
@@ -219,7 +241,7 @@ class BlueprintManager(metaclass=Singleton):
         Returns:
             The summary/details of all blueprints that satisfy the given filter.
         """
-        blue_list = self._load_all_blue_from_db(blue_type)
+        blue_list = self._load_all_blue_from_db(blue_type, provider_initialization=False)
         blue_mem_id_list = self.worker_collection.keys()
         # Replace blueprints from DB with the ones that are present in the memory.
         for i in range(len(blue_list)):

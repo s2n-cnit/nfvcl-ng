@@ -1,11 +1,9 @@
 from typing import Union
-from pydantic import BaseModel
-from nfvcl.models.blueprint.blue_events import BlueEventType
-from nfvcl.models.k8s.k8s_events import K8sEventType
-from nfvcl.topology.topology_events import TopologyEventType
+from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.utils.redis_utils.event_types import K8sEventType, TopologyEventType, BlueEventType
 
 
-class Event(BaseModel):
+class Event(NFVCLBaseModel):
     operation: Union[TopologyEventType, BlueEventType, K8sEventType]
     data: dict
 

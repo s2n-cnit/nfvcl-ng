@@ -2,15 +2,11 @@ import base64
 import os
 import string
 import random
-import glob
 from pathlib import Path
-from typing import List
 import OpenSSL
 import yaml
-import shutil
 from nfvcl.models.config_model import NFVCLConfigModel
 from OpenSSL.crypto import PKey
-from jinja2 import Environment, FileSystemLoader
 
 IP_PORT_PATTERN: str = '^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$'
 IP_PATTERN: str = '^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
@@ -122,84 +118,6 @@ def generate_blueprint_id() -> str:
     return generate_id(6, string.ascii_uppercase + string.digits)
 
 
-# TODO move to Path, not use str
-def render_file_from_template_to_file(path: str, render_dict: dict, prefix_to_name: str = "") -> str:
-    """
-    Render a template file using the render_dict dictionary. Use the keys and their values to give a value at the
-    variables present in the template file.
-    The result of the rendering is placed in day2_files/filename.extension and the path is returned by this method.
-
-    Args:
-        path: the path of the file template
-
-        render_dict: the dictionary containing values to be used in template variables. The name of the variable should
-        be the same of the key in this dictionary.
-
-        prefix_to_name: A prefix to be appended to generated file.
-
-    Returns:
-        the path of the generated file from the template.
-    """
-    env_path = ""
-    for folder in path.split('/')[:-1]:
-        env_path += "{}/".format(folder)
-    filename = path.split('/')[-1]
-    env = Environment(loader=FileSystemLoader(env_path),
-                      extensions=['jinja2_ansible_filters.AnsibleCoreFiltersExtension'])
-    template = env.get_template(filename)
-    data = template.render(confvar=render_dict)
-
-    if prefix_to_name == "":
-        new_name = filename
-    else:
-        new_name = prefix_to_name + '_' + filename
-
-    with open('day2_files/' + new_name, 'w') as file:
-        file.write(data)
-        file.close()
-
-    return file.name
-
-
-def render_file_jinja2_to_str(file_to_render: Path, confvar: dict):
-    """
-    Takes a file and renders it using values in the dictionary
-    Args:
-        file_to_render: The file to be rendered containing '{{ variable123 }}' references
-        confvar: A dictionary containing the variables to be rendered. { 'variable123': 'desiredvalue' }
-
-    Returns:
-        The rendered file
-    """
-    env = Environment(loader=FileSystemLoader(file_to_render.parent))
-    template = env.get_template(file_to_render.name)
-
-    return template.render(**confvar)
-
-
-def render_files_from_template(paths: List[str], render_dict, files_name_prefix: str = "TEST") -> List[str]:
-    """
-    Render multiple files from their templates. For further details looks at render_file_from_template function.
-    Then the list of generated files (paths) is returned
-
-    Args:
-        paths: the list of file templates
-
-        render_dict: the dictionary containing values to be used in template variables. The name of the variable should
-        be the same of the key in this dictionary.
-
-        files_name_prefix: A prefix to be appended to generated files.
-
-    Returns:
-        A list path representing generated files.
-    """
-    to_return: List[str] = []
-    for file_path in paths:
-        to_return.append(render_file_from_template_to_file(path=file_path, render_dict=render_dict,
-                                                           prefix_to_name=files_name_prefix))
-    return to_return
-
-
 def generate_rsa_key(length: int = 2048):
     """
     Generate an RSA key
@@ -269,22 +187,19 @@ def convert_from_base64(content: str) -> str:
     return content_str
 
 
-def remove_files_by_pattern(folder: str, name_pattern: str):
-    """
-    Remove all files in the target folder that match the pattern condition
-    Args:
-        folder: the folder in witch files are located. ("./day2_files" or "day2_files" or "/tmp/nsd_packages"
+def get_from_nested_dict(d, keys):
+    if "." in keys:
+        key, rest = keys.split(".", 1)
+        return get_from_nested_dict(d[key], rest)
+    else:
+        return d[keys]
 
-        name_pattern: a file name ("DV87AO_vyos_2-3.yaml") or a pattern for multiple files ("DV87AO_*")
 
-    Returns:
-
-    """
-    source_path: str = "{}/{}".format(folder, name_pattern)
-    path_list = glob.glob(source_path)
-    for path in path_list:
-        if os.path.isdir(path):
-            shutil.rmtree(path)
-        else:
-            os.remove(path)
-
+def put_in_nested_dict(d, keys, item):
+    if "." in keys:
+        key, rest = keys.split(".", 1)
+        if key not in d:
+            d[key] = {}
+        put_in_nested_dict(d[key], rest, item)
+    else:
+        d[keys] = item

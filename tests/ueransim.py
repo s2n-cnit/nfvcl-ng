@@ -1,27 +1,36 @@
 import unittest
-from typing import List, Dict
+from typing import List, Optional
+
+from pydantic import Field
 
 from nfvcl.blueprints_ng.lcm.blueprint_manager import BlueprintManager
+from nfvcl.blueprints_ng.modules import UeransimBlueprintNG
+from nfvcl.blueprints_ng.resources import VmResource
 from nfvcl.blueprints_ng.utils import get_yaml_parser
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestConfigureGNB
 from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
-from tests.models.config_unitest import Model
+from tests.models.config_unitest import ConfigUniteTest
 from tests.models.gnb_config import GNBConfig
 from tests.models.ue_config import UEConfig
 from tests.utils import SSH
 
 
-class UeransimVM(NFVCLBaseModel):
-    ip: str
-    name: str
-    area: int
+class UeransimGNB(NFVCLBaseModel):
+    gnb: Optional[VmResource] = Field(default=None)
+    ue: Optional[List[VmResource]] = Field(default_factory=list)
+
+
+class UeransimTunInterface(NFVCLBaseModel):
+    imsi: str = Field("")
+    interface_name: str = Field("")
+    ip: str = Field("")
 
 
 parser = get_yaml_parser()
 with open("config_unitest_dev.yaml", 'r') as stream:
     data_loaded = parser.load(stream)
-    model = Model.model_validate(data_loaded)
+    model = ConfigUniteTest.model_validate(data_loaded)
 
 create_model: UeransimBlueprintRequestInstance = UeransimBlueprintRequestInstance.model_validate(
     {
@@ -98,11 +107,31 @@ gnb_configuration = UeransimBlueprintRequestConfigureGNB.model_validate(
 )
 
 
+def get_ueransim_tun_interface(ueransim: UeransimBlueprintNG) -> List[UeransimTunInterface]:
+    interfaces: List[UeransimTunInterface] = []
+    for area in ueransim.state.areas.keys():
+        for ue in ueransim.state.areas[area].ues:
+            connection = SSH(ue.vm_ue.access_ip)
+            for sim in ue.vm_ue_configurator.sims:
+                interface = connection.get_ue_TUN_name(sim.imsi)
+                if interface:
+                    interfaces.append(UeransimTunInterface(imsi=sim.imsi, interface_name=interface, ip=ue.vm_ue.access_ip))
+            connection.close_connection()
+    return interfaces
+
+
+def get_gnb_ips(ueransim: UeransimBlueprintNG) -> List[str]:
+    ips: List[str] = []
+    for area in ueransim.state.areas.keys():
+        ips.append(ueransim.state.areas[area].vm_gnb.access_ip)
+    return ips
+
+
 class UeransimTestCase(unittest.TestCase):
     bp_id: str
     blueprint_manager = BlueprintManager()
-    details: Dict = []
-    device_list: List[UeransimVM] = []
+    blueprint: UeransimBlueprintNG
+    radio_list: List[UeransimGNB] = []
 
     def test_001(self):
         """
@@ -113,7 +142,7 @@ class UeransimTestCase(unittest.TestCase):
 
         self.__class__.bp_id = self.blueprint_manager.create_blueprint(create_model, "ueransim", True)
         self.assertIsNotNone(self.__class__.bp_id)
-        self.__class__.details = self.blueprint_manager.get_blueprint_summary_by_id(self.__class__.bp_id, True)
+        self.__class__.blueprint = self.blueprint_manager.get_blueprint_instance_by_id(self.__class__.bp_id)
         print("Ended Test_001")
 
     def test_002_(self):
@@ -122,20 +151,21 @@ class UeransimTestCase(unittest.TestCase):
         Returns:
 
         """
-        for vm_id in self.__class__.details['registered_resources'].keys():
-            vm_data = self.__class__.details['registered_resources'][vm_id]['value']
-            if "access_ip" in vm_data and ("GNB" or "UE" in vm_data["name"]):
-                ip = vm_data['access_ip']
-                name = vm_data['name']
-                area = vm_data['area']
-                new_device = UeransimVM(ip=ip, name=name, area=area)
-                self.__class__.device_list.append(new_device)
+        number_devices_created = 0
+        for area in self.__class__.blueprint.state.areas.keys():
+            radio: UeransimGNB = UeransimGNB()
+            radio.gnb = self.__class__.blueprint.state.areas[area].vm_gnb
+            number_devices_created += 1
+            for ue in self.__class__.blueprint.state.areas[area].ues:
+                radio.ue.append(ue.vm_ue)
+                number_devices_created += 1
+            self.__class__.radio_list.append(radio)
 
         expected_devices = len(create_model.areas)
         for area in create_model.areas:
             expected_devices += len(area.ues)
 
-        self.assertEqual(expected_devices, len(self.__class__.device_list))
+        self.assertEqual(expected_devices, number_devices_created)
         print("Ended Test_002")
 
     def test_003(self):
@@ -145,23 +175,24 @@ class UeransimTestCase(unittest.TestCase):
         """
         worker = self.blueprint_manager.get_worker(self.__class__.bp_id)
         gnb_path = "/opt/UERANSIM/gnb.conf"
-        for device in self.__class__.device_list:
-            connection = SSH(device.ip)
-            if "GNB" in device.name:
-                worker.put_message_sync(WorkerMessageType.DAY2, "ueransim/configure_gnb", UeransimBlueprintRequestConfigureGNB.model_validate(gnb_configuration))
-                file = connection.get_file_content(gnb_path)
-                gnb_conf = GNBConfig.model_validate(parser.load(file))
-                self.assertEqual(gnb_conf.tac, 0)
-                self.assertEqual(gnb_conf.mcc, "001")
-                self.assertEqual(gnb_conf.mnc, "01")
-                self.assertEqual(gnb_conf.amf_configs[0].address, "10.180.0.26")
-                self.assertEqual(gnb_conf.slices[0].sst, 1)
-                self.assertEqual(gnb_conf.slices[0].sd, 1)
-                self.assertNotEqual(gnb_conf.slices[0].sst, 2)
-            else:
-                for ue in create_model.areas[device.area].ues:
+        for radio in self.__class__.radio_list:
+            gnb_connection = SSH(radio.gnb.access_ip)
+            worker.put_message_sync(WorkerMessageType.DAY2, "ueransim/configure_gnb", UeransimBlueprintRequestConfigureGNB.model_validate(gnb_configuration))
+            file = gnb_connection.get_file_content(gnb_path)
+            gnb_conf = GNBConfig.model_validate(parser.load(file))
+            self.assertEqual(gnb_conf.tac, 0)
+            self.assertEqual(gnb_conf.mcc, "001")
+            self.assertEqual(gnb_conf.mnc, "01")
+            self.assertEqual(gnb_conf.amf_configs[0].address, "10.180.0.26")
+            self.assertEqual(gnb_conf.slices[0].sst, 1)
+            self.assertEqual(gnb_conf.slices[0].sd, 1)
+            self.assertNotEqual(gnb_conf.slices[0].sst, 2)
+            gnb_connection.close_connection()
+            for dev in radio.ue:
+                ue_connection = SSH(dev.access_ip)
+                for ue in create_model.areas[dev.area].ues:
                     for sim in ue.sims:
-                        file = connection.get_file_content(f"/opt/UERANSIM/ue-sim-{sim.imsi}.conf")
+                        file = ue_connection.get_file_content(f"/opt/UERANSIM/ue-sim-{sim.imsi}.conf")
                         ue_config = UEConfig.model_validate(parser.load(file))
                         self.assertEqual(ue_config.mcc, "001")
                         self.assertEqual(ue_config.mnc, "01")
@@ -170,7 +201,7 @@ class UeransimTestCase(unittest.TestCase):
                         self.assertEqual(ue_config.sessions[0].slice.sst, 1)
                         self.assertEqual(ue_config.sessions[0].slice.sd, 1)
                         self.assertNotEqual(ue_config.sessions[0].slice.sst, 2)
-            connection.close_connection()
+                ue_connection.close_connection()
         print("Ended Test_003")
 
     def test_004(self):

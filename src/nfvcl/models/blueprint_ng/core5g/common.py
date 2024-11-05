@@ -6,6 +6,7 @@ from typing import List, Optional, Dict
 from pydantic import Field
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint.blueprint_base_model import BlueNSD, BlueprintBaseModel
+from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl.models.vim.vim_models import VimModel
 
 
@@ -24,12 +25,15 @@ class SubDataNets(BaseModel):
     downlinkAmbr: Optional[str] = Field(default=None)
     default5qi: Optional[str] = Field(default=None)
 
+class Router5GNetworkInfo(BaseModel):
+    n3_ip: SerializableIPv4Address = Field()
+    n6_ip: SerializableIPv4Address = Field()
+    gnb_ip: SerializableIPv4Address = Field()
+    gnb_cidr: SerializableIPv4Network = Field()
 
 class NetworkEndPoints(BaseModel):
     mgt: Optional[str] = Field(default=None)
     wan: Optional[str] = Field(default=None)
-    n3: Optional[str] = Field(default=None)
-    n6: Optional[str] = Field(default=None)
     data_nets: List[SubDataNets]
 
 
@@ -105,12 +109,23 @@ class SubSlices(BaseModel):
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
     sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
 
+class SubAreaNetwork(BaseModel):
+    n3: Optional[str] = Field(default=None)
+    n6: Optional[str] = Field(default=None)
+    gnb: Optional[str] = Field(default=None)
+    external_router: Optional[Router5GNetworkInfo] = Field(default=None)
+
+class SubAreaUPF(BaseModel):
+    type: str = Field()
+    external: Optional[bool] = Field(default=False)
 
 class SubArea(BaseModel):
     id: int
     nci: str
     idLength: int
     core: bool = Field(default=True)
+    upf: SubAreaUPF = Field(default_factory=list)
+    networks: SubAreaNetwork = Field()
     slices: Optional[List[SubSlices]] = Field(default=[], description="set slices ")
 
 
@@ -119,13 +134,32 @@ class SubArea(BaseModel):
 
 
 class Create5gModel(BaseModel):
-    type: Literal["5G"]
     callbackURL: Optional[HttpUrl] = Field(
         default=None,
         description='url that will be used to notify when the topology terraform ends'
     )
     config: SubConfig
     areas: List[SubArea] = Field(..., description="Set area")
+
+    def get_area(self, area_id: int):
+        for area in self.areas:
+            if area.id == area_id:
+                return area
+        return None
+
+    def get_slice_profile(self, slice_id: str) -> SubSliceProfiles:
+        for slice in self.config.sliceProfiles:
+            if slice.sliceId == slice_id:
+                return slice
+
+    def get_slices_profiles_for_area(self, area_id: int) -> List[SubSliceProfiles]:
+        slice_profiles: List[SubSliceProfiles] = []
+        for area in self.areas:
+            if area.id == area_id:
+                for slice in area.slices:
+                    slice_profiles.append(self.get_slice_profile(slice.sliceId))
+        return slice_profiles
+
 
 
 # =========================================== End of main section =====================================================

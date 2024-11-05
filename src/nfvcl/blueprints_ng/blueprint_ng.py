@@ -5,13 +5,18 @@ import enum
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import TypeVar, Generic, Optional, List, Any, Dict
+from functools import wraps
+from typing import TypeVar, Generic, Optional, List, Any, Dict, Type
 
 from pydantic import SerializeAsAny, Field, ConfigDict, ValidationError
 
+from nfvcl.blueprints_ng.lcm.performance_manager import get_performance_manager
+from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUConfigurator
+from nfvcl.blueprints_ng.providers.blueprint.blueprint_provider import BlueprintProvider
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from nfvcl.blueprints_ng.providers.kubernetes import K8SProviderNative
 from nfvcl.blueprints_ng.providers.kubernetes.k8s_provider_interface import K8SProviderInterface
+from nfvcl.blueprints_ng.providers.pdu.pdu_provider import PDUProvider
 from nfvcl.blueprints_ng.providers.virtualization import VirtualizationProviderOpenstack, VirtualizationProviderProxmox
 from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderInterface
@@ -19,8 +24,13 @@ from nfvcl.blueprints_ng.resources import Resource, ResourceConfiguration, Resou
     HelmChartResource, VmResourceConfiguration, NetResource
 from nfvcl.blueprints_ng.utils import get_class_from_path, get_class_path_str_from_obj
 from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.blueprint_ng.worker_message import BlueprintOperationCallbackModel
+from nfvcl.models.http_models import BlueprintNotFoundException
+from nfvcl.models.network import PduModel
+from nfvcl.models.network.network_models import PduType
 from nfvcl.models.prometheus.prometheus_model import PrometheusTargetModel
 from nfvcl.models.vim import VimTypeEnum
+from nfvcl.topology.topology import build_topology
 from nfvcl.utils.database import save_ng_blue, destroy_ng_blue
 from nfvcl.utils.log import create_logger
 
@@ -49,11 +59,19 @@ class BlueprintNGStatus(NFVCLBaseModel):
 
     @classmethod
     def deploying(cls, blue_id) -> BlueprintNGStatus:
-        return BlueprintNGStatus(current_operation=CurrentOperation.DEPLOYING, detail=f"The blueprint {blue_id} is deploying")
+        return BlueprintNGStatus(current_operation=CurrentOperation.DEPLOYING, detail=f"The blueprint {blue_id} is being deployed...")
 
     @classmethod
     def destroying(cls, blue_id) -> BlueprintNGStatus:
-        return BlueprintNGStatus(current_operation=CurrentOperation.DESTROYING, detail=f"The blueprint {blue_id} is being destroyed")
+        return BlueprintNGStatus(current_operation=CurrentOperation.DESTROYING, detail=f"The blueprint {blue_id} is being destroyed...")
+
+    @classmethod
+    def running_day2(cls) -> BlueprintNGStatus:
+        return BlueprintNGStatus(current_operation=CurrentOperation.IDLE, detail=f"Running day2 operation...")
+
+    @classmethod
+    def idle(cls) -> BlueprintNGStatus:
+        return BlueprintNGStatus(current_operation=CurrentOperation.IDLE, detail=f"Waiting for further operations")
 
 
 class BlueprintNGCreateModel(NFVCLBaseModel):
@@ -97,6 +115,8 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
     # Providers (the key is str because MongoDB doesn't support int as key for dictionary)
     virt_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
     k8s_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
+    pdu_provider: Optional[BlueprintNGProviderModel] = Field(default=None)
+    blueprint_provider: Optional[BlueprintNGProviderModel] = Field(default=None)
 
     created: Optional[datetime] = Field(default=None)
     corrupted: bool = Field(default=False)
@@ -105,7 +125,7 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
 
     node_exporters: List[PrometheusTargetModel] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
 
-    day_2_call_history: List[dict] = Field(default=[], description="The history of calls that have been made to the blueprint instance")
+    day_2_call_history: List[str] = Field(default=[], description="The history of calls that have been made to the blueprint instance")
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**self.fix_types(["state", "provider_data", "create_config"], **kwargs))
@@ -140,8 +160,28 @@ class BlueprintNGState(NFVCLBaseModel):
 class BlueprintNGException(Exception):
     pass
 
+performance_manager = get_performance_manager()
+def register_performance(params_to_info=None):
+    def decorator(method):
+        @wraps(method)
+        def wrapper(*args, **kwargs):
+            provider_aggregator_instance: ProvidersAggregator = args[0]
+            info = {}
+            if params_to_info:
+                for pi in params_to_info:
+                    if pi[2]:
+                        info[pi[1]] = pi[2](args[pi[0]])
+                    else:
+                        info[pi[1]] = args[pi[0]]
+            provider_call_id = performance_manager.start_provider_call(performance_manager.get_pending_operation_id(provider_aggregator_instance.blueprint.id), method.__name__, info)
+            res = method(*args, **kwargs)
+            performance_manager.end_provider_call(provider_call_id)
+            return res
+        return wrapper
+    return decorator
 
-class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface):
+
+class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface, PDUProvider, BlueprintProvider):
     def init(self):
         pass
 
@@ -151,6 +191,8 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
 
         self.virt_providers_impl: Dict[int, VirtualizationProviderInterface] = {}
         self.k8s_providers_impl: Dict[int, K8SProviderInterface] = {}
+        self.pdu_provider_impl: Optional[PDUProvider] = None
+        self.blueprint_provider_impl: Optional[BlueprintProvider] = None
 
     def get_virt_provider(self, area: int):
         vim = self.topology.get_vim_from_area_id_model(area)
@@ -160,11 +202,12 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
             elif vim.vim_type is VimTypeEnum.PROXMOX:
                 self.virt_providers_impl[area] = VirtualizationProviderProxmox(area, self.blueprint.id, self.blueprint.to_db)
 
-            self.blueprint.base_model.virt_providers[str(area)] = BlueprintNGProviderModel(
-                provider_type=get_class_path_str_from_obj(self.virt_providers_impl[area]),
-                provider_data_type=get_class_path_str_from_obj(self.virt_providers_impl[area].data),
-                provider_data=self.virt_providers_impl[area].data
-            )
+            if str(area) not in self.blueprint.base_model.virt_providers:
+                self.blueprint.base_model.virt_providers[str(area)] = BlueprintNGProviderModel(
+                    provider_type=get_class_path_str_from_obj(self.virt_providers_impl[area]),
+                    provider_data_type=get_class_path_str_from_obj(self.virt_providers_impl[area].data),
+                    provider_data=self.virt_providers_impl[area].data
+                )
 
         return self.virt_providers_impl[area]
 
@@ -172,17 +215,46 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
         if area not in self.k8s_providers_impl:
             self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint.id, self.blueprint.to_db)
 
-            self.blueprint.base_model.k8s_providers[str(area)] = BlueprintNGProviderModel(
-                provider_type=get_class_path_str_from_obj(self.k8s_providers_impl[area]),
-                provider_data_type=get_class_path_str_from_obj(self.k8s_providers_impl[area].data),
-                provider_data=self.k8s_providers_impl[area].data
-            )
+            if str(area) not in self.blueprint.base_model.k8s_providers:
+                self.blueprint.base_model.k8s_providers[str(area)] = BlueprintNGProviderModel(
+                    provider_type=get_class_path_str_from_obj(self.k8s_providers_impl[area]),
+                    provider_data_type=get_class_path_str_from_obj(self.k8s_providers_impl[area].data),
+                    provider_data=self.k8s_providers_impl[area].data
+                )
 
         return self.k8s_providers_impl[area]
 
+    def get_pdu_provider(self):
+        # The area is -1 because there is only one PDUProvider
+        if not self.pdu_provider_impl:
+            self.pdu_provider_impl = PDUProvider(area=-1, blueprint_id=self.blueprint.id, persistence_function=self.blueprint.to_db)
+
+            if not self.blueprint.base_model.pdu_provider:
+                self.blueprint.base_model.pdu_provider = BlueprintNGProviderModel(
+                    provider_type=get_class_path_str_from_obj(self.pdu_provider_impl),
+                    provider_data_type=get_class_path_str_from_obj(self.pdu_provider_impl.data),
+                    provider_data=self.pdu_provider_impl.data
+                )
+        return self.pdu_provider_impl
+
+    def get_blueprint_provider(self):
+        # The area is -1 because there is only one BlueprintProvider
+        if not self.blueprint_provider_impl:
+            self.blueprint_provider_impl = BlueprintProvider(area=-1, blueprint_id=self.blueprint.id, persistence_function=self.blueprint.to_db)
+
+            if not self.blueprint.base_model.blueprint_provider:
+                self.blueprint.base_model.blueprint_provider = BlueprintNGProviderModel(
+                    provider_type=get_class_path_str_from_obj(self.blueprint_provider_impl),
+                    provider_data_type=get_class_path_str_from_obj(self.blueprint_provider_impl.data),
+                    provider_data=self.blueprint_provider_impl.data
+                )
+        return self.blueprint_provider_impl
+
+    @register_performance(params_to_info=[(1, "vm_name", lambda x: x.name)])
     def create_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).create_vm(vm_resource)
 
+    @register_performance(params_to_info=[(1, "vm_name", lambda x: x.name)])
     def attach_nets(self, vm_resource: VmResource, nets_name: List[str]):
         """
         Attach a network to an already running VM
@@ -196,29 +268,72 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface)
         """
         return self.get_virt_provider(vm_resource.area).attach_nets(vm_resource, nets_name)
 
+    @register_performance()
     def create_net(self, net_resource: NetResource):
         return self.get_virt_provider(net_resource.area).create_net(net_resource)
 
+    @register_performance(params_to_info=[(1, "vm_name", lambda x: x.vm_resource.name)])
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         return self.get_virt_provider(vm_resource_configuration.vm_resource.area).configure_vm(vm_resource_configuration)
 
+    @register_performance(params_to_info=[(1, "vm_name", lambda x: x.name)])
     def destroy_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).destroy_vm(vm_resource)
 
+    @register_performance()
     def final_cleanup(self):
         for virt_provider_impl in self.virt_providers_impl.values():
             virt_provider_impl.final_cleanup()
         for k8s_provider_impl in self.k8s_providers_impl.values():
             k8s_provider_impl.final_cleanup()
+        self.get_pdu_provider().final_cleanup()
+        self.get_blueprint_provider().final_cleanup()
 
+    @register_performance(params_to_info=[(1, "release_name", lambda x: x.name)])
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         return self.get_k8s_provider(helm_chart_resource.area).install_helm_chart(helm_chart_resource, values)
 
+    @register_performance(params_to_info=[(1, "release_name", lambda x: x.name)])
     def update_values_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         return self.get_k8s_provider(helm_chart_resource.area).update_values_helm_chart(helm_chart_resource, values)
 
+    @register_performance(params_to_info=[(1, "release_name", lambda x: x.name)])
     def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
         return self.get_k8s_provider(helm_chart_resource.area).uninstall_helm_chart(helm_chart_resource)
+
+    @register_performance()
+    def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
+        return self.get_k8s_provider(helm_chart_resource.area).get_pod_log(helm_chart_resource, pod_name, tail_lines)
+
+    def find_pdu(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None, name: Optional[str] = None) -> PduModel:
+        return self.get_pdu_provider().find_pdu(area, pdu_type, instance_type, name)
+
+    def is_pdu_locked(self, pdu_model: PduModel) -> bool:
+        return self.get_pdu_provider().is_pdu_locked(pdu_model)
+
+    def is_pdu_locked_by_current_blueprint(self, pdu_model: PduModel) -> bool:
+        return self.get_pdu_provider().is_pdu_locked_by_current_blueprint(pdu_model)
+
+    def lock_pdu(self, pdu_model: PduModel) -> PduModel:
+        return self.get_pdu_provider().lock_pdu(pdu_model)
+
+    def unlock_pdu(self, pdu_model: PduModel) -> PduModel:
+        return self.get_pdu_provider().unlock_pdu(pdu_model)
+
+    def get_pdu_configurator(self, pdu_model: PduModel) -> Any:
+        return self.get_pdu_provider().get_pdu_configurator(pdu_model)
+
+    @register_performance(params_to_info=[(2, "blueprint_type", None)])
+    def create_blueprint(self, msg: Any, path: str):
+        return self.get_blueprint_provider().create_blueprint(msg, path)
+
+    @register_performance(params_to_info=[(1, "blueprint_id", None)])
+    def delete_blueprint(self, blueprint_id: str):
+        return self.get_blueprint_provider().delete_blueprint(blueprint_id)
+
+    @register_performance(params_to_info=[(1, "blueprint_id", None), (2, "function_name", None)])
+    def call_blueprint_function(self, blue_id: str, function_name: str, *args, **kwargs) -> BlueprintOperationCallbackModel:
+        return self.get_blueprint_provider().call_blueprint_function(blue_id, function_name, *args, **kwargs)
 
 
 class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
@@ -247,6 +362,8 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             created=datetime.now()
         )
 
+        self.topology = build_topology()
+
         self.provider = ProvidersAggregator(self)
 
     def register_resource(self, resource: Resource):
@@ -259,6 +376,12 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             raise BlueprintNGException(f"Already registered")
         if not resource.id:
             resource.id = str(uuid.uuid4())
+        if isinstance(resource, ResourceDeployable):
+            resource_dep: ResourceDeployable = resource
+            try:
+                self.topology.get_vim_from_area_id_model(resource_dep.area)
+            except ValueError as e:
+                raise BlueprintNGException("Unable to register resource, the area has no associated VIM")
         self.base_model.registered_resources[resource.id] = RegisteredResource(type=get_class_path_str_from_obj(resource), value=resource)
 
     def deregister_resource(self, resource: Resource):
@@ -271,6 +394,17 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             raise BlueprintNGException(f"The ID of the resource to be deleted is None")
         if resource.id in self.base_model.registered_resources:
             self.base_model.registered_resources.pop(resource.id)
+        else:
+            raise BlueprintNGException(f"The resource to be deleted is not present in registered resources")
+
+    def deregister_resource_by_id(self, resource_id: str):
+        """
+        Remove a resource in the blueprint registered resources using its id
+        Args:
+            resource_id: the id of the resource to be deregistered
+        """
+        if resource_id in self.base_model.registered_resources:
+            self.base_model.registered_resources.pop(resource_id)
         else:
             raise BlueprintNGException(f"The resource to be deleted is not present in registered resources")
 
@@ -315,10 +449,11 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         self.base_model.create_config_type = get_class_path_str_from_obj(model)
 
     def destroy(self):
-        from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
-
         for children_id in self.base_model.children_blue_ids.copy():
-            get_blueprint_manager().delete_blueprint(children_id, wait=True)
+            try:
+                self.provider.delete_blueprint(children_id)
+            except BlueprintNotFoundException:
+                self.logger.warning(f"The children blueprint {children_id} has not been found. Could be deleted before, skipping...")
             self.deregister_children(children_id)
 
         for key, value in self.base_model.registered_resources.items():
@@ -389,7 +524,11 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             for key in path[:-1]:  # This is done because cannot perform path[:-1][a][b][c].... dynamically
                 current = current[key]
             # Replacing the object with its reference ID
-            current[path[-1]] = f'REF={current[path[-1]]["id"]}'
+            current_id = current[path[-1]]["id"]
+            if current_id in self.base_model.registered_resources:
+                current[path[-1]] = f'REF={current[path[-1]]["id"]}'
+            else:
+                raise BlueprintNGException(f"Resource {current_id} not registered")
 
     def __override_variables_in_dict_ref(self, obj, obj_dict, registered_resource):
         occ = self.__find_field_occurrences(obj, type_to_find=str, check_fun=lambda x: x.startswith('REF='))
@@ -402,13 +541,17 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
     def __serialize_content(self) -> dict:
         serialized_dict = self.base_model.model_dump()
 
-        # Find every occurrence of type Resource in the state amd replace them with a reference
-        self.__override_variables_in_dict(self.base_model.state, serialized_dict["state"], Resource)
+        try:
+            # Find every occurrence of type Resource in the state amd replace them with a reference
+            self.__override_variables_in_dict(self.base_model.state, serialized_dict["state"], Resource)
 
-        # Find every occurrence of type ResourceConfiguration in the registered_resources and replace the ResourceDeployable field with a reference
-        for key, value in self.base_model.registered_resources.items():
-            if isinstance(value.value, ResourceConfiguration):
-                self.__override_variables_in_dict(value.value, serialized_dict["registered_resources"][key]["value"], ResourceDeployable)
+            # Find every occurrence of type ResourceConfiguration in the registered_resources and replace the ResourceDeployable field with a reference
+            for key, value in self.base_model.registered_resources.items():
+                if isinstance(value.value, ResourceConfiguration):
+                    self.__override_variables_in_dict(value.value, serialized_dict["registered_resources"][key]["value"], ResourceDeployable)
+        except BlueprintNGException as e:
+            self.logger.error(f"Error serializing blueprint: {str(e)}")
+            serialized_dict["corrupted"] = True
 
         return serialized_dict
 
@@ -422,6 +565,33 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
     @classmethod
     def from_db(cls, deserialized_dict: dict):
+        """
+        Load a blueprint from the dictionary and initialize providers.
+        Args:
+            deserialized_dict: The dictionary coming from the database
+
+        Returns:
+            A complete blueprint instance that can operate on the blueprint.
+        """
+        instance = cls.__from_db(deserialized_dict, provider_initialization=True)
+        return instance
+
+    @classmethod
+    def from_db_no_prov_init(cls, deserialized_dict: dict):
+        """
+        Load a blueprint from the dictionary but does not initialize the providers. The blueprint cannot be used to perform actions.
+        It is useful when a representation to display information is needed, like blueprint list for user.
+        Args:
+            deserialized_dict: The dictionary coming from the database
+
+        Returns:
+            A blueprint instance for display purposes.
+        """
+        instance = cls.__from_db(deserialized_dict, provider_initialization=False)
+        return instance
+
+    @classmethod
+    def __from_db(cls, deserialized_dict: dict, provider_initialization: bool = True):
         BlueSavedClass = get_class_from_path(deserialized_dict['type'])
         instance = BlueSavedClass(deserialized_dict['id'])
 
@@ -455,13 +625,32 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             instance.base_model.corrupted = True
             instance.logger.error(f"Blueprint set as corrupted")
 
-        # Loading the providers data
-        # get_virt_provider is used to create a new instance of the provider for the area
-        for area, virt_provider in deserialized_dict["virt_providers"].items():
-            instance.provider.get_virt_provider(int(area)).data = instance.provider.get_virt_provider(int(area)).data.model_validate(virt_provider["provider_data"])
+        if provider_initialization:
+            # Loading the providers data
+            # get_virt_provider is used to create a new instance of the provider for the area
+            for area, virt_provider in deserialized_dict["virt_providers"].items():
+                provider_data = instance.provider.get_virt_provider(int(area)).data.model_validate(virt_provider["provider_data"])
+                instance.provider.get_virt_provider(int(area)).data = provider_data
+                instance.base_model.virt_providers[str(area)].provider_data = provider_data
 
-        for area, k8s_provider in deserialized_dict["k8s_providers"].items():
-            instance.provider.get_k8s_provider(int(area)).data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
+            for area, k8s_provider in deserialized_dict["k8s_providers"].items():
+                provider_data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
+                instance.provider.get_k8s_provider(int(area)).data = provider_data
+                instance.base_model.k8s_providers[str(area)].provider_data = provider_data
+
+            if "pdu_provider" in deserialized_dict:
+                pdu_provider = deserialized_dict["pdu_provider"]
+                if pdu_provider:
+                    provider_data = instance.provider.get_pdu_provider().data.model_validate(pdu_provider["provider_data"])
+                    instance.provider.get_pdu_provider().data = provider_data
+                    instance.base_model.pdu_provider.provider_data = provider_data
+
+            if "blueprint_provider" in deserialized_dict:
+                blueprint_provider = deserialized_dict["blueprint_provider"]
+                if blueprint_provider:
+                    provider_data = instance.provider.get_blueprint_provider().data.model_validate(blueprint_provider["provider_data"])
+                    instance.provider.get_blueprint_provider().data = provider_data
+                    instance.base_model.blueprint_provider.provider_data = provider_data
 
         return instance
 
@@ -483,20 +672,3 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 dict_to_ret["corrupted"] = "True"
             return dict_to_ret
 
-    def call_external_function(self, external_blue_id: str, function_name: str, *args, **kwargs):
-        """
-        Call a function on another blueprint
-        Args:
-            external_blue_id: Id of the blueprint to call on the function on
-            function_name: Name of the function to call
-            *args: args
-            **kwargs: kwargs
-
-        Returns: Result of the function call
-        """
-        from nfvcl.blueprints_ng.lcm.blueprint_manager import get_blueprint_manager
-
-        self.logger.debug(f"Calling external function '{function_name}' on blueprint '{external_blue_id}', args={args}, kwargs={kwargs}")
-        res = get_blueprint_manager().get_worker(external_blue_id).call_function_sync(function_name, *args, **kwargs)
-        self.logger.debug(f"Result of external function '{function_name}' on blueprint '{external_blue_id}' = {res}")
-        return res

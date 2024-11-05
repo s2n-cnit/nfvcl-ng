@@ -1,5 +1,7 @@
+import hashlib
 from typing import List, Dict
 
+import requests
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
 from openstack.compute.v2.server_interface import ServerInterface
@@ -18,7 +20,7 @@ from nfvcl.blueprints_ng.providers.virtualization.virtualization_provider_interf
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
-    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor
+    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
 from nfvcl.models.vim import VimModel
 from nfvcl.utils.openstack.openstack_client import OpenStackClient
 
@@ -61,19 +63,25 @@ def get_os_client_from_vim(vim: VimModel, area: int):
     if area not in os_clients_dict:
         os_clients_dict[area] = OpenStackClient(vim)
 
-    return os_clients_dict[area].client
+    return os_clients_dict[area]
 
 
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
+    vim: VimModel
+    os_client: OpenStackClient
+    conn: Connection
+    vim_need_floating_ip: bool
+
     def init(self):
         self.data: VirtualizationProviderDataOpenstack = VirtualizationProviderDataOpenstack()
         self.vim = self.topology.get_vim_from_area_id_model(self.area)
-        self.conn = get_os_client_from_vim(self.vim, self.area)
+        self.os_client = get_os_client_from_vim(self.vim, self.area)
+        self.conn = self.os_client.client
         self.vim_need_floating_ip = self.vim.config.use_floating_ip
 
-    def __create_image_from_url(self, vm_resource: VmResource):
+    def __create_image_from_url(self, vm_image: VmResourceImage):
         image_attrs = {
-            'name': vm_resource.image.name,
+            'name': vm_image.name,
             'disk_format': 'qcow2',
             'container_format': 'bare',
             'visibility': 'public',
@@ -85,7 +93,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             image_attrs['visibility'] = "private"
             image = self.conn.image.create_image(**image_attrs)
 
-        self.conn.image.import_image(image, method="web-download", uri=vm_resource.image.url)
+        self.conn.image.import_image(image, method="web-download", uri=vm_image.url)
         self.conn.wait_for_image(image)
         return image
 
@@ -98,23 +106,67 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         Returns: True if everything is as expected, False otherwise
         """
         for net in vm_resource.get_all_connected_network_names():
-            if self.conn.get_network(net) is None:
+            if self.os_client.get_network(net) is None:
                 raise VirtualizationProviderOpenstackException(f"Network >{net}< not found on vim")
 
+    def __get_checksum(self, vm_image: VmResourceImage) -> str:
+        self.logger.debug(f"Downloading {vm_image.url} image on NFVCL machine to compute its hash 512...")
+        response = requests.get(vm_image.url, stream=True)
 
-    def create_vm(self, vm_resource: VmResource):
+        if response.status_code == 200:
+            file_hash = hashlib.sha512(response.content).hexdigest()
+            self.logger.debug(f"Downloading of {vm_image.url} finished")
+            return file_hash
+        else:
+            self.logger.error(f"Failed to download file. Status code: {response.status_code}")
+            raise ValueError("The URL is not valid")
+
+    def __prepare_image(self, vm_image: VmResourceImage):
+        """
+        Download the image if it is not present on the VIM.
+        If the image requires to check if the hash 512 coincides, the nfvcl downloads the file and compare the hash: if it
+        differs than it creates a new image with a different name.
+        N.B. The old image cannot be deleted since it can be used by other VMs
+        Args:
+            vm_image: The image to be prepared
+
+        Returns:
+            The existing image on the VIM.
+        """
+        image = self.conn.get_image(vm_image.name)
+        if image is None:
+            if vm_image.url:
+                self.logger.info(f"Image {vm_image.name} not found on VIM, downloading from {vm_image.url}")
+                image = self.__create_image_from_url(vm_image)
+                self.logger.info(f"Image {vm_image.name} download completed")
+            else:
+                raise VirtualizationProviderOpenstackException(f"Image >{vm_image.name}< not found")
+        elif vm_image.check_sha512sum and vm_image.check_sha512sum:
+            os_remote_image = self.conn.get_image(vm_image.name)
+            os_remote_image_hash512 = os_remote_image.hash_value
+            new_image_hash512 = self.__get_checksum(vm_image)
+            # If sha does not coincide, image needs to be updated
+            if new_image_hash512 != os_remote_image_hash512:
+                # WE NEED TO CHANGE NAME SINCE WE CANNOT DELETE THE OLD ONE BECAUSE IT CAN BE USED BY OTHER INSTANCES
+                # We are using the HASH to compute the new name soo we can identify if it is already present
+                vm_image.name = vm_image.name+new_image_hash512[0:12]
+                image = self.conn.get_image(vm_image.name)
+                if image is None:
+                    self.logger.info(f"Updated image {vm_image.name} not found on VIM, downloading on VIM from {vm_image.url}")
+                    image = self.__create_image_from_url(vm_image)
+                    self.logger.info(f"Image {vm_image.name} download completed on VIM")
+                else:
+                    self.logger.info("Updated image has been found on VIM, download will be skipped")
+            else:
+                self.logger.info(f"Image {vm_image.name} on Openstack sha512 coincides with the one of the remote image")
+        return image
+
+    def create_vm(self, vm_resource: VmResource, check_image_hash: bool = False):
         self.logger.info(f"Creating VM {vm_resource.name}")
 
         self._pre_creation_checks(vm_resource)
 
-        image = self.conn.get_image(vm_resource.image.name)
-        if image is None:
-            if vm_resource.image.url:
-                self.logger.info(f"Image {vm_resource.image.name} not found on VIM, downloading from {vm_resource.image.url}")
-                image = self.__create_image_from_url(vm_resource)
-                self.logger.info(f"Image {vm_resource.image.name} download completed")
-            else:
-                raise VirtualizationProviderOpenstackException(f"Image >{vm_resource.image.name}< not found")
+        image = self.__prepare_image(vm_resource.image)
 
         flavor: Flavor = self.create_get_flavor(vm_resource.flavor, vm_resource.name)
 
@@ -145,7 +197,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             auto_ip=auto_ip,
             nat_destination=vm_resource.management_network,
             ip_pool=floating_ip_net,
-            network=vm_resource.get_all_connected_network_names(),
+            network=self.os_client.network_names_to_ids(vm_resource.get_all_connected_network_names()),
             userdata=cloudin
         )
 
@@ -168,15 +220,16 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def __update_net_info_vm(self, vm_resource: VmResource, server_obj: Server):
         vm_resource.network_interfaces.clear()
         # Getting detailed info about the networks attached to the machine
-        subnet_detailed = self.__get_network_details(self.conn, vm_resource.get_all_connected_network_names())
+        subnet_detailed = self.__get_network_details(vm_resource.get_all_connected_network_names())
         # Parse the OS output and create a structured network_interfaces dictionary
         self.__parse_os_addresses(vm_resource, server_obj.addresses, subnet_detailed)
 
         # Find the IP to use for configuring the VM, floating if present or the fixed one from the management interface if not
-        if server_obj.access_ipv4 and len(server_obj.access_ipv4) > 0:
-            vm_resource.access_ip = server_obj.access_ipv4
+        mgt_interface = vm_resource.network_interfaces[vm_resource.management_network][0]
+        if mgt_interface.floating:
+            vm_resource.access_ip = mgt_interface.floating.ip
         else:
-            vm_resource.access_ip = vm_resource.network_interfaces[vm_resource.management_network][0].fixed.ip
+            vm_resource.access_ip = mgt_interface.fixed.ip
 
         # Run an Ansible playbook to gather information
         self.__gather_info_from_vm(vm_resource)
@@ -211,7 +264,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         for net in to_attach:
             # Get the OS SDK network object
-            network = self.conn.get_network(net)
+            network = self.os_client.get_network(net)
             # Connect the network to the instance
             new_server_interface: ServerInterface = self.conn.compute.create_server_interface(self.data.os_dict[vm_resource.id], net_id=network.id)
             self.logger.debug(f"OS network '{net}' attached to VM {vm_resource.name}")
@@ -228,7 +281,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             nics.append(NetplanInterface(nic_name=net_intf.fixed.interface_name, mac_address=net.mac_addr))
             ips.append(net_intf.fixed.ip)
 
-        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics), self.blueprint_id)
+        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=nics), self.blueprint_id, logger_override=self.logger)
         self.logger.success(f"Networks {to_attach} attached to VM {vm_resource.name}")
         self.save_to_db()
 
@@ -237,9 +290,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def create_net(self, net_resource: NetResource):
         self.logger.info(f"Creating NET {net_resource.name}")
 
-        if self.conn.get_network(net_resource.name):
+        if self.os_client.get_network(net_resource.name):
             raise VirtualizationProviderOpenstackException(f"Network {net_resource.name} already exist")
-        if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name}):
+        if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name, "project_id": self.os_client.project_id}):
             raise VirtualizationProviderOpenstackException(f"Subnet with cidr {net_resource.cidr} already exist")
 
         network: Network = self.conn.create_network(net_resource.name, port_security_enabled=False)
@@ -304,7 +357,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def __gather_info_from_vm(self, vm_resource: VmResource):
         self.logger.info(f"Starting VM info gathering")
 
-        facts = configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource), self.blueprint_id)
+        facts = configure_vm_ansible(VmInfoGathererConfigurator(vm_resource=vm_resource), self.blueprint_id, logger_override=self.logger)
 
         mac_name_dict = {}
 
@@ -335,7 +388,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id)
+            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id, logger_override=self.logger)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
         self.save_to_db()
@@ -373,7 +426,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                     floating = VmResourceNetworkInterfaceAddress(ip=address["addr"], mac=address["OS-EXT-IPS-MAC:mac_addr"], cidr=subnet_details[network_name].cidr)
                 if network_name not in vm_resource.network_interfaces:
                     vm_resource.network_interfaces[network_name] = []
-                vm_resource.network_interfaces[network_name].append(VmResourceNetworkInterface(fixed=fixed, floating=floating))
+            vm_resource.network_interfaces[network_name].append(VmResourceNetworkInterface(fixed=fixed, floating=floating))
 
     def __disable_port_security(self, conn: Connection, port_id):
         try:
@@ -381,11 +434,10 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         except Exception as e:
             raise e
 
-    def __get_network_details(self, connection: Connection, network_names: List[str]) -> Dict[str, Subnet]:
+    def __get_network_details(self, network_names: List[str]) -> Dict[str, Subnet]:
         """
         Given the network names, it retrieves the details of the first subnet of every network
         Args:
-            connection: The connection to openstack
             network_names: The network names
 
         Returns:
@@ -393,6 +445,6 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         """
         subnet_detail_list = {}
         for network_name in network_names:
-            network_detail: Network = connection.get_network(network_name)
-            subnet_detail_list[network_name] = connection.get_subnet(network_detail.subnet_ids[0])
+            network_detail: Network = self.os_client.get_network(network_name)
+            subnet_detail_list[network_name] = self.conn.get_subnet(network_detail.subnet_ids[0])
         return subnet_detail_list

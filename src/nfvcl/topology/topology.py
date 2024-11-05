@@ -1,44 +1,29 @@
-from logging import Logger
-from redis.client import Redis
-from nfvcl.utils.database import save_topology, delete_topology, NFVCLDatabase
-
-from nfvcl.models.event import Event
-from nfvcl.models.k8s.common_k8s_model import LBPool
-from nfvcl.models.k8s.topology_k8s_model import K8sModel
-from nfvcl.models.network.network_models import RouterPortModel, IPv4ReservedRange
-from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
-from nfvcl.models.vim import VimModel, UpdateVimModel
-from nfvcl.topology.topology_events import TopologyEventType
-from nfvcl.utils.log import create_logger
-from nfvcl.utils.ipam import *
-from nfvcl.utils.util import remove_files_by_pattern
-from nfvcl.models.topology import TopologyModel
-from nfvcl.models.network import PduModel, NetworkModel, RouterModel
-import typing
 import json
 import traceback
+import typing
+from logging import Logger
 from multiprocessing import RLock
+
+from nfvcl.models.k8s.common_k8s_model import LBPool
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
+from nfvcl.models.network import PduModel, NetworkModel, RouterModel
+from nfvcl.models.network.network_models import RouterPortModel, IPv4ReservedRange
+from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
+from nfvcl.models.topology import TopologyModel
+from nfvcl.models.vim import VimModel, UpdateVimModel
+from nfvcl.utils.database import save_topology, delete_topology, get_nfvcl_database
 from nfvcl.utils.decorators import obj_multiprocess_lock
-from nfvcl.utils.redis_utils.redis_manager import get_redis_instance, trigger_redis_event
+from nfvcl.utils.file_utils import remove_files_by_pattern
+from nfvcl.utils.ipam import *
+from nfvcl.utils.log import create_logger
+from nfvcl.utils.redis_utils.event_types import TopologyEventType
+from nfvcl.utils.redis_utils.redis_manager import trigger_redis_event
 from nfvcl.utils.redis_utils.topic_list import TOPOLOGY_TOPIC
+from nfvcl.utils.util import get_nfvcl_config
 
 topology_lock = RLock()
 
 logger: Logger = create_logger('Topology')
-redis_cli: Redis = get_redis_instance()
-
-
-def trigger_event(event_name: TopologyEventType, data: dict):
-    """
-    Send an event, together with the data that have been updated, to REDIS.
-
-    Args:
-        event_name: the name of the event
-        data: the updated data (dict)
-    """
-
-    event: Event = Event(operation=event_name.value, data=data)
-    trigger_redis_event(redis_cli, TOPOLOGY_TOPIC, event)
 
 
 class Topology:
@@ -69,12 +54,11 @@ class Topology:
         """
         Return the topology from the DB as TopologyModel instance.
         Args:
-            db: the database
             lock: the resource lock
         Returns:
             Topology: The instance of the topology from the database
         """
-        db = NFVCLDatabase()
+        db = get_nfvcl_database()
         topo = db.find_one_in_collection("topology", {})
         if topo:
             data = TopologyModel.model_validate(topo).model_dump()
@@ -130,7 +114,7 @@ class Topology:
             self.add_vim(vim, terraform=terraform)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE, self._model.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_CREATE, data=self._model.model_dump())
 
     @obj_multiprocess_lock
     def delete(self, terraform: bool = False) -> None:
@@ -154,7 +138,7 @@ class Topology:
 
         delete_topology()
         self._model = None
-        trigger_event(TopologyEventType.TOPO_DELETE, deleted_topology.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETE, data=self._model.model_dump())
 
     # **************************** VIMs ****************************
 
@@ -190,7 +174,7 @@ class Topology:
         vim_dict = vim_model.model_dump(exclude={'networks', 'routers', 'areas'})
         vim_dict['config']['use_floating_ip'] = use_floating_ip
 
-        trigger_event(TopologyEventType.TOPO_VIM_CREATE, vim_model.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_VIM_CREATE, data=self._model.model_dump())
 
     @obj_multiprocess_lock
     def del_vim(self, vim_name: str, terraform=False):
@@ -209,7 +193,7 @@ class Topology:
         # Local deletion
         self._model.del_vim(vim_model.name)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_VIM_DEL, vim_model.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_VIM_DEL, data=self._model.model_dump())
 
     @obj_multiprocess_lock
     def update_vim(self, update_msg: UpdateVimModel, terraform: bool = True):
@@ -245,7 +229,7 @@ class Topology:
             vim_model.del_area(vim_area)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_VIM_UPDATE, vim_model.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_VIM_UPDATE, data=vim_model.model_dump())
 
     def get_vim_name_from_area_id(self, area: int) -> Union[str, None]:
         """
@@ -380,7 +364,7 @@ class Topology:
                 self._add_vim_net(network_name, vim, terraform=terraform)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_NETWORK, network_model.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_CREATE_NETWORK, data=network_model.model_dump())
         return added_network
 
     @obj_multiprocess_lock
@@ -405,7 +389,7 @@ class Topology:
 
         self._model.del_network(network.name)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, network.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETE_NETWORK, data=network.model_dump())
 
     @obj_multiprocess_lock
     def del_network_by_name(self, network_name: str, terraform: bool = False):
@@ -425,7 +409,7 @@ class Topology:
 
         delete_net = self._model.del_network(network_name)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_NETWORK, delete_net.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETE_NETWORK, data=delete_net.model_dump())
 
     # **************************** Routers **************************
 
@@ -440,7 +424,6 @@ class Topology:
         """
         # Looking for the router in the topology
         router: RouterModel = self._model.get_router(router_name)
-
         return router.model_dump()
 
     @obj_multiprocess_lock
@@ -457,7 +440,7 @@ class Topology:
         # Crash if already present
         self._model.add_router(router)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_ROUTER, router.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_CREATED_ROUTER, data=router.model_dump())
 
     @obj_multiprocess_lock
     def del_router(self, router_name: str, vim_names_list: list = None):
@@ -481,7 +464,7 @@ class Topology:
                 vim.del_router(vim_router)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_ROUTER, router.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETED_ROUTER, data=router.model_dump())
 
     # **************************** VIM updating **********************
 
@@ -729,7 +712,7 @@ class Topology:
         topo_net.add_reserved_range(ip_range)
 
         self._save_topology_from_model()  # Since we are working on the model
-        trigger_event(TopologyEventType.TOPO_CREATE_RANGE_RES, ip_range.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_CREATE_RANGE_RES, data=ip_range.model_dump())
         return ip_range
 
     @obj_multiprocess_lock
@@ -762,25 +745,23 @@ class Topology:
             logger.error(msg_err)
         else:
             self._save_topology_from_model()
-            trigger_event(TopologyEventType.TOPO_DELETE_RANGE_RES, removed_range.model_dump())
+            trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETE_RANGE_RES, data=removed_range.model_dump())
             return removed_range
 
     @obj_multiprocess_lock
-    def add_pdu(self, pdu_input: PduModel, nfvo_onboard: bool = False):
+    def add_pdu(self, pdu_input: PduModel):
         """
         Add PDU to the topology
         Args:
             pdu_input: The PDU to be added to the topology
         """
-        pdu_input.nfvo_onboarded = False
         try:
-            pdu_input.details = ""
             self._model.add_pdu(pdu_input)
 
             # Saving changes to the topology
             self._save_topology_from_model()
 
-            trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.model_dump())
+            trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_CREATE_PDU, data=pdu_input.model_dump())
 
         except ValueError:
             # Value error is thrown when the PDU already exist
@@ -797,7 +778,7 @@ class Topology:
 
         # Saving changes to the topology
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_PDU, pdu_input.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_CREATE_PDU, data=pdu_input.model_dump())
 
     @obj_multiprocess_lock
     def del_pdu(self, pdu_name: str):
@@ -810,7 +791,7 @@ class Topology:
 
         deleted_pdu = self._model.del_pdu(pdu_name)
 
-        trigger_event(TopologyEventType.TOPO_DELETE_PDU, deleted_pdu.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETE_PDU, data=deleted_pdu.model_dump())
         self._save_topology_from_model()
 
     def get_pdu(self, pdu_name: str) -> PduModel:
@@ -825,35 +806,49 @@ class Topology:
         """
         return self._model.get_pdu(pdu_name)
 
-    def get_pdus(self):
+    def get_pdus(self) -> List[PduModel]:
         """
         Returns a list of PDUs
         """
         return self._model.get_pdus()
 
-    def get_k8s_clusters(self) -> List[K8sModel]:
+    def get_k8s_clusters(self) -> List[TopologyK8sModel]:
         """
         Get the k8s cluster list from the topology as List[K8sModel]
 
         Returns:
-            List[K8sModel]: the k8s cluster list
+            List[TopologyK8sModel]: the k8s cluster list
         """
         return self._model.kubernetes
 
-    def get_k8s_cluster(self, cluster_name: str) -> K8sModel:
+    def get_k8s_cluster(self, cluster_name: str) -> TopologyK8sModel:
         """
         Get the k8s cluster from the topology
 
         Returns:
-            K8sModel: the desired k8s cluster
+            TopologyK8sModel: the desired k8s cluster
 
         Raises:
             ValueError if not found.
         """
         return self._model.find_k8s_cluster(cluster_name)
 
+    def get_k8s_cluster_by_area(self, area_id: int) -> TopologyK8sModel:
+        """
+        Get the first k8s cluster from the topology given the area id.
+
+        Args:
+
+            area_id: the area id in of the cluster to get.
+
+        Returns:
+
+            The FIRST matching k8s cluster or Throw ValueError if NOT found.
+        """
+        return self._model.find_k8s_cluster_by_area(area_id)
+
     @obj_multiprocess_lock
-    def add_k8scluster(self, data: K8sModel):
+    def add_k8scluster(self, data: TopologyK8sModel):
         """
         Add the k8s cluster to the topology. If specified it onboard the cluster on OSM
         Args:
@@ -863,7 +858,7 @@ class Topology:
         self._model.add_k8s_cluster(data)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_K8S, data.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_CREATE_K8S, data=data.model_dump())
 
     @obj_multiprocess_lock
     def del_k8scluster(self, cluster_id: str):
@@ -876,10 +871,10 @@ class Topology:
         k8s_deleted_cluster = self._model.del_k8s_cluster(cluster_id)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_K8S, k8s_deleted_cluster.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETE_K8S, data=k8s_deleted_cluster.model_dump())
 
     @obj_multiprocess_lock
-    def update_k8scluster(self, cluster: K8sModel):
+    def update_k8scluster(self, cluster: TopologyK8sModel):
         """
         Update a topology K8s cluster
         Args:
@@ -888,7 +883,7 @@ class Topology:
         updated_cluster = self._model.upd_k8s_cluster(cluster)
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_UPDATE_K8S, updated_cluster.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_UPDATE_K8S, data=updated_cluster.model_dump())
 
     @obj_multiprocess_lock
     def add_prometheus_server(self, prom_server: PrometheusServerModel):
@@ -901,7 +896,7 @@ class Topology:
         # Check if there is an instance with the same id
         self._model.add_prometheus_srv(prom_server)
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_CREATE_PROM_SRV, prom_server.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_CREATE_PROM_SRV, data=prom_server.model_dump())
 
     @obj_multiprocess_lock
     def del_prometheus_server(self, prom_srv_id: str, force: bool = False) -> PrometheusServerModel:
@@ -915,10 +910,10 @@ class Topology:
         """
         deleted_prom_instance = self._model.del_prometheus_srv(prom_srv_id, force)
 
-        remove_files_by_pattern("day2_files", 'prometheus_{}'.format(prom_srv_id))
+        remove_files_by_pattern(get_nfvcl_config().nfvcl.tmp_folder, f"prometheus_{prom_srv_id}*")
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_DELETE_PROM_SRV, deleted_prom_instance.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_DELETE_PROM_SRV, data=deleted_prom_instance.model_dump())
         return deleted_prom_instance
 
     @obj_multiprocess_lock
@@ -932,7 +927,7 @@ class Topology:
         prom_server.update_remote_sd_file()
 
         self._save_topology_from_model()
-        trigger_event(TopologyEventType.TOPO_UPDATE_PROM_SRV, updated_instance.model_dump())
+        trigger_redis_event(TOPOLOGY_TOPIC, TopologyEventType.TOPO_UPDATE_PROM_SRV, data=updated_instance.model_dump())
 
     def get_prometheus_server(self, prom_server_id: str) -> PrometheusServerModel:
         """

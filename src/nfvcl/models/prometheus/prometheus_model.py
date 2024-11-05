@@ -1,9 +1,10 @@
-import os
-
-from pydantic import BaseModel, Field
 from typing import List
-from nfvcl.utils.ssh_utils import upload_file, createSCPClient
+
 import ruamel.yaml
+from pydantic import BaseModel, Field
+
+from nfvcl.utils.file_utils import create_tmp_file
+from nfvcl.utils.ssh_utils import upload_file, createSCPClient
 
 
 class PrometheusTargetModel(BaseModel):
@@ -114,11 +115,11 @@ class PrometheusServerModel(BaseModel):
         Returns:
             The path of the created file.
         """
-        relative_path: str = 'day2_files/prometheus_{}_scraps.yaml'.format(self.id)
-        with open(relative_path, 'w') as file:
+        relative_path = create_tmp_file("prometheus", f"prometheus_{self.id}_scraps.yaml")
+        # relative_path: str = 'day2_files/prometheus_{}_scraps.yaml'.format(self.id)
+        with relative_path.open("+w") as file:
             file.write(ruamel.yaml.dump(self.model_dump()['targets'], Dumper=ruamel.yaml.RoundTripDumper, allow_unicode=True))
-        global_path = f"{os.getcwd()}/{relative_path}"
-        return global_path
+        return str(relative_path.absolute())
 
     def update_remote_sd_file(self):
         """

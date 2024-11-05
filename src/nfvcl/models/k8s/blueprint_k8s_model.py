@@ -2,7 +2,7 @@ from typing import List, Optional, Literal, Dict
 from pydantic import Field
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.k8s.common_k8s_model import LBPool, Cni
-from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sVersion
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
 from nfvcl.models.virtual_link_desc import VirtLinkDescr
 from nfvcl.models.vim.vim_models import VMFlavors
 
@@ -67,7 +67,7 @@ class K8sBlueprintModel(K8sBlueprintCreate):
     blueprint_instance_id: str = Field(description="The blueprint ID generated when it has been instantiated")
     vim_name: Optional[str] = Field(default=None)
 
-    def parse_to_k8s_topo_model(self, vim_name: str = None) -> K8sModel:
+    def parse_to_k8s_topo_model(self, vim_name: str = None) -> TopologyK8sModel:
         """
         Parse the blueprint model to the topology representation
         Args:
@@ -75,7 +75,7 @@ class K8sBlueprintModel(K8sBlueprintCreate):
         Returns:
             The parsed model.
         """
-        k8s_data: K8sModel = K8sModel(
+        k8s_data: TopologyK8sModel = TopologyK8sModel(
             name=self.blueprint_instance_id,
             provided_by='blueprint',
             blueprint_ref=self.blueprint_instance_id,

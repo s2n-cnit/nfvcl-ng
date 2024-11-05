@@ -1,20 +1,6 @@
-from pathlib import Path
-
 from nfvcl.models.config_model import NFVCLConfigModel
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.util import get_nfvcl_config
-
-
-# ---------- Checking Folders -------------------------------------
-def check_folders():
-    """
-    Creates empty folders not pushed on GitHub, if not already present.
-    """
-    Path("helm_charts/charts/").mkdir(parents=True, exist_ok=True)
-    Path("day2_files").mkdir(parents=True, exist_ok=True)
-
-
-check_folders()
 
 # ---------- Imports and static variables
 from logging import Logger
@@ -50,6 +36,7 @@ def check_py_version():
         logger.error(f"The version of Python must be greater then {PY_MIN_MAJOR}.{PY_MIN_MINOR}. "
                      f"You are using the {sys.version}")
         exit(-1)
+
 
 if __name__ == "__main__":
     urllib3.disable_warnings()

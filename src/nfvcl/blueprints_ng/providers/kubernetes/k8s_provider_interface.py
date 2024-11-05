@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData, \
     BlueprintNGProviderInterface
@@ -29,4 +29,8 @@ class K8SProviderInterface(BlueprintNGProviderInterface):
 
     @abc.abstractmethod
     def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
+        pass
+
+    @abc.abstractmethod
+    def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
         pass

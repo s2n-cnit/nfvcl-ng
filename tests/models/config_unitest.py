@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from nfvcl.models.base_model import NFVCLBaseModel
 
 
-class Networks(BaseModel):
+class Networks(NFVCLBaseModel):
     mgmt: str
     data: str
+    k8s_controller: str
 
 
-class Vim(BaseModel):
+class Vim(NFVCLBaseModel):
     user: str
     password: str
     url: str
 
 
-class Config(BaseModel):
+class Config(NFVCLBaseModel):
     networks: Networks
     vim: Vim
 
 
-class Model(BaseModel):
+class ConfigUniteTest(NFVCLBaseModel):
     config: Config

@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 # DO NOT MOVE THIS PIECE OF CODE -------
 # Log level must be set before loggers are created!
+from nfvcl.rest_endpoints.performance import performance_router
 from nfvcl.rest_endpoints.rest_utils import ansible_router
 from nfvcl.rest_endpoints.day2action import day2_router
-from nfvcl.rest_endpoints.helm import helm_router
 from nfvcl.rest_endpoints.k8s import k8s_router
 from nfvcl.rest_endpoints.rest_callback import RestAnswer202
 from nfvcl.rest_endpoints.topology import topology_router
@@ -11,6 +11,7 @@ from nfvcl.rest_endpoints.blue_ng_router import blue_ng_router as blue_ng_router
 from nfvcl.rest_endpoints.HORSE.horse import horse_router
 
 from nfvcl.rest_endpoints import blue_ng_router
+from nfvcl.utils.file_utils import create_folder
 from nfvcl.utils.log import mod_logger, set_log_level
 from nfvcl.utils.util import get_nfvcl_config
 
@@ -26,7 +27,7 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-swagger_parameters={"syntaxHighlight.theme": "obsidian", "deepLinking": True}
+swagger_parameters = {"syntaxHighlight.theme": "obsidian", "deepLinking": True}
 app = FastAPI(
     title="NFVCL",
     description="CNIT/UniGe S2N Lab NFVCL",
@@ -35,7 +36,7 @@ app = FastAPI(
         "name": "Apache 2.0",
         "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
     },
-    swagger_ui_parameters = swagger_parameters
+    swagger_ui_parameters=swagger_parameters
 )
 
 # Populate blue_router with all blueprints APIs before include it.
@@ -50,17 +51,12 @@ app.include_router(day2_router)
 app.include_router(k8s_router)
 app.include_router(helm_router)
 app.include_router(ansible_router)
-app.include_router(horse_router)
-
-day2_files = "day2_files"
-
-# Check if the day2 folder exists and, in case not, it creates the folder.
-if not os.path.exists(day2_files):
-    os.makedirs(day2_files)
+app.include_router(performance_router)
 
 # Making repositories available for external access. Configuration files will be served from here.
-app.mount("/nfvcl_day2/day2", StaticFiles(directory="day2_files"), name="day2_files")
-app.mount("/helm_repo", StaticFiles(directory="helm_charts"), name="helm_repo")
+accessible_folder = _nfvcl_config.nfvcl.mounted_folder
+create_folder(accessible_folder)
+app.mount("/files", StaticFiles(directory=accessible_folder, html=True), name="mounted_files")
 
 
 @app.get("/", status_code=status.HTTP_308_PERMANENT_REDIRECT)
@@ -69,6 +65,7 @@ async def redirect_to_swagger():
     Redirect to docs page for APIs
     """
     return RedirectResponse("/docs")
+
 
 @app.post("/close", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED)
 async def close_nfvcl():

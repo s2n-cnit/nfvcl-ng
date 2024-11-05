@@ -8,14 +8,21 @@ RUN apt-get update && \
     apt-get -y dist-upgrade && \
     apt-get -y install curl gnupg2 software-properties-common lsb-release git wget sshpass && \
     rm -rf /var/lib/apt/lists/*
-
+# Installing python and poetry
 RUN apt-add-repository --yes ppa:ansible/ansible && \
     add-apt-repository --yes ppa:deadsnakes/ppa && \
     apt-get update && apt install -y ansible && \
     apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils uvicorn build-essential && \
     echo "[defaults]\nhost_key_checking = False" >> /etc/ansible/ansible.cfg && \
-    curl -sSL https://install.python-poetry.org | python3 - && \
-    apt-get clean all -y && \
+    curl -sSL https://install.python-poetry.org | python3 -
+# Installing Helm
+RUN curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | tee /usr/share/keyrings/helm.gpg > /dev/null && \
+    apt-get install apt-transport-https --yes && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list && \
+    apt-get update && \
+    apt-get install -y helm
+# Cleaning apt
+RUN apt-get clean all -y && \
     rm -rf /var/lib/apt/lists/*
 # Installing ansible plugins
 RUN ansible-galaxy collection install vyos.vyos && \

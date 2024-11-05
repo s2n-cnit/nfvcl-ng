@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Union
 
-from nfvcl.utils.database import NFVCLDatabase
+from nfvcl.utils.database import get_nfvcl_database
 from nfvcl.utils.log import create_logger
 
 
@@ -52,7 +52,7 @@ def post(msg: ActionResultModel):
                 'stderr': item.stderr
             }
         )
-    NFVCLDatabase().insert_in_collection("action_output", action_item)
+    get_nfvcl_database().insert_in_collection("action_output", action_item)
 
 
 

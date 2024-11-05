@@ -2,6 +2,7 @@
 nsd_packages/*
 vnf_packages/*
 day2_files/*
+mounted_folder/*
 *.pyo
 *.pyc
 *.log

@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app: cadvisor
+  name: cadvisor
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: cadvisor
+  name: cadvisor
+  namespace: cadvisor
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    seccomp.security.alpha.kubernetes.io/pod: docker/default
+  labels:
+    app: cadvisor
+  name: cadvisor
+  namespace: cadvisor
+spec:
+  selector:
+    matchLabels:
+      app: cadvisor
+      name: cadvisor
+  template:
+    metadata:
+      labels:
+        app: cadvisor
+        name: cadvisor
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - image: gcr.io/cadvisor/cadvisor:v0.45.0
+        name: cadvisor
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 800m
+            memory: 2000Mi
+          requests:
+            cpu: 400m
+            memory: 400Mi
+        volumeMounts:
+        - mountPath: /rootfs
+          name: rootfs
+          readOnly: true
+        - mountPath: /var/run
+          name: var-run
+          readOnly: true
+        - mountPath: /sys
+          name: sys
+          readOnly: true
+        - mountPath: /var/lib/docker
+          name: docker
+          readOnly: true
+        - mountPath: /dev/disk
+          name: disk
+          readOnly: true
+      serviceAccountName: cadvisor
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /
+        name: rootfs
+      - hostPath:
+          path: /var/run
+        name: var-run
+      - hostPath:
+          path: /sys
+        name: sys
+      - hostPath:
+          path: /var/lib/docker
+        name: docker
+      - hostPath:
+          path: /dev/disk
+        name: disk
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cadvisor-svc
+  namespace: cadvisor
+  labels:
+    app: cadvisor
+spec:
+  ports:
+  - port: 8100
+    targetPort: 8080
+    nodePort: {{ confvar.cadvisor_node_port if confvar.cadvisor_node_port is not none else 30080 }}
+    protocol: TCP
+  selector:
+    app: cadvisor
+  type: NodePort

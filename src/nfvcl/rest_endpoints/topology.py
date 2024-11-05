@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status, HTTPException
 from nfvcl.models.blueprint.blueprint_base_model import BlueprintBaseModel
 from nfvcl.models.k8s.blueprint_k8s_model import K8sBlueprintModel
-from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sModelCreateFromBlueprint
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sModelCreateFromBlueprint
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl.models.response_model import OssCompliantResponse, OssStatus
 from nfvcl.models.topology import TopologyModel
@@ -15,7 +15,7 @@ from typing import List
 
 from nfvcl.utils.openstack.openstack_utils import check_openstack_instances
 from .rest_description import *
-from ..utils.database import NFVCLDatabase
+from ..utils.database import get_nfvcl_database
 
 topology_router = APIRouter(
     prefix="/v1/topology",
@@ -338,7 +338,7 @@ async def add_k8s_from_blueprint(cluster_info: K8sModelCreateFromBlueprint):
         OssCompliantResponse that confirm the operation has been submitted
     """
     # Loading the blueprint from the database and checking that exist. Then converting to model
-    blue_item = next((item for item in NFVCLDatabase().find_in_collection('blueprint-instances', {'id': cluster_info.blueprint_ref}, None)))
+    blue_item = next((item for item in get_nfvcl_database().find_in_collection('blueprint-instances', {'id': cluster_info.blueprint_ref}, None)))
     if not blue_item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Blueprint {} not found'.format(cluster_info.blueprint_ref))
@@ -367,7 +367,7 @@ async def add_k8s_from_blueprint(cluster_info: K8sModelCreateFromBlueprint):
 @topology_router.post("/kubernetes_external", response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED,
                       callbacks=callback_router.routes, summary=ADD_EXTERNAL_K8SCLUSTER_SUMMARY,
                       description=ADD_EXTERNAL_K8SCLUSTER)
-async def add_external_k8scluster(cluster: K8sModel):
+async def add_external_k8scluster(cluster: TopologyK8sModel):
     """
     Add a K8s cluster, EXTERNAL, to the topology
     Args:
@@ -385,7 +385,7 @@ async def add_external_k8scluster(cluster: K8sModel):
 @topology_router.put("/kubernetes/update", response_model=OssCompliantResponse, status_code=status.HTTP_202_ACCEPTED,
                      callbacks=callback_router.routes, summary=UPD_K8SCLUSTER_SUMMARY,
                      description=UPD_PROM_SRV_DESCRIPTION)
-async def update_k8scluster(cluster: K8sModel):
+async def update_k8scluster(cluster: TopologyK8sModel):
     """
     Update a K8s cluster in the topology
     Args:
@@ -421,7 +421,7 @@ async def delete_k8scluster(cluster_name: str):
     return OssCompliantResponse(detail="Operation submitted")
 
 
-@topology_router.get("/kubernetes", response_model=List[K8sModel])
+@topology_router.get("/kubernetes", response_model=List[TopologyK8sModel])
 async def get_k8scluster():
     """
     Return a list of all k8s clusters in the topology.

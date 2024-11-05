@@ -2,6 +2,7 @@ import tempfile
 import time
 import traceback
 from logging import Logger
+from pathlib import Path
 from typing import List
 
 import kubernetes.client
@@ -9,14 +10,15 @@ import kubernetes.utils
 import yaml
 from kubernetes import config
 from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, VersionInfo, V1ConfigMap, \
-    V1Namespace, V1ObjectMeta, V1ServiceList
+    V1Namespace, V1ObjectMeta, V1ServiceList, V1DeploymentList
 from kubernetes.client.rest import ApiException
 from kubernetes.utils import FailToCreateError
 
+import nfvcl.utils.file_utils
 import nfvcl.utils.util
 from nfvcl.config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
-from nfvcl.models.k8s.plugin_k8s_model import K8sTemplateFillData, K8sPluginName, K8sPluginType
-from nfvcl.models.k8s.topology_k8s_model import K8sModel, K8sVersion
+from nfvcl.models.k8s.plugin_k8s_model import K8sPluginAdditionalData, K8sPluginName, K8sPluginType
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
 from nfvcl.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl.utils.log import create_logger
 
@@ -142,6 +144,20 @@ def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configurati
 
         return pod_list
 
+def get_logs_for_pod(kube_client_config: kubernetes.client.Configuration, namespace: str, pod_name: str, tail_lines=None):
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        pod_log: str
+        try:
+            pod_log = api_instance_core.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=tail_lines)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>read_namespaced_pod_log: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return pod_log
 
 def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
                     label_selector: str = None) -> V1DaemonSetList:
@@ -179,7 +195,7 @@ def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespa
 
 
 def get_deployments(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
-                    label_selector: str = None) -> V1DaemonSetList:
+                    label_selector: str = None) -> V1DeploymentList:
     """
     Search for all Deployments of a namespace. If a namespace is not specified, it will work on
     all namespaces.
@@ -195,12 +211,12 @@ def get_deployments(kube_client_config: kubernetes.client.Configuration, namespa
     # Enter a context with an instance of the API kubernetes.client
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         # Create an instance of the apps API
-        api_instance_appsV1 = kubernetes.client.AppsV1Api
+        api_instance_appsV1 = kubernetes.client.AppsV1Api(api_client)
         try:
             if namespace:
                 deploy_list = api_instance_appsV1.list_namespaced_deployment(namespace=namespace, label_selector=label_selector)
             else:
-                deploy_list: V1DaemonSetList = api_instance_appsV1.list_deployment_for_all_namespaces(
+                deploy_list: V1DeploymentList = api_instance_appsV1.list_deployment_for_all_namespaces(
                     timeout_seconds=TIMEOUT_SECONDS, label_selector=label_selector)
         except ApiException as error:
             logger.error("Exception when calling appsV1->list_deployments: {}\n".format(error))
@@ -325,7 +341,7 @@ def patch_config_map(kube_client_config: kubernetes.client.Configuration, name, 
 
 
 def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, dict_to_be_applied: dict = None,
-                         yaml_file_to_be_applied: str = None):
+                         yaml_file_to_be_applied: Path = None):
     """
     This method can apply a definition (yaml) to a k8s cluster. The data origin to apply can be a dictionary or a yaml file.
 
@@ -345,7 +361,7 @@ def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, di
             if dict_to_be_applied:
                 result_dict = kubernetes.utils.create_from_dict(api_client, dict_to_be_applied)
             if yaml_file_to_be_applied:
-                result_yaml = create_from_yaml_custom(api_client, yaml_file_to_be_applied)
+                result_yaml = create_from_yaml_custom(api_client, str(yaml_file_to_be_applied))
         except ApiException as error:
             logger.error("Exception when calling create_from_yaml: {}\n".format(error))
             raise error
@@ -356,7 +372,7 @@ def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, di
 
 def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configuration,
                                plugins_to_install: List[K8sPluginName],
-                               template_fill_data: K8sTemplateFillData,
+                               template_fill_data: K8sPluginAdditionalData,
                                cluster_id: str,
                                skip_plug_checks: bool = False) -> dict:
     """
@@ -396,9 +412,9 @@ def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configurati
         # Yaml files to be applied to the cluster for each plugin
         yaml_file_configs_templates = get_yaml_files_for_plugin(version, plugin)
 
-        rendered_files_list = nfvcl.utils.util.render_files_from_template(paths=yaml_file_configs_templates,
-                                                                          render_dict=template_fill_data.model_dump(),
-                                                                          files_name_prefix=cluster_id)
+        rendered_files_list = nfvcl.utils.file_utils.render_files_from_template(paths=yaml_file_configs_templates,
+                                                                                render_dict=template_fill_data.model_dump(),
+                                                                                files_name_prefix=cluster_id)
 
         result_list = []
         logger.info("Plugin <{}> installation is starting.".format(plugin.name))
@@ -453,6 +469,30 @@ def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, na
             namespace = api_instance_core.create_namespace(body=namespace)
         except ApiException as error:
             logger.error("Exception when calling CoreV1Api>create_namespace: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return namespace
+
+def k8s_delete_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str) -> V1Namespace:
+    """
+    delete a namespace in a k8s cluster.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace_name: The name of the namespace
+    Returns:
+        The deleted namespace
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        try:
+            namespace = api_instance_core.delete_namespace(namespace_name)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>delete_namespace: {}\n".format(error))
             raise error
         finally:
             api_client.close()
@@ -582,7 +622,7 @@ def read_namespaced_config_map(kube_client_config: kubernetes.client.Configurati
         return config_map
 
 
-def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[K8sModel]:
+def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[TopologyK8sModel]:
     """
     From a k8s cluster list in dictionary form returns a list of corresponding k8s models.
 
@@ -593,14 +633,14 @@ def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[K8sModel]:
 
         a list of K8sModel objects
     """
-    k8s_obj_list: List[K8sModel] = []
+    k8s_obj_list: List[TopologyK8sModel] = []
     for k8s in k8s_list:
-        k8s_object = K8sModel.model_validate(k8s)
+        k8s_object = TopologyK8sModel.model_validate(k8s)
         k8s_obj_list.append(k8s_object)
     return k8s_obj_list
 
 
-def find_k8s_from_list_by_id(cluster_list: List[K8sModel], cluster_id: str) -> K8sModel:
+def find_k8s_from_list_by_id(cluster_list: List[TopologyK8sModel], cluster_id: str) -> TopologyK8sModel:
     """
     Get the k8s corresponding cluster from the list.
 

@@ -2,12 +2,12 @@ import abc
 from pathlib import Path
 from typing import Optional, List, Dict, Union
 
-from kubernetes.client import V1ServiceList
+from kubernetes.client import V1ServiceList, V1DeploymentList, V1PodList
 from pydantic import Field
 from typing_extensions import Literal
 
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType
+from nfvcl.models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType, K8sDeployment, K8sStatefulSet, K8sPod
 
 
 class Resource(NFVCLBaseModel):
@@ -44,9 +44,11 @@ class VmResourceImage(NFVCLBaseModel):
     Attributes:
         name (str): The name of the VM image.
         url (str, optional): The URL from witch the image is downloaded if necessary.
+        check_sha512sum: bool: If the sha512sum needs to be compared with the remote image if the image is already existing.
     """
     name: str = Field()
     url: Optional[str] = Field(default=None)
+    check_sha512sum: bool = Field(default=False, description="If true the provider should check if the image at URL has the same hash, if not a new image with different name is created.")
 
 
 class VmResourceFlavor(NFVCLBaseModel):
@@ -253,6 +255,9 @@ class HelmChartResource(ResourceDeployable):
 
     created: bool = Field(default=False)
     services: Optional[Dict[str, K8sService]] = Field(default=None)
+    deployments: Optional[Dict[str, K8sDeployment]] = Field(default=None)
+    statefulsets: Optional[Dict[str, K8sStatefulSet]] = Field(default=None)
+
 
     def set_services_from_k8s_api(self, k8s_services: V1ServiceList):
         self.services = {}
@@ -278,6 +283,22 @@ class HelmChartResource(ResourceDeployable):
 
             self.services[service.name] = service
 
+    def set_deployments_from_k8s_api(self, k8s_deployments: V1DeploymentList, deployments_pods: Dict[str, V1PodList]):
+        self.deployments = {}
+
+        for k8s_deployment in k8s_deployments.items:
+            pods = []
+
+            for pod in deployments_pods[k8s_deployment.metadata.name].items:
+                pods.append(K8sPod(name=pod.metadata.name))
+
+            deployment = K8sDeployment(
+                name=k8s_deployment.metadata.name,
+                pods=pods
+            )
+
+            self.deployments[deployment.name] = deployment
+
     def get_chart_converted(self) -> Union[str, Path]:
         if self.chart_as_path:
             return Path(self.chart)
@@ -285,18 +306,18 @@ class HelmChartResource(ResourceDeployable):
             return self.chart
 
 
-class HardwareResource(Resource):
-    ip: str = Field()
-    username: str = Field()
-    password: str = Field()
-    become_password: Optional[str] = Field(default=None)
+# class PDUResource(Resource):
+#     ip: str = Field()
+#     username: str = Field()
+#     password: str = Field()
+#     become_password: Optional[str] = Field(default=None)
+#
+#
+# class PDUResourceConfiguration(ResourceConfiguration):
+#     pdu_resource: PDUResource = Field()
 
 
-class HardwareResourceConfiguration(ResourceConfiguration):
-    hardware_resource: HardwareResource = Field()
-
-
-class HardwareResourceAnsibleConfiguration(HardwareResourceConfiguration):
+class PDUResourceAnsibleConfiguration(ResourceConfiguration):
     @abc.abstractmethod
     def dump_playbook(self) -> str:
         pass

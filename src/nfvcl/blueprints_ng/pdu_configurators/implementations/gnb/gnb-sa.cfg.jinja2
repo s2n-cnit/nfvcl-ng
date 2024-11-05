@@ -1,0 +1,469 @@
+/* lteenb configuration file version 2024-09-13
+ * Copyright (C) 2019-2024 Amarisoft
+ * NR SA FDD or TDD cell */
+
+ /* Configuration File automatically built by the S2N NFVCL */
+
+
+#define NR_TDD               {{ nr_tdd }} //default 1  // Values: 0 (NR FDD), 1(NR TDD)
+#define FR2                  0   // Values: 0 (FR1), 1 (FR2)
+#if FR2
+#define UDC_TYPE             1   // Values: 0 (NO UDC), 1 (B2), 2 (A2), 3 (B4)  (refer to application note to identify your UDC type)
+#define NR_TDD_CONFIG        10  // Values: FR1: 1, 2, 3, 4 (compatible with LTE TDD config 2) FR2: 10
+#define NR_BANDWIDTH         100 // NR cell bandwidth
+#define IF_ATTENUATION       -9  // Value: 10*log10(N_PORTS_COMBINER) + external evenutal IF attenuators
+#else
+#define NR_TDD_CONFIG        {{ nr_tdd_config }} //default 2   // Values: FR1: 1, 2, 3, 4 (compatible with LTE TDD config 2) FR2: 10
+#define NR_BANDWIDTH         {{ nr_bandwidth }} //default 40  // NR cell bandwidth
+#endif
+#define N_ANTENNA_DL         {{ n_antenna_dl }}   //default 1 // Values: 1 (SISO), 2 (MIMO 2x2), 4 (MIMO 4x4)
+#define N_ANTENNA_UL         {{ n_antenna_ul }}   //default 1 // Values: 1, 2, 4
+#define NR_LONG_PUCCH_FORMAT 2   // Values: 2, 3, 4
+
+/* define to 1 to enable periodic SRS with N_ANTENNA_UL ports. Uplink
+   SU-MIMO is also enabled if N_ANTENNA_UL >= 2. Not all UEs support
+   uplink SU-MIMO. */
+#define USE_SRS             {{ use_srs }}   //default 0
+
+{
+  //log_options: "all.level=debug,all.max_size=1",
+  log_options: "all.level=error,all.max_size=0,nas.level=debug,nas.max_size=1,ngap.level=debug,ngap.max_size=1,xnap.level=debug,xnap.max_size=1,rrc.level=debug,rrc.max_size=1",
+
+  // default /tmp/gnb0.log
+  log_filename: "{{ logfile }}",
+
+  /* Enable remote API and Web interface */
+  com_addr: "[::]:9001",
+
+  rf_driver: {
+        name: "sdr",
+
+        /* list of devices. 'dev0' is always the master. */
+#if N_ANTENNA_DL >= 4
+        args: "dev0=/dev/sdr0,dev1=/dev/sdr1",
+#else
+        args: "dev0=/dev/sdr0",
+#endif
+        /* TDD: force the RX antenna on the RX connector */
+        rx_antenna: "rx",
+
+        /* synchronisation source: none, internal, gps, external (default = none) */
+        // sync: "gps",
+
+  },
+  tx_gain: 90.0, /* TX gain (in dB) */
+  rx_gain: 60.0, /* RX gain (in dB) */
+
+#if FR2 == 1
+  udc_ports: [
+  {
+    #if UDC_TYPE == 1  // B2 type
+       #if N_ANTENNA_DL == 1
+          args: "/dev/ttyUSB0",
+       #elif N_ANTENNA_DL == 2
+          args: "/dev/ttyUSB0;/dev/ttyUSB1",
+       #else
+          #error Unsupported number of MIMO layers in FR2
+       #endif
+    #elif UDC_TYPE == 2  // A2 type
+       #if N_ANTENNA_DL == 1
+          args: "/dev/ttyACM0",
+       #elif N_ANTENNA_DL == 2
+          args: "/dev/ttyACM0;/dev/ttyACM1",
+       #else
+        #error Unsupported number of MIMO layers in FR2
+       #endif
+    #elif UDC_TYPE == 3  // B4 type
+        args: "/dev/ttyUSB0",
+    #else
+       #warning No UDC used for FR2 testing
+    #endif
+
+    cmd: "udc-auto-cfg.sh",
+  },
+  ],
+#endif
+
+  amf_list: [
+    {
+      /* address of AMF for NGAP connection. Must be modified if the AMF runs on a different host. */
+      amf_addr: "{{ amf_ip }}",
+    },
+  ],
+  /* GTP bind address (=address of the ethernet interface connected to
+     the AMF). Must be modified if the AMF runs on a different host. */
+  gtp_addr: "{{ gtp_ip }}",
+#ifdef GTP_U_BUNDLING
+  gtp_use_packet_bundling: true,
+#endif
+
+  /*
+  default bit: 28
+  default id: 0x12345
+  */
+  gnb_id_bits: {{ gnb_id_bits }},
+  gnb_id: {{ gnb_id }},
+
+  en_dc_support: true,
+
+  rf_ports: [
+    {
+#if FR2
+       udc_port: 0,
+       tx_power_offset:IF_ATTENUATION,
+#endif
+    },
+  ],
+
+  /* list of cells */
+  cell_list: [],
+
+  nr_cell_list: [
+  {
+    rf_port: 0,
+    cell_id: {{ cell_id }}, // default 0x01
+#if NR_TDD == 1
+#if FR2
+    band: 257,
+    dl_nr_arfcn: 2079167,  /* 28000.08 MHz */
+    subcarrier_spacing: 120, /* kHz */
+    ssb_pos_bitmap: "0100000000000000000000000000000000000000000000000000000000000000",
+
+    rx_to_tx_latency: 9, /* slots */
+#else
+    band: 78,
+    dl_nr_arfcn: 632628,  /* 3489.42 MHz */
+    subcarrier_spacing: 30, /* kHz */
+    ssb_pos_bitmap: "10000000",
+#endif
+#else
+    band: 7,
+    dl_nr_arfcn: 531000,  /* 2655 MHz */
+    subcarrier_spacing: 15, /* kHz */
+    ssb_pos_bitmap: "1000",
+#endif
+  },
+  ], /* nr_cell_list */
+
+  nr_cell_default: {
+    bandwidth: NR_BANDWIDTH, /* MHz */
+    n_antenna_dl: N_ANTENNA_DL,
+    n_antenna_ul: N_ANTENNA_UL,
+
+    /* force the timing TA offset (optional) */
+//    n_timing_advance_offset: 39936,
+    /* subframe offset to align with the LTE TDD pattern (optional) */
+//    subframe_offset: 2,
+
+#if NR_TDD == 1
+    tdd_ul_dl_config: {
+#if NR_TDD_CONFIG == 1
+      pattern1: {
+        period: 5, /* in ms */
+        dl_slots: 7,
+        dl_symbols: /* 6 */ 2,
+        ul_slots: 2,
+        ul_symbols: 2,
+      },
+#elif NR_TDD_CONFIG == 2
+      pattern1: {
+        period: 5, /* in ms */
+        dl_slots: 7,
+        dl_symbols: 6,
+        ul_slots: 2,
+        ul_symbols: 4,
+      },
+#elif NR_TDD_CONFIG == 3
+      pattern1: {
+        period: 5, /* in ms */
+        dl_slots: 6,
+        dl_symbols: 2,
+        ul_slots: 3,
+        ul_symbols: 2,
+      },
+#elif NR_TDD_CONFIG == 4
+      pattern1: {
+        period: 3, /* in ms */
+        dl_slots: 3,
+        dl_symbols: 6,
+        ul_symbols: 4,
+        ul_slots: 2,
+      },
+      pattern2: {
+        period: 2, /* in ms */
+        dl_slots: 4,
+        dl_symbols: 0,
+        ul_symbols: 0,
+        ul_slots: 0,
+      },
+#elif NR_TDD_CONFIG == 10
+      /* only for FR2 */
+      pattern1: {
+        period: 0.625, /* in ms */
+        dl_slots: 3,
+        dl_symbols: 10,
+        ul_slots: 1,
+        ul_symbols: 2,
+      },
+#endif
+    },
+#endif
+    ssb_period: 20, /* in ms */
+
+    n_id_cell: {{ n_id_cell }},
+    plmn_list: [
+    {%- for p in plmn_list %}
+    {
+       plmn: "{{ p.plmn }}",
+       tac: {{ p.tac }},
+       reserved: {%  if p.reserved %}true{% else %}false{% endif %},
+       {%- if 'nssai' in p %}
+       nssai: [
+       {%- for s in p.nssai %}
+          {
+            sst: {{s.sst}},
+            {%- if 'sd' in s %}
+            sd: {{s.sd}},
+            {%-  endif %}
+          },
+       {%- endfor %}
+      ]
+      {%-  endif %}
+    },
+    {%- endfor %}
+    ],
+
+    /*sib_sched_list: [
+      {
+        filename: "sib2_nr.asn",
+        si_periodicity: 16,
+      },
+      {
+        filename: "sib3_nr.asn",
+        si_periodicity: 16,
+      },
+      {
+        filename: "sib4_nr.asn",
+        si_periodicity: 32,
+      },
+    ],
+    sib9: {
+      si_periodicity: 32
+    },*/
+    si_window_length: 40,
+
+    cell_barred: false,
+    intra_freq_reselection: true,
+    q_rx_lev_min: -70,
+    q_qual_min: -20,
+    //p_max: 10, /* dBm */
+
+    root_sequence_index: 1, /* PRACH root sequence index */
+
+    /* Scheduling request period (slots). */
+    sr_period: 40,
+
+    dmrs_type_a_pos: 2,
+
+    /* to limit the number of HARQ feedback in UL, use pdsch_harq_ack_max;
+       allows to workaround issues with SM-G977N for example */
+    //pdsch_harq_ack_max: 2,
+
+    prach: {
+#if NR_TDD == 1
+#if FR2
+      prach_config_index: 149, /* format C0, every 4 frames */
+      msg1_subcarrier_spacing: 120, /* kHz */
+#else
+#if NR_TDD_CONFIG == 4
+      prach_config_index: 156, /* format B4, subframe 2 */
+#else
+      prach_config_index: 160, /* format B4, subframe 9 */
+#endif
+      msg1_subcarrier_spacing: 30, /* kHz */
+#endif
+#else
+      prach_config_index: 16, /* subframe 1 every frame */
+#endif
+      msg1_fdm: 1,
+      msg1_frequency_start: -1,
+      zero_correlation_zone_config: 15,
+      preamble_received_target_power: -110, /* in dBm */
+      preamble_trans_max: 7,
+      power_ramping_step: 4, /* in dB */
+#if FR2 == 1
+      ra_response_window: 40, /* in slots */
+#elif NR_TDD == 1
+      ra_response_window: 20, /* in slots */
+#else
+      ra_response_window: 10, /* in slots */
+#endif
+      restricted_set_config: "unrestricted_set",
+      ra_contention_resolution_timer: 64, /* in ms */
+      ssb_per_prach_occasion: 1,
+      cb_preambles_per_ssb: 8,
+    },
+
+    pdcch: {
+      search_space0_index: 0,
+
+      dedicated_coreset: {
+        rb_start: -1, /* -1 to have the maximum bandwidth */
+        l_crb: -1, /* -1 means all the bandwidth */
+        duration: 0, /* 0 means to automatically set it from the coreset bandwidth */
+        precoder_granularity: "sameAsREG_bundle",
+      },
+
+      css: {
+        n_candidates: [ 0, 0, 4, 0, 0 ],
+      },
+      rar_al_index: 2,
+      si_al_index: 2,
+
+      uss: {
+        n_candidates: [ 0, 4, 0, 0, 0 ],
+        dci_0_1_and_1_1: true,
+      },
+      al_index: 1,
+    },
+
+#if FR2
+    k_min: 8,
+#endif
+    pdsch: {
+      mapping_type: "typeA",
+      dmrs_add_pos: 1,
+      dmrs_type: 1,
+      dmrs_max_len: 1,
+      /* k0 delay in slots from DCI to PDSCH: automatic setting */
+      /* k1 delay in slots from PDSCH to PUCCH/PUSCH ACK/NACK: automatic setting */
+      mcs_table: "qam256",
+      rar_mcs: 2,
+      si_mcs: 6,
+      /* If defined, force the PDSCH MCS for all UEs. Otherwise it is computed
+       * based on DL channel quality estimation */
+      /* mcs: 24, */
+    },
+
+    csi_rs: {
+      resource_auto: {
+        nzp_csi_rs_period: 80,
+#if FR2
+        trs_presence: false,
+#endif
+      },
+      csi_report_config: [
+        {
+          report_config_type: "periodic",
+          period: 80,
+        },
+      ],
+    },
+
+    pucch: {
+      pucch_group_hopping: "neither",
+      hopping_id: -1, /* -1 = n_cell_id */
+      p0_nominal: -96,
+#if 0
+        pucch0: {
+          initial_cyclic_shift: 1,
+          n_symb: 1,
+        },
+#else
+        pucch1: {
+          n_cs: 3,
+          n_occ: 3,
+          freq_hopping: true,
+#if USE_SRS && NR_TDD == 0
+          n_symb: 12,
+#endif
+        },
+#endif
+#if NR_LONG_PUCCH_FORMAT == 2
+        pucch2: {
+          n_symb: 2,
+          n_prb: 1,
+          freq_hopping: true,
+          simultaneous_harq_ack_csi: false,
+          max_code_rate: 0.25,
+        },
+#elif NR_LONG_PUCCH_FORMAT == 3
+        pucch3: {
+          bpsk: false,
+          additional_dmrs: false,
+          freq_hopping: true,
+          n_prb: 1,
+          simultaneous_harq_ack_csi: true,
+          max_code_rate: 0.25,
+        },
+#elif NR_LONG_PUCCH_FORMAT == 4
+        pucch4: {
+          occ_len: 4,
+          bpsk: false,
+          additional_dmrs: false,
+          freq_hopping: true,
+          simultaneous_harq_ack_csi: true,
+          max_code_rate: 0.25,
+        },
+#endif
+    },
+
+#if USE_SRS
+    srs: {
+      resource_auto: {
+        codebook: {
+          resource_type: "periodic",
+          period: 80, /* in slots */
+        }
+      }
+    },
+#endif
+
+    pusch: {
+      mapping_type: "typeA",
+      n_symb: 14,
+      dmrs_add_pos: 1,
+      dmrs_type: 1,
+      dmrs_max_len: 1,
+      tf_precoding: false,
+      mcs_table: "qam256", /* without transform precoding */
+      mcs_table_tp: "qam256", /* with transform precoding */
+      ldpc_max_its: 5,
+      /* k2, msg3_k2 delay in slots from DCI to PUSCH: automatic setting */
+      p0_nominal_with_grant: -84,
+      msg3_mcs: 4,
+      msg3_delta_power: 0, /* in dB */
+      beta_offset_ack_index: 9,
+#if USE_SRS
+      max_rank: N_ANTENNA_UL,
+#endif
+
+      /* if defined, force the PUSCH MCS for all UEs. Otherwise it is
+       computed from the last received PUSCH. */
+      /* mcs: 16, */
+    },
+
+    /* MAC configuration */
+    mac_config: {
+      msg3_max_harq_tx: 5,
+      ul_max_harq_tx: 5, /* max number of HARQ transmissions for uplink */
+      dl_max_harq_tx: 5, /* max number of HARQ transmissions for downlink */
+      ul_max_consecutive_retx: 30, /* disconnect UE if reached */
+      dl_max_consecutive_retx: 30, /* disconnect UE if reached */
+      periodic_bsr_timer: 20,
+      retx_bsr_timer: 320,
+      periodic_phr_timer: 500,
+      prohibit_phr_timer: 200,
+      phr_tx_power_factor_change: "dB3",
+      sr_prohibit_timer: 0, /* in ms, 0 to disable the timer */
+      sr_trans_max: 64,
+    },
+
+    cipher_algo_pref: [],
+    integ_algo_pref: [2, 1],
+
+    inactivity_timer: 10000,
+
+    drb_config: "drb_nr.cfg",
+  },
+}

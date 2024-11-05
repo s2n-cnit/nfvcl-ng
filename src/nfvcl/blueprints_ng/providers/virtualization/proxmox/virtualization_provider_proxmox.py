@@ -153,7 +153,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id)
+            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id, logger_override=self.logger)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
         self.save_to_db()
@@ -198,7 +198,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     )
                     netplan_interfaces.append(tmp)
 
-        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces), self.blueprint_id)
+        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces), self.blueprint_id, logger_override=self.logger)
 
         self.__parse_proxmox_addresses(vm_resource, vmid)
 

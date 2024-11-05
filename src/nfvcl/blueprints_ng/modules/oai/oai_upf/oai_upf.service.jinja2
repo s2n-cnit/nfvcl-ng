@@ -1,0 +1,17 @@
+[Unit]
+Description=OAI UPF
+After=network.target
+After=docker.service
+BindsTo=docker.service
+ReloadPropagatedFrom=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/upfConfig/
+ExecStart=/root/upfConfig/start.sh
+RemainAfterExit=true
+ExecStop=/root/upfConfig/stop.sh
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

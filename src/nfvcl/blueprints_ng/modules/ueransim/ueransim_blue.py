@@ -11,11 +11,12 @@ from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourc
     NetResource
 from nfvcl.blueprints_ng.utils import rel_path
 from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestConfigureGNB, \
-    UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
-    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, GNBN3Info
+from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
+    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, Route
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.network import PduModel
+from nfvcl.models.network.network_models import PduType
+from nfvcl.models.pdu.gnb import GNBPDUConfigure
 from nfvcl.models.ueransim.blueprint_ueransim_model import UeransimSim, UeransimUe
 from nfvcl.topology.topology import build_topology
 
@@ -40,11 +41,12 @@ class UeransimBlueprintNGState(BlueprintNGState):
 
 
 class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
-    configuration: UeransimBlueprintRequestConfigureGNB = Field()
+    configuration: GNBPDUConfigure = Field()
     radio_addr: str = Field()
     ngap_addr: str = Field()
     gtp_addr: str = Field()
     n3_nic_name: str = Field()
+    additional_routes: Optional[List[Route]] = Field(default_factory=list)
 
     def dump_playbook(self) -> str:
         ansible_builder = AnsiblePlaybookBuilder("Playbook UeransimGNBConfigurator")
@@ -54,12 +56,18 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.set_var("ngap_addr", self.ngap_addr)
         ansible_builder.set_var("gtp_addr", self.gtp_addr)
 
+        if self.additional_routes and len(self.additional_routes) > 0:
+            additional_routes_str: List[str] = []
+            for route in self.additional_routes:
+                additional_routes_str.append(route.as_linux_replace_command())
+            ansible_builder.set_var("additional_routes", additional_routes_str)
+
         ansible_builder.add_template_task(rel_path("config/config_network.sh.jinja2"), "/opt/config_network.sh")
         ansible_builder.add_template_task(rel_path("config/config-network.service.jinja2"), "/etc/systemd/system/config-network.service")
         ansible_builder.set_var("n3_if", self.n3_nic_name)
-        ansible_builder.add_shell_task("systemctl daemon-reload")
-        ansible_builder.add_service_task("config-network", ServiceState.STARTED, True)
 
+        ansible_builder.add_shell_task("systemctl daemon-reload")
+        ansible_builder.add_service_task("config-network", ServiceState.RESTARTED, True)
         ansible_builder.add_service_task("ueransim-gnb", ServiceState.RESTARTED, True)
 
         return ansible_builder.build()
@@ -115,7 +123,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     # RADIO_NET_CIDR_START = '10.168.0.2'
     # RADIO_NET_CIDR_END = '10.168.255.253'
 
-    ueransim_image = VmResourceImage(name="ueransim-v3.2.6-dev", url="https://images.tnt-lab.unige.it/ueransim/ueransim-v3.2.6-dev.qcow2")
+    ueransim_image = VmResourceImage(name="ueransim-v3.2.6-dev-3", url="https://images.tnt-lab.unige.it/ueransim/ueransim-v3.2.6-dev-3-ubuntu2204.qcow2")
     ueransim_flavor = VmResourceFlavor(vcpu_count='2', memory_mb='4096', storage_gb='10')
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = UeransimBlueprintNGState):
@@ -135,20 +143,19 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         super().destroy()
 
     def add_gnb_to_topology(self, area_id: int):
-        name = f"UERANSIM_GNB_{self.id}_{area_id}"
         build_topology().add_pdu(PduModel(
-            name=name,
+            name=f"UERANSIM_GNB_{self.id}_{area_id}",
             area=area_id,
-            type="UERANSIM",
-            user="",
-            passwd="",
-            implementation="nfvcl.blueprints_ng.pdu_configurators.ueransim_pdu_configurator.UERANSIMPDUConfigurator",  # TODO this should be dynamic
-            config={"blue_id": self.id},
-            interface=[]
+            type=PduType.GNB,
+            instance_type="UERANSIM",
+            config={"blue_id": self.id}
         ))
 
     def del_gnb_from_topology(self, area_id: int):
-        build_topology().del_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
+        try:
+            build_topology().del_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
+        except Exception as e:
+            self.logger.warning(f"Error deleting PDU: {str(e)}")
 
     def _create_gnb(self, area_id: str):
         if area_id not in self.state.areas:
@@ -273,7 +280,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         self._create_gnb(model.area_id)
 
     @day2_function("/configure_gnb", [HttpRequestType.POST])
-    def configure_gnb(self, model: UeransimBlueprintRequestConfigureGNB):
+    def configure_gnb(self, model: GNBPDUConfigure):
         area = self.state.areas[str(model.area)]
         area.vm_gnb_configurator = UeransimGNBConfigurator(
             vm_resource=area.vm_gnb,
@@ -281,7 +288,8 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             radio_addr=area.vm_gnb.network_interfaces[area.radio_net.name][0].fixed.ip,
             ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2][0].fixed.ip,
             gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.ip,
-            n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.interface_name
+            n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.interface_name,
+            additional_routes=model.additional_routes
         )
 
         self.register_resource(area.vm_gnb_configurator)
@@ -307,8 +315,25 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     def del_sim(self, model: UeransimBlueprintRequestDelSim):
         self._del_sim(model.area_id, model.ue_id, model.imsi)
 
-    def get_n3_info(self, area_id: int) -> GNBN3Info:
-        return GNBN3Info(
-            ip=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.ip,
-            mac=self.state.areas[str(area_id)].vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.mac
-        )
+    def to_dict(self, detailed: bool) -> dict:
+        """
+        OVERRIDE
+        Return a dictionary representation of the UERANSIM blueprint instance.
+        Use the father function to generate the dict, if not detailed, add the node list.
+
+        Args:
+            detailed: Return the same content saved in the database containing all the details of the blueprint.
+
+        Returns:
+
+        """
+        if detailed:
+            return super().to_dict(detailed)
+        else:
+            base_dict = super().to_dict(detailed)
+            base_dict['gnbs'] = {}
+            for area in self.state.areas.items():
+                base_dict['gnbs'][area[0]] = {}
+                base_dict['gnbs'][area[0]]["gnb"] = area[1].vm_gnb.access_ip
+                base_dict['gnbs'][area[0]]["ues"] = [ue.vm_ue.access_ip for ue in area[1].ues]
+            return base_dict

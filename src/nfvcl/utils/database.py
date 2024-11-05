@@ -7,7 +7,6 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.results import InsertOneResult
 from nfvcl.models.config_model import NFVCLConfigModel
-from nfvcl.utils.patterns import Singleton
 from nfvcl.utils.util import get_nfvcl_config
 
 nfvcl_config: NFVCLConfigModel = get_nfvcl_config()

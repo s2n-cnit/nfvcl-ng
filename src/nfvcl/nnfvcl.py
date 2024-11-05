@@ -49,9 +49,9 @@ app.include_router(topology_router)
 app.include_router(blue_ng_router2)
 app.include_router(day2_router)
 app.include_router(k8s_router)
-app.include_router(helm_router)
 app.include_router(ansible_router)
 app.include_router(performance_router)
+app.include_router(horse_router)
 
 # Making repositories available for external access. Configuration files will be served from here.
 accessible_folder = _nfvcl_config.nfvcl.mounted_folder

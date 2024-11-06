@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from logging import Logger
 from pathlib import Path
 from typing import Annotated, Optional
 import yaml
@@ -17,21 +16,32 @@ from nfvcl.utils.database import insert_extra, get_extra
 from nfvcl.utils.util import IP_PORT_PATTERN, PATH_PATTERN, IP_PATTERN, PORT_PATTERN
 from nfvcl.utils.log import create_logger
 import os
+import logging
 
+DEFAULT_TIMEOUT = 60
+ERROR_TIMEOUT = 90
+
+
+def get_timeout_from_env(logger: logging.Logger) -> int:
+    timeout_str = os.environ.get('HORSE_TIMEOUT')
+    if timeout_str:
+        try:
+            return int(timeout_str)
+        except ValueError:
+            logger.error("Cannot correctly read HORSE_TIMEOUT env variable, setting it to 90")
+            return ERROR_TIMEOUT
+    return DEFAULT_TIMEOUT
+
+
+# Only import get_blueprint_manager if HORSE_DEBUG is not set
 if not os.environ.get('HORSE_DEBUG'):
     from nfvcl.rest_endpoints.blue_ng_router import get_blueprint_manager
 
-logger: Logger = create_logger("Horse REST")
-if os.environ.get('HORSE_TIMEOUT'):
-    try:
-        TIMEOUT = int(os.environ.get('HORSE_TIMEOUT'))
-    except ValueError:
-        logger.error("Cannot correctly read HORSE_TIMEOUT env variable, setting it to 90")
-        TIMEOUT = 90
-else:
-    TIMEOUT = 60
-logger.info(f"Horse DOC timeout set to {TIMEOUT}")
+logger: logging.Logger = create_logger("Horse REST")
 
+# Get and set the timeout value
+TIMEOUT = get_timeout_from_env(logger)
+logger.info(f"Horse DOC timeout set to {TIMEOUT}")
 horse_router = APIRouter(
     prefix="/v2/horse",
     tags=["Horse"],
@@ -75,7 +85,7 @@ def extract_action(actionType: RTRActionType, playbook: str) -> DOCActionDNSLimi
 
 def dump_playbook(playbook: str):
     """
-    Dump playbook to file to debug application
+    Dump playbook to file to debug app
     """
     now = datetime.now()
     formatted_date = now.strftime("%Y-%m-%d_%H-%M-%S")
@@ -108,7 +118,7 @@ def build_request_for_doc(actionid: str, target: str, actiontype: RTRActionType,
     return doc_north_model
 
 
-def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
+def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel, action_id: str, callback_http_url: HttpUrl):
     if 'url' in doc_mod_info:
         doc_module_url = doc_mod_info['url']
         doc_response: Response
@@ -118,19 +128,29 @@ def forward_request_to_doc(doc_mod_info: dict, doc_request: DOCNorthModel):
             doc_response = httpx.post(f"http://{doc_module_url}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
             # Returning the code that
             if doc_response.status_code != 200:
+                send_callback_http(callback_http_url, action_id, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_DOC, description=f"Error while forwarding request to DOC module.\n{doc_response.text}")
                 raise HTTPException(status_code=doc_response.status_code, detail=f"DOC response code is different from 200: {doc_response.text}")
-        except ConnectTimeout | httpx.ReadTimeout:
+        except httpx.ReadTimeout:
             logger.debug(f"Connection Timeout to DOC module at http://{doc_module_url}")
+            send_callback_http(callback_http_url, action_id, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_DOC, description=f"Connection Timeout to DOC module at http://{doc_module_url}")
             raise HTTPException(status_code=408, detail=f"Cannot contact DOC module at http://{doc_module_url}")
         except httpx.ConnectError:
             logger.debug(f"Connection Error to DOC module (refused at http://{doc_module_url})")
+            send_callback_http(callback_http_url, action_id, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_DOC, description=f"Connection Error to DOC module (refused at http://{doc_module_url})")
             raise HTTPException(status_code=500, detail=f"Connection refused by DOC module at http://{doc_module_url}")
 
         doc_response_debug = f"HTTP Status code: {doc_response.status_code}\nUrl: {doc_response.url}\nParams: {doc_response.headers}\nBody: {doc_response.text}"
         logger.info(f"DOC response\n{doc_response_debug}")
+        ##### CALLBACK OK FORW TO DOC ###### TODO wait and forward the callback coming from the DOC
+        send_callback_http(callback_http_url, action_id, callback_code=CallbackCode.ACTION_APPLIED_BY_DOC, description="Missing implementation of DOC callback, need to implement in future")
         return RTRRestAnswer(description=f"The request has been forwarded to DOC module. DOC responce is: \n {doc_response_debug}", status="forwarded", status_code=200)
     else:
-        return RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=404)
+        msg_return = RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is NO DOC module info or missing URL. Please use /set_doc_ip_port to set the URL.", status="error", status_code=500)
+        logger.error(msg_return.description)
+        ##### CALLBACK ERROR ######
+        send_callback_http(callback_http_url, action_id, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_DOC, description="The action should be forwarded to DOC but it's IP is missing.")
+
+        return msg_return
 
 
 def send_callback_http(url: HttpUrl, actionid: str, callback_code: CallbackCode, description: str):
@@ -207,28 +227,13 @@ def rtr_request_workaround(target: str, action_type: RTRActionType, username: st
     else:
         # Request should be forwarded to DOC
         doc_mod_info = get_extra("doc_module")
-        if doc_mod_info is None:
-            # Cannot forward since no DOC module info
-            msg_return = RTRRestAnswer(description="The request has NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the IP.", status="error", status_code=404)
-            logger.error(msg_return.description)
-            ##### CALLBACK ERROR ######
-            send_callback_http(callback_http_url, actionID, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_DOC, description="The action should be forwarded to DOC but it's IP is missing.")
-            return msg_return
-        else:
-            if actionID is None:
-                actionID = str(uuid.uuid4())
-            if service is None:
-                service = "DNS"  # TODO Workaround
-            body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target, actiontype=action_type, service=service, playbook=payload)
-            try:
-                msg_return = forward_request_to_doc(doc_mod_info, body)
-            except HTTPException as doc_forward_exception:
-                send_callback_http(callback_http_url, actionID, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_DOC, description="Error while forwarding request to DOC module.")
-                raise doc_forward_exception
-            logger.debug(msg_return)
-            ##### CALLBACK OK FORW TO DOC ###### TODO wait and forward the callback coming from the DOC
-            send_callback_http(callback_http_url, actionID, callback_code=CallbackCode.ACTION_APPLIED_BY_DOC, description="Missing implementation of DOC callback, need to implement in future")
-            return msg_return
+        if actionID is None:
+            actionID = str(uuid.uuid4())
+        if service is None:
+            service = "DNS"  # TODO Workaround
+        body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target, actiontype=action_type, service=service, playbook=payload)
+        msg_return = forward_request_to_doc(doc_mod_info, body, actionID, callback_http_url)
+        return msg_return
 
 
 @horse_router.post("/rtr_request", response_model=RTRRestAnswer)
@@ -258,46 +263,37 @@ def rtr_request(target_ip: Annotated[str, Query(pattern=IP_PATTERN)], target_por
         payload: body (yaml), The ansible playbook in yaml format to be applied on the remote target
     """
     dump_playbook(playbook=payload)
+    # IF in DEBUG mode, the blueprint manager isn't loaded
     if not os.environ.get('HORSE_DEBUG'):
         bm = get_blueprint_manager()
         vm: VmResource = bm.get_vm_target_by_ip(target_ip)
     else:
+        # In DEBUG mode only local target is allowed (ePEM itself)
         if target_ip == "127.0.0.1":
             vm = "not_none"
         else:
             vm=None
 
     if vm is None:
-        # This is the case where the VM is not managed by the ePEM -> Request will be forwarded to DOC
+        # This is the case where the VM is not managed by the ePEM -> Request is forwarded to DOC
         doc_mod_info = get_extra("doc_module")
-        if doc_mod_info is None:
-            msg_return = RTRRestAnswer(description="The Target has not been found in VMs managed by the ePEM. The request will NOT been forwarded to DOC module cause there is no DOC MODULE info. Please use /set_doc_ip_port to set the DOC IP.", status="error", status_code=404)
-            send_callback_http(callback_http_url, actionID, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_DOC, description="The action should be forwarded to DOC but it's IP is missing. Please use /set_doc_ip_port to set the DOC IP")
-            logger.error(msg_return.description)
-            return msg_return
-        else:
-            body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target_ip, actiontype=actionType, service=service, playbook=payload)
-            try:
-                msg_return = forward_request_to_doc(doc_mod_info, body)
-            except HTTPException as doc_forward_exception:
-                send_callback_http(callback_http_url, actionID, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_DOC, description="Error while forwarding request to DOC module.")
-                raise doc_forward_exception
-            #### TODO wait for callback from DOC module and then forward it to the RTR
-            send_callback_http(callback_http_url, actionID, callback_code=CallbackCode.ACTION_APPLIED_BY_DOC, description="Missing implementation of DOC callback, need to implement in future")
-            return msg_return
+        body: DOCNorthModel = build_request_for_doc(actionid=actionID, target=target_ip, actiontype=actionType, service=service, playbook=payload)
+        msg_return = forward_request_to_doc(doc_mod_info, body, actionID, callback_http_url)
+        return msg_return
     else:
+        # Action applied by ePEM
         logger.debug("Started applying ansible playbook")
         if not os.environ.get('HORSE_DEBUG'):
             ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, vm.username, vm.password, payload)
         else:
-            ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, "ubuntu", "testpassword", payload)
+            ansible_runner_result, fact_cache = run_ansible_playbook(target_ip, "ubuntutest", "ubuntutest", payload)
         if ansible_runner_result.status == "failed":
             send_callback_http(callback_http_url, actionID, callback_code=CallbackCode.ACTION_NOT_APPLIED_BY_EPEM, description="Execution of Playbook failed. See NFVCL DEBUG log for more info.")
             raise HTTPException(status_code=500, detail="Execution of Playbook failed. See NFVCL DEBUG log for more info.")
 
         msg_return = RTRRestAnswer(description="Playbook applied", status="success")
-        logger.info(msg_return)
         send_callback_http(callback_http_url, actionID, callback_code=CallbackCode.ACTION_APPLIED_BY_EPEM, description="Action applied by the ePEM")
+        logger.info(msg_return)
         return msg_return
 
 

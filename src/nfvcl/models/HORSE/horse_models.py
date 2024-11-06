@@ -64,4 +64,4 @@ class CallbackModel(NFVCLBaseModel):
     actionid: str = Field(description="Action ID used to identify the action that has been completed")
     code: CallbackCode = Field(description="Code used to identify the status of the performed action")
     description: str = Field(description="Description of the application of the mitigation. Describe why it has been or not applied")
-    timestamp: str = Field(description="Timestamp when the action/mitigation has been completed", default=str(datetime.datetime.now()))
+    timestamp: str = Field(description="Timestamp when the action/mitigation has been completed", default_factory=lambda: str(datetime.datetime.now()))

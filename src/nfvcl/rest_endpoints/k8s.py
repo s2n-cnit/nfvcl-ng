@@ -8,7 +8,6 @@ from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAcc
 from verboselogs import VerboseLogger
 
 from nfvcl.main import topology_lock
-from nfvcl.models.event import Event
 from nfvcl.models.k8s.blueprint_k8s_model import TopologyK8sModel
 from nfvcl.models.k8s.common_k8s_model import Labels
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sOperationType, K8sPluginName
@@ -16,8 +15,8 @@ from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, K8sQuota
 from nfvcl.models.response_model import OssCompliantResponse, OssStatus
 from nfvcl.rest_endpoints.rest_callback import RestAnswer202
 from nfvcl.topology.topology import Topology
-from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_installed_plugins, \
-    get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
+from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace
+from nfvcl.utils.k8s.helm_plugin_manager import HelmPluginManager
 from nfvcl.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, \
     k8s_admin_role_to_sa, \
     k8s_create_secret_for_user, k8s_create_service_account, k8s_get_secrets, k8s_cert_sign_req, \
@@ -101,13 +100,9 @@ async def get_k8s_installed_plugins(cluster_id: str):
 
         A list of installed plugins
     """
-
     cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
-    k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
-    installed_plugins = get_installed_plugins(kube_client_config=k8s_config)
-
-    return installed_plugins
+    helm_plugin_manager = HelmPluginManager(cluster.credentials, "K8S REST UTILS")
+    return helm_plugin_manager.get_installed_plugins()
 
 
 @k8s_router.put("/{cluster_id}/plugins", response_model=RestAnswer202, status_code=status.HTTP_202_ACCEPTED)
@@ -127,8 +122,10 @@ async def install_k8s_plugin(cluster_id: str, message: K8sPluginsToInstall):
         The k8s response in that confirm the submission of the requested operation. You can observe process output
         subscribing to NFVCL log at the redis instance.
     """
+    # Return 404 error if the cluster does not exist
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
 
-    request = K8sModelManagement(k8s_ops=K8sOperationType.INSTALL_PLUGIN, cluster_id=cluster_id, data=json.dumps(message.model_dump()))
+    request = K8sModelManagement(k8s_ops=K8sOperationType.INSTALL_PLUGIN, cluster_id=cluster.name, data=json.dumps(message.model_dump()))
 
     trigger_redis_event(topic=K8S_MANAGEMENT_TOPIC, event_type=K8sEventType.PLUGIN_INSTALLED, data=request.model_dump())
 
@@ -148,20 +145,14 @@ async def apply_to_k8s(cluster_id: str, body=Body(...)):
         body: The yaml content to apply at the cluster
 
     """
+    # Return 404 error if the cluster does not exist
+    cluster: TopologyK8sModel = get_k8s_cluster_by_id(cluster_id)
+
     request = K8sModelManagement(k8s_ops=K8sOperationType.APPLY_YAML, cluster_id=cluster_id, data=body.decode('utf-8'))
 
     trigger_redis_event(topic=K8S_MANAGEMENT_TOPIC, event_type=K8sEventType.DEFINITION_APPLIED, data=request.model_dump())
 
     return RestAnswer202(id='K8s management')
-
-
-@k8s_router.delete("/{cluster_id}/plugins", response_model=RestAnswer202)
-async def uninstall_k8s_plugin(cluster_id: str, message: List[K8sPluginName]):
-    """
-    # TODO
-    Still not implemented
-    """
-    return RestAnswer202(id='K8s management', description="This operation is still not implemented", status="NOT IMPLEMENTED")
 
 
 @k8s_router.get("/{cluster_id}/cidr", response_model=dict)
@@ -200,9 +191,9 @@ async def get_k8s_pods(cluster_id: str, namespace: str = ""):
 
     Args:
 
-        cluster_id: the k8s cluster ID from witch the pods are obtained
+        cluster_id: the k8s cluster ID from which the pods are obtained
 
-        namespace: the namespace of pods to be retrieved, if empty pods are retrieved for all namespaces
+        namespace: the namespace of pods to be retrieved if empty pods are retrieved for all namespaces
 
     Returns:
 
@@ -240,6 +231,10 @@ async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = B
             "label1": "ciao",
             "label2": "test"
         }
+        or
+        {
+            "pod-security.kubernetes.io/enforce": "privileged"
+        }
 
     Returns:
         the created namespace
@@ -255,12 +250,11 @@ async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = B
 
     except (ValueError, ApiException) as val_err:
         logger.error(val_err)
-        resp = OssCompliantResponse(status=OssStatus.failed, detail=val_err, result={})
+        resp = OssCompliantResponse(status=OssStatus.failed, detail=str(val_err), result={})
         return resp
 
     resp = OssCompliantResponse(status=OssStatus.ready, detail="Namespace created", result=created_namespace.to_dict())
     return resp
-
 
 @k8s_router.delete("/{cluster_id}/namespace/{name}", response_model=dict)
 async def delete_k8s_namespace(cluster_id: str, name: str = ""):

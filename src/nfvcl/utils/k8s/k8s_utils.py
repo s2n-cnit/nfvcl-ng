@@ -1,6 +1,4 @@
 import tempfile
-import time
-import traceback
 from logging import Logger
 from pathlib import Path
 from typing import List
@@ -10,15 +8,11 @@ import kubernetes.utils
 import yaml
 from kubernetes import config
 from kubernetes.client import Configuration, V1PodList, V1DaemonSetList, VersionInfo, V1ConfigMap, \
-    V1Namespace, V1ObjectMeta, V1ServiceList, V1DeploymentList
+    V1Namespace, V1ObjectMeta, V1ServiceList, V1DeploymentList, V1StorageClass
 from kubernetes.client.rest import ApiException
-from kubernetes.utils import FailToCreateError
-
-import nfvcl.utils.file_utils
-import nfvcl.utils.util
-from nfvcl.config_templates.k8s.k8s_plugin_config_manager import get_yaml_files_for_plugin, get_enabled_plugins
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginAdditionalData, K8sPluginName, K8sPluginType
-from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
+from nfvcl.config_templates.k8s.k8s_plugin_config_manager import get_enabled_plugins
+from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPluginType
+from nfvcl.models.k8s.topology_k8s_model import K8sVersion
 from nfvcl.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl.utils.log import create_logger
 
@@ -283,39 +277,6 @@ def get_config_map(kube_client_config: kubernetes.client.Configuration, namespac
         return config_map
 
 
-def get_installed_plugins(kube_client_config: kubernetes.client.Configuration) -> List[K8sPluginName]:
-    """
-    Check which plugin is installed on a k8s cluster. To this goal, daemon sets and pods in 'kube system' are iterated.
-    The function check if there are labels that highlight the presence of a plugin.
-
-    Args:
-        kube_client_config: the configuration of K8s on which the client is built.
-
-    Returns
-        the list of detected plugins in a k8s cluster
-    """
-    enabled_plugins = get_enabled_plugins()
-    to_return = []
-
-    # Not the efficient way but this function should be called rarely
-    for plugin in enabled_plugins:
-        # For each plugin that is detected by the presence of a daemon set
-        for daemon_set in plugin.daemon_sets:
-            label = f"{daemon_set.label}={daemon_set.value}"
-            retrieved_daemons = get_daemon_sets(kube_client_config, namespace=daemon_set.namespace, label_selector=label)
-            if len(retrieved_daemons.items) > 0:
-                to_return.append(K8sPluginName(plugin.name))
-
-        # For each plugin that is detected by the presence of a deployment
-        for deploy in plugin.deployments:
-            label = f"{deploy.label}={deploy.value}"
-            retrieved_daemons = get_daemon_sets(kube_client_config, namespace=deploy.namespace, label_selector=label)
-            if len(retrieved_daemons.items) > 0:
-                to_return.append(K8sPluginName(plugin.name))
-
-    return to_return
-
-
 def patch_config_map(kube_client_config: kubernetes.client.Configuration, name, namespace, config_map: V1ConfigMap):
     """
         Patch a config map in a k8s cluster.
@@ -368,82 +329,6 @@ def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, di
         finally:
             api_client.close()
     return result_dict, result_yaml
-
-
-def install_plugins_to_cluster(kube_client_config: kubernetes.client.Configuration,
-                               plugins_to_install: List[K8sPluginName],
-                               template_fill_data: K8sPluginAdditionalData,
-                               cluster_id: str,
-                               skip_plug_checks: bool = False) -> dict:
-    """
-    Install a plugin list at the target k8s cluster.
-
-    Args:
-        kube_client_config: the configuration of K8s on which the client is built.
-
-        plugins_to_install: List[K8sPluginName] the list of plugins to install on the cluster.
-
-        template_fill_data: data to fill plugins yaml file templates. If additional_data.pod_network_cidr is null,
-        the function is retrieving this value from k8s cluster.
-
-        cluster_id: The ID of the k8s cluster, used to give a name to configuration files
-
-        skip_plug_checks: skip plugin checks (already installed...)
-
-    Returns:
-        A dict[List[List[K8sTypes]]]: for each plugin a new key for the dictionary is created witch contains a list of resource types
-        (V1Pod, V1DaemonSet, ...) and for each resource type there is a list of elements.
-
-    Raises:
-        ValueError if some plugins are already installed or there is a conflict
-    """
-    version: K8sVersion = get_k8s_version(kube_client_config)
-
-    installed_plugins: List[K8sPluginName] = get_installed_plugins(kube_client_config)
-
-    result: dict = {}
-
-    # Checking plugins to be installed, that ones to be installed are not already present.
-    # Raise error if problem
-    if not skip_plug_checks:
-        check_plugin_to_be_installed(installed_plugins=installed_plugins, plugins_to_install=plugins_to_install)
-
-    for plugin in plugins_to_install:
-        # Yaml files to be applied to the cluster for each plugin
-        yaml_file_configs_templates = get_yaml_files_for_plugin(version, plugin)
-
-        rendered_files_list = nfvcl.utils.file_utils.render_files_from_template(paths=yaml_file_configs_templates,
-                                                                                render_dict=template_fill_data.model_dump(),
-                                                                                files_name_prefix=cluster_id)
-
-        result_list = []
-        logger.info("Plugin <{}> installation is starting.".format(plugin.name))
-        for yaml_file in rendered_files_list:
-            # Element in position 1 because apply_def_to_cluster is working on yaml file, please look at the source
-            # code of apply_def_to_cluster
-            try:
-                result_list.append(apply_def_to_cluster(kube_client_config, yaml_file_to_be_applied=yaml_file)[1])
-            except FailToCreateError as fail:
-                logger.warning(traceback.format_tb(fail.__traceback__))
-                logger.warning("Definition <{}> for plugin <{}> has gone wrong. Retrying in 60 seconds...".
-                               format(yaml_file, plugin.name))
-                time.sleep(60)
-                result_list.append(apply_def_to_cluster(kube_client_config, yaml_file_to_be_applied=yaml_file)[1])
-
-            # If it is the last does not wait
-            if not rendered_files_list[-1] == yaml_file:
-                logger.info(
-                    "Yaml definition ({}/{}) for {} have been applied. Waiting 30 seconds before next definition.".
-                    format(len(result_list), len(rendered_files_list), plugin.name))
-                time.sleep(30)
-        result[plugin.value] = result_list
-
-        # If it is the last plugin it does NOT wait
-        if not plugins_to_install[-1] == plugin:
-            logger.info(
-                "Plugin <{}> definitions have been applied. Waiting 30 seconds before next plugin.".format(plugin.name))
-            time.sleep(30)
-    return result
 
 
 def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str,
@@ -622,49 +507,56 @@ def read_namespaced_config_map(kube_client_config: kubernetes.client.Configurati
         return config_map
 
 
-def parse_k8s_clusters_from_dict(k8s_list: List[dict]) -> List[TopologyK8sModel]:
+def read_namespaced_storage_class(kube_client_config: kubernetes.client.Configuration, storage_class_name: str) -> V1StorageClass:
     """
-    From a k8s cluster list in dictionary form returns a list of corresponding k8s models.
+    Read and return a storage class from a namespace
 
     Args:
-        k8s_list: dict to convert into K8sModel objects
+        kube_client_config: the configuration of K8s on which the client is built.
+        storage_class_name: the name of the storage class
 
     Returns:
+        The V1StorageClass object representing the desired storage class in the target namespace
 
-        a list of K8sModel objects
+    Raises:
+        ApiException when k8s client fails
     """
-    k8s_obj_list: List[TopologyK8sModel] = []
-    for k8s in k8s_list:
-        k8s_object = TopologyK8sModel.model_validate(k8s)
-        k8s_obj_list.append(k8s_object)
-    return k8s_obj_list
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance = kubernetes.client.StorageV1Api(api_client)
+        try:
+            storage_class = api_instance.read_storage_class(name=storage_class_name)
+        except kubernetes.client.rest.ApiException as error:
+            logger.error(f"Exception when calling StorageV1Api->read_storage_class: {error}\n")
+            raise error
+        finally:
+            api_client.close()
+
+    return storage_class
 
 
-def find_k8s_from_list_by_id(cluster_list: List[TopologyK8sModel], cluster_id: str) -> TopologyK8sModel:
+def patch_namespaced_storage_class(kube_client_config: kubernetes.client.Configuration, storage_class):
     """
-    Get the k8s corresponding cluster from the list.
+    Patch a storage class in a k8s cluster.
 
     Args:
-
-        cluster_list: the list in which the method search the corresponding cluster
-
-        cluster_id: the cluster ID that identify a k8s cluster in the list.
+        kube_client_config: the configuration of K8s on which the client is built.
+        storage_class: The storage class to be patched
 
     Returns:
-
-        The matching k8s cluster or Throw ValueError if NOT found.
+        The patched storage class
     """
-    try:
-        match = next((x for x in cluster_list if x.name == cluster_id), None)
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance = kubernetes.client.StorageV1Api(api_client)
+        try:
+            patched_storage_class = api_instance.patch_storage_class(name=storage_class.metadata.name,
+                                                                     body=storage_class)
+        except kubernetes.client.rest.ApiException as error:
+            logger.error(f"Exception when calling StorageV1Api->patch_storage_class: {error}\n")
+            raise error
+        finally:
+            api_client.close()
 
-        if match:
-            return match
-        else:
-            msg_err = "The k8s cluster {} has not been found in the topology".format(cluster_id)
-            raise ValueError(msg_err)
-    except Exception as err:
-        logger.error(err)
-        raise err
+    return patched_storage_class
 
 
 def convert_str_list_2_plug_name(list_to_convert: List[str]) -> List[K8sPluginName]:

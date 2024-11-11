@@ -12,7 +12,7 @@ class NFVCLParameters(NFVCLBaseModel):
     ip: str
     port: int
     mounted_folder: str = Field(default="mounted_folder", description="The folder in which files are generated to be exposed in API 'NFVCL_URL:NFVCL_PORT/files/'")
-    tmp_folder: str = Field(default="/tmp", description="The folder in which the tmp files are saved")
+    tmp_folder: str = Field(default="/tmp/nfvcl", description="The folder in which the tmp files are saved")
 
     class Config:
         validate_assignment = True

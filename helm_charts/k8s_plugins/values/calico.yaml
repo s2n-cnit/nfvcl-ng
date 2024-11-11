@@ -1,0 +1,8 @@
+installation:
+  cni:
+    type: Calico
+  calicoNetwork:
+    bgp: Disabled
+    ipPools:
+    - cidr: 10.254.0.0/16
+      encapsulation: IPIP

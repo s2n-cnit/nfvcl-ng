@@ -543,6 +543,34 @@ def k8s_cert_sign_req(kube_client_config: kubernetes.client.Configuration, usern
 
         return to_return
 
+def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str, labels: dict) -> V1Namespace:
+    """
+    Create a namespace in a k8s cluster.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace_name: The name of the namespace to be created
+
+    Returns:
+        The created namespace
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        metadata = V1ObjectMeta(name=namespace_name, labels=labels)
+        namespace_body = V1Namespace(metadata=metadata)
+        try:
+            namespace = api_instance_core.create_namespace(body=namespace_body)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>create_namespace: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return namespace
+
+
 
 def k8s_delete_namespace(kube_client_config: kubernetes.client.Configuration, namespace_name: str) -> V1Namespace:
     """

@@ -14,12 +14,11 @@ from pydantic import ValidationError
 from redis.client import PubSub
 from verboselogs import VerboseLogger
 
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sPluginAdditionalData, K8sOperationType, \
-    K8sPluginName, K8sLoadBalancerPoolArea
+from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall, K8sPluginAdditionalData, K8sOperationType, K8sLoadBalancerPoolArea
 from nfvcl.models.k8s.topology_k8s_model import K8sModelManagement, TopologyK8sModel
 from nfvcl.topology.topology import Topology
-from nfvcl.utils.k8s import install_plugins_to_cluster, get_k8s_config_from_file_content, \
-    convert_str_list_2_plug_name, apply_def_to_cluster, get_k8s_cidr_info
+from nfvcl.utils.k8s import get_k8s_config_from_file_content, apply_def_to_cluster, get_k8s_cidr_info
+from nfvcl.utils.k8s.helm_plugin_manager import HelmPluginManager
 from nfvcl.utils.log import create_logger
 from nfvcl.utils.redis_utils.redis_manager import get_redis_instance
 from nfvcl.utils.redis_utils.topic_list import K8S_MANAGEMENT_TOPIC
@@ -163,32 +162,17 @@ class K8sManager:
         # Getting k8s cluster from topology
         cluster = self.get_k8s_cluster_by_id(cluster_id)
 
-        # Extracting names from K8sPluginToInstall list
-        plugin_names_raw_list: List[K8sPluginName] = plug_to_install_list.plugin_list
-        # Converting List[str] to List[K8sPluginNames]
-        plugin_name_list: List[K8sPluginName] = convert_str_list_2_plug_name(plugin_names_raw_list)
-
         lb_pool: K8sLoadBalancerPoolArea = plug_to_install_list.load_balancer_pool
-        # Get the k8s pod network cidr
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         pod_network_cidr = get_k8s_cidr_info(k8s_config)
 
         # Create additional data for plugins (lbpool and cidr)
         template_fill_data = K8sPluginAdditionalData(areas=[lb_pool], pod_network_cidr=pod_network_cidr)
 
-        # Try to install plugins to cluster
-        installation_result: dict = install_plugins_to_cluster(kube_client_config=k8s_config,
-                                                               plugins_to_install=plugin_name_list,
-                                                               template_fill_data=template_fill_data,
-                                                               cluster_id=cluster_id,
-                                                               skip_plug_checks=plug_to_install_list.skip_plug_checks)
+        helm_plugin_manager = HelmPluginManager(cluster.credentials, cluster_id)
+        helm_plugin_manager.install_plugins(plug_to_install_list.plugin_list, template_fill_data)
 
-        # Return only the name of installed plugins
-        to_print = []
-        for plugin_result in installation_result:
-            to_print.append(plugin_result)
-
-        self.logger.success(f"Plugins {to_print} have been installed")
+        self.logger.success(f"Plugins {plug_to_install_list.plugin_list} have been installed")
 
     def apply_to_k8s(self, cluster_id: str, body):
         """

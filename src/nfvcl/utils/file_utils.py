@@ -77,13 +77,13 @@ def create_accessible_folder(sub_folder: str = None) -> Path:
 
 def create_folder(base_folder_path: str, sub_folder: str = None) -> Path:
     """
-    Creates a subfolder in the given base_folder. If parents do not exist, they will be created.
+    Creates a subfolder in the given base_folder. If parents don't exist, they're created.
     Args:
-        base_folder_path: The base folder (e.g. '/tmp')
-        sub_folder:  The sub folder (e.g. 'test/jojo/subfolder')
+        base_folder_path: The base folder (for example, '/tmp')
+        sub_folder:  The subfolder (for example, 'test/jojo/subfolder')
 
     Returns:
-        The path of the created folder (e.g. PosixPath('/tmp/test/jojo/subfolder'))
+        The path of the created folder (for example, PosixPath('/tmp/test/jojo/subfolder'))
     """
     base_folder = Path(base_folder_path)
     if not base_folder.exists():

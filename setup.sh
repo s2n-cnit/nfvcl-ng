@@ -15,7 +15,12 @@ echo "Installing Ansible"
 sudo apt install -y ansible
 sudo mkdir -p /etc/ansible
 sudo touch /etc/ansible/ansible.cfg
-echo -e '[defaults]\nhost_key_checking = False' | sudo tee -a /etc/ansible/ansible.cfg
+if grep -q 'host_key_checking = False' /etc/ansible/ansible.cfg; then
+    echo "Skipping ansible cfg since it already exist"
+else
+    echo -e '[defaults]\nhost_key_checking = False' | sudo tee -a /etc/ansible/ansible.cfg
+fi
+
 
 echo "Installing Helm"
 curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null

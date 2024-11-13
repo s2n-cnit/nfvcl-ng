@@ -1,7 +1,7 @@
 ---
 log_level: "20"
 nfvcl:
-  version: "0.3.0"
+  version: "0.3.1"
   port: "5002"
   ip: ""
 mongodb:

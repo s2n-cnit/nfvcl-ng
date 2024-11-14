@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 import pyhelm3.errors
 import yaml
 from kubernetes.client import V1PodList
+from nfvcl.utils.file_utils import create_tmp_file, create_tmp_folder
 from pydantic import Field
 from pyhelm3 import Client, ReleaseRevisionStatus
 
@@ -17,10 +18,9 @@ from nfvcl.rest_endpoints.k8s import get_k8s_cluster_by_area
 from nfvcl.topology.topology import build_topology
 from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_services, get_deployments, k8s_delete_namespace, \
     get_pods_for_k8s_namespace, get_logs_for_pod
+from nfvcl.utils.k8s.helm_plugin_manager import build_helm_client_from_credential_file_content
 
-HELM_TMP_FOLDER_PATH = Path(tempfile.gettempdir()) / 'nfvcl/helm'
-HELM_TMP_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
-
+HELM_TMP_FOLDER_PATH = create_tmp_folder('helm')
 
 class K8SProviderDataNative(BlueprintNGProviderData):
     namespaces: Optional[List[str]] = Field(default_factory=list)
@@ -45,15 +45,12 @@ def get_helm_client_by_area(area: int) -> Client:
     global helm_client_dict
 
     k8s_cluster: TopologyK8sModel = get_k8s_cluster_by_area(area)
-    k8s_credential_file_path = HELM_TMP_FOLDER_PATH / f"k8s_credential_{k8s_cluster.name}"
+    k8s_credential_file_name = f"k8s_credential_{k8s_cluster.name}"
+    k8s_credential_file_path = create_tmp_file(k8s_credential_file_name, "helm", True)
     # If helm client does not exist for an area or the cluster for the area have changed without restart of NFVCL
     if area not in helm_client_dict or not (helm_client_dict[area]._command._kubeconfig == k8s_credential_file_path):
         k8s_cluster: TopologyK8sModel = get_k8s_cluster_by_area(area)
-        k8s_credential_file_path = HELM_TMP_FOLDER_PATH / f"k8s_credential_{k8s_cluster.name}"
-        with open(k8s_credential_file_path, mode="w") as k8s_credential_file:
-            k8s_credential_file.write(k8s_cluster.credentials)
-
-        helm_client_dict[area] = Client(kubeconfig=k8s_credential_file_path)
+        helm_client_dict[area] = build_helm_client_from_credential_file_content(k8s_cluster.credentials,k8s_credential_file_path)
 
     return helm_client_dict[area]
 

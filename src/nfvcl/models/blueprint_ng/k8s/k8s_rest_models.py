@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import List, Optional
 from nfvcl.models.k8s.common_k8s_model import Cni
 from nfvcl.blueprints_ng.resources import VmResourceFlavor
-from pydantic import Field, field_validator, PositiveInt, IPvAnyAddress
+from pydantic import Field, field_validator, PositiveInt
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGCreateModel
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network

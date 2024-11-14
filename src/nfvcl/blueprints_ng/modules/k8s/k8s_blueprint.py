@@ -14,13 +14,13 @@ from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAre
     KarmadaInstallModel, K8sDelNodeModel
 from nfvcl.models.http_models import HttpRequestType
 from nfvcl.models.k8s.common_k8s_model import Cni
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData, K8sLoadBalancerPoolArea
+from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
 from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl.models.topology.topology_models import TopoK8SHasBlueprintException
 from nfvcl.topology.topology import Topology, build_topology
-from nfvcl.utils.k8s import get_k8s_config_from_file_content, install_plugins_to_cluster, get_k8s_cidr_info, \
-    get_config_map, patch_config_map
+from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_config_map, patch_config_map, get_k8s_cidr_info
+from nfvcl.utils.k8s.helm_plugin_manager import HelmPluginManager
 
 K8S_BLUE_TYPE = "k8s"
 K8S_VERSION = K8sVersion.V1_30
@@ -317,25 +317,26 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         Day 2 operation. Install k8s default plugins after the cluster has been initialized.
         Suppose that there is NO plugin installed.
         """
+        self.logger.info(f"Starting default plugin installation on {self.id} K8S cluster")
         client_config = get_k8s_config_from_file_content(self.state.master_credentials)
         # It builds plugin list
         plug_list: List[K8sPluginName] = []
 
         if self.state.cni == Cni.flannel.value:
-            plug_list.append(K8sPluginName.FLANNEL)
+           plug_list.append(K8sPluginName.FLANNEL)
         elif self.state.cni == Cni.calico.value:
-            plug_list.append(K8sPluginName.CALICO)
+           plug_list.append(K8sPluginName.CALICO)
         plug_list.append(K8sPluginName.METALLB)
         plug_list.append(K8sPluginName.OPEN_EBS)
-        plug_list.append(K8sPluginName.CADVISOR)
 
         # Get the k8s pod network cidr
         pod_network_cidr = get_k8s_cidr_info(client_config)
-        # Create additional data for plugins (lbpool and cidr)
-        add_data = K8sPluginAdditionalData(areas=self.state.load_balancer_pools, pod_network_cidr=pod_network_cidr, cadvisor_node_port=self.state.cadvisor_node_port)
+        plugin_data = K8sPluginAdditionalData(areas=self.state.load_balancer_pools, pod_network_cidr=pod_network_cidr, cadvisor_node_port=self.state.cadvisor_node_port) # TODO cadvisor is not anymore present
 
-        install_plugins_to_cluster(kube_client_config=client_config, plugins_to_install=plug_list,
-                                   template_fill_data=add_data, cluster_id=self.base_model.id)
+        helm_plugin_manager = HelmPluginManager(k8s_credential_file=self.state.master_credentials, context_name=self.id)
+        helm_plugin_manager.install_plugins([K8sPluginName.FLANNEL, K8sPluginName.METALLB, K8sPluginName.OPEN_EBS], plugin_data)
+
+
 
     @day2_function("/add_node", [HttpRequestType.POST])
     def add_worker(self, model: K8sAddNodeModel):

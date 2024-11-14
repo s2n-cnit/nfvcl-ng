@@ -54,62 +54,6 @@ class N4if(NFVCLBaseModel):
 class Smf(NFVCLBaseModel):
     n4if: N4if
 
-
-# class N2network(NFVCLBaseModel):
-#     enabled: bool
-#     name: str
-#     type: str
-#     master_if: str = Field(..., alias='masterIf')
-#     subnet_ip: str = Field(..., alias='subnetIP')
-#     cidr: int
-#     gateway_ip: str = Field(..., alias='gatewayIP')
-#     exclude_ip: str = Field(..., alias='excludeIP')
-#
-#
-# class N3network(NFVCLBaseModel):
-#     enabled: bool
-#     name: str
-#     type: str
-#     master_if: str = Field(..., alias='masterIf')
-#     subnet_ip: str = Field(..., alias='subnetIP')
-#     cidr: int
-#     gateway_ip: str = Field(..., alias='gatewayIP')
-#     exclude_ip: str = Field(..., alias='excludeIP')
-#
-#
-# class N4network(NFVCLBaseModel):
-#     enabled: bool
-#     name: str
-#     type: str
-#     master_if: str = Field(..., alias='masterIf')
-#     subnet_ip: str = Field(..., alias='subnetIP')
-#     cidr: int
-#     gateway_ip: str = Field(..., alias='gatewayIP')
-#     exclude_ip: str = Field(..., alias='excludeIP')
-#
-#
-# class N6network(NFVCLBaseModel):
-#     enabled: bool
-#     name: str
-#     type: str
-#     master_if: str = Field(..., alias='masterIf')
-#     subnet_ip: str = Field(..., alias='subnetIP')
-#     cidr: int
-#     gateway_ip: str = Field(..., alias='gatewayIP')
-#     exclude_ip: str = Field(..., alias='excludeIP')
-#
-#
-# class N9network(NFVCLBaseModel):
-#     enabled: bool
-#     name: str
-#     type: str
-#     master_if: str = Field(..., alias='masterIf')
-#     subnet_ip: str = Field(..., alias='subnetIP')
-#     cidr: int
-#     gateway_ip: str = Field(..., alias='gatewayIP')
-#     exclude_ip: str = Field(..., alias='excludeIP')
-
-
 class Global(NFVCLBaseModel):
     name: str
     user_plane_architecture: str = Field(..., alias='userPlaneArchitecture')
@@ -117,11 +61,6 @@ class Global(NFVCLBaseModel):
     sbi: Sbi
     amf: Amf
     smf: Smf
-    # n2network: N2network
-    # n3network: N3network
-    # n4network: N4network
-    # n6network: N6network
-    # n9network: N9network
 
 
 class Auth(NFVCLBaseModel):

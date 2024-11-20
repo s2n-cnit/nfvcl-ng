@@ -29,9 +29,11 @@ class UPFBlueCreateModel(BlueprintNGCreateModel):
     nrf_ip: Optional[SerializableIPv4Address] = Field(default=None)
     slices: List[SliceModel] = Field(default_factory=list)
     start: Optional[bool] = Field(default=True)
-    n3_gateway_ip: SerializableIPv4Address = Field()
-    n6_gateway_ip: SerializableIPv4Address = Field()
-    gnb_cidr: SerializableIPv4Network = Field()
+    # Optional because if the UPF is a PDU the routing is fixed
+    n3_gateway_ip: Optional[SerializableIPv4Address] = Field(default=None)
+    n6_gateway_ip: Optional[SerializableIPv4Address] = Field(default=None)
+    gnb_cidr: Optional[SerializableIPv4Network] = Field(default=None)
+
 
 #####################################################
 class DnnModel(NFVCLBaseModel):

@@ -36,6 +36,7 @@ class AthonetCore(Generic5GBlueprintNG[AthonetCoreBlueprintNGState, Create5gMode
 
         """
         super().__init__(blueprint_id, state_type)
+        self.router_needed = False
 
     def create_5g(self, create_model: Create5gModel):
         if len(self.state.current_config.areas) > 1:
@@ -209,63 +210,3 @@ class AthonetCore(Generic5GBlueprintNG[AthonetCoreBlueprintNGState, Create5gMode
             if dnn_name == dnn.dnn:
                 return dnn
         raise ValueError(f'Dnn {dnn_name} not found.')
-
-    def update_edge_areas(self):
-        #TODO Remove when router spawn will be optional
-        """
-        Deploy new edge areas
-        Delete edge areas not needed anymore
-        If necessary send update to changed edge areas
-        """
-
-        for area in self.state.current_config.areas:
-            if str(area.id) not in self.state.edge_areas:
-                # Deploy everything that this edge area need
-
-                self.state.edge_areas[str(area.id)] = EdgeAreaInfo(area=area.id)
-
-                # Router deployment for this area
-                router_info: Router5GInfo
-                if not area.networks.external_router:
-                    router_info = self.deploy_router_blueprint(area.id)
-                else:
-                    router_info = Router5GInfo(external=True, network=area.networks.external_router)
-                self.state.edge_areas[str(area.id)].router = router_info
-
-                # UPF deployment for this area
-                upf_info = self.deploy_upf_blueprint(area.id, area.upf.type)
-                self.state.edge_areas[str(area.id)].upf = upf_info
-            else:
-                # The edge area is already deployed but MAY need to be updated with a new configuration
-                edge_info = self.state.edge_areas[str(area.id)]
-
-                # Updating UPF configuration (move to a new method in the future?)
-                updated_config = self._create_upf_config(area.id)
-                if edge_info.upf.current_config != updated_config:
-                    self.logger.info(f"Updating UPF for area {area.id}")
-                    self.provider.call_blueprint_function(edge_info.upf.blue_id, "update", updated_config)
-                    self.state.edge_areas[str(area.id)].upf = self.get_upfs_info(area.id, edge_info.upf.blue_id, updated_config)
-
-            # # The router need to route the traffic for the DNN ip pool through the UPF N6 interface
-            # for deployed_upf in self.state.edge_areas[str(area.id)].upf.upf_list:
-            #     for slice in deployed_upf.served_slices:
-            #         for dnn in slice.dnn_list:
-            #             self.add_route_to_router(area.id, dnn.cidr, deployed_upf.network_info.n6_ip.exploded)
-
-        # Deleting edge areas that are not in the current configuration (deleted by del_tac day2)
-        currently_existing_areas: Set[str] = set(map(lambda x: str(x.id), self.state.current_config.areas))
-        currently_deployed_edge_areas = set(self.state.edge_areas.keys())
-        areas_to_delete = currently_deployed_edge_areas - currently_existing_areas
-        for edge_area_id in areas_to_delete:
-            # Get information about the area that need to be deleted
-            edge_area_info = self.state.edge_areas[edge_area_id]
-
-            # Undeploy router blueprint
-            if not edge_area_info.router.external:
-                self.undeploy_router_blueprint(int(edge_area_id))
-
-            # Undeploy upf blueprint
-            self.undeploy_upf_blueprint(int(edge_area_id))
-
-            # Delete edge area from state
-            del self.state.edge_areas[edge_area_id]

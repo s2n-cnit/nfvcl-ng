@@ -57,8 +57,6 @@ class AthonetUPF(Generic5GUPFBlueprintNG[AthonetUPFBlueprintNGState, UPFBlueCrea
         deployed_upf_info = DeployedUPFInfo(
             area=self.state.current_config.area_id,
             served_slices=self.state.current_config.slices,
-            vm_resource_id="1",
-            vm_configurator_id="1",
             network_info=UPFNetworkInfo(
                 n4_cidr=SerializableIPv4Network(n4_cidr),
                 n3_cidr=SerializableIPv4Network(n3_cidr),

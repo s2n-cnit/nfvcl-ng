@@ -16,8 +16,8 @@ class DeployedUPFInfo(NFVCLBaseModel):
     area: int = Field()
     served_slices: List[SliceModel] = Field(default_factory=list)
     network_info: Optional[UPFNetworkInfo] = Field(default=None)
-    vm_resource_id: str = Field()
-    vm_configurator_id: str = Field()
+    vm_resource_id: Optional[str] = Field(default=None)
+    vm_configurator_id: Optional[str] = Field(default=None)
 
     def served_dnns(self) -> List[str]:
         served_dnns_list: List[str] = []

@@ -33,8 +33,29 @@ class PDUProvider(BlueprintNGProviderInterface):
             pdu_type: Type of the PDU
             instance_type: Instance type of the PDU, optional
             name: Name of the PDU, optional, may be needed if there are multiple PDUs of the same type in the same area
-
         Returns: The PDU if exactly one is found
+        """
+        found = self.find_pdus(area, pdu_type, instance_type)
+
+        if name:
+            found = list(filter(lambda x: x.name == name, found))
+
+        if len(found) == 0:
+            raise PDUProviderException(f"No PDU found with area {area} of type {pdu_type} and with name '{name}' (None mean that the name was not used to find the PDU)")
+        if len(found) > 1:
+            raise PDUProviderException(f"Found multiple PDUs with area {area} of type {pdu_type}, the name need to be used in this case to choose one")
+        return found[0]
+
+    def find_pdus(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None) -> List[PduModel]:
+        """
+        Find a PDU given the search parameters
+        Args:
+            area: Area of the PDU
+            pdu_type: Type of the PDU
+            instance_type: Instance type of the PDU, optional
+            name: Name of the PDU, optional, may be needed if there are multiple PDUs of the same type in the same area
+
+        Returns: List of PDUs that match the search parameters
         """
         all_pdus = build_topology().get_pdus()
 
@@ -46,14 +67,9 @@ class PDUProvider(BlueprintNGProviderInterface):
         else:
             found = filtered_by_type
 
-        if name:
-            found = list(filter(lambda x: x.name == name, found))
-
         if len(found) == 0:
-            raise PDUProviderException(f"No PDU found with area {area} of type {pdu_type} and with name '{name}' (None mean that the name was not used to find the PDU)")
-        if len(found) > 1:
-            raise PDUProviderException(f"Found multiple PDUs with area {area} of type {pdu_type}, the name need to be used in this case to choose one")
-        return found[0]
+            raise PDUProviderException(f"No PDU found with area {area} of type {pdu_type}")
+        return found
 
     def find_by_name(self, name: str) -> PduModel:
         all_pdus = build_topology().get_pdus()

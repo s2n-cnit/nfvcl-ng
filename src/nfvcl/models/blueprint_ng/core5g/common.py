@@ -119,12 +119,17 @@ class SubAreaUPF(BaseModel):
     type: str = Field()
     external: Optional[bool] = Field(default=False)
 
+class SubAreaGNB(NFVCLBaseModel):
+    configure: bool = Field(default=True)
+    pduList: Optional[List[str]] = Field(default=None)
+
 class SubArea(BaseModel):
     id: int
     nci: str
     idLength: int
     core: bool = Field(default=True)
-    upf: SubAreaUPF = Field(default_factory=list)
+    gnb: Optional[SubAreaGNB] = Field(default_factory=SubAreaGNB)
+    upf: SubAreaUPF = Field()
     networks: SubAreaNetwork = Field()
     slices: Optional[List[SubSlices]] = Field(default=[], description="set slices ")
 

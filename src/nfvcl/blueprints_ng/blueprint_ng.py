@@ -306,7 +306,10 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
         return self.get_k8s_provider(helm_chart_resource.area).get_pod_log(helm_chart_resource, pod_name, tail_lines)
 
     def find_pdu(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None, name: Optional[str] = None) -> PduModel:
-        return self.get_pdu_provider().find_pdu(area, pdu_type, instance_type, name)
+        return self.get_pdu_provider().find_pdu(area, pdu_type, instance_type=instance_type, name=name)
+
+    def find_pdus(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None) -> List[PduModel]:
+        return self.get_pdu_provider().find_pdus(area, pdu_type, instance_type)
 
     def is_pdu_locked(self, pdu_model: PduModel) -> bool:
         return self.get_pdu_provider().is_pdu_locked(pdu_model)
@@ -599,7 +602,14 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)
         del deserialized_dict_edited["registered_resources"]
         deserialized_dict_edited["state"] = instance.state_type().model_dump()
-        instance.base_model = BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar].model_validate(deserialized_dict_edited)
+        try:
+            instance.base_model = BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar].model_validate(deserialized_dict_edited)
+        except ValidationError as e:
+            deserialized_dict_edited["create_config"] = None
+            instance.base_model = BlueprintNGBaseModel[StateTypeVar, CreateConfigTypeVar].model_validate(deserialized_dict_edited)
+            instance.logger.error(f"Unable to load create_config: {str(e)}")
+            instance.base_model.corrupted = True
+            instance.logger.error(f"Blueprint set as corrupted")
 
         # Register the reloaded resources of type ResourceDeployable
         for resource_id, resource in deserialized_dict["registered_resources"].items():
@@ -669,6 +679,6 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         else:
             dict_to_ret = {"id": self.base_model.id, "type": self.base_model.type, "status": self.base_model.status, "created": self.base_model.created, "protected": self.base_model.protected}
             if self.base_model.corrupted:
-                dict_to_ret["corrupted"] = "True"
+                dict_to_ret["corrupted"] = True
             return dict_to_ret
 

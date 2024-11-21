@@ -39,7 +39,7 @@ class Router5GInfo(NFVCLBaseModel):
 
 class RANAreaInfo(NFVCLBaseModel):
     area: int = Field()
-    pdu_name: str = Field()
+    pdu_names: List[str] = Field(default_factory=list)
 
 class EdgeAreaInfo(NFVCLBaseModel):
     area: int = Field()
@@ -95,7 +95,9 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         Make sure that the prerequisites for the blueprint are met
         This method should raise an exception if the prerequisites are not met
         """
-        self.get_gnb_pdus()
+        for pdu_model in self.get_gnb_pdus():
+            if self.provider.is_pdu_locked(pdu_model):
+                raise BlueprintNGException(f"GNB PDU {pdu_model.name} is already locked")
 
     def configuration_feasibility_check(self, config_model: Create5gModel):
         """
@@ -360,17 +362,16 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         Returns: List of PDUs
         """
-        areas = list(map(lambda x: x.id, self.state.current_config.areas))
+        pdu_models: List[PduModel] = []
 
-        pdus_to_return = []
-
-        for area in areas:
-            pdu_model = self.provider.find_pdu(area, PduType.GNB)
-            if not self.provider.is_pdu_locked_by_current_blueprint(pdu_model):
-                self.provider.lock_pdu(pdu_model)
-            pdus_to_return.append(pdu_model)
-
-        return pdus_to_return
+        for area in self.state.current_config.areas:
+            if area.gnb.configure:
+                if not area.gnb.pduList:
+                    pdu_models.extend(self.provider.find_pdus(area.id, PduType.GNB))
+                else:
+                    for pdu_name in area.gnb.pduList:
+                        pdu_models.append(self.provider.find_pdu(area.id, PduType.GNB, name=pdu_name))
+        return pdu_models
 
     def _additional_routes_for_gnb(self, area: str) -> List[Route]:
         """
@@ -394,6 +395,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         Update the GNBs config
         """
         for pdu in self.get_gnb_pdus():
+            if not self.provider.is_pdu_locked_by_current_blueprint(pdu):
+                self.provider.lock_pdu(pdu)
             configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu)
 
             # TODO nci is calculated with tac, is this correct?
@@ -413,7 +416,9 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             )
 
             configurator_instance.configure(gnb_configuration_request)
-            self.state.ran_areas[str(pdu.area)] = RANAreaInfo(area=pdu.area, pdu_name=pdu.name)
+            if str(pdu.area) not in self.state.ran_areas:
+                self.state.ran_areas[str(pdu.area)] = RANAreaInfo(area=pdu.area)
+            self.state.ran_areas[str(pdu.area)].pdu_names.append(pdu.name)
 
         # Unlock PDUs for removed areas
         currently_existing_areas: Set[str] = set(map(lambda x: str(x.id), self.state.current_config.areas))
@@ -422,8 +427,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         for ran_area_id in areas_to_delete:
             # Get information about the area that need to be deleted
             ran_area_info = self.state.ran_areas[ran_area_id]
-
-            self.provider.unlock_pdu(self.provider.find_by_name(ran_area_info.pdu_name))
+            for pdu in ran_area_info.pdu_names:
+                self.provider.unlock_pdu(self.provider.find_by_name(pdu))
 
             # Delete edge area from state
             del self.state.ran_areas[ran_area_id]

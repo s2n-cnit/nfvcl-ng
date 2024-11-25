@@ -57,6 +57,7 @@ class NF5GType(str, Enum):
     UDR = 'UDR'
     AF = 'AF'
     AUSF = 'AUSF'
+    WEBUI = 'WEBUI'
 
 class NetworkFunctionScaling(NFVCLBaseModel):
     nf: NF5GType = Field()

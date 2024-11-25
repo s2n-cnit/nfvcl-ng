@@ -7,7 +7,7 @@ import httpx
 from pydantic import Field
 
 from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.resources import HelmChartResource
@@ -19,7 +19,6 @@ from nfvcl.models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAd
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
     Core5GUpdateSliceModel, NF5GType, Core5GAddSubscriberModel
 from nfvcl.models.blueprint_ng.g5.upf import DnnModel
-from nfvcl.models.http_models import HttpRequestType
 from nfvcl.utils.log import create_logger
 
 OAI_CORE_BLUE_TYPE = "oai"
@@ -42,7 +41,7 @@ class OAIBlueprintNGState(Generic5GK8sBlueprintNGState):
 
     """
     oai_config_values: Optional[OaiCoreValuesModel] = Field(default=None)
-    ue_dict: Dict[str, List[Snssai]] = {}
+    ue_dict: Dict[str, List[Snssai]] = Field(default_factory=dict)
     mcc: Optional[str] = Field(default=None)
     mnc: Optional[str] = Field(default=None)
 

@@ -1504,12 +1504,12 @@ class Free5gcSubScriber(NFVCLBaseModel):
                             self.access_and_mobility_subscription_data.nssai.default_single_nssais.append(temp_slice)
                             smsd = SessionManagementSubscriptionDatum(
                                 single_nssai=temp_slice,
-                                dnn_configurations=DnnConfigurations({})
+                                dnn_configurations=DnnConfigurations.model_validate({})
                             )
 
                             self.sm_policy_data.sm_policy_snssai_data.root[f"0{temp_slice.sst}{snssai.sliceId}"] = SlicePolicy(
                                 snssai=temp_slice,
-                                sm_policy_dnn_data=SmPolicyDnnData({})
+                                sm_policy_dnn_data=SmPolicyDnnData.model_validate({})
                             )
 
                             self.smf_selection_subscription_data.subscribed_snssai_infos.root[f"0{temp_slice.sst}{snssai.sliceId}"] = SliceDnn(dnn_infos=[])

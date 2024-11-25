@@ -18,6 +18,7 @@ def create_tmp_file(filename: str, sub_folder: str = None, file_can_exist: bool 
     Args:
         filename: The file name (e.g. 'file.json')
         sub_folder: The subfolder name (e.g. 'sub_folder' or 'sub_folder/sub_sub_folder/sub_sub_sub_folder')
+        file_can_exist: If True, the file can exist and will not raise an error if it does.
 
     Returns:
         The Path to the created file (e.g. PosixPath('/tmp/sub_folder/sub_sub_folder/file.json'))
@@ -51,6 +52,7 @@ def create_accessible_file(filename: str, sub_folder: str = None, file_can_exist
     Args:
         filename: The file name (e.g. 'file.json')
         sub_folder: The subfolder name (e.g. 'sub_folder' or 'sub_folder/sub_sub_folder/sub_sub_sub_folder')
+        file_can_exist: If True, the file can exist and will not raise an error if it does.
 
     Returns:
         The Path to the created file (e.g. PosixPath('mounted_folder/sub_folder/sub_sub_folder/file.json'))

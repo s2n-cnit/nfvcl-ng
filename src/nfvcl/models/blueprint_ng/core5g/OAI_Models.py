@@ -2,8 +2,8 @@ from typing import *
 
 from pydantic import Field
 
-from nfvcl.models.blueprint_ng.core5g.common import Blueprint5GBaseModel, Create5gModel, SubSubscribers, SubSliceProfiles, SubArea
 from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubArea
 from nfvcl.models.k8s.k8s_objects import K8sService
 
 
@@ -559,19 +559,6 @@ class OaiSmf(NFVCLBaseModel):
     imagePullSecrets: List[ImagePullSecret]
     nodeSelector: Dict[str, Any]
 
-
-class OaiValuesModel(NFVCLBaseModel):
-    global_: Optional[Global] = Field(None, alias='global')
-    mysql: Optional[Mysql] = None
-    oai_nrf: Optional[OaiNrf] = Field(None, alias='oai-nrf')
-    oai_udr: Optional[OaiUdr] = Field(None, alias='oai-udr')
-    oai_udm: Optional[OaiUdm] = Field(None, alias='oai-udm')
-    oai_ausf: Optional[OaiAusf] = Field(None, alias='oai-ausf')
-    oai_amf: Optional[OaiAmf] = Field(None, alias='oai-amf')
-    oai_upf: Optional[OaiUpf] = Field(None, alias='oai-upf')
-    oai_smf: Optional[OaiSmf] = Field(None, alias='oai-smf')
-    currentconfig: Optional[Currentconfig] = Field(None, alias='currentconfig')
-
 class OaiCoreValuesModel(NFVCLBaseModel):
     global_: Optional[Global] = Field(None, alias='global')
     mysql: Optional[Mysql] = None
@@ -585,17 +572,6 @@ class OaiCoreValuesModel(NFVCLBaseModel):
 
 class OaiUpfValuesModel(NFVCLBaseModel):
     upfconfig: Optional[Upfconfig] = Field(None, alias='currentconfig')
-
-
-class OAIModel(OAIBlueCreateModel):
-    core_services: Optional[OAIModelServices] = Field(default=None)
-    oai_config_values: Optional[OaiValuesModel] = Field(default=None)
-    upf_config_dict: Dict[int, Currentconfig] = {}
-    ue_dict: Dict[str, List[Snssai]] = {}
-
-
-class BlueprintOAIBaseModel(Blueprint5GBaseModel):
-    blue_model_5g: Optional[OAIModel] = Field(default=None)
 
 
 # UE Model

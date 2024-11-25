@@ -1,11 +1,12 @@
 import time
-from typing import List
-import kubernetes
 from logging import Logger
+from typing import List
+
+import kubernetes
 from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccount, V1ClusterRoleList, V1ClusterRole, \
     V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, V1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
-    V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1PodSpec, V1Container, V1ResourceQuota, \
+    V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1Container, V1ResourceQuota, \
     V1ResourceQuotaSpec, V1ClusterRoleBinding, V1Node, V1NodeList, V1DeploymentList, V1Deployment, V1DeploymentSpec
 
 from nfvcl.models.k8s.common_k8s_model import Labels
@@ -463,7 +464,7 @@ def k8s_get_secrets(kube_client_config: kubernetes.client.Configuration, namespa
             secret: V1Secret
             for secret in secret_list.items:
                 annotations: dict = secret.metadata.annotations
-                if annotations != None:
+                if annotations is not None:
                     if 'kubernetes.io/service-account.name' in annotations.keys():
                         if annotations['kubernetes.io/service-account.name'] == owner:
                             to_return_list.append(secret)
@@ -550,6 +551,7 @@ def k8s_create_namespace(kube_client_config: kubernetes.client.Configuration, na
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
         namespace_name: The name of the namespace to be created
+        labels: The labels to be assigned to the namespace
 
     Returns:
         The created namespace
@@ -715,6 +717,7 @@ def k8s_get_deployments(kube_client_config: kubernetes.client.Configuration, nam
     Return a list of deployments
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
+        namespace: the namespace in which the deployments reside
         detailed: if true, return all deployments details
     Returns:
         The list of deployments or the list of names if detailed is false.
@@ -736,6 +739,7 @@ def k8s_add_label_to_k8s_deployment(kube_client_config: kubernetes.client.Config
     Add labels to a deployment
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
+        namespace: The namespace in which the deployment resides
         deployment_name: The name of the deployment to be labeled in the cluster
         labels: labels to be applied to the deployment (can already exist and are overwritten)
     Returns:
@@ -759,6 +763,7 @@ def k8s_scale_k8s_deployment(kube_client_config: kubernetes.client.Configuration
     Scale a deployment
     Args:
         kube_client_config: the configuration of K8s on which the client is built.
+        namespace: The namespace in which the deployment resides
         deployment_name: The name of the deployment to be labeled
         replica_num: the number of instances for the deployment
     Returns:

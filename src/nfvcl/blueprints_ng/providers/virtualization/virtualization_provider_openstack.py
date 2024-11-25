@@ -10,6 +10,7 @@ from openstack.exceptions import ForbiddenException
 from openstack.network.v2.network import Network
 from openstack.network.v2.port import Port
 from openstack.network.v2.subnet import Subnet
+from pydantic import Field
 
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl.blueprints_ng.cloudinit_builder import CloudInit
@@ -26,10 +27,10 @@ from nfvcl.utils.openstack.openstack_client import OpenStackClient
 
 
 class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
-    os_dict: Dict[str, str] = {}
-    flavors: List[str] = []
-    networks: List[str] = []
-    subnets: List[str] = []
+    os_dict: Dict[str, str] = Field(default_factory=dict)
+    flavors: List[str] = Field(default_factory=list)
+    networks: List[str] = Field(default_factory=list)
+    subnets: List[str] = Field(default_factory=list)
 
 
 class VirtualizationProviderOpenstackException(VirtualizationProviderException):

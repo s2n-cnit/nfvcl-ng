@@ -949,7 +949,7 @@ class ProvisionedDataProfile(NFVCLBaseModel):
                             sd=info.slice.sliceId,
                             sst=SstConvertion.to_int(info.slice.sliceType)
                         ),
-                        dnn_configurations=DnnConfigurations({f"{info.dnn.dnn}": DnnConfiguration()})
+                        dnn_configurations=DnnConfigurations.model_validate({f"{info.dnn.dnn}": DnnConfiguration()})
                     )
                     datums.append(datum)
 
@@ -963,7 +963,7 @@ class ProvisionedDataProfile(NFVCLBaseModel):
 
         data.sm_data = datums
         plmn_rule.data = data
-        self.plmn_rules_map = PlmnRulesMap({"*": PlmnRule(data=data)})
+        self.plmn_rules_map = PlmnRulesMap.model_validate({"*": PlmnRule(data=data)})
 
 
 #################### SUPI DATA #####################

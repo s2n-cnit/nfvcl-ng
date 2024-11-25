@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import Field
@@ -14,7 +14,7 @@ class HelmRepo(NFVCLBaseModel):
 class HelmChart(NFVCLBaseModel):
     name: str
     version: str
-    created: str = Field(default=datetime.utcnow().replace(microsecond=0).isoformat()+'Z')
+    created: str = Field(default=datetime.now(timezone.utc).replace(microsecond=0).isoformat()+'Z')
     digest: Optional[str]
     home: str = Field(default='https://helm.sh/helm')
     sources: List[str] = Field(default=['https://github.com/helm/helm'])
@@ -31,7 +31,7 @@ class HelmChart(NFVCLBaseModel):
 class HelmIndex(NFVCLBaseModel):
     apiVersion: str = 'v1'
     entries: dict = Field(default={})
-    generated: str = datetime.utcnow().replace(microsecond=0).isoformat()+'Z'
+    generated: str = datetime.now(timezone.utc).replace(microsecond=0).isoformat()+'Z'
 
     @classmethod
     def build_index(cls, chart_list: List[HelmChart]):

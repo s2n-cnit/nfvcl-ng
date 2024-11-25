@@ -216,7 +216,6 @@ class BlueprintManager:
         Retrieves the blueprint summary for the given blueprint ID. If the blueprint is present in memory, returns it from there instead of DB.
         Args:
             blueprint_id: The blueprint to be retrieved.
-            detailed: If true, return all the info saved in the database about the blueprints.
 
         Returns:
             The summary/details of a blueprint

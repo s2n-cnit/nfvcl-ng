@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field, field_validator, field_serializer, IPvAnyNetwork, IPvAnyAddress
-from typing import List, Optional, Union, Any
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
+from typing import List, Optional, Union
+
+from pydantic import BaseModel, Field, field_validator, field_serializer
+
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 
@@ -101,7 +103,6 @@ class NetworkModel(BaseModel):
         return False
 
     @field_validator('gateway_ip')
-    @classmethod
     def end_validator(cls, val):
         """
         Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')

@@ -1,5 +1,7 @@
 from typing import List
 
+from pydantic import Field
+
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription, AnsibleShellTask
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
 
@@ -8,7 +10,7 @@ class VmK8sDayNConfigurator(VmResourceAnsibleConfiguration):
     """
     This is the configurator for day0 of kubernetes nodes (master and workers)
     """
-    task_list: List[AnsibleTaskDescription] = []
+    task_list: List[AnsibleTaskDescription] = Field(default_factory=list)
 
     def dump_playbook(self) -> str:
         """

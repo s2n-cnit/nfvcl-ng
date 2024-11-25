@@ -42,9 +42,9 @@ class VimModel(NFVCLBaseModel):
     vim_proxmox_storage_volume: Optional[str] = Field(default='local-lvm')
     osm_onboard: Optional[bool] = Field(default=False)
     config: VimConfigModel = Field(default=VimConfigModel())
-    networks: List[str] = []
-    routers: List[str] = []
-    areas: List[int] = []
+    networks: List[str] = Field(default_factory=list)
+    routers: List[str] = Field(default_factory=list)
+    areas: List[int] = Field(default_factory=list)
 
     def __eq__(self, other):
         """
@@ -56,7 +56,6 @@ class VimModel(NFVCLBaseModel):
         return False
 
     @field_validator("name")
-    @classmethod
     def validate_lb_pools(cls, name: str) -> str:
         # Removing uppercase
         new_name = name.lower()
@@ -230,7 +229,6 @@ class VMFlavors(NFVCLBaseModel):
     vcpu_count: str = Field(default="4", alias='vcpu-count')
 
     @field_validator('memory_mb', 'storage_gb', 'vcpu_count', mode='before')
-    @classmethod
     def validate_field(cls, input_val) -> str:
         to_ret: str
         if isinstance(input_val, str):
@@ -352,8 +350,7 @@ class VirtualNetworkFunctionDescriptor(NFVCLBaseModel):
         return vnfd
 
     @field_serializer('vdu', 'kdu', 'pdu')
-    @classmethod
-    def serialize_list(cls, list_to_ser: List, _info):
+    def serialize_list(self, list_to_ser: List, _info):
         """
         If the list is empty, return None such that when the model is serialized -> Empty list are not included in the
         dump of the model.

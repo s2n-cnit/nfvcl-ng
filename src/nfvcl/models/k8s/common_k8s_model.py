@@ -5,12 +5,12 @@ from pydantic import Field
 from nfvcl.models.base_model import NFVCLBaseModel
 
 
-class Cni(Enum):
+class Cni(str, Enum):
     flannel = 'flannel'
     calico = 'calico'
 
 
-class LbType(Enum):
+class LbType(str, Enum):
     layer2 = 'layer2'
     layer3 = 'layer3'
 

@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # DO NOT MOVE THIS PIECE OF CODE -------
 # Log level must be set before loggers are created!
+from contextlib import asynccontextmanager
+
 from nfvcl.rest_endpoints.performance import performance_router
 from nfvcl.rest_endpoints.rest_utils import ansible_router
 from nfvcl.rest_endpoints.day2action import day2_router
@@ -26,6 +28,19 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+
+@asynccontextmanager
+async def lifespan(fastapp: FastAPI):
+    """
+    Mod the unicorn loggers to add colors and custom style
+    """
+    mod_logger(logging.getLogger('uvicorn'), remove_handlers=True, disable_propagate=True)
+    mod_logger(logging.getLogger('uvicorn.access'), remove_handlers=True, disable_propagate=True)
+    mod_logger(logging.getLogger('uvicorn.error'), remove_handlers=True, disable_propagate=True)
+    mod_logger(logging.getLogger('fastapi'), remove_handlers=True, disable_propagate=True)
+    yield
+    # If something need to be done after shutdown of the app, it can be done here.
+
 swagger_parameters = {"syntaxHighlight.theme": "obsidian", "deepLinking": True}
 app = FastAPI(
     title="NFVCL",
@@ -35,7 +50,8 @@ app = FastAPI(
         "name": "Apache 2.0",
         "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
     },
-    swagger_ui_parameters=swagger_parameters
+    swagger_ui_parameters=swagger_parameters,
+    lifespan=lifespan
 )
 
 # Populate blue_router with all blueprints APIs before include it.
@@ -72,14 +88,3 @@ async def close_nfvcl():
     """
     os.kill(os.getpid(), signal.SIGTERM)
     return RestAnswer202(id="close", description="Closing")
-
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    Mod the unicorn loggers to add colors and custom style
-    """
-    mod_logger(logging.getLogger('uvicorn'), remove_handlers=True, disable_propagate=True)
-    mod_logger(logging.getLogger('uvicorn.access'), remove_handlers=True, disable_propagate=True)
-    mod_logger(logging.getLogger('uvicorn.error'), remove_handlers=True, disable_propagate=True)
-    mod_logger(logging.getLogger('fastapi'), remove_handlers=True, disable_propagate=True)

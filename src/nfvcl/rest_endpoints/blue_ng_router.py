@@ -134,6 +134,7 @@ def create_blueprint(cls, msg: dict, request: Request):
     This function receives ALL the creation requests of all the blueprints!
 
     Args:
+        cls: The class of the blueprint, this is necessary because this function will be injected as a class method in the blueprint class.
         msg: The message of creation, the type depends on the blueprint type.
         request: The details about the request, used to retrieve the path, can be used for request info.
 
@@ -152,6 +153,7 @@ def update_blueprint(cls, msg: dict, blue_id: str, request: Request):
     This function receives ALL the update (day2) requests of all the blueprints!
 
     Args:
+        cls: The class of the blueprint, this is necessary because this function will be injected as a class method in the blueprint class.
         msg: Day 2 message, the type depends on the blueprint type.
         blue_id (str): The ID of the blueprint to be updated.
         request: The details about the request, used to retrieve the path, can be used for request info.
@@ -171,6 +173,7 @@ def get_from_blueprint(cls, blue_id: str, request: Request):
     This function receives ALL get (day2) requests of all the blueprints!
 
     Args:
+        cls: The class of the blueprint, this is necessary because this function will be injected as a class method in the blueprint class.
         blue_id (str): The ID of the blueprint from which the data will be retrieved.
         request: The details about the request, used to retrieve the path, can be used for request info.
 

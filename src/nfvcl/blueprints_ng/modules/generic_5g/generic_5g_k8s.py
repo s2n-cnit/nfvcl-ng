@@ -106,4 +106,4 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
                 metric_list.append(metric_query)
             metrics_dict[nf_name] = metric_list
 
-        return Metrics5GContainers(metrics_dict)
+        return Metrics5GContainers.model_validate(metrics_dict)

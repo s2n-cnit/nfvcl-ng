@@ -54,7 +54,7 @@ def get_nfvcl_config() -> NFVCLConfigModel:
     Returns:
         The NFVCL config
     """
-    global _nfvcl_config, logger
+    global _nfvcl_config
 
     # Using _nfvcl_config is present
     if not _nfvcl_config:

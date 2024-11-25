@@ -73,6 +73,9 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
             NF5GType.WEBUI: ("webui", "webui-service")
         }
 
+    def wait_core_ready(self):
+        pass
+
     def create_5g(self, create_model: Create5gModel):
         self.logger.info("Starting creation of Free5gc blueprint")
 

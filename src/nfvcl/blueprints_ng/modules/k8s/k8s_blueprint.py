@@ -58,14 +58,14 @@ class K8sBlueprintNGState(BlueprintNGState):
     load_balancer_ips_area: dict[str, List[SerializableIPv4Address]] = Field(default={}, description="The IPs used by the load balancer indexed by the area")
     load_balancer_pools: List[K8sLoadBalancerPoolArea] = Field(default=[], description="The K8sTemplateArea filled when calculating the load balancer pools")
 
-    worker_numbers: List[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # We can have at maximum 18 workers. This is used to reserve the number of workers.
+    worker_numbers: List[int] = Field(default=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  # We can have at maximum 18 workers. This is used to reserve the number of workers.
     attached_networks: List[str] = Field(default=[], description="A list of networks attached to all the nodes from every area. Every are can have different networks")
     # VM Master/Controller
     vm_master: Optional[VmResource] = Field(default=None, description="The virtual machine describing the master of the cluster")
     day_0_master_configurator: Optional[VmK8sDay0Configurator] = Field(default=None, description="The DAY0 configurator of the master")
     day_2_master_configurator: Optional[VmK8sDay2Configurator] = Field(default=None, description="The DAY2 configurator of the master")
     # VMs Worker
-    vm_workers: List[VmResource] = []
+    vm_workers: List[VmResource] = Field(default_factory=list)
     day_0_workers_configurators: List[VmK8sDay0Configurator] = Field(default=[], description="The DAY0 configurators of the workers")
     day_0_workers_configurators_tobe_exec: List[VmK8sDay0Configurator] = Field(default=[], description="The DAY0 configurators of the workers that have ansible tasks to be executed")
     # Data retrieved and saved from cluster creation

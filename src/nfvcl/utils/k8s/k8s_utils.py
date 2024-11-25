@@ -283,6 +283,7 @@ def patch_config_map(kube_client_config: kubernetes.client.Configuration, name, 
 
         Args:
             kube_client_config: the configuration of K8s on which the client is built.
+            name: the name of the configmap to be patched
             namespace: the namespace in witch the configmap is located
             config_map: The configmap to be patched
 

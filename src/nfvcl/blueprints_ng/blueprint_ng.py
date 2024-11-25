@@ -6,12 +6,11 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from functools import wraps
-from typing import TypeVar, Generic, Optional, List, Any, Dict, Type
+from typing import TypeVar, Generic, Optional, List, Any, Dict
 
 from pydantic import SerializeAsAny, Field, ConfigDict, ValidationError
 
 from nfvcl.blueprints_ng.lcm.performance_manager import get_performance_manager
-from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUConfigurator
 from nfvcl.blueprints_ng.providers.blueprint.blueprint_provider import BlueprintProvider
 from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from nfvcl.blueprints_ng.providers.kubernetes import K8SProviderNative

@@ -1,9 +1,9 @@
-from typing import Set, List, Optional
+from typing import List, Optional
 
 from pydantic import Field
 
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState, EdgeAreaInfo, Router5GInfo
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState
 from nfvcl.models.blueprint_ng.Athonet.core import ProvisionedDataInfo, AthonetApplicationCoreConfig
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubSubscribers, SubArea, SubDataNets, SubSnssai
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GAddDnnModel, Core5GDelDnnModel

@@ -8,6 +8,7 @@ from typing import Dict, List
 import httpx
 import paramiko
 from httpx import Response
+from pydantic import Field
 
 from nfvcl.blueprints_ng.cloudinit_builder import CloudInit, CloudInitNetworkRoot
 from nfvcl.blueprints_ng.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
@@ -35,10 +36,10 @@ class ApiRequestType(Enum):
 
 
 class VirtualizationProviderDataProxmox(VirtualizationProviderData):
-    proxmox_dict: Dict[str, str] = {}
-    proxmox_macs: Dict[str, List[ProxmoxMac]] = {}
+    proxmox_dict: Dict[str, str] = Field(default_factory=dict)
+    proxmox_macs: Dict[str, List[ProxmoxMac]] = Field(default_factory=dict)
     proxmox_net_device: ProxmoxNetsDevice = ProxmoxNetsDevice()
-    proxmox_vnet: List[str] = []
+    proxmox_vnet: List[str] = Field(default_factory=list)
     proxmox_node_name: str = ""
     proxmox_credentials: ProxmoxTicket = ProxmoxTicket()
 
@@ -289,14 +290,14 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                         vm_resource.network_interfaces[p_mac.net_name].append(ni)
 
     def __get_disks_memory(self, vmid: int):
-        '''
+        """
         Retrieves disk memory space
         Args:
             vmid: id of virtual machine
 
         Returns: Positional array of disk memory
 
-        '''
+        """
         stdout = self.__execute_ssh_command(f"qm config {vmid} | grep -E 'scsi[0-9]+:'")
         disk_devices = stdout.readlines()
         if disk_devices is not None:

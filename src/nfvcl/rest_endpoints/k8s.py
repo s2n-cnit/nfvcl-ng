@@ -227,14 +227,14 @@ async def create_k8s_namespace(cluster_id: str, name: str = "", labels: dict = B
         name: the name to be given at the new namespace
 
         labels: the labels to be applied at the namespace
-        {
-            "label1": "ciao",
-            "label2": "test"
-        }
-        or
-        {
-            "pod-security.kubernetes.io/enforce": "privileged"
-        }
+                {
+                    "label1": "ciao",
+                    "label2": "test"
+                }
+                or
+                {
+                    "pod-security.kubernetes.io/enforce": "privileged"
+                }
 
     Returns:
         the created namespace
@@ -779,11 +779,9 @@ async def add_label_to_k8s_deployment(cluster_id: str, namespace: str, deploymen
     Add labels to a k8s node
 
     Args:
-
         cluster_id: The K8s cluster (from the topology) on witch the deployment resides
-
+        namespace: The namespace in which the deployment resides
         deployment_name: the name of the deployment on witch labels is applied
-
         labels: The labels to be applied
 
     Returns:
@@ -801,11 +799,9 @@ async def scale_k8s_deployment(cluster_id: str, namespace: str, deployment_name:
     Scale a deployment in the cluster
 
     Args:
-
         cluster_id: The K8s cluster (from the topology) on witch the deployment resides
-
+        namespace: The namespace in which the deployment resides
         deployment_name: the name of the deployment that will be scaled
-
         replica_number: The desired number of pods (scaling)
 
     Returns:

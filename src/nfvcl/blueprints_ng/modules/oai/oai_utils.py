@@ -9,7 +9,7 @@ from nfvcl.models.blueprint_ng.core5g.OAI_Models import Snssai, Baseconfig, Dnn,
 def add_snssai(config: Baseconfig, slice_id: str, slice_type: str) -> Snssai:
     """
     Add new "snssai" to OAI values configuration.
-    :param config": config to add snssai to.
+    :param config: config to add snssai to.
     :param slice_id: slice id of snssai to add.
     :param slice_type: slice type of snssai to add.
     :return: new snassai otherwise raise an error.
@@ -42,6 +42,8 @@ def add_dnn_dnns(config: Baseconfig, dnn_name: str, dnn_cidr: str) -> Optional[D
     """
     Add "dnn" to OAI values configuration.
     :param config: config to add dnn.
+    :param dnn_name: name of dnn.
+    :param dnn_cidr: cidr of dnn.
     :return: new dnn otherwise None.
     """
     new_dnn = Dnn(
@@ -158,6 +160,7 @@ def add_host_aliases(config: OaiSmf, area_id: int, ip_upf: str) -> HostAliase:
     Add new "host alias" to OAI SMF configuration.
     :param config: config to add host alias to.
     :param area_id: area id of upf.
+    :param ip_upf: ip of upf.
     :return: new host alias, raise an error otherwise.
     """
     new_hostalias = HostAliase(

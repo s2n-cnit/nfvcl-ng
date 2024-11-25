@@ -53,7 +53,6 @@ class PDUProvider(BlueprintNGProviderInterface):
             area: Area of the PDU
             pdu_type: Type of the PDU
             instance_type: Instance type of the PDU, optional
-            name: Name of the PDU, optional, may be needed if there are multiple PDUs of the same type in the same area
 
         Returns: List of PDUs that match the search parameters
         """

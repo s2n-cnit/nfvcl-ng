@@ -113,7 +113,7 @@ class HelmPluginManager:
     def install_plugins(self, plugin_names: list[K8sPluginName], plugin_data: K8sPluginAdditionalData):
         """
         Args:
-            plugin_names_copy: list[K8sPluginName]: List of plugin names to be installed.
+            plugin_names: list[K8sPluginName]: List of plugin names to be installed.
             plugin_data: K8sPluginAdditionalData: Additional data required for installing the plugins.
         """
         plugin_names_copy = plugin_names.copy()

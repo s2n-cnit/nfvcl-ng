@@ -1,5 +1,8 @@
 from __future__ import annotations
 from typing import List
+
+from pydantic import Field
+
 from nfvcl.models.blueprint_ng.vyos.vyos_models import VyOSDestNATRule, VyOSSourceNATRule, VyOS1to1NATRule
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
@@ -12,10 +15,10 @@ class VmVyOSNatConfigurator(VmResourceAnsibleConfiguration):
 
     The fields in this class will be saved to the DB and can be used to customize the configuration at runtime
     """
-    task_list: List[AnsibleTaskDescription] = []
-    nat_rules: List[int] = []
-    applied_snat_rules: List[VyOSSourceNATRule] = []
-    applied_dnat_rules: List[VyOSDestNATRule] = []
+    task_list: List[AnsibleTaskDescription] = Field(default_factory=list)
+    nat_rules: List[int] = Field(default_factory=list)
+    applied_snat_rules: List[VyOSSourceNATRule] = Field(default_factory=list)
+    applied_dnat_rules: List[VyOSDestNATRule] = Field(default_factory=list)
 
     def dump_playbook(self) -> str:
         """

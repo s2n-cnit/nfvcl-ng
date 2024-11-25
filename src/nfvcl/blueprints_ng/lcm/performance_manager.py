@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import datetime
 import uuid
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from pymongo import MongoClient
@@ -113,7 +113,7 @@ class PerformanceManager:
             blueprint_id: ID of the blueprint
             blueprint_type: The type of the blueprint
         """
-        blueprint_performance = BlueprintPerformance(blueprint_id=blueprint_id, start=datetime.datetime.utcnow(), blueprint_type=blueprint_type)
+        blueprint_performance = BlueprintPerformance(blueprint_id=blueprint_id, start=datetime.now(timezone.utc), blueprint_type=blueprint_type)
         self.performance_dict[blueprint_id] = blueprint_performance
 
     def start_operation(self, blueprint_id: str, operation_type: BlueprintPerformanceType, op_name: str) -> Optional[str]:
@@ -130,7 +130,7 @@ class PerformanceManager:
             logger.warning("Skipping operation performance for unknown blueprint")
             return None
         op_id = str(uuid.uuid4())
-        blueprint_operation = BlueprintPerformanceOperation(id=op_id, op_name=op_name, type=operation_type, start=datetime.datetime.utcnow())
+        blueprint_operation = BlueprintPerformanceOperation(id=op_id, op_name=op_name, type=operation_type, start=datetime.now(timezone.utc))
         self.performance_dict[blueprint_id].operations.append(blueprint_operation)
         self.operations[op_id] = blueprint_operation
         if blueprint_id in self.pending_operations:
@@ -156,7 +156,7 @@ class PerformanceManager:
         if operation is None:
             logger.warning("Skipping operation performance for unknown operation or blueprint")
             return
-        operation.end = datetime.datetime.utcnow()
+        operation.end = datetime.now(timezone.utc)
         operation.duration = round((operation.end - operation.start).total_seconds() * 1000)
         del self.pending_operations[blueprint_id]
         self._persist_to_db()
@@ -176,7 +176,7 @@ class PerformanceManager:
             return None
         provider_call_id = str(uuid.uuid4())
         operation = self.operations[operation_id]
-        blueprint_performance_provider_call = BlueprintPerformanceProviderCall(id=provider_call_id, method_name=method_name, info=info, start=datetime.datetime.utcnow())
+        blueprint_performance_provider_call = BlueprintPerformanceProviderCall(id=provider_call_id, method_name=method_name, info=info, start=datetime.now(timezone.utc))
         self.provider_calls[provider_call_id] = blueprint_performance_provider_call
         operation.provider_calls.append(blueprint_performance_provider_call)
         return provider_call_id
@@ -191,5 +191,5 @@ class PerformanceManager:
             logger.warning("Skipping provider call performance for unknown operation")
             return
         provider_call = self.provider_calls[provider_call_id]
-        provider_call.end = datetime.datetime.utcnow()
+        provider_call.end = datetime.now(timezone.utc)
         provider_call.duration = round((provider_call.end - provider_call.start).total_seconds() * 1000)

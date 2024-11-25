@@ -12,8 +12,9 @@ from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourc
 from nfvcl.blueprints_ng.utils import rel_path
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
-    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, Route
+    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim
 from nfvcl.models.http_models import HttpRequestType
+from nfvcl.models.linux.ip import Route
 from nfvcl.models.network import PduModel
 from nfvcl.models.network.network_models import PduType
 from nfvcl.models.pdu.gnb import GNBPDUConfigure

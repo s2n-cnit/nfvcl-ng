@@ -44,7 +44,6 @@ class K8sCreateModel(BlueprintNGCreateModel):
     areas: List[K8sAreaDeployment] = Field(min_length=1, description="List of areas in witch deployment is made (with requirements)")
 
     @field_validator('areas')
-    @classmethod
     def check_areas(cls, areas: List[K8sAreaDeployment]) -> List[K8sAreaDeployment]:
         if isinstance(areas, list):
             master_areas = [area for area in areas if area.is_master_area == True]
@@ -70,7 +69,6 @@ class K8sAddNodeModel(BlueprintNGCreateModel):
     areas: List[K8sAreaDeployment] = Field(min_length=1, description="List of areas in witch deployment is made (with requirements)")
 
     @field_validator('areas')
-    @classmethod
     def check_areas(cls, areas: List[K8sAreaDeployment]) -> List[K8sAreaDeployment]:
         """
         Checks if there is NOT a master area in day2 call

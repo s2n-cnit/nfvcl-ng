@@ -18,7 +18,6 @@ class NFVCLParameters(NFVCLBaseModel):
         validate_assignment = True
 
     @field_validator('ip', mode='before')
-    @classmethod
     def validate_ip(cls, ip: str):
         if ip is None or len(ip) == 0:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -37,7 +36,6 @@ class NFVCLParameters(NFVCLBaseModel):
             return ip
 
     @field_validator('port', mode='before')
-    @classmethod
     def validate_port(cls, port: int):
         if isinstance(port, str):
             try:
@@ -60,7 +58,6 @@ class MongoParameters(NFVCLBaseModel):
         validate_assignment = True
 
     @field_validator('port', mode='before')
-    @classmethod
     def validate_mongo_port(cls, port: int):
         if isinstance(port, str):
             try:
@@ -72,14 +69,12 @@ class MongoParameters(NFVCLBaseModel):
         return port
 
     @field_validator('host', mode='before')
-    @classmethod
     def validate_mongo_host(cls, host: int):
         if isinstance(host, str):
             return host
         raise ValueError(f"Config decode error for Mongo DB host: >{host}< is not a valid string.")
 
     @field_validator('db', mode='before')
-    @classmethod
     def check_parameters(cls, db):
         if not isinstance(db, str):
             raise ValueError(f"Config decode error for Mongo DB name: >{db}< is not a valid string.")
@@ -94,7 +89,6 @@ class RedisParameters(NFVCLBaseModel):
         validate_assignment = True
 
     @field_validator('port', mode='before')
-    @classmethod
     def validate_redis_port(cls, port: int):
         if isinstance(port, str):
             try:
@@ -106,7 +100,6 @@ class RedisParameters(NFVCLBaseModel):
         return port
 
     @field_validator('host', mode='before')
-    @classmethod
     def validate_redis_host(cls, host: int):
         if isinstance(host, str):
             return host

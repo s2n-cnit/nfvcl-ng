@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from typing import List
 
+from pydantic import Field
+
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterfaceAddress
 from nfvcl.models.blueprint_ng.vyos.vyos_models import AnsibleVyOSInterface, AnsibleVyOSL3Interface
 
 
 class VmVyOSDay0Configurator(VmResourceAnsibleConfiguration):
-    task_list: List[AnsibleTaskDescription] = []
-    vars_to_be_collected: List[str] = []
+    task_list: List[AnsibleTaskDescription] = Field(default_factory=list)
+    vars_to_be_collected: List[str] = Field(default_factory=list)
     """
     This class is an example for an Ansible configurator for a VM
 

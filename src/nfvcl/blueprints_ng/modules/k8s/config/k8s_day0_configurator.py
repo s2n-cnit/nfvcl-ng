@@ -1,12 +1,12 @@
 import textwrap
 
-from pydantic import IPvAnyNetwork
 from ruamel.yaml.scalarstring import LiteralScalarString
+
 from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
 from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.models.network.ipam_models import SerializableIPv4Network
 from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import KarmadaInstallModel
+from nfvcl.models.network.ipam_models import SerializableIPv4Network
 
 
 class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):

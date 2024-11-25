@@ -21,14 +21,14 @@ class TopoK8SNotFoundException(Exception):
 class TopologyModel(BaseModel):
     id: Optional[str] = Field(default='topology')
     callback: Optional[HttpUrl] = Field(default=None)
-    vims: List[VimModel] = []
-    kubernetes: List[TopologyK8sModel] = []
-    networks: List[NetworkModel] = []
-    routers: List[RouterModel] = []
-    pdus: List[PduModel] = []
+    vims: List[VimModel] = Field(default_factory=list)
+    kubernetes: List[TopologyK8sModel] = Field(default_factory=list)
+    networks: List[NetworkModel] = Field(default_factory=list)
+    routers: List[RouterModel] = Field(default_factory=list)
+    pdus: List[PduModel] = Field(default_factory=list)
     # "The list of prometheus server that can be used by the NFVCL (blueprints) to pull data from node exporter" \
     # " installed deployed services. When needed the NFVCL will add a new job to the server in order to pull data."
-    prometheus_srv: List[PrometheusServerModel] = Field(default=[])
+    prometheus_srv: List[PrometheusServerModel] = Field(default_factory=list)
 
     def add_prometheus_srv(self, prom_srv: PrometheusServerModel):
         """

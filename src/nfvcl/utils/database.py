@@ -101,8 +101,8 @@ class NFVCLDatabase:
                 local_database[collection_info['name']].append(item)
 
         local_file = NFVCL_DB_BACKUP_PATH
-        with local_file.open('w') as local_file_opened:
-            json.dump(local_database, local_file_opened)
+        with open(local_file, 'w') as local_file_opened:
+            local_file_opened.write(json.dumps(local_database))
 
 
 def get_ng_blue_list(blueprint_type: str = None) -> List[dict]:

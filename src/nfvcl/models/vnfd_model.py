@@ -97,7 +97,6 @@ class VNFSol006Descriptor(NFVCLBaseModel):
     k8s_cluster: Optional[KDUcluster] = Field(alias='k8s-cluster', default=None)
 
     @field_serializer('kdu', 'vdu', 'df', 'ext_cpd', 'sw_image_desc', 'virtual_compute_desc', 'virtual_storage_desc')
-    @classmethod
     def serialize_dt(cls, list_to_ser: List, _info):
         """
         If the list is empty return None such that when the model is serialized -> Empty list are not included in the

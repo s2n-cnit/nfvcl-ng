@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import Field
 
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl.blueprints_ng.modules.athonet.athonet_upf_blue import ATHONET_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState
 from nfvcl.models.blueprint_ng.Athonet.core import ProvisionedDataInfo, AthonetApplicationCoreConfig
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubSubscribers, SubArea, SubDataNets, SubSnssai
@@ -29,14 +30,11 @@ class AthonetCoreBlueprintNGState(Generic5GBlueprintNGState):
 
 @blueprint_type(ATHONET_BLUE_TYPE)
 class AthonetCore(Generic5GBlueprintNG[AthonetCoreBlueprintNGState, Create5gModel]):
+    default_upf_implementation = ATHONET_UPF_BLUE_TYPE
+    router_needed = False
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GBlueprintNGState] = AthonetCoreBlueprintNGState):
-        """
-        Don't write code in the init method, this will be called every time the blueprint is loaded from the DB.
-
-        """
         super().__init__(blueprint_id, state_type)
-        self.router_needed = False
 
     def create_5g(self, create_model: Create5gModel):
         if len(self.state.current_config.areas) > 1:

@@ -11,6 +11,7 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBl
     NF5GType
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_default_config import default_config
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_values_model import SDCoreValuesModel, SimAppYamlConfiguration
+from nfvcl.blueprints_ng.modules.sdcore_upf.sdcore_upf_blueprint import SDCORE_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.resources import HelmChartResource
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
 
@@ -25,6 +26,8 @@ class SdCoreBlueprintNGState(Generic5GK8sBlueprintNGState):
 
 @blueprint_type("sdcore")
 class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateModel]):
+    default_upf_implementation = SDCORE_UPF_BLUE_TYPE
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = SdCoreBlueprintNGState):
         super().__init__(blueprint_id, state_type)
 

@@ -63,9 +63,11 @@ ROUTER_ADD_ROUTES = "add_routes"
 
 
 class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel], Generic[StateTypeVar5G, CreateConfigTypeVar5G]):
+    router_needed: bool = True
+    default_upf_implementation: Optional[str] = None
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GBlueprintNGState] = StateTypeVar5G):
         super().__init__(blueprint_id, state_type)
-        self.router_needed = True
 
     @property
     def state(self) -> StateTypeVar5G:
@@ -162,7 +164,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                     self.state.edge_areas[str(area.id)].router = router_info
 
                 # UPF deployment for this area
-                upf_info = self.deploy_upf_blueprint(area.id, area.upf.type)
+                upf_info = self.deploy_upf_blueprint(area.id, area.upf.type if area.upf.type else self.default_upf_implementation)
                 self.state.edge_areas[str(area.id)].upf = upf_info
             else:
                 # The edge area is already deployed but MAY need to be updated with a new configuration

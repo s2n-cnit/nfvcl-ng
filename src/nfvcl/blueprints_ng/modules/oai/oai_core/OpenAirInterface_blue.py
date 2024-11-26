@@ -10,6 +10,7 @@ from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGException
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
+from nfvcl.blueprints_ng.modules.oai.oai_upf.OpenAirInterfaceUpf_blue import OAI_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.resources import HelmChartResource
 from nfvcl.models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, OaiCoreValuesModel, \
     SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile
@@ -53,6 +54,8 @@ class OAIBlueprintNGState(Generic5GK8sBlueprintNGState):
 
 @blueprint_type(OAI_CORE_BLUE_TYPE)
 class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
+    default_upf_implementation = OAI_UPF_BLUE_TYPE
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = OAIBlueprintNGState):
         """
         Don't write code in the init method, this will be called every time the blueprint is loaded from the DB.

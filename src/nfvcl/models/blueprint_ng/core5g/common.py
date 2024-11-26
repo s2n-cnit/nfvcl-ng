@@ -115,7 +115,7 @@ class SubAreaNetwork(BaseModel):
     external_router: Optional[Router5GNetworkInfo] = Field(default=None)
 
 class SubAreaUPF(BaseModel):
-    type: str = Field()
+    type: Optional[str] = Field(default=None)
     external: Optional[bool] = Field(default=False)
 
 class SubAreaGNB(NFVCLBaseModel):
@@ -128,7 +128,7 @@ class SubArea(BaseModel):
     idLength: int
     core: bool = Field(default=True)
     gnb: Optional[SubAreaGNB] = Field(default_factory=SubAreaGNB)
-    upf: SubAreaUPF = Field()
+    upf: Optional[SubAreaUPF] = Field(default_factory=SubAreaUPF)
     networks: SubAreaNetwork = Field()
     slices: Optional[List[SubSlices]] = Field(default=[], description="set slices ")
 

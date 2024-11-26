@@ -8,6 +8,7 @@ from pydantic import Field
 
 from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_core_config, free5gc_subscriber_config
+from nfvcl.blueprints_ng.modules.free5gc.free5gc_upf.Free5gcUpf_blue import FREE5GC_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNGState, Generic5GK8sBlueprintNG
 from nfvcl.blueprints_ng.resources import HelmChartResource
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubArea, SubSliceProfiles, SubSubscribers, SubDataNets, SstConvertion
@@ -53,6 +54,8 @@ class Free5gcBlueprintNGState(Generic5GK8sBlueprintNGState):
 
 @blueprint_type(FREE5GC_CORE_BLUE_TYPE)
 class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreateModel]):
+    default_upf_implementation = FREE5GC_UPF_BLUE_TYPE
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = Free5gcBlueprintNGState):
         """
         Don't write code in the init method, this will be called every time the blueprint is loaded from the DB.

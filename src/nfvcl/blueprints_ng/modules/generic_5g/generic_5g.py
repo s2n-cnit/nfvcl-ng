@@ -10,6 +10,7 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInf
 from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel, Router5GCreateModelNetworks, \
     Router5GAddRouteModel
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
+from nfvcl.blueprints_ng.resources import NetResource
 from nfvcl.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
     SstConvertion, Router5GNetworkInfo, SubDataNets
@@ -158,6 +159,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                 if self.router_needed:
                     router_info: Router5GInfo
                     if not area.networks.external_router:
+                        self._create_upf_data_networks(area.id)
                         router_info = self.deploy_router_blueprint(area.id)
                     else:
                         router_info = Router5GInfo(external=True, network=area.networks.external_router)
@@ -201,6 +203,28 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
             # Delete edge area from state
             del self.state.edge_areas[edge_area_id]
+
+    def _create_upf_data_networks(self, area_id: int):
+        """
+        Create the data networks for the UPF in the given area if not overridden by the user
+        Args:
+            area_id: Area id
+        """
+        area = self.state.current_config.get_area(area_id)
+        if not area.networks.n3:
+            n3_net_name = f"{self.id}_{area_id}_n3"
+            network = NetResource(area=area_id, name=n3_net_name, cidr=f"10.{168 + area_id}.3.0/24")
+            self.register_resource(network)
+            self.provider.create_net(network)
+            area.networks.n3 = n3_net_name
+            self.to_db()
+        if not area.networks.n6:
+            n6_net_name = f"{self.id}_{area_id}_n6"
+            network = NetResource(area=area_id, name=n6_net_name, cidr=f"10.{168 + area_id}.6.0/24")
+            self.register_resource(network)
+            self.provider.create_net(network)
+            area.networks.n6 = n6_net_name
+            self.to_db()
 
     def deploy_router_blueprint(self, area_id: int) -> Router5GInfo:
         """

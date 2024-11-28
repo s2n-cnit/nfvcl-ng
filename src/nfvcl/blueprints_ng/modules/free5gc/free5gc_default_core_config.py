@@ -4,7 +4,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
     {
         "global": {
             "name": "free5gc",
-            "userPlaneArchitecture": "single",
+            "userPlaneArchitecture": "ulcl",
             "nrf": {
                 "service": {
                     "name": "nrf-nnrf",
@@ -60,8 +60,8 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                         "nnrf-nfm",
                         "nnrf-disc"
                     ],
-                    "oauthConfiguration":{
-                      "oauth": True
+                    "oauthConfiguration": {
+                        "oauth": False
                     },
                     "configuration": {
                         "DefaultPlmnId": {
@@ -254,6 +254,9 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                                 "dnnInfos": [
                                     {
                                         "dnn": "internet",
+                                        "dnaiList": [
+                                            "mec"
+                                        ],
                                         "dns": {
                                             "ipv4": "8.8.8.8"
                                         }
@@ -525,8 +528,6 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "free5gc-udr": {
             "udr": {
                 "configuration": {
-                    "serviceNameList": None,
-                    "configuration": None,
                     "logger": {
                         "enable": True,
                         "level": "info",
@@ -543,5 +544,25 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                     ]
                 }
             }
+        },
+        "free5gc-nef": {
+            "nef": {
+                "configuration": {
+                    "serviceList": [
+                        {
+                            "serviceName": "nnef-pfdmanagement"
+                        },
+                        {
+                            "serviceName": "nnef-oam"
+                        }
+                    ]
+                },
+                "logger": {
+                    "enable": True,
+                    "level": "info",
+                    "reportCaller": False
+                }
+            }
         }
+
     })

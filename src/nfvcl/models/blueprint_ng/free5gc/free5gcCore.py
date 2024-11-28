@@ -54,6 +54,7 @@ class N4if(NFVCLBaseModel):
 class Smf(NFVCLBaseModel):
     n4if: N4if
 
+
 class Global(NFVCLBaseModel):
     name: str
     user_plane_architecture: str = Field(..., alias='userPlaneArchitecture')
@@ -113,6 +114,7 @@ class Free5gcCoreConfig(NFVCLBaseModel):
     free5gc_udm: Free5gcUdm = Field(..., alias='free5gc-udm')
     free5gc_udr: Free5gcUdr = Field(..., alias='free5gc-udr')
     free5gc_chf: Free5gcChf = Field(..., alias='free5gc-chf')
+    free5gc_nef: Free5gcNef = Field(..., alias='free5gc-nef')
 
     ###############################################################################
     ##################################### GLOBAL ##################################
@@ -664,6 +666,7 @@ class DnnInfo(NFVCLBaseModel):
 class SnssaiInfo(NFVCLBaseModel):
     s_nssai: Snssai = Field(..., alias='sNssai')
     dnn_infos: List[DnnInfo] = Field(..., alias='dnnInfos')
+    dnaiList: List[str] = Field(default=["mec"], alias='dnaiList')
 
 
 class GNb(NFVCLBaseModel):
@@ -1258,7 +1261,9 @@ class UdrConfiguration(NFVCLBaseModel):
 
 
 class ConfigurationUdr(NFVCLBaseModel):
-    pass
+    service_name_list: Optional[List[str]] = Field(default_factory=list, alias='serviceNameList')
+    udr_configuration: Optional[UdrConfiguration] = Field(default=None, alias='serviceNameList')
+    logger: Logger
 
 
 class Udr(NFVCLBaseModel):
@@ -1281,6 +1286,22 @@ class Chf(NFVCLBaseModel):
 
 class Free5gcChf(NFVCLBaseModel):
     chf: Chf
+
+
+################################################ NEF ######################################################
+
+
+class ConfigurationNef(NFVCLBaseModel):
+    service_list: List[ServiceListItem] = Field(..., alias='serviceList')
+
+
+class Nef(NFVCLBaseModel):
+    configuration: ConfigurationNef
+    logger: Logger
+
+
+class Free5gcNef(NFVCLBaseModel):
+    nef: Nef
 
 
 ################################################ API ######################################################

@@ -2,7 +2,7 @@ version: '3.8'
 services:
   free5gc-upf{{ upf_id }}:
     container_name: upf{{ upf_id }}
-    image: free5gc/upf:v3.4.3
+    image: free5gc/upf:v3.4.4
     restart: on-failure
     command: bash -c "./upf-iptables.sh && ./upf -c ./config/upfcfg.yaml"
     volumes:

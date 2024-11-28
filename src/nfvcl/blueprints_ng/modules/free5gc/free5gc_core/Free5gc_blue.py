@@ -90,7 +90,7 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
             area=core_area.id,
             name="free5gc",
             # repo="https://mysql.github.io/mysql-operator/",
-            chart="helm_charts/charts/free5gc-3.4.2.tgz",
+            chart="helm_charts/charts/free5gc-3.4.4.tgz",
             chart_as_path=True,
             # version="9.19.1",
             namespace=self.id

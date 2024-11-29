@@ -660,13 +660,13 @@ class Dns(NFVCLBaseModel):
 
 class DnnInfo(NFVCLBaseModel):
     dnn: str
+    dnaiList: List[str] = Field(default=["mec"], alias='dnaiList')
     dns: Dns
 
 
 class SnssaiInfo(NFVCLBaseModel):
     s_nssai: Snssai = Field(..., alias='sNssai')
     dnn_infos: List[DnnInfo] = Field(..., alias='dnnInfos')
-    dnaiList: List[str] = Field(default=["mec"], alias='dnaiList')
 
 
 class GNb(NFVCLBaseModel):

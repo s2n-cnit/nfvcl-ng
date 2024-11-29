@@ -67,7 +67,7 @@ class PerformanceManager:
         """
         blueprints_to_load = self.blue_inst_collection.find()
         for blueprint_to_load in blueprints_to_load:
-            element = self.performance_collection.find_one({"blueprint_id": blueprint_to_load["id"]})
+            element = self.performance_collection.find_one({"blueprint_id": blueprint_to_load["id"]}, {"_id": False})
             if element:
                 self.performance_dict[element['blueprint_id']] = BlueprintPerformance.model_validate(element)
                 logger.debug(f"Loaded performances for blueprint {element['blueprint_id']}")
@@ -89,7 +89,7 @@ class PerformanceManager:
 
         Returns: A BlueprintPerformance instance for the blueprint
         """
-        element = self.performance_collection.find_one({"blueprint_id": blueprint_id})
+        element = self.performance_collection.find_one({"blueprint_id": blueprint_id}, {"_id": False})
         if element:
             return BlueprintPerformance.model_validate(element)
         raise ValueError(f"No performance metrics found for blueprint '{blueprint_id}'")

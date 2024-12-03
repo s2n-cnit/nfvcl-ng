@@ -1,5 +1,5 @@
 from fastapi import APIRouter, status, HTTPException
-from nfvcl.models.blueprint.blueprint_base_model import BlueprintBaseModel
+from nfvcl.models.blueprint.blueprint_base_model import BlueprintBaseModel # TODO remove
 from nfvcl.models.k8s.blueprint_k8s_model import K8sBlueprintModel
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sModelCreateFromBlueprint
 from nfvcl.models.prometheus.prometheus_model import PrometheusServerModel
@@ -342,7 +342,7 @@ async def add_k8s_from_blueprint(cluster_info: K8sModelCreateFromBlueprint):
     if not blue_item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Blueprint {} not found'.format(cluster_info.blueprint_ref))
-    blue_obj = BlueprintBaseModel.model_validate(blue_item)
+    blue_obj = BlueprintBaseModel.model_validate(blue_item) # TODO must update with new Blueprint model from NG
     # Checking the blueprint type
     if blue_obj.type not in ['K8sBeta']:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Blueprint {} is not a Kubernetes cluster'

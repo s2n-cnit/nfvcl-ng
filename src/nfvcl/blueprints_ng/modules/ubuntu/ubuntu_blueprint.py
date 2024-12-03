@@ -10,8 +10,8 @@ from nfvcl.models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuCreateMode
 UBUNTU_BLUE_TYPE = "ubuntu"
 UBU22_IMAGE_NAME = "ubuntu-lab-22"
 UBU24_IMAGE_NAME = "ubuntu-lab-24"
-UBU22_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.0.5-ubuntu2204.qcow2"
-UBU24_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.0.5-ubuntu2404.qcow2"
+UBU22_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.1-ubuntu2204.qcow2"
+UBU24_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.1-ubuntu2404.qcow2"
 UBUNTU_DEFAULT_PASSWORD = "ubuntu"
 
 class UbuntuBlueprintNGState(BlueprintNGState):

@@ -44,13 +44,13 @@ Or maybe a Blueprint that creates only inter-connected Virtual Machines
 Getting started
 ***************
 
-In order to be able to deploy Blueprints you will need to
+In order to be able to deploy Blueprints you will need to:
 
 #. Create the Topology information (You can find a general description here :doc:`topology/topology`, :doc:`topology/topology_creation`)
 
     A. Including at least 1 VIM where VMs are deployed
 
-    B. Including at least 1 K8S clusters where Helm Charts are deployed (The cluster can be generated and added later using the dedicated K8S blueprint)
+    B. Including at least 1 K8S clusters where Helm Charts are deployed (The cluster can be generated using the dedicated K8S blueprint that does not require a K8S Cluster to be present in the Topology)
 
 #. Set up the VIM :doc:`topology/topology_vim`
 
@@ -76,8 +76,10 @@ Configuration of Virtual Machines
 Prometheus scraping
 *******************
 Prometheus is used as metrics database. Once a Prometheus server as been added to the Topology, it can be used by the NFVCL:
-- The NFVCL install exporters on supported Blueprints.
-- Edit the Prometheus configuration to scrape from all the installed exporters
+
+    - The NFVCL install exporters on supported Blueprints.
+
+    - Edit the Prometheus configuration to scrape from all the installed exporters
 
 For more details you can go to :doc:`prometheus/prometheus`
 

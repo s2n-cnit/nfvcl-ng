@@ -1,3 +1,5 @@
+.. contents::
+
 ====================
 Blueprint
 ====================
@@ -67,8 +69,8 @@ Blueprint Type List
      - 2
    * - :doc:`free5gc/free5gc_blue_index`
      - 5G Core
-     - K8s cluster onboarded in OSM + VIM
-     - 1
+     - K8s in topology + VIM
+     - 2
    * - :doc:`5gcores/openairinterface/openairinterface_blue_index`
      - :doc:`5gcores/5gcore_blue_index`
      - K8s in topology + VIM
@@ -85,14 +87,19 @@ Blueprint Type List
      - gNodeB and UE emulator
      - VIM
      - 2
+   * - Ubuntu Blueprint
+     - Creates a VM running Ubuntu 22/24
+     - VIM
+     - 2
+
 
 Blueprint LCM Management
 ++++++++++++++++++++++++
 This section describes how the NFVCL user can use the Blueprint system to deploy, manage and destroy Blueprints.
 The specific guide for APIs is found in the Blueprint dedicated page and in the NFVCL API swagger.
 
-Blueprint creation
-******************
+Blueprint deployment/instantiation
+**********************************
 The deployment of a Blueprint can result into the deployment of one or more VM/Helm-Chart.
 To deploy VMs a VIM is required to be present in the Topology, while, for the deployment of a Helm Chart a K8S cluster is
 needed in the Topology.
@@ -100,6 +107,7 @@ The K8S cluster can be deployed on VMs using the dedicated Blueprint (K8S) or ca
 cluster to the topology.
 
 To instantiate a blueprint it is sufficient to call a POST API, each blueprint has the dedicated call for its creation.
+**For further details** please see the specific Blueprint dedicated page.
 
 Blueprint day 2 operation
 *************************

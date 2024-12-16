@@ -12,9 +12,6 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
         "http_version": 2,
         "snssais": [
             {
-                "sst": 1
-            },
-            {
                 "sst": 1,
                 "sd": "FFFFFF"
             }
@@ -112,14 +109,21 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
         "upf": {
             "support_features": {
                 "enable_bpf_datapath": "no",
-                "enable_snat": "yes"
+                "enable_snat": "yes",
+                "enable_qos": "no"
             },
-            "remote_n6_gw": "127.0.0.1",
+            "remote_n6_gw": "localhost",
+            "smfs": [
+                {
+                    "host": ""
+                }
+            ],
             "upf_info": {
                 "sNssaiUpfInfoList": [
                     {
                         "sNssai": {
-                            "sst": 1
+                            "sst": 1,
+                            "sd": "FFFFFF"
                         },
                         "dnnUpfInfoList": [
                             {
@@ -145,12 +149,12 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
             {
                 "dnn": "oai",
                 "pdu_session_type": "IPV4",
-                "ipv4_subnet": "12.1.1.0/24"
+                "ipv4_subnet": "10.1.0.0/24"
             },
             {
                 "dnn": "ims",
                 "pdu_session_type": "IPV4V6",
-                "ipv4_subnet": "14.1.1.0/24"
+                "ipv4_subnet": "10.2.0.0/24"
             }
         ]
     }

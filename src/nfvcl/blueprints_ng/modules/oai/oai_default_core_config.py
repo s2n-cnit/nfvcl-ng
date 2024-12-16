@@ -3,9 +3,11 @@ from nfvcl.models.blueprint_ng.core5g.OAI_Models import OaiCoreValuesModel
 # Class rappresenting default config, it will be overwritten with the input one
 default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
     "global": {
-        "nfConfigurationConfigMap": "oai-5g-basic",
+        "kubernetesDistribution": "Vanilla",
+        "coreNetworkConfigMap": "oai-5g-basic",
         "clusterIpServiceIpAllocation": True,
         "waitForNRF": True,
+        "waitForUDR": True,
         "http2Param": "--http2-prior-knowledge",
         "timeout": 1
     },
@@ -13,11 +15,6 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
         "enabled": True,
         "imagePullPolicy": "IfNotPresent",
         "oai5gdatabase": "basic",
-        "service": {
-            "annotations": {},
-            "type": "LoadBalancer",
-            "port": 3306
-        },
         "imagePullSecrets": [
             {
                 "name": "regcred"
@@ -29,13 +26,46 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
     },
     "oai-nrf": {
         "enabled": True,
-        "kubernetesType": "Vanilla",
         "nfimage": {
             "repository": "docker.io/oaisoftwarealliance/oai-nrf",
-            "version": "v2.0.0",
+            "version": "v2.1.0",
             "pullPolicy": "IfNotPresent"
         },
         "includeTcpDumpContainer": False,
+        "persistent": {
+            "sharedvolume": False,
+            "storageClass": "-",
+            "size": "1Gi"
+        },
+        "start": {
+            "nrf": True,
+            "tcpdump": False
+        },
+        "imagePullSecrets": [
+            {
+                "name": "regcred"
+            }
+        ],
+        "config": {
+            "logLevel": "debug"
+        },
+        "nodeSelector": {}
+    },
+    "oai-lmf": {
+        "enabled": True,
+        "nfimage": {
+            "repository": "docker.io/oaisoftwarealliance/oai-lmf",
+            "version": "v2.1.0",
+            "pullPolicy": "IfNotPresent"
+        },
+        "includeTcpDumpContainer": False,
+        "persistent": {
+            "sharedvolume": False
+        },
+        "start": {
+            "lmf": True,
+            "tcpdump": False
+        },
         "imagePullSecrets": [
             {
                 "name": "regcred"
@@ -48,13 +78,19 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
     },
     "oai-udr": {
         "enabled": True,
-        "kubernetesType": "Vanilla",
         "nfimage": {
             "repository": "docker.io/oaisoftwarealliance/oai-udr",
-            "version": "v2.0.0",
+            "version": "v2.1.0",
             "pullPolicy": "IfNotPresent"
         },
         "includeTcpDumpContainer": False,
+        "persistent": {
+            "sharedvolume": False
+        },
+        "start": {
+            "udr": True,
+            "tcpdump": False
+        },
         "imagePullSecrets": [
             {
                 "name": "regcred"
@@ -67,13 +103,19 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
     },
     "oai-udm": {
         "enabled": True,
-        "kubernetesType": "Vanilla",
         "nfimage": {
             "repository": "docker.io/oaisoftwarealliance/oai-udm",
-            "version": "v2.0.0",
+            "version": "v2.1.0",
             "pullPolicy": "IfNotPresent"
         },
         "includeTcpDumpContainer": False,
+        "persistent": {
+            "sharedvolume": False
+        },
+        "start": {
+            "udm": True,
+            "tcpdump": False
+        },
         "imagePullSecrets": [
             {
                 "name": "regcred"
@@ -86,18 +128,27 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
     },
     "oai-ausf": {
         "enabled": True,
-        "kubernetesType": "Vanilla",
         "nfimage": {
             "repository": "docker.io/oaisoftwarealliance/oai-ausf",
-            "version": "v2.0.0",
+            "version": "v2.1.0",
             "pullPolicy": "IfNotPresent"
         },
         "includeTcpDumpContainer": False,
+        "persistent": {
+            "sharedvolume": False
+        },
+        "start": {
+            "ausf": True,
+            "tcpdump": False
+        },
         "imagePullSecrets": [
             {
                 "name": "regcred"
             }
         ],
+        "securityContext": {
+            "privileged": False
+        },
         "config": {
             "logLevel": "debug"
         },
@@ -105,80 +156,67 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
     },
     "oai-amf": {
         "enabled": True,
-        "kubernetesType": "Vanilla",
         "nfimage": {
             "repository": "docker.io/oaisoftwarealliance/oai-amf",
             "version": "v2.0.0",
             "pullPolicy": "IfNotPresent"
         },
         "includeTcpDumpContainer": False,
+        "persistent": {
+            "sharedvolume": False
+        },
+        "start": {
+            "amf": True,
+            "tcpdump": False
+        },
         "imagePullSecrets": [
             {
                 "name": "regcred"
             }
         ],
-        "multus": {
-            "defaultGateway": "",
-            "n2Interface": {
-                "create": False,
-                "Ipadd": "172.21.6.94",
-                "Netmask": "22",
-                "Gateway": None,
-                "routes": [
-                    {
-                        "dst": "10.8.0.0/24",
-                        "gw": "172.21.7.254"
-                    }
-                ],
-                "hostInterface": "bond0"
-            }
+        "securityContext": {
+            "privileged": False
+        },
+        "config": {
+            "logLevel": "debug"
         },
         "nodeSelector": {}
     },
     "oai-smf": {
         "enabled": True,
-        "kubernetesType": "Vanilla",
         "nfimage": {
             "repository": "docker.io/oaisoftwarealliance/oai-smf",
-            "version": "v2.0.0",
+            "version": "v2.1.0",
             "pullPolicy": "IfNotPresent"
         },
         "includeTcpDumpContainer": False,
-        "hostAliases": [
-            {
-                "ip": "10.180.2.41",
-                "hostnames": "oai-upf"
-            }
-        ],
-        "multus": {
-            "defaultGateway": "",
-            "n4Interface": {
-                "create": False,
-                "Ipadd": "192.168.24.3",
-                "Netmask": "24",
-                "Gateway": "",
-                "hostInterface": "bond0"
-            }
+        "persistent": {
+            "sharedvolume": False
         },
+        "start": {
+            "smf": True,
+            "tcpdump": False
+        },
+        "config": {
+            "logLevel": "debug"
+        },
+        "nodeSelector": {},
         "imagePullSecrets": [
             {
                 "name": "regcred"
             }
-        ],
-        "nodeSelector": {}
+        ]
     },
     "currentconfig": {
         "log_level": {
-            "general": "info"
+            "general": "debug"
         },
         "register_nf": {
             "general": "yes"
         },
         "http_version": 2,
+        "curl_timeout": 6000,
         "snssais": [
-            {
-                "sst": 1
-            },
             {
                 "sst": 1,
                 "sd": "FFFFFF"
@@ -248,6 +286,14 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
                     "interface_name": "eth0"
                 }
             },
+            "lmf": {
+                "host": "oai-lmf",
+                "sbi": {
+                    "port": 80,
+                    "api_version": "v1",
+                    "interface_name": "eth0"
+                }
+            },
             "ausf": {
                 "host": "oai-ausf",
                 "sbi": {
@@ -300,9 +346,6 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
                     "tac": "1",
                     "nssai": [
                         {
-                            "sst": 1
-                        },
-                        {
                             "sst": 1,
                             "sd": "FFFFFF"
                         }
@@ -334,9 +377,9 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
                 }
             ],
             "ue_dns": {
-                "primary_ipv4": "10.3.2.200",
+                "primary_ipv4": "8.8.8.8",
                 "primary_ipv6": "2001:4860:4860::8888",
-                "secondary_ipv4": "8.8.8.8",
+                "secondary_ipv4": "1.1.1.1",
                 "secondary_ipv6": "2001:4860:4860::8888"
             },
             "ims": {
@@ -345,16 +388,6 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
             },
             "smf_info": {
                 "sNssaiSmfInfoList": [
-                    {
-                        "sNssai": {
-                            "sst": 1
-                        },
-                        "dnnSmfInfoList": [
-                            {
-                                "dnn": "oai"
-                            }
-                        ]
-                    },
                     {
                         "sNssai": {
                             "sst": 1,
@@ -371,11 +404,12 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
             "local_subscription_infos": [
                 {
                     "single_nssai": {
-                        "sst": 1
+                        "sst": 1,
+                        "sd": "FFFFFF"
                     },
                     "dnn": "oai",
                     "qos_profile": {
-                        "5qi": 5,
+                        "5qi": 6,
                         "session_ambr_ul": "200Mbps",
                         "session_ambr_dl": "400Mbps"
                     }
@@ -387,23 +421,38 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
                     },
                     "dnn": "ims",
                     "qos_profile": {
-                        "5qi": 2,
+                        "5qi": 5,
                         "session_ambr_ul": "100Mbps",
                         "session_ambr_dl": "200Mbps"
                     }
                 }
             ]
         },
+        "lmf": {
+            "http_threads_count": 8,
+            "gnb_id_bits_count": 28,
+            "num_gnb": 1,
+            "trp_info_wait_ms": 10000,
+            "positioning_wait_ms": 10000,
+            "measurement_wait_ms": 10000,
+            "support_features": {
+                "request_trp_info": "no",
+                "determine_num_gnb": "no",
+                "use_http2": "yes",
+                "use_fqdn_dns": "no",
+                "register_nrf": "yes"
+            }
+        },
         "dnns": [
             {
                 "dnn": "oai",
                 "pdu_session_type": "IPV4",
-                "ipv4_subnet": "12.1.1.0/24"
+                "ipv4_subnet": "10.1.0.0/24"
             },
             {
                 "dnn": "ims",
                 "pdu_session_type": "IPV4V6",
-                "ipv4_subnet": "14.1.1.0/24"
+                "ipv4_subnet": "10.2.0.0/24"
             }
         ]
     }

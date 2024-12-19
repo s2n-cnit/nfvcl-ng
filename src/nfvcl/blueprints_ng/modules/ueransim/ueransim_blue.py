@@ -161,7 +161,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     def _create_gnb(self, area_id: str):
         if area_id not in self.state.areas:
             radio_network_name = f"radio_{self.id}_{area_id}"
-            network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{area_id}.0/24")
+            network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{int(area_id)%256}.0/24")
             self.register_resource(network)
             self.provider.create_net(network)
 

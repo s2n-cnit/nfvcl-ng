@@ -62,11 +62,6 @@ class OAIModelServices(NFVCLBaseModel):
     mysql: K8sService = Field()
 
 
-class SMFHostAliases(NFVCLBaseModel):
-    ip: str = Field()
-    hostnames: str = Field()
-
-
 class DNN(NFVCLBaseModel):
     dnn: str = Field()
     pdu_session_type: str = Field(default="IPv4")
@@ -140,14 +135,17 @@ class Sbi(NFVCLBaseModel):
     interface_name: str
 
 
+class OaiNfs(NFVCLBaseModel):
+    host: str
+    sbi: Sbi
+
+
 class N2(NFVCLBaseModel):
     interface_name: str
     port: int
 
 
-class Amf(NFVCLBaseModel):
-    host: str
-    sbi: Sbi
+class Amf(OaiNfs):
     n2: N2
 
 
@@ -156,9 +154,7 @@ class N4(NFVCLBaseModel):
     port: int
 
 
-class Smf(NFVCLBaseModel):
-    host: str
-    sbi: Sbi
+class Smf(OaiNfs):
     n4: N4
 
 
@@ -176,43 +172,32 @@ class N9(NFVCLBaseModel):
     port: int
 
 
-class Upf(NFVCLBaseModel):
-    host: str
-    sbi: Sbi
+class Upf(OaiNfs):
     n3: N3
     n4: N4
     n6: N6
     n9: N9
 
 
-class Udm(NFVCLBaseModel):
-    host: str
-    sbi: Sbi
-
-
-class Udr(NFVCLBaseModel):
-    host: str
-    sbi: Sbi
-
-
-class Ausf(NFVCLBaseModel):
-    host: str
-    sbi: Sbi
-
-
-class Nrf(NFVCLBaseModel):
-    host: str
-    sbi: Sbi
-
-
-class Nfs(NFVCLBaseModel):
+class CoreNfs(NFVCLBaseModel):
     amf: Amf
     smf: Smf
     upf: Upf
-    udm: Udm
-    udr: Udr
-    ausf: Ausf
-    nrf: Nrf
+    lmf: OaiNfs = Field(alias='lmf')
+    udm: OaiNfs = Field(alias='udm')
+    udr: OaiNfs = Field(alias='udr')
+    ausf: OaiNfs = Field(alias='ausf')
+    nrf: OaiNfs = Field(alias='nrf')
+
+
+class UpfNfs(NFVCLBaseModel):
+    amf: Amf
+    smf: Smf
+    upf: Upf
+    udm: OaiNfs = Field(alias='udm')
+    udr: OaiNfs = Field(alias='udr')
+    ausf: OaiNfs = Field(alias='ausf')
+    nrf: OaiNfs = Field(alias='nrf')
 
 
 class Database(NFVCLBaseModel):
@@ -258,6 +243,24 @@ class Amf1(NFVCLBaseModel):
     supported_encryption_algorithms: List[str]
 
 
+class SupportFeatures(NFVCLBaseModel):
+    request_trp_info: str
+    determine_num_gnb: str
+    use_http2: str
+    use_fqdn_dns: str
+    register_nrf: str
+
+
+class Lmf1(NFVCLBaseModel):
+    http_threads_count: int
+    gnb_id_bits_count: int
+    num_gnb: int
+    trp_info_wait_ms: int
+    positioning_wait_ms: int
+    measurement_wait_ms: int
+    support_features: SupportFeatures
+
+
 class SupportFeaturesSmf(NFVCLBaseModel):
     use_local_subscription_info: str
     use_local_pcc_rules: str
@@ -269,7 +272,7 @@ class Config(NFVCLBaseModel):
 
 class UpfAvailable(NFVCLBaseModel):
     host: str
-    config: Config = Field(default=Config())
+    config: Config = Field(default_factory=Config)
 
 
 class UeDns(NFVCLBaseModel):
@@ -322,6 +325,7 @@ class Smf1(NFVCLBaseModel):
 class SupportFeaturesUpf(NFVCLBaseModel):
     enable_bpf_datapath: str
     enable_snat: str
+    enable_qos: str
 
 
 class SNssaiUpfInfoListItem(NFVCLBaseModel):
@@ -333,9 +337,14 @@ class UpfInfo(NFVCLBaseModel):
     sNssaiUpfInfoList: List[SNssaiUpfInfoListItem]
 
 
+class AvailableSmf(NFVCLBaseModel):
+    host: str
+
+
 class Upf2(NFVCLBaseModel):
     support_features: SupportFeaturesUpf
     remote_n6_gw: str
+    smfs: List[AvailableSmf]
     upf_info: UpfInfo
 
 
@@ -345,42 +354,34 @@ class Dnn(NFVCLBaseModel):
     ipv4_subnet: str
 
 
-class Currentconfig(NFVCLBaseModel):
-    log_level: LogLevel
-    register_nf: RegisterNf
-    http_version: int
-    snssais: List[Snssai]
-    nfs: Nfs
-    database: Database
-    amf: Amf1
-    smf: Smf1
-    upf: Upf2
-    dnns: List[Dnn]
-
-
 class Baseconfig(NFVCLBaseModel):
     log_level: LogLevel
     register_nf: RegisterNf
     http_version: int
     snssais: List[Snssai]
-    nfs: Nfs
     database: Database
     dnns: List[Dnn]
 
 
 class Coreconfig(Baseconfig):
+    nfs: CoreNfs
+    curl_timeout: int
     amf: Amf1
     smf: Smf1
+    lmf: Lmf1
 
 
 class Upfconfig(Baseconfig):
+    nfs: UpfNfs
     upf: Upf2
 
 
 class Global(NFVCLBaseModel):
-    nfConfigurationConfigMap: str
+    kubernetesDistribution: str
+    coreNetworkConfigMap: str
     clusterIpServiceIpAllocation: bool
     waitForNRF: bool
+    waitForUDR: bool
     http2Param: str
     timeout: int
 
@@ -403,14 +404,13 @@ class Mysql(NFVCLBaseModel):
     enabled: bool
     imagePullPolicy: str
     oai5gdatabase: str
-    service: Service
     imagePullSecrets: List[ImagePullSecret]
     persistence: Persistence
 
 
 class Nfimage(NFVCLBaseModel):
     repository: str
-    version: str
+    version: Optional[str] = Field(default=None)
     pullPolicy: str
 
 
@@ -418,157 +418,100 @@ class ConfigPod(NFVCLBaseModel):
     logLevel: str
 
 
-class OaiNrf(NFVCLBaseModel):
-    enabled: bool
-    kubernetesType: str
-    nfimage: Nfimage
-    includeTcpDumpContainer: bool
-    imagePullSecrets: List[ImagePullSecret]
-    config: ConfigPod
-    nodeSelector: Dict[str, Any]
+class Persistent(NFVCLBaseModel):
+    sharedvolume: bool
+    storage_class: Optional[str] = Field(default=None, alias='storageClass')
+    size: Optional[str] = Field(default=None)
 
 
-class OaiUdr(NFVCLBaseModel):
+class OaiNF(NFVCLBaseModel):
     enabled: bool
-    kubernetesType: str
     nfimage: Nfimage
-    includeTcpDumpContainer: bool
-    imagePullSecrets: List[ImagePullSecret]
-    config: ConfigPod
-    nodeSelector: Dict[str, Any]
+    include_tcp_dump_container: bool = Field(..., alias='includeTcpDumpContainer')
+    persistent: Persistent
+    image_pull_secrets: List[ImagePullSecret] = Field(..., alias='imagePullSecrets')
+    config: Config
+    node_selector: Dict[str, Any] = Field(..., alias='nodeSelector')
+
+
+class Start(NFVCLBaseModel):
+    tcpdump: bool
+
+
+class StartNrf(Start):
+    nrf: bool
+
+
+class OaiNrf(OaiNF):
+    start: StartNrf
+
+
+class StartLmf(Start):
+    lmf: bool
+
+
+class OaiLmf(OaiNF):
+    start: StartLmf
+
+
+class StartUdr(Start):
+    udr: bool
+
+
+class OaiUdr(OaiNF):
+    start: StartUdr
+
+
+class StartUdm(Start):
+    udm: bool
 
 
 class OaiUdm(NFVCLBaseModel):
-    enabled: bool
-    kubernetesType: str
-    nfimage: Nfimage
-    includeTcpDumpContainer: bool
-    imagePullSecrets: List[ImagePullSecret]
-    config: ConfigPod
-    nodeSelector: Dict[str, Any]
+    start: StartUdm
 
 
-class OaiAusf(NFVCLBaseModel):
-    enabled: bool
-    kubernetesType: str
-    nfimage: Nfimage
-    includeTcpDumpContainer: bool
-    imagePullSecrets: List[ImagePullSecret]
-    config: ConfigPod
-    nodeSelector: Dict[str, Any]
+class SecurityContext(NFVCLBaseModel):
+    privileged: bool
 
 
-class Route(NFVCLBaseModel):
-    dst: str
-    gw: str
+class StartAusf(Start):
+    ausf: bool
 
 
-class N2Interface(NFVCLBaseModel):
-    create: bool
-    Ipadd: str
-    Netmask: str
-    Gateway: Any
-    routes: List[Route]
-    hostInterface: str
+class OaiAusf(OaiNF):
+    start: StartAusf
+    security_context: SecurityContext = Field(..., alias='securityContext')
 
 
-class MultusAmf(NFVCLBaseModel):
-    defaultGateway: str
-    n2Interface: N2Interface
+class StartAmf(Start):
+    amf: bool
 
 
-class OaiAmf(NFVCLBaseModel):
-    enabled: bool
-    kubernetesType: str
-    nfimage: Nfimage
-    includeTcpDumpContainer: bool
-    imagePullSecrets: List[ImagePullSecret]
-    multus: MultusAmf
-    nodeSelector: Dict[str, Any]
+class OaiAmf(OaiNF):
+    start: StartAmf
+    security_context: SecurityContext = Field(..., alias='securityContext')
 
 
-class N3Interface(NFVCLBaseModel):
-    create: bool
-    Ipadd: str
-    Netmask: str
-    Gateway: str
-    routes: List[Route]
-    hostInterface: str
+class StartSmf(Start):
+    smf: bool
 
 
-class N4Interface(NFVCLBaseModel):
-    create: bool
-    Ipadd: str
-    Netmask: str
-    Gateway: str
-    routes: str
-    hostInterface: str
+class OaiSmf(OaiNF):
+    start: StartSmf
 
-
-class N6Interface(NFVCLBaseModel):
-    create: bool
-    Ipadd: str
-    Netmask: str
-    Gateway: str
-    routes: str
-    hostInterface: str
-
-
-class MultusUpf(NFVCLBaseModel):
-    defaultGateway: str
-    n3Interface: N3Interface
-    n4Interface: N4Interface
-    n6Interface: N6Interface
-
-
-class OaiUpf(NFVCLBaseModel):
-    enabled: bool
-    kubernetesType: str
-    nfimage: Nfimage
-    includeTcpDumpContainer: bool
-    imagePullSecrets: List[ImagePullSecret]
-    multus: MultusUpf
-    nodeSelector: Dict[str, Any]
-
-
-class HostAliase(NFVCLBaseModel):
-    ip: str
-    hostnames: str
-
-
-class N4InterfaceMultusSmf(NFVCLBaseModel):
-    create: bool
-    Ipadd: str
-    Netmask: str
-    Gateway: str
-    hostInterface: str
-
-
-class MultusSmf(NFVCLBaseModel):
-    defaultGateway: str
-    n4Interface: N4InterfaceMultusSmf
-
-
-class OaiSmf(NFVCLBaseModel):
-    enabled: bool
-    kubernetesType: str
-    nfimage: Nfimage
-    includeTcpDumpContainer: bool
-    hostAliases: List[HostAliase]
-    multus: MultusSmf
-    imagePullSecrets: List[ImagePullSecret]
-    nodeSelector: Dict[str, Any]
 
 class OaiCoreValuesModel(NFVCLBaseModel):
     global_: Optional[Global] = Field(None, alias='global')
     mysql: Optional[Mysql] = None
     oai_nrf: Optional[OaiNrf] = Field(None, alias='oai-nrf')
+    oai_lmf: Optional[OaiLmf] = Field(None, alias='oai-lmf')
     oai_udr: Optional[OaiUdr] = Field(None, alias='oai-udr')
     oai_udm: Optional[OaiUdm] = Field(None, alias='oai-udm')
     oai_ausf: Optional[OaiAusf] = Field(None, alias='oai-ausf')
     oai_amf: Optional[OaiAmf] = Field(None, alias='oai-amf')
     oai_smf: Optional[OaiSmf] = Field(None, alias='oai-smf')
     coreconfig: Optional[Coreconfig] = Field(None, alias='currentconfig')
+
 
 class OaiUpfValuesModel(NFVCLBaseModel):
     upfconfig: Optional[Upfconfig] = Field(None, alias='currentconfig')

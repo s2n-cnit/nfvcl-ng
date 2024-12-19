@@ -12,8 +12,8 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBl
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.modules.oai.oai_upf.OpenAirInterfaceUpf_blue import OAI_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.resources import HelmChartResource
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, OaiCoreValuesModel, \
-    SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile
+from nfvcl.models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, \
+    SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile, OaiCoreValuesModel
 from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubArea, SubSubscribers, SubDataNets, \
     SubSliceProfiles, Create5gModel
 from nfvcl.models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, \
@@ -66,10 +66,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
     def network_functions_dictionary(self) -> Dict[NF5GType, Tuple[str, str]]:
         return {
             NF5GType.AMF: ("oai-amf", "oai-amf-svc-lb"),
-            NF5GType.AUSF: ("oai-ausf", "oai-ausf-svc-lb"),
             NF5GType.NRF: ("oai-nrf", "oai-nrf-svc-lb"),
             NF5GType.SMF: ("oai-smf", "oai-smf-svc-lb"),
-            NF5GType.UDM: ("oai-udm", "oai-udm-svc-lb"),
             NF5GType.UDR: ("oai-udr", "oai-udr-svc-lb")
         }
 
@@ -85,7 +83,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             area=core_area.id,
             name="oai",
             # repo="https://mysql.github.io/mysql-operator/",
-            chart="helm_charts/charts/oai5gbasic-2.0.0.tgz",
+            chart="helm_charts/charts/oai5gbasic-2.1.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
             namespace=self.id
@@ -119,8 +117,9 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         """
         self.state.oai_config_values.coreconfig.amf.served_guami_list.clear()
         oai_utils.add_served_guami_list_item(config=self.state.oai_config_values.coreconfig, mcc=self.state.mcc, mnc=self.state.mnc)
+        self.state.oai_config_values.coreconfig.lmf.num_gnb = len(self.state.current_config.areas)
 
-        self.state.oai_config_values.oai_smf.hostAliases.clear()
+        # self.state.oai_config_values.oai_smf.hostAliases.clear()
         self.state.oai_config_values.coreconfig.smf.upfs.clear()
         self.state.oai_config_values.coreconfig.snssais.clear()
         self.state.oai_config_values.coreconfig.amf.plmn_support_list.clear()
@@ -130,8 +129,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         for sub_area in self.state.current_config.areas:
             # TODO this work only for oai UPF, with the sdcore one multiple UPFs may be deployed for a single area
-            deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
-            oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, deployed_upf_info.network_info.n4_ip.exploded)
+            # deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
+            # oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, deployed_upf_info.network_info.n4_ip.exploded)
             oai_utils.add_available_upf(self.state.oai_config_values.coreconfig, sub_area.id)
 
             for _slice in sub_area.slices:
@@ -175,10 +174,10 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         """
         logger.info(f"Adding dnn: {new_dnn.dnn}")
 
-        if any(dnn.dnn == new_dnn.dnn for dnn in self.state.current_config.config.network_endpoints.data_nets):
-            raise BlueprintNGException(f"Dnn {new_dnn.dnn} already exist")
-
-        self.state.current_config.config.network_endpoints.data_nets.append(new_dnn)
+        # if any(dnn.dnn == new_dnn.dnn for dnn in self.state.current_config.config.network_endpoints.data_nets):
+        #     raise BlueprintNGException(f"Dnn {new_dnn.dnn} already exist")
+        #
+        # self.state.current_config.config.network_endpoints.data_nets.append(new_dnn)
 
         self.update_core_values()
         self.update_core()

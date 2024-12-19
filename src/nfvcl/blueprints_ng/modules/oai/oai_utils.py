@@ -1,9 +1,9 @@
 from typing import Optional
 
-from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubDataNets
 from nfvcl.models.blueprint_ng.core5g.OAI_Models import Snssai, Baseconfig, Dnn, Upfconfig, \
-    SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, OaiSmf, HostAliase, UpfAvailable, \
+    SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, UpfAvailable, \
     LocalSubscriptionInfo, QosProfile, SNssaiSmfInfoListItem, PlmnSupportListItem
+from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubDataNets
 
 
 def add_snssai(config: Baseconfig, slice_id: str, slice_type: str) -> Snssai:
@@ -154,37 +154,35 @@ def del_served_guami_list_item(config: Coreconfig, mcc: str, mnc: str) -> bool:
             return True
     return False
 
-
-def add_host_aliases(config: OaiSmf, area_id: int, ip_upf: str) -> HostAliase:
-    """
-    Add new "host alias" to OAI SMF configuration.
-    :param config: config to add host alias to.
-    :param area_id: area id of upf.
-    :param ip_upf: ip of upf.
-    :return: new host alias, raise an error otherwise.
-    """
-    new_hostalias = HostAliase(
-        ip=ip_upf,
-        hostnames=f"oai-upf{area_id}"
-    )
-    if new_hostalias not in config.hostAliases:
-        config.hostAliases.append(new_hostalias)
-        return new_hostalias
-    raise ValueError(f"Add failed, oai-upf{area_id} already exist")
-
-
-def del_host_aliases(config: OaiSmf, area_id: int) -> bool:
-    """
-    Delete "host alias" from OAI SMF configuration.
-    :param config: config to remove host alias from.
-    :param area_id: area id of upf.
-    :return: True if sucessfully delete host alias, otherwise raise an error.
-    """
-    for host in config.hostAliases:
-        if host.hostnames == f"oai-upf{area_id}":
-            config.hostAliases.remove(host)
-            return True
-    raise ValueError(f"Delete failed, oai-upf{area_id} doesnt exist")
+# def add_host_aliases(config: OaiSmf, area_id: int, ip_upf: str) -> HostAliase:
+#     """
+#     Add new "host alias" to OAI SMF configuration.
+#     :param config: config to add host alias to.
+#     :param area_id: area id of upf.
+#     :return: new host alias, raise an error otherwise.
+#     """
+#     new_hostalias = HostAliase(
+#         ip=ip_upf,
+#         hostnames=f"oai-upf{area_id}"
+#     )
+#     if new_hostalias not in config.hostAliases:
+#         config.hostAliases.append(new_hostalias)
+#         return new_hostalias
+#     raise ValueError(f"Add failed, oai-upf{area_id} already exist")
+#
+#
+# def del_host_aliases(config: OaiSmf, area_id: int) -> bool:
+#     """
+#     Delete "host alias" from OAI SMF configuration.
+#     :param config: config to remove host alias from.
+#     :param area_id: area id of upf.
+#     :return: True if sucessfully delete host alias, otherwise raise an error.
+#     """
+#     for host in config.hostAliases:
+#         if host.hostnames == f"oai-upf{area_id}":
+#             config.hostAliases.remove(host)
+#             return True
+#     raise ValueError(f"Delete failed, oai-upf{area_id} doesnt exist")
 
 
 def add_available_upf(config: Coreconfig, area_id: int) -> Optional[UpfAvailable]:
@@ -229,7 +227,7 @@ def add_local_subscription_info(config: Coreconfig, snnsai: Snssai, dnn: SubData
         single_nssai=snnsai,
         dnn=dnn.dnn,
         qos_profile=QosProfile(
-            field_5qi=dnn.default5qi,
+            field_5qi=int(dnn.default5qi),
             session_ambr_ul=dnn.uplinkAmbr.replace(" ", ""),
             session_ambr_dl=dnn.downlinkAmbr.replace(" ", "")
         )

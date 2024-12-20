@@ -430,7 +430,7 @@ class OaiNF(NFVCLBaseModel):
     include_tcp_dump_container: bool = Field(..., alias='includeTcpDumpContainer')
     persistent: Persistent
     image_pull_secrets: List[ImagePullSecret] = Field(..., alias='imagePullSecrets')
-    config: Config
+    config: ConfigPod
     node_selector: Dict[str, Any] = Field(..., alias='nodeSelector')
 
 
@@ -466,7 +466,7 @@ class StartUdm(Start):
     udm: bool
 
 
-class OaiUdm(NFVCLBaseModel):
+class OaiUdm(OaiNF):
     start: StartUdm
 
 

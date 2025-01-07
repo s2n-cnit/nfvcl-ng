@@ -123,15 +123,16 @@ class OpenAirInterfaceUpf(Generic5GUPFBlueprintNG[OAIUpfBlueprintNGState, UPFBlu
 
         upf_conf_yaml = yaml.dump(json.loads(self.state.upf_conf.model_dump_json(by_alias=True)))
 
-        self.state.upf_vm_configurator.upf_id = self.state.current_config.area_id
-        self.state.upf_vm_configurator.nrf_ipv4_address = self.state.current_config.nrf_ip.exploded
-        self.state.upf_vm_configurator.upf_conf = upf_conf_yaml
+        if self.state.current_config.nrf_ip:
+            self.state.upf_vm_configurator.upf_id = self.state.current_config.area_id
+            self.state.upf_vm_configurator.nrf_ipv4_address = self.state.current_config.nrf_ip.exploded
+            self.state.upf_vm_configurator.upf_conf = upf_conf_yaml
 
-        self.state.upf_vm_configurator.n3_gateway = self.state.current_config.n3_gateway_ip.exploded
-        self.state.upf_vm_configurator.n6_gateway = self.state.current_config.n6_gateway_ip.exploded
-        self.state.upf_vm_configurator.gnb_cidr = self.state.current_config.gnb_cidr.exploded
+            self.state.upf_vm_configurator.n3_gateway = self.state.current_config.n3_gateway_ip.exploded
+            self.state.upf_vm_configurator.n6_gateway = self.state.current_config.n6_gateway_ip.exploded
+            self.state.upf_vm_configurator.gnb_cidr = self.state.current_config.gnb_cidr.exploded
 
-        self.provider.configure_vm(self.state.upf_vm_configurator)
+            self.provider.configure_vm(self.state.upf_vm_configurator)
 
         self.update_upf_info()
 

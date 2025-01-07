@@ -165,47 +165,6 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
     def wait_core_ready(self):
         pass
 
-    def add_dnn_to_conf(self, new_dnn: SubDataNets):
-        """
-        Add new SubDataNets to conf.
-        Args:
-            new_dnn: new dnn to add.
-
-        """
-        logger.info(f"Adding dnn: {new_dnn.dnn}")
-
-        # if any(dnn.dnn == new_dnn.dnn for dnn in self.state.current_config.config.network_endpoints.data_nets):
-        #     raise BlueprintNGException(f"Dnn {new_dnn.dnn} already exist")
-        #
-        # self.state.current_config.config.network_endpoints.data_nets.append(new_dnn)
-
-        self.update_core_values()
-        self.update_core()
-        self.update_edge_areas()
-        self.update_gnb_config()
-
-    def del_dnn_from_conf(self, old_dnn: str):
-        """
-        Delete SubDataNets from conf.
-        Args:
-            old_dnn: old_dnn to delete.
-
-        """
-        logger.info(f"Deleting dnn: {old_dnn}")
-        dnn = self.get_dnn(old_dnn)
-
-        for _slice in self.state.current_config.config.sliceProfiles:
-            for _dnn in _slice.dnnList:
-                if _dnn == dnn.dnn:
-                    raise BlueprintNGException(f"Dnn {old_dnn} cannot be deleted because there are slices that use it")
-
-        self.state.current_config.config.network_endpoints.data_nets.remove(dnn)
-
-        self.update_core_values()
-        self.update_core()
-        self.update_edge_areas()
-        self.update_gnb_config()
-
     def add_subscriber_to_conf(self, new_subscriber: SubSubscribers):
         """
         Add new SubSubscribers obj to conf.
@@ -491,7 +450,13 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.update_gnb_config()
 
     def add_dnn(self, dnn: Core5GAddDnnModel):
-        self.add_dnn_to_conf(dnn)
+
+        self.update_core_values()
+        self.update_core()
+
 
     def del_dnn(self, dnn: Core5GDelDnnModel):
-        self.del_dnn_from_conf(dnn.dnn)
+
+        self.update_core_values()
+        self.update_core()
+

@@ -231,7 +231,7 @@ class PlmnSupportListItem(NFVCLBaseModel):
     nssai: List[Snssai]
 
 
-class Amf1(NFVCLBaseModel):
+class AmfCore(NFVCLBaseModel):
     amf_name: str
     support_features_options: SupportFeaturesOptions
     relative_capacity: int
@@ -251,7 +251,7 @@ class SupportFeatures(NFVCLBaseModel):
     register_nrf: str
 
 
-class Lmf1(NFVCLBaseModel):
+class LmfCore(NFVCLBaseModel):
     http_threads_count: int
     gnb_id_bits_count: int
     num_gnb: int
@@ -312,7 +312,7 @@ class LocalSubscriptionInfo(NFVCLBaseModel):
     qos_profile: QosProfile
 
 
-class Smf1(NFVCLBaseModel):
+class SmfCore(NFVCLBaseModel):
     ue_mtu: int
     support_features: SupportFeaturesSmf
     upfs: List[UpfAvailable]
@@ -366,9 +366,9 @@ class Baseconfig(NFVCLBaseModel):
 class Coreconfig(Baseconfig):
     nfs: CoreNfs
     curl_timeout: int
-    amf: Amf1
-    smf: Smf1
-    lmf: Lmf1
+    amf: AmfCore
+    smf: SmfCore
+    lmf: LmfCore
 
 
 class Upfconfig(Baseconfig):

@@ -21,7 +21,8 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
             }
         ],
         "persistence": {
-            "enabled": False
+            "enabled": True,
+            "storageClass": ""
         }
     },
     "oai-nrf": {

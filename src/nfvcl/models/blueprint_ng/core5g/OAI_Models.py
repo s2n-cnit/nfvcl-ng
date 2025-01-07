@@ -398,6 +398,7 @@ class ImagePullSecret(NFVCLBaseModel):
 
 class Persistence(NFVCLBaseModel):
     enabled: bool
+    storageClass: str
 
 
 class Mysql(NFVCLBaseModel):

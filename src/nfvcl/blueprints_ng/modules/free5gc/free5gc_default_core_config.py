@@ -42,6 +42,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "deployAusf": True,
         "deployN3iwf": False,
         "deployNrf": True,
+        "deployNef": True,
         "deployNssf": True,
         "deployPcf": True,
         "deploySmf": True,

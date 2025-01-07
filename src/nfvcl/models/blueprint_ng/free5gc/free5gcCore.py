@@ -93,6 +93,7 @@ class Free5gcCoreConfig(NFVCLBaseModel):
     deploy_mongo_db: bool = Field(..., alias='deployMongoDb')
     deploy_amf: bool = Field(..., alias='deployAmf')
     deploy_ausf: bool = Field(..., alias='deployAusf')
+    deploy_nef: bool = Field(..., alias='deployNef')
     deploy_n3iwf: bool = Field(..., alias='deployN3iwf')
     deploy_nrf: bool = Field(..., alias='deployNrf')
     deploy_nssf: bool = Field(..., alias='deployNssf')

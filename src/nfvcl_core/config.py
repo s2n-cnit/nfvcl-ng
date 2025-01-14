@@ -140,13 +140,15 @@ def load_nfvcl_config() -> NFVCLConfigModel:
             nfvcl_conf = yaml.safe_load(stream_file)
         except yaml.YAMLError as exc:
             # pre_config_logger.exception("Error loading config", exc)
-            pass
+            print("Error loading config", exc)
+            exit(1)
 
         # Parsing the config file
         try:
             config = NFVCLConfigModel(**nfvcl_conf)
         except Exception as exce:
             # pre_config_logger.exception("Exception in the configuration file parsing", exce)
-            pass
+            print("Exception in the configuration file parsing", exce)
+            exit(1)
         return config
 

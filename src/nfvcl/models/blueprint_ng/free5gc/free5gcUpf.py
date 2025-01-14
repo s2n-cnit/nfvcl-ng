@@ -4,7 +4,7 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 
 
 class Pfcp(NFVCLBaseModel):

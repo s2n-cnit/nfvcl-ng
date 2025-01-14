@@ -4,9 +4,9 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGCreateModel
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.ueransim.blueprint_ueransim_model import UeransimArea, UeransimConfig, UeransimUe, UeransimSim
+from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl.models.blueprint_ng.blueprint_ueransim_model import UeransimArea, UeransimConfig, UeransimUe, UeransimSim
+from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
 
 
 class UeransimBlueprintRequestInstance(BlueprintNGCreateModel):

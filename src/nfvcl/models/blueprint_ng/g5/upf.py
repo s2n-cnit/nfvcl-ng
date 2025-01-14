@@ -3,10 +3,10 @@ from typing import Optional, Literal, List
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGCreateModel
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.core5g.common import SubSliceProfiles, SubDataNets
-from nfvcl.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 
 
 class BlueCreateModelNetworks(NFVCLBaseModel):

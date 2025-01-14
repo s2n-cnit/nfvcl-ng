@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGCreateModel, BlueprintNGState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.pdu_configurators.implementations.generic_linux_pdu_configurator import GenericLinuxPDUConfigurator
-from nfvcl.blueprints_ng.resources import PDUResourceAnsibleConfiguration
+from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core.models.resources import PDUResourceAnsibleConfiguration
 
 
 #

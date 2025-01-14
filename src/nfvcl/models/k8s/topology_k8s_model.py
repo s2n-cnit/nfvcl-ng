@@ -1,11 +1,11 @@
 from enum import Enum
 from typing import Optional, List
 from pydantic import Field
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.k8s.plugin_k8s_model import K8sOperationType
 
 
-class NfvoStatus(Enum):
+class NfvoStatus(str, Enum):
     ONBOARDED = "onboarded"
     NOT_ONBOARDED = "not_onboarded"
     ONBOARDING = 'onboarding'

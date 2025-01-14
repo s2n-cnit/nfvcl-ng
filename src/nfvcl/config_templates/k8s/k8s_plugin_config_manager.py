@@ -5,7 +5,7 @@ import os
 import json
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPlugin
 from nfvcl.models.k8s.topology_k8s_model import K8sVersion
-from nfvcl.utils.log import create_logger
+from nfvcl_core.utils.log import create_logger
 
 PLUGIN_BASE_PATH = 'src/nfvcl/config_templates/k8s/'
 

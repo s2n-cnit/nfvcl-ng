@@ -2,9 +2,9 @@ from typing import Optional
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
+from nfvcl_core.models.resources import VmResource, VmResourceImage
 from nfvcl.models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuCreateModel, UbuntuVersion
 
 UBUNTU_BLUE_TYPE = "ubuntu"

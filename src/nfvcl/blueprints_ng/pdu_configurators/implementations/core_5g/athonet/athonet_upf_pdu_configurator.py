@@ -8,8 +8,8 @@ from nfvcl.blueprints_ng.pdu_configurators.types.generic_5g_pdu_configurator imp
 from nfvcl.models.blueprint_ng.Athonet.core import AthonetAccessToken
 from nfvcl.models.blueprint_ng.Athonet.upf import AthonetNetworkUpfConfig, AthonetApplicationUpfConfig, DnnVrfMapping
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel
-from nfvcl.models.network import PduModel
-from nfvcl.utils.log import create_logger
+from nfvcl_core.models.network import PduModel
+from nfvcl_core.utils.log import create_logger
 
 logger = create_logger('AthonetUPFPDUConfigurator')
 

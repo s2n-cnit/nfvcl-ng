@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import List
 from typing import Optional
 from pydantic import BaseModel, Field
-from nfvcl.blueprints_ng.ansible_builder import AnsibleTask
+from nfvcl_core.blueprints.ansible_builder import AnsibleTask
 
 
 class AnsibleVyOSConfigTask(AnsibleTask):

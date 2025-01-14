@@ -2,7 +2,7 @@ from typing import *
 
 from pydantic import Field
 
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubArea
 from nfvcl.models.k8s.k8s_objects import K8sService
 

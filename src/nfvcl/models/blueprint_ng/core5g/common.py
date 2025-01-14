@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import List, Optional
 from typing import Literal
 
-from pydantic import constr, HttpUrl
 from pydantic import Field
+from pydantic import constr
 
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 
 
 # ===================================== SubClasses of subconfig section ================================================
@@ -16,7 +16,7 @@ class Pool(NFVCLBaseModel):
 
 
 class SubDataNets(NFVCLBaseModel):
-    net_name: str = Field(..., description="set net-name, exp: 'boh'")
+    net_name: str = Field(..., description="set net-name, exp: 'internet'")
     dnn: str = Field(..., description="set dnn, exp: 'internet'")
     dns: str
     pools: List[Pool]
@@ -68,6 +68,7 @@ class SubEnabledUEList(NFVCLBaseModel):
 
 
 class SubSliceProfiles(NFVCLBaseModel):
+    area_ids: Optional[List[str]] = Field(default=None)
     sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
     dnnList: List[str] = Field([], description="set dnn-list as a listst on names")
@@ -138,10 +139,6 @@ class SubArea(NFVCLBaseModel):
 
 
 class Create5gModel(NFVCLBaseModel):
-    callbackURL: Optional[HttpUrl] = Field(
-        default=None,
-        description='url that will be used to notify when the topology terraform ends'
-    )
     config: SubConfig
     areas: List[SubArea] = Field(..., description="Set area")
 
@@ -167,11 +164,6 @@ class Create5gModel(NFVCLBaseModel):
 
 
 # =========================================== End of main section =====================================================
-
-
-class AddTacModel(Create5gModel):
-    callbackURL: Optional[HttpUrl] = Field(default=None, description="URL that will be used to notify when the topology terraform ends")
-    config: Optional[SubConfig] = Field(default=None)
 
 class SstConvertion:
     sstType = {"EMBB": 1, "URLLC": 2, "MMTC": 3}

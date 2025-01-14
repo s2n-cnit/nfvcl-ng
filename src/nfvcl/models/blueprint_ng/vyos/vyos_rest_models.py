@@ -4,7 +4,7 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGCreateModel
+from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
 
 
 class VyOSCreateModel(BlueprintNGCreateModel):

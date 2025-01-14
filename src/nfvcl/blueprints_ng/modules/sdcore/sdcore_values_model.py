@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import List, Optional
 from pydantic import Field
 from nfvcl.models.blueprint_ng.core5g.common import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers, Create5gModel, SstConvertion
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.utils.log import create_logger
+from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core.utils.log import create_logger
 
 logger = create_logger('BlueSDCoreValuesConverter')
 

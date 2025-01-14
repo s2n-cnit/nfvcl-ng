@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional, List, Dict, Union, Literal, Annotated
 from pydantic import Field, RootModel, field_validator
 
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 import re
 
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SstConvertion

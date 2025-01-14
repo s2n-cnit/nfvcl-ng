@@ -2,14 +2,15 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUException
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
-from nfvcl.blueprints_ng.resources import PDUResourceAnsibleConfiguration
-from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.pdu.gnb import GNBPDUConfigure, GNBPDUSlice
+from nfvcl_core.models.pdu.gnb import GNBPDUSlice, GNBPDUConfigure
+from nfvcl_core.models.resources import PDUResourceAnsibleConfiguration
+from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core.providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl_core.utils.blue_utils import rel_path
+
 
 class AmariPLMN(NFVCLBaseModel):
     plmn: str = Field()

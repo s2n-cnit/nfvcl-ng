@@ -6,15 +6,15 @@ from typing import Optional, Dict, List, Tuple
 import httpx
 from pydantic import Field
 
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_core_config, free5gc_subscriber_config
 from nfvcl.blueprints_ng.modules.free5gc.free5gc_upf.Free5gcUpf_blue import FREE5GC_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNGState, Generic5GK8sBlueprintNG
-from nfvcl.blueprints_ng.resources import HelmChartResource
+from nfvcl_core.models.resources import HelmChartResource
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubArea, SubSliceProfiles, SubSubscribers, SubDataNets, SstConvertion
 from nfvcl.models.blueprint_ng.free5gc.free5gcCore import Free5gcCoreConfig, Snssai, Free5gcLogin, Free5gcSubScriber
 from nfvcl.models.blueprint_ng.g5.core import Core5GDelTacModel, Core5GAddTacModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GDelSubscriberModel, Core5GAddSubscriberModel, NF5GType, Core5GAddDnnModel, Core5GDelDnnModel
-from nfvcl.utils.log import create_logger
+from nfvcl_core.utils.log import create_logger
 
 FREE5GC_CORE_BLUE_TYPE = "free5gc"
 free5gc_credentials = {"username": "admin", "password": "free5gc"}

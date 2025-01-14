@@ -1,6 +1,6 @@
 import abc
 
-from nfvcl.models.network import PduModel
+from nfvcl_core.models.network import PduModel
 
 class PDUException(Exception):
     pass

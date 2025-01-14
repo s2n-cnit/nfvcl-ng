@@ -8,7 +8,7 @@ from nfvcl.models.blueprint_ng.Athonet.core import AthonetApplicationCoreConfig,
 from nfvcl.models.blueprint_ng.Athonet.upf import DnnVrfMapping
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel
-from nfvcl.models.network import PduModel
+from nfvcl_core.models.network import PduModel
 
 
 class AthonetCorePDUConfigurator(Generic5GConfigurator):

@@ -2,7 +2,7 @@ from enum import Enum
 from ipaddress import IPv4Address
 from typing import Optional, List
 from pydantic import Field
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 
 
 class Cni(str, Enum):

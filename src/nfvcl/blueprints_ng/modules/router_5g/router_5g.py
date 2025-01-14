@@ -4,16 +4,17 @@ from typing import Optional, List
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGCreateModel
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core.models.linux.ip import Route
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.core5g.common import Router5GNetworkInfo
-from nfvcl.models.http_models import HttpRequestType
-from nfvcl.models.linux.ip import Route
-from nfvcl.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core.models.http_models import HttpRequestType
+from nfvcl_core.utils.blue_utils import rel_path
 
 
 class Router5GCreateModelNetworks(NFVCLBaseModel):

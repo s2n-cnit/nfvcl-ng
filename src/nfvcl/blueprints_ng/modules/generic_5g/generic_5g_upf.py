@@ -4,12 +4,12 @@ from typing import Generic, TypeVar, Optional, final, List, Dict
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import day2_function
-from nfvcl.blueprints_ng.resources import VmResource
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
+from nfvcl_core.blueprints.blueprint_type_manager import day2_function
+from nfvcl_core.models.resources import VmResource
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, SliceModel
-from nfvcl.models.http_models import HttpRequestType
+from nfvcl_core.models.http_models import HttpRequestType
 
 
 class DeployedUPFInfo(NFVCLBaseModel):

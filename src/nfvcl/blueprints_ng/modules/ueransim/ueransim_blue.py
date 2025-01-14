@@ -4,22 +4,21 @@ from typing import List, Optional, Dict
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_core.models.linux.ip import Route
+from nfvcl_core.models.network.network_models import PduType
+from nfvcl_core.models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
-from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
     UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim
-from nfvcl.models.http_models import HttpRequestType
-from nfvcl.models.linux.ip import Route
-from nfvcl.models.network import PduModel
-from nfvcl.models.network.network_models import PduType
-from nfvcl.models.pdu.gnb import GNBPDUConfigure
-from nfvcl.models.ueransim.blueprint_ueransim_model import UeransimSim, UeransimUe
-from nfvcl.topology.topology import build_topology
+from nfvcl_core.models.http_models import HttpRequestType
+from nfvcl_core.models.network import PduModel
+from nfvcl.models.blueprint_ng.blueprint_ueransim_model import UeransimSim, UeransimUe
+from nfvcl_core.utils.blue_utils import rel_path
 
 UERANSIM_BLUE_TYPE = "ueransim"
 
@@ -144,7 +143,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         super().destroy()
 
     def add_gnb_to_topology(self, area_id: int):
-        build_topology().add_pdu(PduModel(
+        self.provider.add_pdu(PduModel(
             name=f"UERANSIM_GNB_{self.id}_{area_id}",
             area=area_id,
             type=PduType.GNB,
@@ -154,7 +153,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
     def del_gnb_from_topology(self, area_id: int):
         try:
-            build_topology().del_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
+            self.provider.delete_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
         except Exception as e:
             self.logger.warning(f"Error deleting PDU: {str(e)}")
 

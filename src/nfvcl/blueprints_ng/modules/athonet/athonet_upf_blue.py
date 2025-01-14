@@ -2,13 +2,13 @@ from typing import Optional
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBlueprintNG, Generic5GUPFBlueprintNGState, DeployedUPFInfo
 from nfvcl.blueprints_ng.pdu_configurators.implementations.core_5g.athonet.athonet_upf_pdu_configurator import AthonetUPFPDUConfigurator
 from nfvcl.models.blueprint_ng.Athonet.upf import AthonetApplicationUpfConfig
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
-from nfvcl.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
-from nfvcl.models.network.network_models import PduType
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core.models.network.network_models import PduType
 
 ATHONET_UPF_BLUE_TYPE = "athonet_upf"
 

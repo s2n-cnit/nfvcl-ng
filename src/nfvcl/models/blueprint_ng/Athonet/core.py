@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 
 from pydantic import Field, RootModel
 
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.Athonet.upf import DnnVrf
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SstConvertion, SubSliceProfiles, SubDataNets
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel

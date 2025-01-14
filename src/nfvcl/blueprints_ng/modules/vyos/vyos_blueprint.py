@@ -5,14 +5,14 @@ from typing import Optional
 from pydantic import Field
 
 from nfvcl.models.blueprint_ng.vyos.vyos_models import VyOSSourceNATRule
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.vyos.config.vyos_day0_conf import VmVyOSDay0Configurator
 from nfvcl.blueprints_ng.modules.vyos.config.vyos_nat_conf import VmVyOSNatConfigurator
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor
+from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor
 from nfvcl.models.blueprint_ng.vyos.vyos_models import VyOSNetworkNotConnectedToVM, VyOSInterfaceNotExisting
 from nfvcl.models.blueprint_ng.vyos.vyos_rest_models import VyOSCreateModel
-from nfvcl.models.http_models import HttpRequestType
+from nfvcl_core.models.http_models import HttpRequestType
 
 # Use a global variable to define the blueprint type, this will be used in the decorator for the requests supported
 # by this blueprint

@@ -2,8 +2,8 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGCreateModel
-from nfvcl.blueprints_ng.resources import VmResourceFlavor
+from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core.models.resources import VmResourceFlavor
 
 
 class DNSCreateModel(BlueprintNGCreateModel):

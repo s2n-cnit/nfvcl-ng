@@ -3,8 +3,8 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
 
 
 class K8sPluginName(str, Enum):

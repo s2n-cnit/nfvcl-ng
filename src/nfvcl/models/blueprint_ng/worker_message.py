@@ -3,7 +3,7 @@ from typing import Any, Optional, Callable
 
 from pydantic import Field
 
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 
 class BlueprintOperationCallbackModel(NFVCLBaseModel):
     id: str = Field()

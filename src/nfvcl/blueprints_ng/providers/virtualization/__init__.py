@@ -1,3 +1,0 @@
-from nfvcl.blueprints_ng.providers.virtualization.proxmox.virtualization_provider_proxmox import \
-    VirtualizationProviderProxmox
-from .virtualization_provider_openstack import VirtualizationProviderOpenstack

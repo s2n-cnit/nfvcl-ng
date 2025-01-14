@@ -4,16 +4,16 @@ from typing import Optional
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_upf_config
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBlueprintNG, Generic5GUPFBlueprintNGState, \
     DeployedUPFInfo
-from nfvcl.blueprints_ng.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
-from nfvcl.blueprints_ng.utils import rel_path, yaml
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core.models.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
 from nfvcl.models.blueprint_ng.free5gc.free5gcUpf import Free5gcUpfConfig, DnnListItem, IfListItem
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
-from nfvcl.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core.utils.blue_utils import rel_path, yaml
 
 FREE5GC_UPF_BLUE_TYPE = "free5gc_upf"
 

@@ -4,23 +4,22 @@ from typing import Optional, List
 from netaddr.ip import IPNetwork
 from pydantic import Field
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day2_configurator import VmK8sDay2Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
     KarmadaInstallModel, K8sDelNodeModel
-from nfvcl.models.http_models import HttpRequestType
+from nfvcl_core.models.http_models import HttpRequestType
 from nfvcl.models.k8s.common_k8s_model import Cni
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
-from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
-from nfvcl.models.topology.topology_models import TopoK8SHasBlueprintException
-from nfvcl.topology.topology import Topology, build_topology
-from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_config_map, patch_config_map, get_k8s_cidr_info
-from nfvcl.utils.k8s.helm_plugin_manager import HelmPluginManager
+from nfvcl_core.models.topology_models import TopoK8SHasBlueprintException
+from nfvcl_core.utils.k8s import get_k8s_config_from_file_content, get_config_map, patch_config_map, get_k8s_cidr_info
+from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 
 K8S_BLUE_TYPE = "k8s"
 K8S_VERSION = K8sVersion.V1_30
@@ -176,17 +175,18 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         # If required, onboarding the cluster in the topology
         if create_model.topology_onboard:
-            topo: Topology = build_topology()
+            # TODO this is a hack, blueprints should not have direct access to the topology manager
+            topology_manager = self.provider.topology_manager
             area_list = [item.area_id for item in self.state.area_list]
 
             k8s_cluster = TopologyK8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id,
                                            credentials=self.state.master_credentials,
-                                           vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id),
+                                           vim_name=topology_manager.get_vim_name_from_area_id(self.state.master_area.area_id),
                                            # For the constraint on the model, there is always a master area.
                                            k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list,
                                            cni="", nfvo_onboard=False, cadvisor_node_port=self.state.cadvisor_node_port,
                                            anti_spoofing_enabled=not self.state.require_port_security_disabled)
-            topo.add_k8scluster(k8s_cluster)
+            topology_manager.add_kubernetes(k8s_cluster)
             self.state.topology_onboarded = create_model.topology_onboard
 
     def deploy_master_node(self, area: K8sAreaDeployment, master_flavors: VmResourceFlavor):
@@ -418,7 +418,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         if self.state.topology_onboarded:
             try:
-                build_topology().del_k8scluster(self.id)
+                self.provider.topology_manager.delete_kubernetes(self.id)
             except ValueError:
                 self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")
             except TopoK8SHasBlueprintException as e:
@@ -426,7 +426,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 raise e
         super().destroy()
         # Remove reserved IP range
-        build_topology().release_ranges(self.id)  # Remove all reserved ranges in the networks
+        self.provider.topology_manager.release_ranges(self.id)  # Remove all reserved ranges in the networks
         # If it was onboarded on the topology (as a usable k8s cluster), remove it.
 
     def to_dict(self, detailed: bool) -> dict:

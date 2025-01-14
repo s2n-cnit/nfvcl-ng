@@ -4,8 +4,8 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription
-from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterfaceAddress
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription
+from nfvcl_core.models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterfaceAddress
 from nfvcl.models.blueprint_ng.vyos.vyos_models import AnsibleVyOSInterface, AnsibleVyOSL3Interface
 
 

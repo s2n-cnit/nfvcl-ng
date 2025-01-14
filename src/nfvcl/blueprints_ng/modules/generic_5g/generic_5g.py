@@ -4,25 +4,25 @@ from typing import Generic, TypeVar, Optional, List, final, Dict, Set
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import day2_function
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
+from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel, Router5GCreateModelNetworks, \
     Router5GAddRouteModel
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl.blueprints_ng.resources import NetResource
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.linux.ip import Route
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core.models.network.network_models import PduType
+from nfvcl_core.models.pdu.gnb import GNBPDUSlice, GNBPDUConfigure
+from nfvcl_core.models.resources import NetResource
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
     SstConvertion, Router5GNetworkInfo, SubDataNets
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, SliceModel
-from nfvcl.models.http_models import HttpRequestType
-from nfvcl.models.linux.ip import Route
-from nfvcl.models.network import PduModel
-from nfvcl.models.network.ipam_models import SerializableIPv4Address
-from nfvcl.models.network.network_models import PduType
-from nfvcl.models.pdu.gnb import GNBPDUConfigure, GNBPDUSlice
+from nfvcl_core.models.http_models import HttpRequestType
+from nfvcl_core.models.network import PduModel
 
 
 class UPFInfo(NFVCLBaseModel):
@@ -249,10 +249,10 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             )
         )
 
-        router_id = self.provider.create_blueprint(router_5g_create_model, ROUTER_BLUEPRINT_TYPE)
+        router_id = self.provider.create_blueprint(ROUTER_BLUEPRINT_TYPE, router_5g_create_model)
         self.register_children(router_id)
         # After the router has been deployed gather the network information
-        router_info: Router5GNetworkInfo = self.provider.call_blueprint_function(router_id, ROUTER_GET_INFO_FUNCTION).result
+        router_info: Router5GNetworkInfo = self.provider.call_blueprint_function(router_id, ROUTER_GET_INFO_FUNCTION)
         self.logger.info(f"Deployed router for area {area_id}")
         return Router5GInfo(external=False, blue_id=router_id, network=router_info)
 
@@ -326,7 +326,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         """
         self.logger.info(f"Deploying UPF for area {area_id}")
         upf_create_model = self._create_upf_config(area_id)
-        upf_id = self.provider.create_blueprint(upf_create_model, upf_type)
+        upf_id = self.provider.create_blueprint(upf_type, upf_create_model)
         self.register_children(upf_id)
 
         upf_info = self.get_upfs_info(area_id, upf_id, upf_create_model)
@@ -344,7 +344,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         Returns: UPFInfo
         """
-        upf_deployed_info: List[DeployedUPFInfo] = self.provider.call_blueprint_function(upf_id, "get_upfs_info").result
+        upf_deployed_info: List[DeployedUPFInfo] = self.provider.call_blueprint_function(upf_id, "get_upfs_info")
         upf_info = UPFInfo(
             blue_id=upf_id,
             router_gnb_ip=self.state.edge_areas[str(area_id)].router.network.gnb_ip.exploded if self.router_needed else None,
@@ -593,7 +593,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
     def del_dnn(self, del_dnn_model: Core5GDelDnnModel):
         self.update_core()
 
-    def day2_add_slice_generic(self, add_slice_model: Core5GAddSliceModel, oss: bool):
+    def day2_add_slice_generic(self, add_slice_model: SubSliceProfiles, oss: bool):
         new_slice: SubSliceProfiles = SubSliceProfiles.model_validate(add_slice_model.model_dump(by_alias=True))
 
         # Create a copy of the config and update it to check if it's still correct
@@ -631,13 +631,13 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         self.state.current_config.config.sliceProfiles.append(new_slice)
 
-    def add_slice(self, add_slice_model: Core5GAddSliceModel, oss: bool):
+    def add_slice(self, add_slice_model: SubSliceProfiles, oss: bool):
         self.update_edge_areas()
         self.update_gnb_config()
         self.update_core()
 
     @day2_function("/add_slice_oss", [HttpRequestType.PUT])
-    def day2_add_slice_oss(self, add_slice_model: Core5GAddSliceModel):
+    def day2_add_slice_oss(self, add_slice_model: SubSliceProfiles):
         """
         Add a new slice to the core, the area is required
         Args:

@@ -1,10 +1,9 @@
 from typing import List, Optional, Literal, Dict
 from pydantic import Field
-from nfvcl.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.k8s.common_k8s_model import LBPool, Cni
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
-from nfvcl.models.virtual_link_desc import VirtLinkDescr
-from nfvcl.models.vim.vim_models import VMFlavors
+from nfvcl_core.models.vim.vim_models import VMFlavors
 
 
 class K8sNetworkEndpoints(NFVCLBaseModel):
@@ -18,7 +17,6 @@ class K8sNetworkEndpoints(NFVCLBaseModel):
 class K8sNsdInterfaceDesc(NFVCLBaseModel):
     nsd_id: str
     nsd_name: str
-    vld: List[VirtLinkDescr]
 
 
 class K8sAreaInfo(NFVCLBaseModel):

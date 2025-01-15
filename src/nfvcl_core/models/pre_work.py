@@ -10,7 +10,4 @@ class PreWorkCallbackResponse(NFVCLBaseModel):
 
 def run_pre_work_callback(pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]], async_return: OssCompliantResponse):
     if pre_work_callback:
-
-        print("lLLLLLLLLLLLLLLLLLLLLLLLLLLL")
-
         pre_work_callback(PreWorkCallbackResponse(async_return=async_return))

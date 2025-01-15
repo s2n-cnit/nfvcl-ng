@@ -395,4 +395,5 @@ if __name__ == "__main__":
     for router in routers_dict.values():
         app.include_router(router)
 
+    # TODO read host and port from config
     uvicorn.run(app, host="0.0.0.0", port=5002)

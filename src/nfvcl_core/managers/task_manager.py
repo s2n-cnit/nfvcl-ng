@@ -1,9 +1,16 @@
 from queue import Queue
 from threading import Thread
+from typing import Dict, Optional
 
 from nfvcl_core.managers.generic_manager import GenericManager
 from nfvcl_core.models.task import NFVCLTask, NFVCLTaskResult
 
+
+class TaskHistoryElement:
+    def __init__(self, task_id: str, task: NFVCLTask, result: Optional[NFVCLTaskResult] = None):
+        self.task_id = task_id
+        self.task = task
+        self.result = result
 
 class TaskManager(GenericManager):
     def __init__(self, worker_count: int):
@@ -11,6 +18,7 @@ class TaskManager(GenericManager):
         self.queue: Queue = Queue()
         self.worker_count = worker_count
         self.worker_list = []
+        self.task_history: Dict[str, TaskHistoryElement] = {}
         self.start_workers()
 
     def start_workers(self):
@@ -23,12 +31,14 @@ class TaskManager(GenericManager):
         # TODO: Implement
         pass
 
-    def add_task(self, task: NFVCLTask):
+    def add_task(self, task: NFVCLTask) -> str:
         self.queue.put(task)
+        return task.task_id
 
     def worker(self):
         while True:
             task: NFVCLTask = self.queue.get()
+            self.task_history[task.task_id] = TaskHistoryElement(task_id=task.task_id, task=task)
             self.logger.verbose(f'Working on {task}')
             excep = None
             try:
@@ -38,8 +48,11 @@ class TaskManager(GenericManager):
                 returnof = None
                 excep = e
 
-
             self.logger.verbose(f'Finished {task}')
             self.queue.task_done()
+
+            task_result = NFVCLTaskResult(task.task_id, returnof, excep is not None, excep)
+            self.task_history[task.task_id].result = task_result
+
             if task.callback_function:
-                task.callback_function(NFVCLTaskResult(returnof, excep is not None ,excep))
+                task.callback_function(task_result)

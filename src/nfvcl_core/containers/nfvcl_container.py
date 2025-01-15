@@ -1,5 +1,4 @@
 from dependency_injector import containers, providers
-from starlette.templating import pass_context
 
 from nfvcl_core.config import NFVCLConfigModel, load_nfvcl_config
 from nfvcl_core.database import TopologyRepository, BlueprintRepository, PerformanceRepository

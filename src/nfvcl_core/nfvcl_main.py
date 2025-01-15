@@ -26,7 +26,7 @@ from nfvcl_core.models.network import PduModel, NetworkModel, RouterModel
 from nfvcl_core.models.performance import BlueprintPerformance
 from nfvcl_core.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl_core.models.response_model import OssCompliantResponse
-from nfvcl_core.models.task import NFVCLTaskResult, NFVCLTask
+from nfvcl_core.models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
 from nfvcl_core.models.topology_models import TopologyModel
 from nfvcl_core.models.vim import VimModel
 from nfvcl_core.public_methods_description import GET_PROM_SRV_SUMMARY, GET_PROM_SRV_DESCRIPTION, GET_PROM_LIST_SRV_SUMMARY, GET_PROM_LIST_SRV_DESCRIPTION, DEL_PROM_SRV_SUMMARY, DEL_PROM_SRV_DESCRIPTION, UPD_PROM_SRV_SUMMARY, UPD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_SUMMARY, UPD_K8SCLUSTER_SUMMARY, UPD_K8SCLUSTER_DESCRIPTION, ADD_EXTERNAL_K8SCLUSTER_SUMMARY, ADD_EXTERNAL_K8SCLUSTER
@@ -80,7 +80,8 @@ class NFVCLPublic:
         self.description = description
 
     def __call__(self, func):
-        func.__doc__ = self.doc_override
+        if self.doc_override:
+            func.__doc__ = self.doc_override
         func.nfvcl_public = NFVCLPublicModel(path=self.path, method=self.method, section=self.section, sync=self.sync, summary=self.summary, description=self.description)
         func.order = NFVCLPublic.order
         NFVCLPublic.order += 1
@@ -123,6 +124,7 @@ class NFVCL:
         self.blueprint_manager.load()
         self.performance_manager.load()
 
+        # TODO rework plugin loading
         from nfvcl_core.plugins.plugin import NFVCLPlugin
         from nfvcl_horse.horse import NFVCLHorsePlugin
 
@@ -175,22 +177,28 @@ class NFVCL:
         callback: Optional[Callable] = kwargs.pop("callback", None)
         # check if the callable function has a pre_work_callback parameter
         function_args = inspect.getfullargspec(function).args
-        event: threading.Event
+        event: Optional[threading.Event] = None
+        namespace = {}
 
         if "pre_work_callback" in function_args:
             print("setting pre_work_callback")
             event = threading.Event()
-            namespace = {}
             kwargs["pre_work_callback"] = partial(pre_work_callback_function, event, namespace)
 
-        self.task_manager.add_task(NFVCLTask(function, callback, *args, **kwargs))
+        task_id = self.task_manager.add_task(NFVCLTask(function, callback, *args, **kwargs))
 
-        if "pre_work_callback" in function_args:
+        async_response: OssCompliantResponse
+
+        if "pre_work_callback" in function_args and event:
             event.wait()
             pre_work_callback_response: PreWorkCallbackResponse = namespace["msg"]
-            return pre_work_callback_response.async_return
+            async_response = pre_work_callback_response.async_return
         else:
-            return OssCompliantResponse(detail="Operation submitted")
+            async_response = OssCompliantResponse(detail="Operation submitted")
+
+        async_response.task_id = task_id
+
+        return async_response
 
     def add_task(self, function, *args, **kwargs):
         callback: Optional[Callable] = kwargs.pop("callback", None)
@@ -206,6 +214,27 @@ class NFVCL:
 
     def get_module_routes(self, prefix) -> List[BlueprintDay2Route]:
         return blueprint_type.get_module_routes(prefix)
+
+    @NFVCLPublic(path="/get_task_status", section=UTILS_SECTION, method=NFVCLPublicMethod.GET, sync=True)
+    def get_task_status(self, task_id: str) -> NFVCLTaskStatus:
+        """
+        Get the status of a task given its task_id
+
+        Warnings:
+            If NFVCL is restarted the task_id will be lost and the task will not be found
+        Args:
+            task_id: ID of the task to get the status of
+
+        Returns: NFVCLTaskStatus, the "status" field can be "running" or "done"
+        """
+        if task_id not in self.task_manager.task_history:
+            raise ValueError("Task not found")
+        if task_id in self.task_manager.task_history:
+            task = self.task_manager.task_history[task_id]
+            if task.result is None:
+                return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.RUNNING)
+            else:
+                return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.DONE, result=task.result.result, error=task.result.error, exception=task.result.exception)
 
     ############# Topology #############
 

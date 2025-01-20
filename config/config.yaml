@@ -1,9 +1,8 @@
 ---
 log_level: "20" # 20 is info, 10 is debug
 nfvcl:
-  version: "0.3.1"
   port: "5002"
-  ip: ""
+  ip: "0.0.0.0"
 mongodb:
   host: "127.0.0.1"
   port: "27017"

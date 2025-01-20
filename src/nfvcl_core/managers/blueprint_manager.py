@@ -319,8 +319,6 @@ class BlueprintManager(GenericManager):
         """
         blue_list = self.get_blueprint_instances(blue_type)
 
-        self._event_manager.fire_event(NFVCLEventTopics.BLUEPRINT_TOPIC, BlueEventType.BLUE_CREATED, data=blue_list[0].base_model)
-
         if detailed:
             return [blueprint.to_dict(detailed=True) for blueprint in blue_list]
         else:

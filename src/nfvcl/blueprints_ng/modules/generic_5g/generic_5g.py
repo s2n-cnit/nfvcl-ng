@@ -467,6 +467,13 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
     ####                   START DAY2 SECTION                   ####
     ################################################################
 
+    @day2_function("/get_current_config", [HttpRequestType.GET])
+    def day2_get_current_config(self) -> Create5gModel:
+        """
+        Get the current configuration of the blueprint
+        """
+        return self.state.current_config
+
     def add_ues(self, subscriber_model: Core5GAddSubscriberModel):
         self.update_core()
 

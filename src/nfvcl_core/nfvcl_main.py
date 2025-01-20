@@ -137,12 +137,16 @@ class NFVCL:
 
     def vim_checks(self):
         # TODO maybe this should be moved somewere else?
-        topology = self.topology_manager.get_topology()
-        vim_list = topology.get_vims()
-        vim_list = list(filter(lambda x: x.vim_type == "openstack", vim_list))
-        err_list = check_openstack_instances(topology, vim_list)
-        for err in err_list:
-            self.logger.error(f"Error checking VIM: {err.name}")
+        # TODO better handling if the topology is not present
+        try:
+            topology = self.topology_manager.get_topology()
+            vim_list = topology.get_vims()
+            vim_list = list(filter(lambda x: x.vim_type == "openstack", vim_list))
+            err_list = check_openstack_instances(topology, vim_list)
+            for err in err_list:
+                self.logger.error(f"Error checking VIM: {err.name}")
+        except Exception as e:
+            self.logger.error(f"Error checking VIMs: {e}")
 
     def get_ordered_public_methods(self) -> List[Callable]:
         """

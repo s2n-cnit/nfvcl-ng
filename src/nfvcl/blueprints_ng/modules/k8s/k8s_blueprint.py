@@ -4,6 +4,7 @@ from typing import Optional, List
 from netaddr.ip import IPNetwork
 from pydantic import Field
 
+from nfvcl.models.blueprint_ng.common import UbuntuVersion
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
@@ -23,9 +24,10 @@ from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 
 K8S_BLUE_TYPE = "k8s"
 K8S_VERSION = K8sVersion.V1_30
-BASE_IMAGE_MASTER = "u24-k8s-base-v0.1.0"
-BASE_IMAGE_WORKER = "u24-k8s-base-v0.1.0"
-BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.0-ubuntu2404.qcow2"
+BASE_IMAGE22 = "u22-k8s-base-v0.1.0"
+BASE_IMAGE22_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.0-ubuntu2204.qcow2"
+BASE_IMAGE24 = "u24-k8s-base-v0.1.0"
+BASE_IMAGE24_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.0-ubuntu2404.qcow2"
 DUMMY_NET_INT_NAME = "eth99"
 POD_NET_CIDR = SerializableIPv4Network("10.254.0.0/16")
 POD_SERVICE_CIDR = SerializableIPv4Network("10.200.0.0/16")
@@ -48,6 +50,8 @@ class K8sBlueprintNGState(BlueprintNGState):
     cadvisor_node_port: int = Field(default=30080, description="The node port on which the cadvisor service is exposed")
 
     password: str = Field(default=K8S_DEFAULT_PASSWORD, description="The password set in master and workers node")
+    base_image_name: str = Field(default=BASE_IMAGE24)
+    base_image_url: str = Field(default=BASE_IMAGE24_URL)
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Indicates if the blueprint will require port security disabled (on openstack)")
     topology_onboarded: bool = Field(default=False, description="If the blueprint cluster has to be added to the topology")
 
@@ -152,7 +156,9 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.state.pod_service_cidr = create_model.service_cidr
         self.state.cni = create_model.cni
         self.state.password = create_model.password
+        self.set_base_image(create_model.ubuntu_version)
         self.state.cadvisor_node_port = create_model.cadvisor_node_port
+
 
         area: K8sAreaDeployment
         for area in create_model.areas:  # In each area we deploy workers and in the core area also the master (there is always a core area containing the master)
@@ -189,12 +195,21 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             topology_manager.add_kubernetes(k8s_cluster)
             self.state.topology_onboarded = create_model.topology_onboard
 
+    def set_base_image(self, version: UbuntuVersion):
+        match version:
+            case UbuntuVersion.UBU24.value:
+                self.state.base_image_url = BASE_IMAGE24_URL
+                self.state.base_image_name = BASE_IMAGE24
+            case UbuntuVersion.UBU22.value:
+                self.state.base_image_url = BASE_IMAGE22_URL
+                self.state.base_image_name = BASE_IMAGE22
+
     def deploy_master_node(self, area: K8sAreaDeployment, master_flavors: VmResourceFlavor):
         # Defining Master node. Should be executed only once.
         self.state.vm_master = VmResource(
             area=area.area_id,
             name=f"{self.id.lower()}-vm-k8s-c",
-            image=VmResourceImage(name=BASE_IMAGE_MASTER, url=BASE_IMAGE_URL),
+            image=VmResourceImage(name=self.state.base_image_name, url=self.state.base_image_url),
             flavor=master_flavors,
             username="ubuntu",
             password=self.state.password,
@@ -219,7 +234,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             vm = VmResource(
                 area=area.area_id,
                 name=f"{self.id.lower()}-vm-w-{worker_number}",
-                image=VmResourceImage(name=BASE_IMAGE_WORKER, url=BASE_IMAGE_URL),
+                image=VmResourceImage(name=self.state.base_image_name, url=self.state.base_image_url),
                 flavor=area.worker_flavors,
                 username="ubuntu",
                 password=self.state.password,

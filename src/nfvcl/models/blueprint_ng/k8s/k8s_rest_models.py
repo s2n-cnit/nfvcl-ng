@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import List, Optional
+
+from nfvcl.models.blueprint_ng.common import UbuntuVersion
 from nfvcl.models.k8s.common_k8s_model import Cni
 from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
@@ -37,6 +39,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     service_cidr: SerializableIPv4Network = Field(default=SerializableIPv4Network("10.200.0.0/16"), description='Network used to deploy services')
     topology_onboard: bool = Field(default=True, description="If true the K8S cluster, once ready, will be added to the Topology of NFVCL to be used for Blueprint, that requires k8s, creation.")
     password: str = Field(default="ubuntu", description="The password to be set, in every vm, for user ubuntu", pattern=r'^[a-zA-Z0-9_.-]*$')
+    ubuntu_version: UbuntuVersion = Field(default=UbuntuVersion.UBU24, description="Version of Ubuntu")
     install_plugins: bool = Field(default=True, description="Whether to install default plugin list on blueprint deployment (default Flannel, MetalLb, OpenEBS)")
     cadvisor_node_port: int = Field(default=30080, ge=30000, le=32767, description="The node port on which the cadvisor service is exposed")
     master_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="2048", storage_gb='16', vcpu_count='2')

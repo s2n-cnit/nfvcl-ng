@@ -1,15 +1,10 @@
-from enum import Enum
 from typing import List
 
 from pydantic import Field
 
+from nfvcl.models.blueprint_ng.common import UbuntuVersion
 from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core.models.resources import VmResourceFlavor
-
-
-class UbuntuVersion(Enum):
-    UBU22 = "UBUNTU22"
-    UBU24 = "UBUNTU24"
 
 
 class UbuntuCreateModel(BlueprintNGCreateModel):

@@ -5,7 +5,8 @@ from pydantic import Field
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core.models.resources import VmResource, VmResourceImage
-from nfvcl.models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuCreateModel, UbuntuVersion
+from nfvcl.models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuCreateModel
+from nfvcl.models.blueprint_ng.common import UbuntuVersion
 
 UBUNTU_BLUE_TYPE = "ubuntu"
 UBU22_IMAGE_NAME = "ubuntu-lab-22"

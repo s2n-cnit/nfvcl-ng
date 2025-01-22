@@ -37,7 +37,7 @@ class PerformanceManager(GenericManager):
         Load the metrics already collected for the blueprints currently instantiated
         """
         for blueprint_to_load in self._blueprint_repository.get_all_dict():
-            element = self._performance_repository.find_by_blueprint_id(blueprint_to_load['id'])
+            element = self._performance_repository.find_by_blueprint_id(blueprint_to_load['id']) # TODO doppia query al database
             if element:
                 self.performance_dict[element.blueprint_id] = BlueprintPerformance.model_validate(element)
                 self.logger.debug(f"Loaded performances for blueprint {blueprint_to_load['id']}")

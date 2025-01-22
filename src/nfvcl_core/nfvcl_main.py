@@ -20,6 +20,7 @@ from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, 
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
+from nfvcl_core.managers.user_manager import UserManager
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core.models.network import PduModel, NetworkModel, RouterModel
@@ -94,6 +95,7 @@ class NFVCL:
     PERFORMANCE_SECTION = NFVCLPublicSectionModel(name="Performances", description="Operations related to the performance metrics", path="/performance/blue")
     K8S_SECTION = NFVCLPublicSectionModel(name="Kubernetes cluster management", description="Operations related to kubernetes clusters", path="/k8s")
     UTILS_SECTION = NFVCLPublicSectionModel(name="Utils", description="Utils", path="/v2/utils")
+    USER_SECTION = NFVCLPublicSectionModel(name="Users", description="User management", path="/v2/users")
 
     def __init__(
         self,
@@ -105,6 +107,7 @@ class NFVCL:
         performance_manager: PerformanceManager = Provide[NFVCLContainer.performance_manager],
         pdu_manager: PDUManager = Provide[NFVCLContainer.pdu_manager],
         kubernetes_manager: KubernetesManager = Provide[NFVCLContainer.kubernetes_manager],
+        user_manager: UserManager = Provide[NFVCLContainer.user_manager],
     ):
         self.logger = create_logger(self.__class__.__name__)
 
@@ -116,6 +119,7 @@ class NFVCL:
         self.kubernetes_manager = kubernetes_manager
         self.task_manager = task_manager
         self.event_manager = event_manager
+        self.user_manager = user_manager
 
         urllib3.disable_warnings()
 
@@ -123,6 +127,8 @@ class NFVCL:
 
         self.blueprint_manager.load()
         self.performance_manager.load()
+        self.user_manager.load()
+
 
         # TODO rework plugin loading
         from nfvcl_core.plugins.plugin import NFVCLPlugin
@@ -546,6 +552,8 @@ class NFVCL:
     @NFVCLPublic(path="/{cluster_id}/deployment/scale", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.scale_k8s_deployment)
     def k8s_scale_deployment(self, cluster_id: str, namespace: str, deployment_name: str, replica_number: int, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.scale_k8s_deployment, cluster_id, namespace, deployment_name, replica_number, callback=callback)
+
+    ############# User management #############
 
 
 def configure_injection():

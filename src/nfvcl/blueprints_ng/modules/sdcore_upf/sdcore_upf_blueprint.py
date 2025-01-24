@@ -48,10 +48,10 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
     configuration: Optional[SDCoreUPFConfiguration] = Field(default=None)
 
     def dump_playbook(self) -> str:
-        ansible_builder = AnsiblePlaybookBuilder(f"Playbook SDCoreUPFConfigurator")
+        ansible_builder = AnsiblePlaybookBuilder("Playbook SDCoreUPFConfigurator")
 
-        upf_config_path = f"/opt/upf/upf.jsonc"
-        run_upf_config_path = f"/opt/upf/run_upf.env"
+        upf_config_path = "/opt/upf/upf.jsonc"
+        run_upf_config_path = "/opt/upf/run_upf.env"
 
         # Get the n3 and n6 gateways mac addresses using ARP
         ansible_builder.add_run_command_and_gather_output_tasks(f"sudo arping -r -c 1 -I {self.configuration.n3_nic_name} {self.configuration.n3_nh_ip}", "n3_nh_mac")
@@ -68,8 +68,8 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
         return ansible_builder.build()
 
 
-UPF_IMAGE_NAME = "sd-core-upf-v1.4.0-2"
-UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v1.4.0-2-ubuntu2404.qcow2"
+UPF_IMAGE_NAME = "sd-core-upf-v2.0.0-2"
+UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.0.0-2-ubuntu2404.qcow2"
 
 
 @blueprint_type(SDCORE_UPF_BLUE_TYPE)

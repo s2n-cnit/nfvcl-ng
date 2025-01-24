@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager
 from nfvcl_core.blueprints import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.models.blueprints.blueprint import BlueprintNGStatus, BlueprintNGDay2HistoryElement
+from nfvcl_core.models.blueprints.blueprint import BlueprintNGStatus
 from nfvcl_core.models.resources import VmResource
 from nfvcl_core.models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus

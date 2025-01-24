@@ -161,6 +161,7 @@ async def catch_exceptions_middleware(request: Request, call_next):
     except Exception as e:
         # TODO log exception
         # TODO unify model with the success response one
+        logger.exception(f"Error: {str(e)}", exc_info=e)
         rest_error = NFVCLRestError(error=str(e))
         return Response(rest_error.model_dump_json(), status_code=rest_error.status_code)
 

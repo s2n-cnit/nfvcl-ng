@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import random
 import string
+from datetime import datetime, timezone
 from typing import Dict, List
 
 from pydantic import ValidationError
@@ -9,6 +11,7 @@ from pydantic import ValidationError
 from nfvcl_core.managers import GenericManager
 from nfvcl_core.database.user_repository import UserRepository, User
 from nfvcl_core.models.user import UserRole
+from nfvcl_core.utils.auth.tokens import decode_token, create_tokens_for_user, DB_TOKEN_HASH_ALGORITHM
 
 
 class UserManager(GenericManager):
@@ -66,6 +69,60 @@ class UserManager(GenericManager):
             self._user_repository.delete_user(username)
         else:
             raise Exception(f"No user found with id '{username}'")
+
+    ############################### LOGIN ########################################
+
+    def login(self, username: str, hashed_password: str) -> tuple[str, str]:
+        """
+        Returns:
+        tuple[str, str]: The access and refresh tokens.
+        """
+        user = self.get_user_by_username(username)
+        if user.password_hash == hashed_password:
+            access_token, refresh_token = create_tokens_for_user(user)
+            self.update_user(user)
+            return access_token, refresh_token
+        raise Exception("Invalid username/password")
+
+    def logout(self, access_token: str):
+        valid, user = self.check_token(access_token)
+        if valid:
+            user.access_token_hashed = None
+            user.refresh_token_hashed = None
+            user.access_token_expiration = None
+            user.refresh_token_expiration = None
+        self.update_user(user)
+
+    def renew_token(self, refresh_token: str) -> tuple[str, str]:
+        decoded_token = decode_token(refresh_token)
+        if decoded_token is not None:
+            user = self.get_user_by_username(decoded_token.username)
+            if user.refresh_token_hashed == getattr(hashlib, DB_TOKEN_HASH_ALGORITHM)(refresh_token.encode()).hexdigest():
+                access_token, refresh_token = create_tokens_for_user(user)
+                self.update_user(user)
+                return access_token, refresh_token
+        raise Exception("Invalid refresh token")
+
+    def check_token(self, access_token: str) -> tuple[bool, User|None]:
+        decoded_token = decode_token(access_token)
+        if decoded_token is not None:
+            user = self.get_user_by_username(decoded_token.username)
+            hash_function = getattr(hashlib, DB_TOKEN_HASH_ALGORITHM)
+            hashed_token = hash_function(access_token.encode()).hexdigest()
+            if user.access_token_hashed == hashed_token and user.access_token_hashed is not None:
+                # The token is the same as in the DB but is it expired?
+                if user.access_token_expiration > datetime.now(timezone.utc):
+                    return True, user
+                else:
+                    self.logger.debug(f"Access token expired for user {user.username}")
+                    return False, None
+            else:
+                self.logger.debug(f"Invalid access token for user {user.username}")
+                return False, None
+        self.logger.debug(f"Invalid access token received")
+        return False, None
+
+    ############################### TESTS ########################################
 
     def _test(self):
         username = 'XYZ'.join(random.choices(string.ascii_letters, k=4))

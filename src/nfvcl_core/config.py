@@ -1,12 +1,9 @@
 from ipaddress import AddressValueError
 from pathlib import Path
 from typing import Optional, Type, Tuple
-
 import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
-
 from pydantic import field_validator, Field, BaseModel
-
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
 
@@ -104,6 +101,7 @@ class NFVCLConfigModel(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NFVCL_", env_nested_delimiter="_")
 
     log_level: int = Field(default=20, description="10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0")
+    authentication: bool = Field(default=False, description="Enable the authentification")
     nfvcl: NFVCLParameters = Field(default_factory=NFVCLParameters)
     mongodb: MongoParameters = Field(default_factory=NFVCLParameters)
     redis: RedisParameters = Field(default_factory=NFVCLParameters)

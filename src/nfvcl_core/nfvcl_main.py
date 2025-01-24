@@ -244,7 +244,7 @@ class NFVCL:
             if task.result is None:
                 return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.RUNNING)
             else:
-                return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.DONE, result=task.result.result, error=task.result.error, exception=task.result.exception)
+                return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.DONE, result=task.result.result, error=task.result.error, exception=str(task.result.exception))
 
     ############# Topology #############
 

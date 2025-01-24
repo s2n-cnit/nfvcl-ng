@@ -1,7 +1,7 @@
 from dependency_injector import containers, providers
 
 from nfvcl_core.config import NFVCLConfigModel, load_nfvcl_config
-from nfvcl_core.database import TopologyRepository, BlueprintRepository, PerformanceRepository, user_repository, UserRepository
+from nfvcl_core.database import TopologyRepository, BlueprintRepository, PerformanceRepository, UserRepository
 from nfvcl_core.managers import PersistenceManager, TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager

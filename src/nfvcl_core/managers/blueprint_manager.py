@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager
 from nfvcl_core.blueprints import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.models.blueprints.blueprint import BlueprintNGStatus
+from nfvcl_core.models.blueprints.blueprint import BlueprintNGStatus, BlueprintNGDay2HistoryElement
 from nfvcl_core.models.resources import VmResource
 from nfvcl_core.models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
@@ -180,6 +180,7 @@ class BlueprintManager(GenericManager):
         blueprint = self.get_blueprint_instance(blueprint_id)
 
         if blueprint is None:
+            run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
             raise Exception(f"Blueprint {blueprint_id} not found")
 
         self.set_blueprint_status(blueprint.id, BlueprintNGStatus.running_day2())
@@ -252,6 +253,10 @@ class BlueprintManager(GenericManager):
         run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint deletion message for {blueprint_id} given to the worker..."))
 
         blueprint_instance = self.get_blueprint_instance(blueprint_id)
+
+        if blueprint_instance is None:
+            run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
+            raise Exception(f"Blueprint {blueprint_id} not found")
 
         performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DELETION, "delete")
         try:

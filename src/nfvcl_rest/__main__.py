@@ -26,7 +26,7 @@ from nfvcl_core.config import NFVCLConfigModel
 from nfvcl_core.global_ref import get_nfvcl_config
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.http_models import HttpRequestType
-from nfvcl_core.models.response_model import OssCompliantResponse
+from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
 from nfvcl_core.models.task import NFVCLTaskResult
 from nfvcl_core.nfvcl_main import NFVCLPublicModel
 from nfvcl_core.utils.file_utils import create_folder
@@ -76,11 +76,13 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
             if arg in override_args:
                 del args[arg]
 
-    def new_fn(request: Request, **kwargs):
+    def new_fn(request: Request, response: Response, **kwargs):
         if override_args:
             for override_arg in override_args:
                 kwargs[override_arg] = override_args[override_arg]
+
         if sync:
+            response.status_code = status.HTTP_200_OK
             return function(**kwargs)
         else:
             callback_function = None
@@ -88,7 +90,14 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
                 callback_url = request.query_params["callback"]
                 callback_function = partial(call_callback_url, callback_url)
             # We need to set a dummy callback function for the function to be executed async
-            return function(**kwargs, callback=callback_function if callback_function else dummy_callback)
+
+            response.status_code = status.HTTP_202_ACCEPTED
+            function_return = function(**kwargs, callback=callback_function if callback_function else dummy_callback)
+            if isinstance(function_return, OssCompliantResponse):
+                function_return: OssCompliantResponse
+                if function_return.status == OssStatus.failed:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+            return function_return
 
     params = []
 
@@ -97,6 +106,11 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
         "request",
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
         annotation=Request)
+    )
+    params.append(inspect.Parameter(
+        "response",
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        annotation=Response)
     )
 
     # If a parameter is of type Annotated[type, "application/yaml"] or other media types it need to be treated as Body by FastAPI
@@ -333,7 +347,13 @@ if __name__ == "__main__":
                     responses={404: {"description": "Not found"}},
                 )
                 routers_dict[nfvcl_public.section.name] = router
-            router.add_api_route(nfvcl_public.path, generate_function_signature(method_callable, sync=nfvcl_public.sync), methods=[nfvcl_public.method], summary=nfvcl_public.summary)
+            router.add_api_route(
+                nfvcl_public.path,
+                generate_function_signature(method_callable, sync=nfvcl_public.sync),
+                methods=[nfvcl_public.method],
+                summary=nfvcl_public.summary,
+                status_code=status.HTTP_200_OK if nfvcl_public.sync else status.HTTP_202_ACCEPTED,
+            )
 
 
     for module in nfvcl.get_loaded_blueprints():
@@ -355,7 +375,8 @@ if __name__ == "__main__":
                 override_doc=module.blue_class.create.__doc__,
                 sync=False
             ),
-            methods=["POST"]
+            methods=["POST"],
+            status_code=status.HTTP_202_ACCEPTED
         )
 
         for day2_route in nfvcl.get_module_routes(module.path):
@@ -374,7 +395,8 @@ if __name__ == "__main__":
                         override_return_type=typing.get_type_hints(day2_route.function)["return"],
                         sync=True
                     ),
-                    methods=["GET"]
+                    methods=["GET"],
+                    status_code=status.HTTP_200_OK
                 )
             else:
                 module_router.add_api_route(
@@ -387,7 +409,8 @@ if __name__ == "__main__":
                         override_doc=day2_route.function.__doc__,
                         sync=False
                     ),
-                    methods=["PUT"] # TODO can a day2 route use a different method?
+                    methods=["PUT"], # TODO can a day2 route use a different method?
+                    status_code=status.HTTP_202_ACCEPTED
                 )
 
         routers_dict[module.class_name] = module_router

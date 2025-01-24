@@ -12,6 +12,7 @@ class NFVCLParameters(NFVCLBaseModel):
     version: str
     ip: str
     port: int
+    authentication: bool = Field(default=False, description="Enable the authentication")
     mounted_folder: str = Field(default="mounted_folder", description="The folder in which files are generated to be exposed in API 'NFVCL_URL:NFVCL_PORT/files/'")
     tmp_folder: str = Field(default="/tmp/nfvcl", description="The folder in which the tmp files are saved")
 
@@ -101,7 +102,6 @@ class NFVCLConfigModel(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NFVCL_", env_nested_delimiter="_")
 
     log_level: int = Field(default=20, description="10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0")
-    authentication: bool = Field(default=False, description="Enable the authentification")
     nfvcl: NFVCLParameters = Field(default_factory=NFVCLParameters)
     mongodb: MongoParameters = Field(default_factory=NFVCLParameters)
     redis: RedisParameters = Field(default_factory=NFVCLParameters)

@@ -70,7 +70,7 @@ def control_token(token: str = Depends(oauth2_scheme)):
     Raises:
         HTTPException: If the token is invalid.
     """
-    if get_nfvcl_config().authentication:
+    if get_nfvcl_config().nfvcl.authentication:
         valid, user = user_manager.check_token(token)
         if not valid:
             raise HTTPException(

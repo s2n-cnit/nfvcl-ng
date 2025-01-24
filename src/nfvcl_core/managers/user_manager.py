@@ -72,13 +72,13 @@ class UserManager(GenericManager):
 
     ############################### LOGIN ########################################
 
-    def login(self, username: str, hashed_password: str) -> tuple[str, str]:
+    def login(self, username: str, password: str) -> tuple[str, str]:
         """
         Returns:
         tuple[str, str]: The access and refresh tokens.
         """
         user = self.get_user_by_username(username)
-        if user.password_hash == hashed_password:
+        if user.password_hash == hashlib.sha256(password.encode()).hexdigest():
             access_token, refresh_token = create_tokens_for_user(user)
             self.update_user(user)
             return access_token, refresh_token
@@ -110,8 +110,9 @@ class UserManager(GenericManager):
             hash_function = getattr(hashlib, DB_TOKEN_HASH_ALGORITHM)
             hashed_token = hash_function(access_token.encode()).hexdigest()
             if user.access_token_hashed == hashed_token and user.access_token_hashed is not None:
+                # TODO we are setting the timezone to the one of the saved token, is this correct?
                 # The token is the same as in the DB but is it expired?
-                if user.access_token_expiration > datetime.now(timezone.utc):
+                if user.access_token_expiration > datetime.now(user.access_token_expiration.tzinfo):
                     return True, user
                 else:
                     self.logger.debug(f"Access token expired for user {user.username}")

@@ -4,6 +4,7 @@ nfvcl:
   version: "0.3.1"
   port: "5002"
   ip: "0.0.0.0"
+  authentication: False
 mongodb:
   host: "mongo"
   port: "27017"

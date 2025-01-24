@@ -73,8 +73,8 @@ class SubSliceProfiles(NFVCLBaseModel):
     sliceType: Literal["EMBB", "URLLC", "MMTC"]
     dnnList: List[str] = Field([], description="set dnn-list as a listst on names")
     profileParams: SubProfileParams
-    locationConstraints: List[SubLocationConstraints]
-    enabledUEList: List[SubEnabledUEList]
+    locationConstraints: Optional[List[SubLocationConstraints]] = Field(default_factory=list)
+    enabledUEList: Optional[List[SubEnabledUEList]] = Field(default_factory=list)
 
 
 class SubSnssai(NFVCLBaseModel):

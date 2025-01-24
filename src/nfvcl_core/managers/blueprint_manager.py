@@ -89,7 +89,7 @@ class BlueprintManager(GenericManager):
             List of blueprint instances
         """
         if blue_type:
-            return list(filter(lambda x: x.base_model.blueprint_type == blue_type, self.blueprint_dict.values()))
+            return list(filter(lambda x: x.base_model.type == blue_type, self.blueprint_dict.values()))
         else:
             return list(self.blueprint_dict.values())
 

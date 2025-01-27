@@ -1,5 +1,6 @@
 from __future__ import annotations
 import copy
+import threading
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -33,6 +34,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         """
         super().__init__()
         self.logger = create_logger(self.__class__.__name__, blueprintid=blueprint_id)
+        self.lock: threading.Lock = threading.Lock()
 
         self.state_type = state_type
         state = state_type()

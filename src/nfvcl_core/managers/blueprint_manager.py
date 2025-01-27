@@ -138,28 +138,28 @@ class BlueprintManager(GenericManager):
             BlueClass = blueprint_type.get_blueprint_class(path)
             # Instantiate the object (creation of services is done by the worker)
             created_blue: BlueprintNG = BlueClass(blue_id)
-            created_blue.provider = ProvidersAggregator(created_blue, topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager)
-            created_blue.base_model.parent_blue_id = parent_id
-            # Saving the new blueprint to db
-            created_blue.to_db()
-            self.blueprint_dict[blue_id] = created_blue
+            with created_blue.lock:
+                created_blue.provider = ProvidersAggregator(created_blue, topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager)
+                created_blue.base_model.parent_blue_id = parent_id
+                # Saving the new blueprint to db
+                created_blue.to_db()
+                self.blueprint_dict[blue_id] = created_blue
 
-            self.set_blueprint_status(blue_id, BlueprintNGStatus.deploying(created_blue.id))
+                self.set_blueprint_status(blue_id, BlueprintNGStatus.deploying(created_blue.id))
 
-            self._performance_manager.add_blueprint(created_blue.id, path)
+                self._performance_manager.add_blueprint(created_blue.id, path)
 
-            performance_operation_id = self._performance_manager.start_operation(created_blue.id, BlueprintPerformanceType.DAY0, "create")
-            try:
-                created_blue.create(msg)
-            except Exception as e:
-                self.logger.error(f"Error during the creation of blueprint {blue_id}. Error: {e}")
-                self.set_blueprint_status(blue_id, BlueprintNGStatus.error_state(str(e)))
-                raise e
-            self.set_blueprint_status(blue_id, BlueprintNGStatus.idle())
-            self._performance_manager.end_operation(performance_operation_id)
+                performance_operation_id = self._performance_manager.start_operation(created_blue.id, BlueprintPerformanceType.DAY0, "create")
+                try:
+                    created_blue.create(msg)
+                except Exception as e:
+                    self.logger.error(f"Error during the creation of blueprint {blue_id}. Error: {e}")
+                    self.set_blueprint_status(blue_id, BlueprintNGStatus.error_state(str(e)))
+                    raise e
+                self.set_blueprint_status(blue_id, BlueprintNGStatus.idle())
+                self._performance_manager.end_operation(performance_operation_id)
 
-            self._event_manager.fire_event(NFVCLEventTopics.BLUEPRINT_TOPIC, BlueEventType.BLUE_CREATED, data=created_blue.base_model)
-
+                self._event_manager.fire_event(NFVCLEventTopics.BLUEPRINT_TOPIC, BlueEventType.BLUE_CREATED, data=created_blue.base_model)
             return blue_id
 
     def update_blueprint(self, blueprint_id: str, path: str, msg: Any, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> Any:
@@ -183,21 +183,22 @@ class BlueprintManager(GenericManager):
             run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
             raise Exception(f"Blueprint {blueprint_id} not found")
 
-        self.set_blueprint_status(blueprint.id, BlueprintNGStatus.running_day2())
+        with blueprint.lock:
+            self.set_blueprint_status(blueprint.id, BlueprintNGStatus.running_day2())
 
-        performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DAY2, path.split("/")[-1])
-        try:
-            if msg:
-                result = getattr(blueprint, function.__name__)(msg)
-            else:
-                result = getattr(blueprint, function.__name__)()
-        except Exception as e:
-            self.logger.error(f"Error during the update of blueprint {blueprint_id}. Error: {e}")
-            self.set_blueprint_status(blueprint.id, BlueprintNGStatus.error_state(str(e)))
-            raise e
-        self._performance_manager.end_operation(performance_operation_id)
+            performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DAY2, path.split("/")[-1])
+            try:
+                if msg:
+                    result = getattr(blueprint, function.__name__)(msg)
+                else:
+                    result = getattr(blueprint, function.__name__)()
+            except Exception as e:
+                self.logger.error(f"Error during the update of blueprint {blueprint_id}. Error: {e}")
+                self.set_blueprint_status(blueprint.id, BlueprintNGStatus.error_state(str(e)))
+                raise e
+            self._performance_manager.end_operation(performance_operation_id)
 
-        self.set_blueprint_status(blueprint.id, BlueprintNGStatus.idle())
+            self.set_blueprint_status(blueprint.id, BlueprintNGStatus.idle())
         return result
 
     def get_from_blueprint(self, blueprint_id: str, path: str) -> Any:
@@ -210,12 +211,16 @@ class BlueprintManager(GenericManager):
         blueprint = self.get_blueprint_instance(blueprint_id)
         function = blueprint_type.get_function_to_be_called(path)
 
-        try:
-            result = getattr(blueprint, function.__name__)()
-        except Exception as e:
-            self.logger.error(f"Error during the get DAY2 on blueprint {blueprint_id}. Error: {e}")
-            self.set_blueprint_status(blueprint.id, BlueprintNGStatus.error_state(str(e)))
-            raise e
+        if blueprint.lock.locked():
+            raise Exception(f"Blueprint {blueprint_id} is locked, since this request is synchronous, it is not possible to get data from a locked blueprint")
+
+        with blueprint.lock:
+            try:
+                result = getattr(blueprint, function.__name__)()
+            except Exception as e:
+                self.logger.error(f"Error during the get DAY2 on blueprint {blueprint_id}. Error: {e}")
+                self.set_blueprint_status(blueprint.id, BlueprintNGStatus.error_state(str(e)))
+                raise e
 
         return result
 
@@ -232,11 +237,11 @@ class BlueprintManager(GenericManager):
         """
 
         blueprint = self.get_blueprint_instance(blueprint_id)
-
-        # BlueprintOperationCallbackModel
-        performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.CROSS_BLUEPRINT_FUNCTION_CALL, function_name)
-        result = getattr(blueprint, function_name)(*args, **kwargs)
-        self._performance_manager.end_operation(performance_operation_id)
+        with blueprint.lock:
+            # BlueprintOperationCallbackModel
+            performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.CROSS_BLUEPRINT_FUNCTION_CALL, function_name)
+            result = getattr(blueprint, function_name)(*args, **kwargs)
+            self._performance_manager.end_operation(performance_operation_id)
         return result
 
     def delete_blueprint(self, blueprint_id: str, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> str:
@@ -258,20 +263,21 @@ class BlueprintManager(GenericManager):
             run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
             raise Exception(f"Blueprint {blueprint_id} not found")
 
-        performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DELETION, "delete")
-        try:
-            if blueprint_instance.base_model.protected:
-                raise BlueprintProtectedException(blueprint_id)
+        with blueprint_instance.lock:
+            performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DELETION, "delete")
+            try:
+                if blueprint_instance.base_model.protected:
+                    raise BlueprintProtectedException(blueprint_id)
 
-            self.set_blueprint_status(blueprint_id, BlueprintNGStatus.destroying(blueprint_id))
-            blueprint_instance.destroy()
-            self.blueprint_dict.pop(blueprint_id)
-            self._blueprint_repository.delete_blueprint(blueprint_id)
-        except Exception as e:
-            self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
-            self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))
-            raise e
-        self._performance_manager.end_operation(performance_operation_id)
+                self.set_blueprint_status(blueprint_id, BlueprintNGStatus.destroying(blueprint_id))
+                blueprint_instance.destroy()
+                self.blueprint_dict.pop(blueprint_id)
+                self._blueprint_repository.delete_blueprint(blueprint_id)
+            except Exception as e:
+                self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
+                self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))
+                raise e
+            self._performance_manager.end_operation(performance_operation_id)
 
         return blueprint_id
 

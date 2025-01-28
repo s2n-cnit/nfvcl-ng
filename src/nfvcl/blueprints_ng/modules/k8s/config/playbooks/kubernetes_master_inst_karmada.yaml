@@ -18,15 +18,19 @@
        path: /usr/local/bin/karmadactl
        state: absent
    - name: Installing Submariner
-     command: bash /tmp/submariner.sh
+     ansible.builtin.shell: |
+       /tmp/submariner.sh
+     environment:
+       DESTDIR: "/usr/local/bin"
    - name: Installing Karmada
-     command: bash /tmp/karmada.sh
+     ansible.builtin.shell: |
+       /tmp/karmada.sh
    - name: Create submariner broker info file
      ansible.builtin.copy:
        content: "{{ submariner_broker }}"
        dest: "/tmp/sub_broker.subm"
    - name: Configuring Submariner
-     command: ~/.local/bin/subctl join --kubeconfig '{{ kube_config_location }}' '/tmp/sub_broker.subm' --clusterid '{{ cluster_id }}' --label-gateway=false
+     ansible.builtin.shell: "echo | /usr/local/bin/subctl join --kubeconfig '{{ kube_config_location }}' '/tmp/sub_broker.subm' --clusterid '{{ cluster_id }}'"
    - name: Configuring Karmada
      command: sudo karmadactl register '{{ karmada_control_plane }}' --token '{{ karmada_token }}' --discovery-token-ca-cert-hash '{{ discovery_token_hash }}' --cluster-name '{{ cluster_id }}' --kubeconfig '{{ kube_config_location }}'
 

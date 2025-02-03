@@ -1,14 +1,14 @@
 import copy
 from abc import abstractmethod
-from typing import Generic, TypeVar, Optional, final, List, Dict
+from typing import Generic, TypeVar, Optional, final, List
 
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
 from pydantic import Field
 
+from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, SliceModel
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
-from nfvcl_core.models.resources import VmResource
 from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, SliceModel
 from nfvcl_core.models.http_models import HttpRequestType
 
 
@@ -18,6 +18,7 @@ class DeployedUPFInfo(NFVCLBaseModel):
     network_info: Optional[UPFNetworkInfo] = Field(default=None)
     vm_resource_id: Optional[str] = Field(default=None)
     vm_configurator_id: Optional[str] = Field(default=None)
+    router_gnb_ip: Optional[SerializableIPv4Address] = Field(default=None)
 
     def served_dnns(self) -> List[str]:
         served_dnns_list: List[str] = []
@@ -30,7 +31,6 @@ class DeployedUPFInfo(NFVCLBaseModel):
 class Generic5GUPFBlueprintNGState(BlueprintNGState):
     current_config: Optional[UPFBlueCreateModel] = Field(default=None)
     upf_list: List[DeployedUPFInfo] = Field(default_factory=list)
-    vm_resources: Dict[str, VmResource] = Field(default_factory=dict)
 
 
 StateTypeVar5GUPF = TypeVar("StateTypeVar5GUPF", bound=Generic5GUPFBlueprintNGState)
@@ -49,19 +49,35 @@ class Generic5GUPFBlueprintNG(BlueprintNG[Generic5GUPFBlueprintNGState, UPFBlueC
     def create(self, create_model: UPFBlueCreateModel):
         super().create(create_model)
         self.state.current_config = copy.deepcopy(create_model)
+        self.pre_create_upf()
         self.create_upf()
+        self.post_update_upf()
+
+    def pre_create_upf(self):
+        pass
 
     @abstractmethod
     def create_upf(self):
         pass
 
+    def post_create_upf(self):
+        pass
+
     @final
     def update(self, create_model: UPFBlueCreateModel):
         self.state.current_config = copy.deepcopy(create_model)
+        self.pre_update_upf()
         self.update_upf()
+        self.post_update_upf()
+
+    def pre_update_upf(self):
+        pass
 
     @abstractmethod
     def update_upf(self):
+        pass
+
+    def post_update_upf(self):
         pass
 
     @day2_function("/update", [HttpRequestType.PUT])

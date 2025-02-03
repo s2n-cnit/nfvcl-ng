@@ -4,11 +4,11 @@ from typing import Optional
 
 from pydantic import Field
 
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUPFVMBlueprintNGState, Generic5GUPFVMBlueprintNG
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_upf_config
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBlueprintNG, Generic5GUPFBlueprintNGState, \
-    DeployedUPFInfo
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 from nfvcl_core.models.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
 from nfvcl.models.blueprint_ng.free5gc.free5gcUpf import Free5gcUpfConfig, DnnListItem, IfListItem
@@ -65,7 +65,7 @@ class Free5gcUpfConfigurator(VmResourceAnsibleConfiguration):
         return ansible_builder.build()
 
 
-class Free5GCUpfBlueprintNGState(Generic5GUPFBlueprintNGState):
+class Free5GCUpfBlueprintNGState(Generic5GUPFVMBlueprintNGState):
     """
     This class represent the current state of the blueprint, the data contained in this class will be saved to the DB
 
@@ -80,8 +80,8 @@ class Free5GCUpfBlueprintNGState(Generic5GUPFBlueprintNGState):
 
 
 @blueprint_type(FREE5GC_UPF_BLUE_TYPE)
-class Free5GCUpf(Generic5GUPFBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCreateModel]):
-    def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFBlueprintNGState] = Free5GCUpfBlueprintNGState):
+class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCreateModel]):
+    def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFVMBlueprintNGState] = Free5GCUpfBlueprintNGState):
         """
         Don't write code in the init method, this will be called every time the blueprint is loaded from the DB
         """

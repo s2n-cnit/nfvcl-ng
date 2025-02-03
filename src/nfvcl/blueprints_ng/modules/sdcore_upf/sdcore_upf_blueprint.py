@@ -4,9 +4,10 @@ from typing import Optional, List, Dict
 
 from pydantic import Field
 
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUPFVMBlueprintNGState, Generic5GUPFVMBlueprintNG
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBlueprintNGState, Generic5GUPFBlueprintNG, DeployedUPFInfo
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from nfvcl_core.models.base_model import NFVCLBaseModel
@@ -16,7 +17,7 @@ from nfvcl_core.utils.blue_utils import rel_path
 SDCORE_UPF_BLUE_TYPE = "sdcore_upf"
 
 
-class SdCoreUPFBlueprintNGState(Generic5GUPFBlueprintNGState):
+class SdCoreUPFBlueprintNGState(Generic5GUPFVMBlueprintNGState):
     vm_configurators: Dict[str, SDCoreUPFConfigurator] = Field(default_factory=dict)
     currently_deployed_dnns: Dict[str, DeployedUPFInfo] = Field(default_factory=dict)
 
@@ -73,11 +74,13 @@ UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.0.0-
 
 
 @blueprint_type(SDCORE_UPF_BLUE_TYPE)
-class SdCoreUPFBlueprintNG(Generic5GUPFBlueprintNG[SdCoreUPFBlueprintNGState, UPFBlueCreateModel]):
+class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, UPFBlueCreateModel]):
+    router_needed = True
+
     sdcore_upf_image = VmResourceImage(name=UPF_IMAGE_NAME, url=UPF_IMAGE_URL)
     sdcore_upf_flavor = VmResourceFlavor(vcpu_count='4', memory_mb='8192', storage_gb='10')
 
-    def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFBlueprintNGState] = SdCoreUPFBlueprintNGState):
+    def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFVMBlueprintNGState] = SdCoreUPFBlueprintNGState):
         super().__init__(blueprint_id, state_type)
 
     def create_upf(self):

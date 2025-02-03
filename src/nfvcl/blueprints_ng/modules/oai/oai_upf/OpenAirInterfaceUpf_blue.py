@@ -5,9 +5,10 @@ from typing import Optional
 import yaml
 from pydantic import Field
 
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUPFVMBlueprintNG, Generic5GUPFVMBlueprintNGState
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBlueprintNG, Generic5GUPFBlueprintNGState, DeployedUPFInfo
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.oai import oai_default_upf_config
 from nfvcl.blueprints_ng.modules.oai import oai_utils
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
@@ -56,15 +57,15 @@ class OpenAirInterfaceUpfConfigurator(VmResourceAnsibleConfiguration):
         return ansible_builder.build()
 
 
-class OAIUpfBlueprintNGState(Generic5GUPFBlueprintNGState):
+class OAIUpfBlueprintNGState(Generic5GUPFVMBlueprintNGState):
     upf_vm_configurator: Optional[OpenAirInterfaceUpfConfigurator] = Field(default=None)
     upf_conf: Optional[Upfconfig] = Field(default=None)
 
 
 @blueprint_type(OAI_UPF_BLUE_TYPE)
-class OpenAirInterfaceUpf(Generic5GUPFBlueprintNG[OAIUpfBlueprintNGState, UPFBlueCreateModel]):
+class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFBlueCreateModel]):
 
-    def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFBlueprintNGState] = OAIUpfBlueprintNGState):
+    def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFVMBlueprintNGState] = OAIUpfBlueprintNGState):
         super().__init__(blueprint_id, state_type)
 
     def create_upf(self):

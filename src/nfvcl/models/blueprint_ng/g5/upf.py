@@ -14,6 +14,7 @@ class BlueCreateModelNetworks(NFVCLBaseModel):
     n4: str = Field()
     n3: str = Field()
     n6: str = Field()
+    gnb: Optional[str] = Field(default=None)
 
 class UPFNetworkInfo(NFVCLBaseModel):
     n4_cidr: SerializableIPv4Network = Field()

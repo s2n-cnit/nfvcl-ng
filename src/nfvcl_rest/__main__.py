@@ -281,7 +281,8 @@ if __name__ == "__main__":
             "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
         },
         swagger_ui_parameters={"syntaxHighlight.theme": "obsidian", "deepLinking": True},
-        lifespan=lifespan
+        lifespan=lifespan,
+        ignore_trailing_slash=True
     )
     app.add_middleware(ExceptionMiddleware)
 

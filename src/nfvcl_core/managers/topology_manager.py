@@ -229,3 +229,12 @@ class TopologyManager(GenericManager):
     def delete_prometheus(self, prometheus_id: str):
         self._topology.del_prometheus_srv(prometheus_id, False)
         self._topology_repository.save_topology(self._topology)
+
+    def update_pdu(self, pdu: PduModel):
+        """
+        Update an existing pdu
+        Args:
+            pdu: the pdu to be updated (identified by pdu.name) with updated data.
+        """
+        self._topology.upd_pdu(pdu)
+        self._topology_repository.save_topology(self._topology)

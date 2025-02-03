@@ -110,7 +110,7 @@ class PDUProvider(BlueprintNGProviderInterface):
         else:
             raise PDUProviderException(f"PDU {pdu_model.name} already locked by blueprint {pdu_model.locked_by}")
 
-        self.topology.upd_pdu(pdu_model)
+        self.topology_manager.update_pdu(pdu_model)
         self.save_to_db()
         return pdu_model
 
@@ -131,7 +131,7 @@ class PDUProvider(BlueprintNGProviderInterface):
         else:
             raise PDUProviderException(f"PDU {pdu_model.name} is not locked")
 
-        self.topology.upd_pdu(pdu_model)
+        self.topology_manager.update_pdu(pdu_model)
         self.save_to_db()
         return pdu_model
 

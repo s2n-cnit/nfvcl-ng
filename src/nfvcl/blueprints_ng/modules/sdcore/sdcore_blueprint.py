@@ -89,6 +89,13 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCo
         """
         self.config_ref.from_generic_5g_model(self.state.current_config)
 
+        # TODO fix this
+        if self.state.current_config.config.persistence.enabled:
+            self.logger.warning("Persistence is enabled but it is not supported by the current blueprint version")
+        #self.state.sdcore_config_values.field_5g_control_plane.mongodb.persistence.enabled = self.state.current_config.config.persistence.enabled
+        # TODO this value does not exist in the current config
+        # self.state.sdcore_config_values.field_5g_control_plane.mongodb.persistence.storage_class = self.state.current_config.config.persistence.storage_class
+
         for area in self.state.current_config.areas:
             for slice in area.slices:
                 edge_info = self.get_upfs_for_slice(slice.sliceId)[0]

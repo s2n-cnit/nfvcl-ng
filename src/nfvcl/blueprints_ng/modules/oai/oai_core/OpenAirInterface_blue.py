@@ -115,6 +115,9 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         Update core values.
 
         """
+        self.state.oai_config_values.mysql.persistence.enabled = self.state.current_config.config.persistence.enabled
+        self.state.oai_config_values.mysql.persistence.storageClass = self.state.current_config.config.persistence.storageClass
+
         self.state.oai_config_values.coreconfig.amf.served_guami_list.clear()
         oai_utils.add_served_guami_list_item(config=self.state.oai_config_values.coreconfig, mcc=self.state.mcc, mnc=self.state.mnc)
         self.state.oai_config_values.coreconfig.lmf.num_gnb = len(self.state.current_config.areas)

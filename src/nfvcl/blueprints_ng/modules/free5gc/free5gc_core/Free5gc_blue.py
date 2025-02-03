@@ -132,6 +132,12 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
 
     def update_core_values(self):
         self.clear_core_values()
+
+        # TODO this should also disable the cert-pvc
+        self.state.free5gc_config_values.mongodb.persistence.enabled = self.state.current_config.config.persistence.enabled
+        # TODO this value is not present in the current config
+        # self.state.free5gc_config_values.mongodb.persistence.storageClass = self.state.current_config.config.persistence.storageClass
+
         if self.state.smf_ip:
             self.state.free5gc_config_values.set_smf_ip(self.state.smf_ip)
 

@@ -93,6 +93,10 @@ class SubSubscribers(NFVCLBaseModel):
     authenticationManagementField: Optional[str] = Field(default="8000")
 
 
+class SubPersistence(NFVCLBaseModel):
+    enabled: bool = Field(default=True)
+    storageClass: Optional[str] = Field(default="")
+
 class SubConfig(NFVCLBaseModel):
     network_endpoints: NetworkEndPoints
     plmn: str = Field(..., pattern=r'^[0-9]*$', min_length=5, max_length=6,
@@ -100,6 +104,7 @@ class SubConfig(NFVCLBaseModel):
                       )
     sliceProfiles: Optional[List[SubSliceProfiles]] = Field(default=None, description="Set Default slices parameters")
     subscribers: List[SubSubscribers]
+    persistence: Optional[SubPersistence] = Field(default_factory=SubPersistence)
 
 
 # =================================================== End of Config class =============================================

@@ -189,7 +189,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                                            credentials=self.state.master_credentials,
                                            vim_name=topology_manager.get_vim_name_from_area_id(self.state.master_area.area_id),
                                            # For the constraint on the model, there is always a master area.
-                                           k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list,
+                                           k8s_version=K8S_VERSION, networks=self.state.attached_networks, areas=area_list,
                                            cni="", nfvo_onboard=False, cadvisor_node_port=self.state.cadvisor_node_port,
                                            anti_spoofing_enabled=not self.state.require_port_security_disabled)
             topology_manager.add_kubernetes(k8s_cluster)

@@ -93,6 +93,17 @@ class BlueprintManager(GenericManager):
         else:
             return list(self.blueprint_dict.values())
 
+    def get_blueprint_instances_by_parent_id(self, parent_id: str) -> List[BlueprintNG]:
+        """
+        Return the blueprint instances that have the given parent ID
+        Args:
+            parent_id: The parent ID of the blueprint
+
+        Returns:
+            List of blueprint instances
+        """
+        return list(filter(lambda x: x.base_model.parent_blue_id == parent_id, self.blueprint_dict.values()))
+
     def _load_modules(self):
         """
         IMPORT all blueprints modules in the NFVCL. When a module is loaded in the memory, decorators are read and executed.

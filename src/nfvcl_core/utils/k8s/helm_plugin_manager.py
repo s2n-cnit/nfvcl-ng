@@ -235,11 +235,13 @@ class HelmPluginManager:
                 match app:
                     case "flannel":
                         plugin_list.append(K8sPluginName.FLANNEL)
-                    case "metallb":
-                        plugin_list.append(K8sPluginName.METALLB)
+                    case "multus":
+                        plugin_list.append(K8sPluginName.MULTUS)
                     case _:
                         pass
-
+            if 'app.kubernetes.io/name' in daemon_set.metadata.labels:
+                if daemon_set.metadata.labels['app.kubernetes.io/name'] == 'metallb':
+                    plugin_list.append(K8sPluginName.METALLB)
             if 'openebs.io/component-name' in daemon_set.metadata.labels: # Value should be ndm
                 if K8sPluginName.OPEN_EBS not in plugin_list:
                     plugin_list.append(K8sPluginName.OPEN_EBS)

@@ -16,7 +16,7 @@ class K8sPluginName(str, Enum):
     METALLB = 'metallb'
     CALICO = 'calico'
     METRIC_SERVER = 'metric-server'
-    MULTUS = 'multus-cni'
+    MULTUS = 'multus'
     ISTIO = 'istio'
     CADVISOR = 'cadvisor'
 

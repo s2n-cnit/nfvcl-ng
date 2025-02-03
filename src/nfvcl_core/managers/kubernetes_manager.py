@@ -8,7 +8,7 @@ from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sQuota
 from nfvcl_core.utils.k8s import get_k8s_config_from_file_content, get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace, k8s_delete_namespace, apply_def_to_cluster
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
-from nfvcl_core.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, k8s_admin_role_over_namespace, k8s_cluster_admin, k8s_create_service_account, k8s_create_secret_for_user, k8s_get_secrets, k8s_cert_sign_req, k8s_add_quota_to_namespace, k8s_get_nodes, k8s_add_label_to_k8s_node, k8s_get_deployments, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment
+from nfvcl_core.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, k8s_admin_role_over_namespace, k8s_cluster_admin, k8s_create_service_account, k8s_create_secret_for_user, k8s_get_secrets, k8s_cert_sign_req, k8s_add_quota_to_namespace, k8s_get_nodes, k8s_add_label_to_k8s_node, k8s_get_deployments, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_ipaddress_pool, k8s_get_storage_classes
 from nfvcl_core.managers import TopologyManager, BlueprintManager, EventManager
 from nfvcl_core.managers.generic_manager import GenericManager
 from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
@@ -714,3 +714,54 @@ class KubernetesManager(GenericManager):
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         deployment: V1Deployment = k8s_scale_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, replica_num=replica_number)
         return deployment.to_dict()
+
+    def get_k8s_ipaddress_pools(self, cluster_id: str) -> List[str]:
+        """
+        Retrieve a list of IP addresses pools in the cluster used by the Load Balancer.
+
+        Returns:
+
+            A list of IP address pools. If there is no pool, an empty list is returned. This means that the LB has not been configured
+        """
+        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
+        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+        ip_pool_list = k8s_get_ipaddress_pool(k8s_config)
+        return ip_pool_list
+
+    def get_k8s_storage_classes(self, cluster_id: str) -> List[str]:
+        """
+        Retrieve a list of storage classes in the cluster
+        Args:
+
+            cluster_id: The cluster id
+
+        Returns:
+
+            A list of storage classes
+        """
+        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
+        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+        storage_classes = k8s_get_storage_classes(k8s_config)
+        sc_name_list = []
+        for sc in storage_classes.items:
+            sc_name_list.append(sc.metadata.name)
+        return sc_name_list
+
+    def get_k8s_default_storage_class(self, cluster_id: str) -> str | None:
+        """
+        Retrieve the default storage class in the cluster
+        Args:
+
+            cluster_id: The cluster id
+
+        Returns:
+
+            The default storage class, empty if none
+        """
+        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
+        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+        storage_classes = k8s_get_storage_classes(k8s_config)
+        for sc in storage_classes.items:
+            if sc.metadata.annotations.get("storageclass.kubernetes.io/is-default-class") == "true":
+                return sc.metadata.name
+        return None

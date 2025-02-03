@@ -386,48 +386,6 @@ def k8s_delete_namespace(kube_client_config: kubernetes.client.Configuration, na
         return namespace
 
 
-def check_plugin_to_be_installed(installed_plugins: List[K8sPluginName], plugins_to_install: List[K8sPluginName]):
-    """
-    Checks that plugins are in enabled list.
-    Next it check that ones to be installed are not already present.
-    Finally, that there is no conflict between them.
-
-    Args:
-        installed_plugins: list of installed plugins
-
-        plugins_to_install: list of plugins to be installed
-
-    Raises:
-        ValueError if:
-            - Plugins are already present in the cluster
-            - There is a conflict between installed plugins + ones to be installed (same type of plugin)
-
-    """
-
-    # Checking if plugins to be installed have element in common with installed plugins
-    common_elements = list(set(installed_plugins).intersection(plugins_to_install))
-    if len(common_elements) > 0:
-        msg_err = "Plugins {} are already present in the cluster.".format(common_elements)
-        raise ValueError(msg_err)
-
-    types: List[str] = []
-    union = set(installed_plugins).union(plugins_to_install)
-    # Getting enabled plugins list of the union (installed+to be installed).
-    filtered_enabled_plugins = get_enabled_plugins(union)
-
-    # Create a list for k8s plugin types, in order to check if there are conflicts.
-    types: List[K8sPluginType] = []
-    for plugin in filtered_enabled_plugins:
-        plugin_type = K8sPluginType(plugin.type)
-        # If type is already present -> Conflict
-        # If type is generic -> No need to check for conflict
-        if plugin_type in types and plugin_type is not K8sPluginType.GENERIC:
-            msg_warning = "There is a conflict between installed plugins + ones to be installed. 2 or more plugins of " \
-                          "the same type {} have been found (Example calico and flannel)".format(plugin_type)
-            logger.warning(msg_warning)
-        types.append(plugin_type)
-
-
 def get_k8s_version(kube_client_config: kubernetes.client.Configuration) -> K8sVersion:
     """
     Return the k8s version of the cluster

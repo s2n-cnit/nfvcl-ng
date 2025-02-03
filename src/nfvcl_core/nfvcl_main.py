@@ -6,6 +6,7 @@ from typing import Callable, Dict, List, Any, Optional, Annotated
 
 import urllib3
 from dependency_injector.wiring import Provide
+from fastapi import HTTPException
 from pydantic import Field
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_implementations
@@ -139,20 +140,20 @@ class NFVCL:
         for plugin in self.plugins:
             plugin.load()
 
-        self.vim_checks()
 
-    def vim_checks(self):
-        # TODO maybe this should be moved somewere else?
-        # TODO better handling if the topology is not present
-        try:
-            topology = self.topology_manager.get_topology()
-            vim_list = topology.get_vims()
-            vim_list = list(filter(lambda x: x.vim_type == "openstack", vim_list))
-            err_list = check_openstack_instances(topology, vim_list)
-            for err in err_list:
-                self.logger.error(f"Error checking VIM: {err.name}")
-        except Exception as e:
-            self.logger.error(f"Error checking VIMs: {e}")
+
+    # def vim_checks(self):
+    #     # TODO maybe this should be moved somewere else?
+    #     # TODO better handling if the topology is not present
+    #     try:
+    #         topology = self.topology_manager.get_topology()
+    #         vim_list = topology.get_vims()
+    #         vim_list = list(filter(lambda x: x.vim_type == "openstack", vim_list))
+    #         err_list = check_openstack_instances(topology, vim_list)
+    #         for err in err_list:
+    #             self.logger.error(f"Error checking VIM: {err.name}")
+    #     except Exception as e:
+    #         self.logger.error(f"Error checking VIMs: {e}")
 
     def get_ordered_public_methods(self) -> List[Callable]:
         """
@@ -459,7 +460,11 @@ class NFVCL:
 
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_installed_plugins)
     def k8s_get_installed_plugins(self, cluster_id: str, callback=None) -> List[str]:
-        return self.add_task(self.kubernetes_manager.get_k8s_installed_plugins, cluster_id, callback=callback)
+        try:
+            return self.add_task(self.kubernetes_manager.get_k8s_installed_plugins, cluster_id, callback=callback)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) # TODO do not return exception here
+
 
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.install_plugins)
     def k8s_install_plugin(self, cluster_id: str, plugin_name: K8sPluginsToInstall, callback=None) -> OssCompliantResponse:
@@ -472,6 +477,22 @@ class NFVCL:
     @NFVCLPublic(path="/{cluster_id}/cidr", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_cidr)
     def k8s_get_cluster_cidr(self, cluster_id: str, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.get_k8s_cidr, cluster_id, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/ipaddresspools", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_ipaddress_pools)
+    def k8s_get_ipaddresspools(self, cluster_id: str, callback=None) -> List[str]:
+        return self.add_task(self.kubernetes_manager.get_k8s_ipaddress_pools, cluster_id, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/storageclasses", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_storage_classes)
+    def k8s_get_storage_classes(self, cluster_id: str, callback=None) -> List[str]:
+        dsc = self.add_task(self.kubernetes_manager.get_k8s_storage_classes, cluster_id, callback=callback)
+        if dsc is not None:
+            return dsc
+        else:
+            raise HTTPException(status_code=404, detail="No default storage class found") # TODO do not return exception here
+
+    @NFVCLPublic(path="/{cluster_id}/defaultstorageclasses", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_default_storage_class)
+    def k8s_get_default_storage_classes(self, cluster_id: str, callback=None) -> str:
+        return self.add_task(self.kubernetes_manager.get_k8s_default_storage_class, cluster_id, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/pods", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_pods)
     def k8s_get_pods(self, cluster_id: str, callback=None) -> dict:

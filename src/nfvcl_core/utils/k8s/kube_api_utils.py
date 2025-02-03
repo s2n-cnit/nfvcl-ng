@@ -7,7 +7,7 @@ from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccou
     V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, V1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1Container, V1ResourceQuota, \
-    V1ResourceQuotaSpec, V1ClusterRoleBinding, V1Node, V1NodeList, V1DeploymentList, V1Deployment, V1DeploymentSpec
+    V1ResourceQuotaSpec, V1ClusterRoleBinding, V1Node, V1NodeList, V1DeploymentList, V1Deployment, V1DeploymentSpec, V1StorageClassList
 
 from nfvcl.models.k8s.common_k8s_model import Labels
 from nfvcl.models.k8s.topology_k8s_model import K8sQuota
@@ -779,3 +779,31 @@ def k8s_scale_k8s_deployment(kube_client_config: kubernetes.client.Configuration
         patched_node = api_instance_app.patch_namespaced_deployment(namespace=namespace, name=deployment_name, body=node)
 
         return patched_node
+
+def k8s_get_ipaddress_pool(kube_client_config: kubernetes.client.Configuration) -> List[str]:
+    ipaddress_pool = []
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_core = kubernetes.client.CustomObjectsApi(api_client)
+        try:
+            ipaddress_pool_list = api_instance_core.list_cluster_custom_object(group="metallb.io", version="v1beta1", plural="ipaddresspools")
+            for ip_pool in ipaddress_pool_list['items']:
+                pool_spec = ip_pool['spec']
+                ipaddress_pool = pool_spec['addresses']
+        except ApiException as error:
+            logger.error("Exception when calling metallb.io/v1beta1>k8s_get_ipaddress_pool: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+    return ipaddress_pool
+
+def k8s_get_storage_classes(kube_client_config: kubernetes.client.Configuration) -> V1StorageClassList:
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_core = kubernetes.client.StorageV1Api(api_client)
+        try:
+            return api_instance_core.list_storage_class()
+        except ApiException as error:
+            logger.error("Exception when calling StorageV1Api>k8s_get_storage_classes: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()

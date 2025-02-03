@@ -2,7 +2,7 @@ from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator, field_serializer
+from pydantic import BaseModel, Field, field_validator, field_serializer, computed_field
 
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
@@ -16,8 +16,14 @@ class NetworkTypeEnum(str, Enum):
 
 
 class IPv4Pool(BaseModel):
-    start: IPv4Address
-    end: IPv4Address
+    start: SerializableIPv4Address
+    end: SerializableIPv4Address
+    used: Optional[List[bool]] = Field(default=None)
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if self.used is None:
+            self.used = [False] * (int(self.end) - int(self.start) + 1)
 
     @field_validator('start')
     def start_val(cls, val):
@@ -45,24 +51,39 @@ class IPv4Pool(BaseModel):
         else:
             raise ValueError("IPv4Pool validator: The type of >end< field is not recognized ->> {}".format(val))
 
-    @field_serializer('start')
-    def serialize_start(self, start: IPv4Address, _info):
-        if start is not None:
-            return start.exploded
+    def assign_ip_address(self) -> SerializableIPv4Address | None:
+        """
+        Assign an IP address to a VM
+        Returns:
+            The IP address assigned, None if no IP is available
+        """
+        for i in range(len(self.used)): # Iterate over the used list and take the first free address
+            if not self.used[i]:
+                self.used[i] = True
+                return self.start + i
+
         return None
 
-    @field_serializer('end')
-    def serialize_end(self, end: IPv4Address, _info):
-        if end is not None:
-            return end.exploded
-        return None
+    def release_ip_address(self, ip: SerializableIPv4Address) -> bool:
+        """
+        Release an IP address from the pool
+        Args:
+            ip: The IP address to be released
 
+        Returns:
+            True if the IP was released, False otherwise
+        """
+        if self.start <= ip <= self.end and self.used[int(ip) - int(self.start)]:  # Check if the IP is in the range and used
+            self.used[int(ip) - int(self.start)] = False
+            return True
+        return False
 
 class IPv4ReservedRange(IPv4Pool):
     """
     Extension of IPv4Pool
     """
     owner: str
+    assigned_to: Optional[str] = Field(default=None)
 
     def __eq__(self, other):
         """
@@ -86,8 +107,8 @@ class NetworkModel(BaseModel):
     cidr: IPv4Network
     gateway_ip: Optional[IPv4Address] = Field(default=None)
     allocation_pool: List[IPv4Pool] = Field(default=[], description='The list of ranges that are used by the VIM to assign IP addresses to VMs (Reserved to VIM)')
-    reserved_ranges: List[IPv4ReservedRange] = Field(default=[], description='The list of ranges that have been reserved by deployed blueprints')
-    dns_nameservers: List[IPv4Address] = Field(default=[], description='List of DNS IPs avaiable in this network')
+    reserved_ranges: List[IPv4ReservedRange] = Field(default=[], description='The list of ranges that have been reserved or assigned')
+    dns_nameservers: List[IPv4Address] = Field(default=[], description='List of DNS IPs available in this network')
 
     @classmethod
     def build_network_model(cls, name: str, type: NetworkTypeEnum, cidr: IPv4Network):

@@ -1,5 +1,7 @@
 from enum import Enum
 from typing import Optional, List
+
+from nfvcl_core.models.network.network_models import IPv4Pool
 from pydantic import Field
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.k8s.plugin_k8s_model import K8sOperationType
@@ -45,21 +47,36 @@ class K8sVersion(str, Enum):
         other_version = to_compare.value[1:]
         return float(this_version) < float(other_version)
 
+class ProvidedBy(str, Enum):
+    """
+    This class represents a k8s version. This should represent supported versions of k8s clusters by k8s manager.
+    It has the utilities for checking if the version is present and to compare versions.
+    """
+    NFVCL = 'NFVCL'
+    EXTERNAL = 'EXTERNAL'
+    UNKNOWN = 'UNKNOWN'
+
+
+class MultusInfo(NFVCLBaseModel):
+    interface_name: str = Field(description="The name of the interface to be used by application using Multus. The interface used as a bridge in the k8s cluster. The interface name must be same for all nodes in the cluster.")
+    available_ip_pools: List[IPv4Pool] = Field(description="The list of IP pools that can be used by blueprints to deploy services. The IP pools must be assigned by the topology.")
+
 
 class TopologyK8sModel(NFVCLBaseModel):
     name: str = Field(title="Name of k8s cluster", description="It must be unique for each k8s cluster")
-    provided_by: str = Field(default="NFVCL", description="The provider of the cluster")
+    provided_by: ProvidedBy = Field(default=ProvidedBy.NFVCL.value, description="The provider of the cluster")
     blueprint_ref: str = Field(default="", description="Reference blueprint, empty if k8s cluster is external")
     deployed_blueprints: List[str] = Field(default=[], description="The list of Blueprints deployed in k8s cluster")
     credentials: str = Field(title="Content of k8s crediential file (example admin.conf)")
     vim_name: Optional[str] = Field(default=None, description="Reference VIM, where k8s cluster is deployed.")
-    k8s_version: K8sVersion = Field(default=K8sVersion.V1_24)
-    networks: List[str] = Field(description="List of attached networks", min_length=1)
-    areas: List[int] = Field(description="Competence areas", min_length=1)
-    cni: Optional[str] = Field(default=None)
+    k8s_version: K8sVersion = Field(default=K8sVersion.V1_30, description="The version of the k8s cluster")
+    networks: List[str] = Field(description="List of attached networks to the cluster", min_length=1)
+    multus_info: Optional[MultusInfo] = Field(default=None, description="Multus information")
+    areas: List[int] = Field(description="Competence areas of the k8s cluster", min_length=1)
+    cni: Optional[str] = Field(default=None, description="The CNI plugin used in the cluster")
     cadvisor_node_port: Optional[int] = Field(default=None, description="The node port on which the cadvisor service is exposed")
-    nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED)
-    nfvo_onboard: bool = Field(default=False)
+    nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED, deprecated=True) # TODO remove
+    nfvo_onboard: bool = Field(default=False, deprecated=True) # TODO remove
     anti_spoofing_enabled: Optional[bool] = Field(default=False)
 
     def __eq__(self, other):

@@ -68,10 +68,11 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             raise BlueprintNGException(f"Already registered")
         if not resource.id:
             resource.id = str(uuid.uuid4())
-        if isinstance(resource, ResourceDeployable):
-            resource_dep: ResourceDeployable = resource
+        # TODO also add a check for k8s resources
+        if isinstance(resource, VmResource):
+            resource_vm: VmResource = resource
             try:
-                self.provider.topology_manager.get_vim_from_area_id_model(resource_dep.area)
+                self.provider.topology_manager.get_vim_from_area_id_model(resource_vm.area)
             except ValueError as e:
                 raise BlueprintNGException("Unable to register resource, the area has no associated VIM")
         self.base_model.registered_resources[resource.id] = RegisteredResource(type=get_class_path_str_from_obj(resource), value=resource)

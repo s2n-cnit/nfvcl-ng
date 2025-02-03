@@ -57,7 +57,7 @@ class EventManager(GenericManager):
 
 
     def debug_callback(self, topic, **kwargs):
-        self.logger.debug(f"** EVENT ** -> Topic: {topic}, Kwargs: {kwargs}")
+        self.logger.verbose(f"** EVENT ** -> Topic: {topic}, Kwargs: {kwargs}")
 
     def subscribe_all_debug(self):
         self.logger.debug("Subscribing to all topics for debug")

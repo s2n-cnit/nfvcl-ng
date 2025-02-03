@@ -268,7 +268,15 @@ def setup_main_routes():
 if __name__ == "__main__":
     check_py_version()
 
-    configure_injection()
+    config_path = os.getenv("NFVCL_CONFIG_PATH")
+    if config_path:
+        if Path(config_path).is_file():
+            configure_injection(config_path)
+        else:
+            logger.error(f"NFVCL_CONFIG_PATH is set to {config_path} but the file does not exist, loading from default location.")
+            configure_injection()
+    else:
+        configure_injection()
 
     nfvcl = NFVCL()
 

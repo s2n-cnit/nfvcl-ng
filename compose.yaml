@@ -5,6 +5,8 @@ services:
       - mongo
       - redis
     restart: always
+    environment:
+      NFVCL_CONFIG_PATH: "/app/nfvcl-ng/config/config.yaml"
     ports:
       - 5002:5002
     volumes:

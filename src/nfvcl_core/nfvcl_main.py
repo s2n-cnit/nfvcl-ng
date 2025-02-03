@@ -14,7 +14,7 @@ from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sQuota
 from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
-from nfvcl_core.config import NFVCLConfigModel
+from nfvcl_core.config import NFVCLConfigModel, load_nfvcl_config
 from nfvcl_core.containers import NFVCLContainer
 from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
@@ -556,8 +556,9 @@ class NFVCL:
     ############# User management #############
 
 
-def configure_injection():
+def configure_injection(config_path: Optional[str] = None):
     container = NFVCLContainer()
+    container.config.from_pydantic(load_nfvcl_config(path=config_path))
     container.init_resources()
     container.wire(modules=[__name__, "nfvcl_core.managers"])
     # register_loader_containers(Container)

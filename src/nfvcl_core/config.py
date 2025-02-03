@@ -117,7 +117,7 @@ class NFVCLConfigModel(BaseSettings):
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
         return env_settings, init_settings
 
-def load_nfvcl_config() -> NFVCLConfigModel:
+def load_nfvcl_config(path: Optional[str] = None) -> NFVCLConfigModel:
     """
     Read the NFVCL config from the configuration file. If config/config_dev.yaml is present, this function load from this file,
     otherwise the function reads the default config/config.yaml
@@ -126,10 +126,13 @@ def load_nfvcl_config() -> NFVCLConfigModel:
         The NFVCL configuration
     """
     print("load_nfvcl_config")
-    dev_config_file_path = Path("config/config_dev.yaml")
-    default_config_file_path = Path("config/config.yaml")
-    # Loading develops nfvcl file if present (Not uploaded on Git)
-    config_file_path = dev_config_file_path if dev_config_file_path.is_file() else default_config_file_path
+    if path:
+        config_file_path = Path(path)
+    else:
+        dev_config_file_path = Path("config/config_dev.yaml")
+        default_config_file_path = Path("config/config.yaml")
+        # Loading develops nfvcl file if present (Not uploaded on Git)
+        config_file_path = dev_config_file_path if dev_config_file_path.is_file() else default_config_file_path
 
     with open(config_file_path, 'r') as stream_file:
         # pre_config_logger.info(f"Loading config from {config_file_path.name}")

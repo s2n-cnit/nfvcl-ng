@@ -22,6 +22,8 @@ redis:
 Using ENV variables every value loaded from the configuration file will be overwritten, this means that you can override
 alse a single value.
 
+TODO: this section is no longer correct and needs to be updated
+
 ```
 MONGO_IP=127.0.0.1
 MONGO_PORT=27017

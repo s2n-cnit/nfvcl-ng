@@ -1,6 +1,6 @@
 from dependency_injector import containers, providers
 
-from nfvcl_core.config import NFVCLConfigModel, load_nfvcl_config
+from nfvcl_core.config import NFVCLConfigModel
 from nfvcl_core.database import TopologyRepository, BlueprintRepository, PerformanceRepository, UserRepository
 from nfvcl_core.managers import PersistenceManager, TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
@@ -10,7 +10,6 @@ from nfvcl_core.managers.user_manager import UserManager
 
 class NFVCLContainer(containers.DeclarativeContainer):
     config: providers.Configuration[NFVCLConfigModel] = providers.Configuration()
-    config.from_pydantic(load_nfvcl_config())
 
     persistence_manager = providers.Singleton(
         PersistenceManager,
@@ -18,7 +17,7 @@ class NFVCLContainer(containers.DeclarativeContainer):
         port=config.mongodb.port,
         db=config.mongodb.db,
         username=config.mongodb.username,
-        password=config.mongodb.password # I was missing :(((((
+        password=config.mongodb.password
     )
 
     task_manager = providers.Singleton(

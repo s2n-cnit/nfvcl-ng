@@ -4,9 +4,9 @@ from nfvcl_core.migrations import Migration
 from nfvcl_core.utils.log import create_logger
 
 
-class Migration001Initial(Migration):
+class Migration002K8sTopo(Migration):
     def __init__(self):
-        self.logger = create_logger("Migration001Initial")
+        self.logger = create_logger("Migration002K8sTopo")
 
     def upgrade(self, db: Database):
         self.logger.info("Test migration upgrade")

@@ -57,21 +57,21 @@ class ProvidedBy(str, Enum):
     UNKNOWN = 'UNKNOWN'
 
 
-class MultusInfo(NFVCLBaseModel):
-    interface_name: str = Field(description="The name of the interface to be used by application using Multus. The interface used as a bridge in the k8s cluster. The interface name must be same for all nodes in the cluster.")
-    available_ip_pools: List[IPv4Pool] = Field(description="The list of IP pools that can be used by blueprints to deploy services. The IP pools must be assigned by the topology.")
-
+class K8sNetworkInfo(NFVCLBaseModel):
+    name: str = Field(description="The name of the network to be used by the k8s cluster")
+    interface_name: Optional[str] = Field(default=None, description="The name of the interface connected to this network. The interface name must be same for all nodes in the cluster.")
+    multus_enabled: Optional[bool] = Field(default=False, description="If true, the network is a Multus network")
+    ip_pools: Optional[List[str]] = Field(default_factory=list, description="The list of IP pools ids that can be used by blueprints to deploy services. The IP pools must be assigned by the topology.")
 
 class TopologyK8sModel(NFVCLBaseModel):
     name: str = Field(title="Name of k8s cluster", description="It must be unique for each k8s cluster")
     provided_by: ProvidedBy = Field(default=ProvidedBy.NFVCL.value, description="The provider of the cluster")
     blueprint_ref: str = Field(default="", description="Reference blueprint, empty if k8s cluster is external")
     deployed_blueprints: List[str] = Field(default=[], description="The list of Blueprints deployed in k8s cluster")
-    credentials: str = Field(title="Content of k8s crediential file (example admin.conf)")
+    credentials: str = Field(title="Content of k8s credential file (example admin.conf)")
     vim_name: Optional[str] = Field(default=None, description="Reference VIM, where k8s cluster is deployed.")
     k8s_version: K8sVersion = Field(default=K8sVersion.V1_30, description="The version of the k8s cluster")
-    networks: List[str] = Field(description="List of attached networks to the cluster", min_length=1)
-    multus_info: Optional[MultusInfo] = Field(default=None, description="Multus information")
+    networks: List[K8sNetworkInfo] = Field(description="List of attached networks to the cluster", min_length=1)
     areas: List[int] = Field(description="Competence areas of the k8s cluster", min_length=1)
     cni: Optional[str] = Field(default=None, description="The CNI plugin used in the cluster")
     cadvisor_node_port: Optional[int] = Field(default=None, description="The node port on which the cadvisor service is exposed")

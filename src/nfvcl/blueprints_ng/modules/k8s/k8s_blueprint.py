@@ -17,7 +17,7 @@ from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAre
 from nfvcl_core.models.http_models import HttpRequestType
 from nfvcl.models.k8s.common_k8s_model import Cni
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
-from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
 from nfvcl_core.models.topology_models import TopoK8SHasBlueprintException
 from nfvcl_core.utils.k8s import get_k8s_config_from_file_content, get_config_map, patch_config_map, get_k8s_cidr_info
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
@@ -185,11 +185,11 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             topology_manager = self.provider.topology_manager
             area_list = [item.area_id for item in self.state.area_list]
 
-            k8s_cluster = TopologyK8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id,
+            k8s_cluster = TopologyK8sModel(name=self.id, provided_by=ProvidedBy.NFVCL, blueprint_ref=self.id,
                                            credentials=self.state.master_credentials,
                                            vim_name=topology_manager.get_vim_name_from_area_id(self.state.master_area.area_id),
                                            # For the constraint on the model, there is always a master area.
-                                           k8s_version=K8S_VERSION, networks=self.state.attached_networks, areas=area_list,
+                                           k8s_version=K8S_VERSION, networks=[K8sNetworkInfo(name=network) for network in self.state.attached_networks], areas=area_list,
                                            cni="", nfvo_onboard=False, cadvisor_node_port=self.state.cadvisor_node_port,
                                            anti_spoofing_enabled=not self.state.require_port_security_disabled)
             topology_manager.add_kubernetes(k8s_cluster)

@@ -366,14 +366,8 @@ class NFVCL:
         kubernetes_model.provided_by = 'external'
         return self.add_task(self.topology_manager.add_kubernetes, kubernetes_model, callback=callback)
 
-    @NFVCLPublic(
-        path="/kubernetes/update",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.PUT,
-        summary=UPD_K8SCLUSTER_SUMMARY,
-        description=UPD_K8SCLUSTER_DESCRIPTION
-    )
-    def update_kubernetes(self, cluster: TopologyK8sModel, callback=None):
+    @NFVCLPublic(path="/kubernetes/update",section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_K8SCLUSTER_SUMMARY, description=UPD_K8SCLUSTER_DESCRIPTION)
+    def update_kubernetes(self, cluster: TopologyK8sModel, callback=None) -> TopologyK8sModel:
         return self.add_task(self.topology_manager.update_kubernetes, cluster, callback=callback)
 
     @NFVCLPublic(path="/kubernetes/{cluster_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)

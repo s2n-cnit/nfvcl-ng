@@ -260,7 +260,7 @@ class NetworkModel(BaseModel):
         total_ips = sum([pool.range_length() for pool in self.allocation_pool])
         available_ips = []
         if total_ips < length:
-            raise ValueError("The requested range is too long for the network. There are not enough free IPs.")
+            raise ValueError("The requested range is too long for the network. There are not enough free IPs in allocation_pools.")
         # Building a list of NOT reserved ips.
         for pool in self.allocation_pool:
             if len(available_ips) >= length:
@@ -271,7 +271,7 @@ class NetworkModel(BaseModel):
                 if not self.is_ip_reserved(ip):
                     available_ips.append(ip)
         if len(available_ips) < length:
-            raise ValueError("The requested range is too long for the network. There are not enough free IPs.")
+            raise ValueError("The requested range is too long for the network. There are not enough free IPs in allocation_pools.")
         # Start building the reserved range
         reserved_ranges = []
         for ip in available_ips:
@@ -316,6 +316,16 @@ class NetworkModel(BaseModel):
 
         raise ValueError(f"Reserved range >{reserved_range_name}< is not present in the network.")
 
+    def get_reserved_range(self, reserved_range_name: str) -> IPv4ReservedRange:
+        """
+        Get a reserved range in a network Model.
+        Args:
+            reserved_range_name: The name of the reserved range to be retrieved
+        """
+        for reserved_range in self.reserved_ranges:
+            if reserved_range.name == reserved_range_name:
+                return reserved_range
+        raise ValueError(f"Reserved range >{reserved_range_name}< is not present in the network.")
 
 class RouterPortModel(BaseModel):
     net: str
@@ -392,6 +402,12 @@ class NetworkInterfaceModel(NFVCLBaseModel):
     network: Optional[SerializableIPv4Network] = Field(default=None, description="The network attached to the network interface")
     gateway: Optional[SerializableIPv4Address] = Field(default=None, description="The IPv4 address of the gateway on the network attached")
 
+class MultusInterface(NFVCLBaseModel):
+    ip_address: SerializableIPv4Address = Field(description="The IP address assigned to the multus interface")
+    gateway_ip: Optional[SerializableIPv4Address] = Field(default=None, description="The IP address of the gateway for the multus interface")
+    host_interface: str = Field(description="The name of the host interface to which the multus interface is attached")
+    prefixlen: int = Field(description="The prefix length of the IP address assigned to the multus interface")
+    network_name: str = Field(description="The name of the network to which the multus interface is attached")
 
 class PduType(str, Enum):
     LINUX: str = 'LINUX'

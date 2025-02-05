@@ -1,5 +1,7 @@
 from typing import Optional, List, Union, Callable
 
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
+
 from nfvcl_core.models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
 from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
 
@@ -7,7 +9,7 @@ from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
 from nfvcl_core.database import TopologyRepository
 from nfvcl_core.managers import GenericManager
 from nfvcl_core.models.network import NetworkModel, RouterModel, PduModel
-from nfvcl_core.models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool
+from nfvcl_core.models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface
 from nfvcl_core.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl_core.models.topology_models import TopologyModel
 from nfvcl_core.models.vim import VimModel
@@ -66,6 +68,8 @@ class TopologyManager(GenericManager):
         self._topology_repository.save_topology(self._topology)
         return vim
 
+    ############################ Network ########################################
+
     def get_network(self, network_id: str) -> NetworkModel:
         return self._topology.get_network(network_id)
 
@@ -121,9 +125,18 @@ class TopologyManager(GenericManager):
         self._topology_repository.save_topology(self._topology)
         return removed_range
 
+    def get_reserved_ranges_from_network(self, network_id: str) -> List[IPv4ReservedRange]:
+        network = self._topology.get_network(network_id)
+        return network.reserved_ranges
+
+    def get_reserved_range_from_network(self, network_id: str, reserved_range_name: str) -> IPv4ReservedRange:
+        return self._topology.get_network(network_id).get_reserved_range(reserved_range_name)
+
     def delete_network(self, network_id: str) -> None:
         self._topology.delete_network(network_id)
         self._topology_repository.save_topology(self._topology)
+
+    ############################ Router ########################################
 
     def get_router(self, router_id: str) -> RouterModel:
         return self._topology.get_router(router_id)
@@ -136,6 +149,8 @@ class TopologyManager(GenericManager):
     def delete_router(self, router_id: str) -> None:
         self._topology.delete_router(router_id)
         self._topology_repository.save_topology(self._topology)
+
+    ############################ PDUs ########################################
 
     def get_pdu(self, pdu_id: str) -> PduModel:
         """
@@ -178,6 +193,8 @@ class TopologyManager(GenericManager):
             List[PduModel] containing list of PDU in the topology
         """
         return self._topology.get_pdus()
+
+    ############################ Kubernetes ########################################
 
     def get_kubernetes_list(self) -> List[TopologyK8sModel]:
         return self._topology.kubernetes
@@ -228,19 +245,33 @@ class TopologyManager(GenericManager):
             # TODO change exception type
             raise Exception(error_msg)
 
-    def release_ranges(self, network_name: str, reserved_range_name: str) -> IPv4ReservedRange:
-        """
-        Release a reserved range. It is possible by giving the owner name or the full specification.
-        Args:
-            network_name: The network name where the range is reserved
-            reserved_range_name: The name of the range to be released
+    def reserve_k8s_multus_ip(self, k8s_id: str, network_id: str) -> MultusInterface:
+        # Getting Info (raise error if not found)
+        cluster = self.get_k8s_cluster_by_id(k8s_id)
+        cluster_network = cluster.get_network(network_id)
+        if cluster_network.ip_pools is None or len(cluster_network.ip_pools) == 0:
+            raise Exception(f"No IP pools assigned to the network {network_id} for the K8s cluster {k8s_id}")
+        if cluster_network.interface_name is None:
+            raise Exception(f"No interface name assigned to the network {network_id} in the K8s cluster {k8s_id}")
+        network = self.get_network(network_id)
 
-        Returns:
-            The deleted IP range reservation
-        """
-        network = self._topology.find_network(network_name)
-        return network.release_range(reserved_range_name)
+        assigned_ip: SerializableIPv4Address | None = None
+        for ip_pool in cluster_network.ip_pools:
+            topology_network_reserved_pool = self.get_network(network_id).get_reserved_range(ip_pool)
+            assigned_ip = topology_network_reserved_pool.assign_ip_address()
+            if assigned_ip is not None:
+                break
+        if assigned_ip is None:
+            raise Exception(f"No available IP in the network {network_id} for the K8s cluster {k8s_id}. Reserved ranges are empty or all IPs have been reserved")
 
+        multus_info = MultusInterface(host_interface=cluster_network.interface_name, ip_address=assigned_ip, network_name=network.name, gateway_ip=network.gateway_ip, prefixlen=network.cidr.prefixlen)
+
+        self._topology_repository.save_topology(self._topology)
+
+        return multus_info
+
+
+    ############################ Prometheus ########################################
 
     def get_prometheus_list(self) -> List[PrometheusServerModel]:
         return self._topology.prometheus_srv

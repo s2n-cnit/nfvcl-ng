@@ -295,19 +295,19 @@ class NFVCL:
     def update_network(self, network: NetworkModel, callback=None):
         return self.add_task(self.topology_manager.create_network, network, callback=callback)
 
-    @NFVCLPublic(path="/network/add/pool/{network}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, sync=True)
+    @NFVCLPublic(path="/network/{network}/add/pool", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def add_pool_network(self, network: str, pool: IPv4Pool, callback=None) -> IPv4Pool:
         return self.add_task(self.topology_manager.add_allocation_pool_to_network, network, pool, callback=callback)
 
-    @NFVCLPublic(path="/network/del/pool/{network}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, sync=True)
+    @NFVCLPublic(path="/network/{network}/del/pool", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def del_pool_network(self, network: str, pool_name: str, callback=None) -> IPv4Pool:
         return self.add_task(self.topology_manager.remove_allocation_pool_from_network, network, pool_name, callback=callback)
 
-    @NFVCLPublic(path="/network/k8s/reserve/{network}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, sync=True)
+    @NFVCLPublic(path="/network/{network}/k8s/reserve", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def reserve_range_to_k8s_cluster(self, network: str, cluster_id: str, length: PositiveInt, callback=None) -> List[IPv4ReservedRange]:
         return self.add_task(self.topology_manager.reserve_range_to_k8s_cluster, network, cluster_id, length, callback=callback)
 
-    @NFVCLPublic(path="/network/K8s/release/{network}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, sync=True)
+    @NFVCLPublic(path="/network/{network}/K8s/release", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def release_range_to_k8s_cluster(self, network: str, reserved_range_name: str, cluster_id: str, callback=None) -> IPv4ReservedRange:
         return self.add_task(self.topology_manager.release_range_from_k8s_cluster, network, reserved_range_name, cluster_id, callback=callback)
 

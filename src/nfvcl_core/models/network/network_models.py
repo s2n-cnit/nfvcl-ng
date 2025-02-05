@@ -75,6 +75,17 @@ class IPv4Pool(NFVCLBaseModel):
         """
         return [self.start + i for i in range(self.range_length())]
 
+    def is_ip_in_range(self, ip: SerializableIPv4Address) -> bool:
+        """
+        Check if an IP is in the pool
+        Args:
+            ip: The IP to be checked
+
+        Returns:
+            True if the IP is in the pool, False otherwise
+        """
+        return self.start <= ip <= self.end
+
     def assign_ip_address(self) -> SerializableIPv4Address | None:
         """
         Assign an IP address to a VM
@@ -116,7 +127,6 @@ class IPv4Pool(NFVCLBaseModel):
 class PoolAssignation(str, Enum):
     K8S_CLUSTER: str = 'K8S_CLUSTER'
     MANUAL: str = 'MANUAL'
-
 
 class IPv4ReservedRange(IPv4Pool):
     """
@@ -326,6 +336,17 @@ class NetworkModel(BaseModel):
             if reserved_range.name == reserved_range_name:
                 return reserved_range
         raise ValueError(f"Reserved range >{reserved_range_name}< is not present in the network.")
+
+    def get_reserved_range_by_ip(self, reserved_ip: SerializableIPv4Address) -> IPv4ReservedRange:
+        """
+        Get a reserved range the topology network to which the address belongs to.
+        Args:
+            reserved_ip: The IP address part of the reserved range
+        """
+        for reserved_range in self.reserved_ranges:
+            if reserved_range.is_ip_in_range(ip=reserved_ip):
+                return reserved_range
+        raise ValueError(f"Reserved range containing IP >{reserved_ip}< is not present in the network.")
 
 class RouterPortModel(BaseModel):
     net: str

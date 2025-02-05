@@ -245,30 +245,49 @@ class TopologyManager(GenericManager):
             # TODO change exception type
             raise Exception(error_msg)
 
-    def reserve_k8s_multus_ip(self, k8s_id: str, network_id: str) -> MultusInterface:
+    def reserve_k8s_multus_ip(self, k8s_id: str, network_name: str) -> MultusInterface:
         # Getting Info (raise error if not found)
         cluster = self.get_k8s_cluster_by_id(k8s_id)
-        cluster_network = cluster.get_network(network_id)
+        cluster_network = cluster.get_network(network_name)
         if cluster_network.ip_pools is None or len(cluster_network.ip_pools) == 0:
-            raise Exception(f"No IP pools assigned to the network {network_id} for the K8s cluster {k8s_id}")
+            raise Exception(f"No IP pools assigned to the network {network_name} for the K8s cluster {k8s_id}")
         if cluster_network.interface_name is None:
-            raise Exception(f"No interface name assigned to the network {network_id} in the K8s cluster {k8s_id}")
-        network = self.get_network(network_id)
+            raise Exception(f"No interface name assigned to the network {network_name} in the K8s cluster {k8s_id}")
+        network = self.get_network(network_name)
 
         assigned_ip: SerializableIPv4Address | None = None
         for ip_pool in cluster_network.ip_pools:
-            topology_network_reserved_pool = self.get_network(network_id).get_reserved_range(ip_pool)
+            topology_network_reserved_pool = self.get_network(network_name).get_reserved_range(ip_pool)
             assigned_ip = topology_network_reserved_pool.assign_ip_address()
             if assigned_ip is not None:
                 break
         if assigned_ip is None:
-            raise Exception(f"No available IP in the network {network_id} for the K8s cluster {k8s_id}. Reserved ranges are empty or all IPs have been reserved")
+            raise Exception(f"No available IP in the network {network_name} for the K8s cluster {k8s_id}. Reserved ranges are empty or all IPs have been reserved")
 
         multus_info = MultusInterface(host_interface=cluster_network.interface_name, ip_address=assigned_ip, network_name=network.name, gateway_ip=network.gateway_ip, prefixlen=network.cidr.prefixlen)
 
         self._topology_repository.save_topology(self._topology)
 
         return multus_info
+
+    def release_k8s_multus_ip(self, k8s_id: str, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
+        """
+        Release the IP address reserved for a k8s cluster using Multus from the network
+        Args:
+            k8s_id: The cluster to which the IP as been assigned
+            ip_address: The IP address to be released
+            network_name: The network in which the IP has been reserved
+
+        Returns:
+            The released IP address
+        """
+        network = self.get_network(network_name)
+        reserved_range = network.get_reserved_range_by_ip(ip_address)
+        if reserved_range.assigned_to == PoolAssignation.K8S_CLUSTER.value and reserved_range.owner == k8s_id:
+            reserved_range.release_ip_address(ip_address)
+        self._topology_repository.save_topology(self._topology)
+        return ip_address
+
 
 
     ############################ Prometheus ########################################

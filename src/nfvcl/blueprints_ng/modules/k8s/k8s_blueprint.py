@@ -441,7 +441,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 raise e
         super().destroy()
         # Remove reserved IP range
-        self.provider.topology_manager.release_ranges(self.id)  # Remove all reserved ranges in the networks
+        #self.provider.topology_manager.release_ranges(self.id)  # Remove all reserved ranges in the networks TODO adjust
         # If it was onboarded on the topology (as a usable k8s cluster), remove it.
 
     def to_dict(self, detailed: bool) -> dict:

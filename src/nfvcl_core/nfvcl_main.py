@@ -6,8 +6,9 @@ from typing import Callable, Dict, List, Any, Optional, Annotated
 
 import urllib3
 from dependency_injector.wiring import Provide
-from fastapi import HTTPException
-from pydantic import Field
+from fastapi import HTTPException # TODO Remove
+from nfvcl_core.models.network.network_models import IPv4Pool, IPv4ReservedRange
+from pydantic import Field, PositiveInt
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_implementations
 from nfvcl.models.k8s.common_k8s_model import Labels
@@ -33,7 +34,6 @@ from nfvcl_core.models.topology_models import TopologyModel
 from nfvcl_core.models.vim import VimModel
 from nfvcl_core.public_methods_description import GET_PROM_SRV_SUMMARY, GET_PROM_SRV_DESCRIPTION, GET_PROM_LIST_SRV_SUMMARY, GET_PROM_LIST_SRV_DESCRIPTION, DEL_PROM_SRV_SUMMARY, DEL_PROM_SRV_DESCRIPTION, UPD_PROM_SRV_SUMMARY, UPD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_SUMMARY, UPD_K8SCLUSTER_SUMMARY, UPD_K8SCLUSTER_DESCRIPTION, ADD_EXTERNAL_K8SCLUSTER_SUMMARY, ADD_EXTERNAL_K8SCLUSTER
 from nfvcl_core.utils.log import create_logger
-from nfvcl_core.utils.openstack.openstack_utils import check_openstack_instances
 
 
 def callback_function(event: threading.Event, namespace: Dict, msg: NFVCLTaskResult):
@@ -287,11 +287,31 @@ class NFVCL:
     def get_network(self, network_id: str, callback=None) -> NetworkModel:
         return self.add_task(self.topology_manager.get_network, network_id, callback=callback)
 
-    @NFVCLPublic(path="/network", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST)
+    @NFVCLPublic(path="/network", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def create_network(self, network: NetworkModel, callback=None):
         return self.add_task(self.topology_manager.create_network, network, callback=callback)
 
-    @NFVCLPublic(path="/network/{network_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)
+    @NFVCLPublic(path="/network", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, sync=True)
+    def update_network(self, network: NetworkModel, callback=None):
+        return self.add_task(self.topology_manager.create_network, network, callback=callback)
+
+    @NFVCLPublic(path="/network/add/pool/{network}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, sync=True)
+    def add_pool_network(self, network: str, pool: IPv4Pool, callback=None) -> IPv4Pool:
+        return self.add_task(self.topology_manager.add_allocation_pool_to_network, network, pool, callback=callback)
+
+    @NFVCLPublic(path="/network/del/pool/{network}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, sync=True)
+    def del_pool_network(self, network: str, pool_name: str, callback=None) -> IPv4Pool:
+        return self.add_task(self.topology_manager.remove_allocation_pool_from_network, network, pool_name, callback=callback)
+
+    @NFVCLPublic(path="/network/k8s/reserve/{network}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, sync=True)
+    def reserve_range_to_k8s_cluster(self, network: str, cluster_id: str, length: PositiveInt, callback=None) -> List[IPv4ReservedRange]:
+        return self.add_task(self.topology_manager.reserve_range_to_k8s_cluster, network, cluster_id, length, callback=callback)
+
+    @NFVCLPublic(path="/network/K8s/release/{network}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, sync=True)
+    def release_range_to_k8s_cluster(self, network: str, reserved_range_name: str, cluster_id: str, callback=None) -> IPv4ReservedRange:
+        return self.add_task(self.topology_manager.release_range_from_k8s_cluster, network, reserved_range_name, cluster_id, callback=callback)
+
+    @NFVCLPublic(path="/network/{network_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_network(self, network_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_network, network_id, callback=callback)
 

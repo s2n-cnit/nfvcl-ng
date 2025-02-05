@@ -1,11 +1,13 @@
+import ipaddress
 from enum import Enum
 from ipaddress import IPv4Network, IPv4Address
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator, field_serializer, computed_field
+from pydantic import BaseModel, Field, field_validator
 
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl_core.utils.util import generate_id
 
 
 class NetworkTypeEnum(str, Enum):
@@ -15,7 +17,8 @@ class NetworkTypeEnum(str, Enum):
     flat: str = 'flat'
 
 
-class IPv4Pool(BaseModel):
+class IPv4Pool(NFVCLBaseModel):
+    name: str = Field(default_factory=generate_id)
     start: SerializableIPv4Address
     end: SerializableIPv4Address
     used: Optional[List[bool]] = Field(default=None)
@@ -24,6 +27,16 @@ class IPv4Pool(BaseModel):
         super().__init__(**data)
         if self.used is None:
             self.used = [False] * (int(self.end) - int(self.start) + 1)
+
+    def __eq__(self, other):
+        """
+        Overrides the default equals implementation. In this way it is possible to directly compare objects
+        of this type on a given criteria (in this case the 'start' and 'end' attributes)
+        """
+        if isinstance(other, IPv4Pool):
+            if other.start <= self.start <= other.end or other.start <= self.end <= other.end:
+                return True
+        return False
 
     @field_validator('start')
     def start_val(cls, val):
@@ -51,13 +64,24 @@ class IPv4Pool(BaseModel):
         else:
             raise ValueError("IPv4Pool validator: The type of >end< field is not recognized ->> {}".format(val))
 
+    def range_length(self) -> int:
+        return int(self.end) - int(self.start) + 1
+
+    def ip_list(self) -> List[SerializableIPv4Address]:
+        """
+        Returns a list of all the IPs in the pool
+        Returns:
+            A list of all the IPs in the pool
+        """
+        return [self.start + i for i in range(self.range_length())]
+
     def assign_ip_address(self) -> SerializableIPv4Address | None:
         """
         Assign an IP address to a VM
         Returns:
             The IP address assigned, None if no IP is available
         """
-        for i in range(len(self.used)): # Iterate over the used list and take the first free address
+        for i in range(len(self.used)):  # Iterate over the used list and take the first free address
             if not self.used[i]:
                 self.used[i] = True
                 return self.start + i
@@ -78,12 +102,42 @@ class IPv4Pool(BaseModel):
             return True
         return False
 
+    def extend_range_end(self, new_end: SerializableIPv4Address):
+        """
+        Extend the range of the pool to the end IP
+        Args:
+            new_end: The end IP of the pool
+        """
+        if new_end <= self.end:
+            raise ValueError("The end IP must be greater than the end IP of the pool")
+        self.used.extend([False] * (int(new_end) - int(self.end) + 1))
+        self.end = new_end
+
+class PoolAssignation(str, Enum):
+    K8S_CLUSTER: str = 'K8S_CLUSTER'
+    MANUAL: str = 'MANUAL'
+
+
 class IPv4ReservedRange(IPv4Pool):
     """
     Extension of IPv4Pool
     """
-    owner: str
-    assigned_to: Optional[str] = Field(default=None)
+    owner: str = Field(description="The owner of the reserved range, could be the ID of a kubernetes cluster an ID of a Blueprint....")
+    assigned_to: Optional[PoolAssignation] = Field(default=None, description="Type of assignation")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+
+    def is_ip_in_range(self, ip: SerializableIPv4Address) -> bool:
+        """
+        Check if an IP is in the reserved range
+        Args:
+            ip: The IP to be checked
+
+        Returns:
+            True if the IP is in the range, False otherwise
+        """
+        return self.start <= ip <= self.end
 
     def __eq__(self, other):
         """
@@ -98,17 +152,17 @@ class IPv4ReservedRange(IPv4Pool):
 
 
 class NetworkModel(BaseModel):
-    name: str
-    external: bool = Field(default=False)
-    type: NetworkTypeEnum
-    vid: Optional[int] = Field(default=None)
-    dhcp: bool = True
-    ids: List[dict] = Field(default=[])
-    cidr: IPv4Network
-    gateway_ip: Optional[IPv4Address] = Field(default=None)
-    allocation_pool: List[IPv4Pool] = Field(default=[], description='The list of ranges that are used by the VIM to assign IP addresses to VMs (Reserved to VIM)')
-    reserved_ranges: List[IPv4ReservedRange] = Field(default=[], description='The list of ranges that have been reserved or assigned')
-    dns_nameservers: List[IPv4Address] = Field(default=[], description='List of DNS IPs available in this network')
+    name: str = Field(description="The name of the network")
+    external: bool = Field(default=False)  # TODO remove
+    type: NetworkTypeEnum  # TODO remove
+    vid: Optional[int] = Field(default=None)  # TODO remove
+    dhcp: bool = True  # TODO remove
+    ids: List[dict] = Field(default=[])  # TODO remove
+    cidr: SerializableIPv4Network = Field(description="The CIDR of the network")
+    gateway_ip: Optional[SerializableIPv4Address] = Field(default=None, description="The IP of the gateway in this network")
+    allocation_pool: List[IPv4Pool] = Field(default=[], description='The pools that can be used to assign IPs. They can be a subset of the CIDR (not all the IPs are available for assignation)')
+    reserved_ranges: List[IPv4ReservedRange] = Field(default=[], description='The list of ranges that have been reserved or assigned. They are not available for assignation because they are already in use or they have been manually added there')
+    dns_nameservers: List[SerializableIPv4Address] = Field(default=[], description='List of DNS server IPs available in this network')
 
     @classmethod
     def build_network_model(cls, name: str, type: NetworkTypeEnum, cidr: IPv4Network):
@@ -123,79 +177,144 @@ class NetworkModel(BaseModel):
             return self.name == other.name
         return False
 
+    def add_allocation_pool(self, pool: IPv4Pool):
+        """
+        Add an allocation pool to the network. This is useful if you want to exclude a range from automatic assignation.
+        Args:
+            pool: The pool to be added
+
+        Returns:
+            The pool added
+
+        Raises: ValueError if the pool is already present in the network
+        """
+        if pool in self.allocation_pool:
+            msg_err = f"Pool >{pool.model_dump(exclude={'used'})}< is already present in the topology. Or have overlapped IPs with an existing pool."
+            raise ValueError(msg_err)
+        if pool.start in self.cidr and pool.end in self.cidr:
+            self.allocation_pool.append(pool)
+            return pool
+        else:
+            msg_err = f"Pool >{pool.model_dump(exclude={'used'})}< is not in the CIDR of the network."
+            raise ValueError(msg_err)
+
+    def remove_allocation_pool(self, pool_name: str):
+        """
+        Remove an allocation pool from the network. This is useful if you want to exclude a range from automatic assignation.
+        Args:
+            pool_name: The name of the pool to be removed
+
+        Returns:
+            The pool removed
+
+        Raises: ValueError if the pool is not present in the network
+        """
+        for pool in self.allocation_pool:
+            if pool.name == pool_name:
+                self.allocation_pool.remove(pool)
+                return pool
+        raise ValueError(f"Pool >{pool_name}< is not present in the topology.")
+
     @field_validator('gateway_ip')
     def end_validator(cls, val):
         """
         Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')
         """
-        if isinstance(val, str):
-            return IPv4Address(val)
-        elif isinstance(val, IPv4Address):
-            return val
-
-    @field_serializer('cidr')
-    def serialize_cidr(self, cidr: IPv4Network, _info):
-        if cidr is not None:
-            return cidr.exploded
-        return None
-
-    @field_serializer('gateway_ip')
-    def serialize_start(self, gateway_ip: IPv4Address, _info):
-        if gateway_ip is not None:
-            return gateway_ip.exploded
-        return None
-
-    @field_serializer('dns_nameservers')
-    def serialize_dns(self, dns_nameservers: List[IPv4Address], _info):
-        to_ret: List[str] = []
-        for i in range(0, len(dns_nameservers)):
-            to_ret.append(dns_nameservers[i].exploded)
-        return to_ret
+        try:
+            ipv4_model = SerializableIPv4Address(val)
+            return ipv4_model
+        except ipaddress.AddressValueError:
+            return None
 
     def add_reserved_range(self, reserved_range: IPv4ReservedRange):
         """
-        Add a reserved range to the network
+        Add a reserved range to the network. This is useful if you want to exclude a range from automatic assignation.
         Args:
             reserved_range: The range to be reserved
 
         Returns:
+            Reserved range added
 
+        Raises: ValueError if the range is already present in the network
         """
         if reserved_range in self.reserved_ranges:
             msg_err = ("Reserved range >{}< is already present in the topology. Or have overlapped IPs with an existing"
                        "range. See IPv4ReservedRange for more info.").format(reserved_range.model_dump())
             raise ValueError(msg_err)
         self.reserved_ranges.append(reserved_range)
+        return reserved_range
 
-    def release_range(self, owner: str, ip_range: IPv4ReservedRange) \
-        -> Union[IPv4ReservedRange, None]:
+    def reserve_range(self, owner: str, length: int, assigned_to: str) -> List[IPv4ReservedRange]:
         """
-        Release a reserved range in a network Model. The removed reservation is the FIRST that match the owner.
-        If a range is given, then the removed IP range will be the desired one.
-        !!! Ranges are considered equal if the IPs are overlapping.
+        Looks into the allocation pool and reserve the desired number of IPs in the reserved ranges.
         Args:
-            owner: The owner of the reservation
-            ip_range: The [OPTIONAL] IP range to be removed
+            owner: The owner of the reserved range. Could be the Blueprint ID or the Kubernetes cluster ID for example.
+            length: The length of the range to be reserved
+            assigned_to: synthetic field that describes the owner of the range
+
+        Returns:
+            A list of reserved ranges that ensure the desired length of ips. In the ideal case, only one range is returned (in a list).
+
+        Raises: ValueError if the requested range is too long for the network. There are not enough free IPs.
+        """
+        total_ips = sum([pool.range_length() for pool in self.allocation_pool])
+        available_ips = []
+        if total_ips < length:
+            raise ValueError("The requested range is too long for the network. There are not enough free IPs.")
+        # Building a list of NOT reserved ips.
+        for pool in self.allocation_pool:
+            if len(available_ips) >= length:
+                break
+            for ip in pool.ip_list():
+                if len(available_ips) >= length:
+                    break
+                if not self.is_ip_reserved(ip):
+                    available_ips.append(ip)
+        if len(available_ips) < length:
+            raise ValueError("The requested range is too long for the network. There are not enough free IPs.")
+        # Start building the reserved range
+        reserved_ranges = []
+        for ip in available_ips:
+            if len(reserved_ranges) == 0:
+                reserved_ranges.append(IPv4ReservedRange(start=ip, end=ip, owner=owner, assigned_to=PoolAssignation.K8S_CLUSTER))
+            else:
+                if reserved_ranges[-1].end + 1 == ip:
+                    reserved_ranges[-1].extend_range_end(ip)
+                else:
+                    reserved_ranges.append(IPv4ReservedRange(start=ip, end=ip, owner=owner, assigned_to=PoolAssignation.K8S_CLUSTER))
+        self.reserved_ranges.extend(reserved_ranges)
+        return reserved_ranges
+
+    def is_ip_reserved(self, ip: SerializableIPv4Address):
+        """
+        Check if an IP is reserved in the network
+        Args:
+            ip: The IP to be checked
+
+        Returns:
+            True if the IP is reserved, False otherwise
+        """
+        for reserved_range in self.reserved_ranges:
+            if reserved_range.is_ip_in_range(ip):
+                return True
+        return False
+
+    def release_range(self, reserved_range_name: str) -> IPv4ReservedRange:
+        """
+        Release a reserved range in a network Model.
+        Args:
+            reserved_range_name: The name of the reserved range to be removed
 
         Returns:
             The released range.
         """
         # Looking for the reservation to be removed in every reserved range.
         for reserved_range in self.reserved_ranges:
-            if ip_range is None:
-                # Checking reserved range has the required owner
-                if reserved_range.owner == owner:
-                    self.reserved_ranges.remove(reserved_range)
-                    return reserved_range
-            else:
-                # Ensure that the owner inside the reservation is the required one
-                assert owner == ip_range.owner
-                # Checking reserved range is equal to the required one (owner, start ip, end ip)
-                if reserved_range == ip_range:
-                    self.reserved_ranges.remove(reserved_range)
-                    return reserved_range
+            if reserved_range.name == reserved_range_name:
+                self.reserved_ranges.remove(reserved_range)
+                return reserved_range
 
-        return None
+        raise ValueError(f"Reserved range >{reserved_range_name}< is not present in the network.")
 
 
 class RouterPortModel(BaseModel):
@@ -282,6 +401,7 @@ class PduType(str, Enum):
     CUDU: str = 'CUDU'
     CORE5G: str = 'CORE5G'
 
+
 class PduModel(BaseModel):
     """
     Model for a Physical deployment unit (PDU) -> RU, gNB...
@@ -300,6 +420,7 @@ class PduModel(BaseModel):
     config: dict = Field(default={}, description="Additional configuration parameters needed by the PDU to be accessed/configured")
 
     locked_by: Optional[str] = Field(default=None, description="The id of the blueprint who locked the PDU")
+
     # last_applied_config: dict = Field(default={}, description="The last configuration used by the configurator to set up the device")
 
     def __eq__(self, other):

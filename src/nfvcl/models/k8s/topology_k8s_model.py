@@ -88,6 +88,31 @@ class TopologyK8sModel(NFVCLBaseModel):
             return self.name == other.name
         return False
 
+    def get_network(self, network_name: str) -> K8sNetworkInfo:
+        """
+        Returns the desired network if connected to the cluster
+        Args:
+            network_name: The desired network
+
+        Returns:
+            The network if attached to the cluster, None otherwise
+        """
+        for network in self.networks:
+            if network.name == network_name:
+                return network
+        raise ValueError(f"Network is not present in {self.name} K8S cluster")
+
+    def release_ip_pool(self, ip_pool_name: str):
+        """
+        Release the IP pools from the network info
+        Args:
+            ip_pool_name: The name of the IP pool to be released
+        """
+        for network in self.networks:
+            if ip_pool_name in network.ip_pools:
+                network.ip_pools.remove(ip_pool_name)
+                return
+        raise ValueError(f"IP pool {ip_pool_name} is not present in {self.name} K8S cluster")
 
 class K8sModelCreateFromBlueprint(NFVCLBaseModel):
     """

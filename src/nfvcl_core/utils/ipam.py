@@ -2,6 +2,7 @@ import ipaddress
 import socket
 from typing import Union, List
 
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core.models.network.network_models import IPv4Pool
 
 
@@ -38,20 +39,20 @@ def check_range_in_cidr(ip_min: Union[ipaddress.IPv4Address, str], ip_max: Union
         ip_max = ipaddress.IPv4Address(ip_max)
     return ip_min in cidr and ip_max in cidr
 
-def check_ipv4_valid(ipv4: str) -> bool:
+def check_ipv4_valid(ipv4: str) -> SerializableIPv4Address | None:
     """
     Check if the IPv4 is a valid address
     Args:
         ipv4: The IP (string) to be checked
 
     Returns:
-        True if it is a valid IPv4 address.
+        The IPv4 address if valid, False otherwise
     """
     try:
-        ipv4_model = ipaddress.IPv4Address(ipv4)
-        return True
+        ipv4_model = SerializableIPv4Address(ipv4)
+        return ipv4_model
     except ipaddress.AddressValueError:
-        return False
+        return None
 
 def get_available_network_ip(cidr: ipaddress.IPv4Network, reserved_ranges: List[IPv4Pool]) -> List[IPv4Pool]:
     """

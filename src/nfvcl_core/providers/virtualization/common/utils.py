@@ -1,3 +1,4 @@
+import datetime
 import time
 from pathlib import Path
 from typing import Optional
@@ -74,11 +75,11 @@ def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfigurati
     else:
         logger = logger_pu
 
-    nfvcl_tmp_dir = create_tmp_folder("nfvcl/playbook")  # Path("/tmp/nfvcl/playbook")
+    nfvcl_tmp_dir = create_tmp_folder("playbook")
 
     playbook_str = vm_resource_configuration.dump_playbook()
 
-    with open(Path(nfvcl_tmp_dir, f"{blueprint_id}_{vm_resource_configuration.vm_resource.name}.yml"), "w+") as f:
+    with open(Path(nfvcl_tmp_dir, f"{blueprint_id}_{vm_resource_configuration.vm_resource.name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.yml"), "w+") as f:
         f.write(playbook_str)
 
     # Wait for SSH to be ready, this is needed because sometimes cloudinit is still not finished and the server doesn't allow password connections

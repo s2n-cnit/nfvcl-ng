@@ -12,6 +12,7 @@ services:
     volumes:
       - ./config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
       - ./logs/:/app/nfvcl-ng/logs/
+      - ./tmp/:/tmp/nfvcl/
 
   redis:
     image: redis:alpine

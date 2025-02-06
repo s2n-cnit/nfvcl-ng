@@ -8,6 +8,7 @@ from typing import Dict, List
 import httpx
 import paramiko
 from httpx import Response
+from nfvcl_core.models.vim import VimModel
 from pydantic import Field
 
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit, CloudInitNetworkRoot
@@ -49,6 +50,11 @@ class VirtualizationProviderProxmoxException(VirtualizationProviderException):
 
 
 class VirtualizationProviderProxmox(VirtualizationProviderInterface):
+    ssh: paramiko.SSHClient
+    data: VirtualizationProviderDataProxmox
+    vim: VimModel
+
+
     def init(self):
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -75,6 +81,9 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         )
         self.__create_ci_qcow_folders()
         self.__load_scripts()
+
+    def get_vim_info(self):
+        return self.vim
 
     def create_vm(self, vm_resource: VmResource):
         if len(self.data.proxmox_node_name) == 0:

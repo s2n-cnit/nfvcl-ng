@@ -80,6 +80,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.conn = self.os_client.client
         self.vim_need_floating_ip = self.vim.config.use_floating_ip
 
+    def get_vim_info(self):
+        return self.vim
+
     def __create_image_from_url(self, vm_image: VmResourceImage):
         image_attrs = {
             'name': vm_image.name,

@@ -20,6 +20,10 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
     data: VirtualizationProviderData
 
     @abc.abstractmethod
+    def get_vim_info(self):
+        pass
+
+    @abc.abstractmethod
     def create_vm(self, vm_resource: VmResource):
         pass
 

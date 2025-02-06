@@ -24,10 +24,15 @@ def register_performance(params_to_info=None):
             info = {}
             if params_to_info:
                 for pi in params_to_info:
-                    if pi[2]:
-                        info[pi[1]] = pi[2](args[pi[0]])
-                    else:
-                        info[pi[1]] = args[pi[0]]
+                    match len(pi):
+                        case 2:
+                            info[pi[1]] = args[pi[0]] # (1, "blueprint_id")
+                        case 3:
+                            info[pi[1]] = pi[2](args[pi[0]]) # (1, "vm_name", lambda x: x.name)
+                        case 4:
+                            info[pi[2]] = pi[3](args[pi[0]], args[pi[1]]) # (0, 3, "vm_name", lambda x, y: x.get_name(y.id))
+                        case _:
+                            raise ValueError("Invalid number of elements in params_to_info")
             provider_call_id = provider_aggregator_instance.performance_manager.start_provider_call(provider_aggregator_instance.performance_manager.get_pending_operation_id(provider_aggregator_instance.blueprint.id), method.__name__, info)
 
             res = method(*args, **kwargs)
@@ -114,11 +119,14 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
                 )
         return self.blueprint_provider_impl
 
-    @register_performance(params_to_info=[(1, "vm_name", lambda x: x.name)])
+    def get_vim_info(self):
+        pass
+
+    @register_performance(params_to_info=[(0, 1, "vim", lambda x, y: x.get_virt_provider(y.area).get_vim_info().name), (1, "vm_name", lambda x: x.name)])
     def create_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).create_vm(vm_resource)
 
-    @register_performance(params_to_info=[(1, "vm_name", lambda x: x.name)])
+    @register_performance(params_to_info=[(0, 1, "vim", lambda x, y: x.get_virt_provider(y.area).get_vim_info().name), (1, "vm_name", lambda x: x.name)])
     def attach_nets(self, vm_resource: VmResource, nets_name: List[str]):
         """
         Attach a network to an already running VM
@@ -136,11 +144,11 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def create_net(self, net_resource: NetResource):
         return self.get_virt_provider(net_resource.area).create_net(net_resource)
 
-    @register_performance(params_to_info=[(1, "vm_name", lambda x: x.vm_resource.name)])
+    @register_performance(params_to_info=[(0, 1, "vim", lambda x, y: x.get_virt_provider(y.vm_resource.area).get_vim_info().name), (1, "vm_name", lambda x: x.vm_resource.name)])
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         return self.get_virt_provider(vm_resource_configuration.vm_resource.area).configure_vm(vm_resource_configuration)
 
-    @register_performance(params_to_info=[(1, "vm_name", lambda x: x.name)])
+    @register_performance(params_to_info=[(0, 1, "vim", lambda x, y: x.get_virt_provider(y.area).get_vim_info().name), (1, "vm_name", lambda x: x.name)])
     def destroy_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).destroy_vm(vm_resource)
 
@@ -190,14 +198,14 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def get_pdu_configurator(self, pdu_model: PduModel) -> Any:
         return self.get_pdu_provider().get_pdu_configurator(pdu_model)
 
-    @register_performance(params_to_info=[(1, "blueprint_type", None)])
+    @register_performance(params_to_info=[(1, "blueprint_type")])
     def create_blueprint(self, path: str, msg: Any):
         return self.get_blueprint_provider().create_blueprint(path, msg)
 
-    @register_performance(params_to_info=[(1, "blueprint_id", None)])
+    @register_performance(params_to_info=[(1, "blueprint_id")])
     def delete_blueprint(self, blueprint_id: str):
         return self.get_blueprint_provider().delete_blueprint(blueprint_id)
 
-    @register_performance(params_to_info=[(1, "blueprint_id", None), (2, "function_name", None)])
+    @register_performance(params_to_info=[(1, "blueprint_id"), (2, "function_name")])
     def call_blueprint_function(self, blue_id: str, function_name: str, *args, **kwargs) -> Any:
         return self.get_blueprint_provider().call_blueprint_function(blue_id, function_name, *args, **kwargs)

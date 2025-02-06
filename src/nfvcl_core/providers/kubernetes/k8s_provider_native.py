@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 from typing import Dict, Any, List, Optional
 
 import pyhelm3.errors
@@ -7,6 +8,8 @@ from kubernetes.client import V1PodList
 from pydantic import Field
 from pyhelm3 import Client, ReleaseRevisionStatus
 
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core.models.network.network_models import MultusInterface
 from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
 from nfvcl_core.providers.kubernetes.k8s_provider_interface import K8SProviderInterface, K8SProviderException
 from nfvcl_core.models.resources import HelmChartResource
@@ -19,6 +22,7 @@ from nfvcl_core.utils.k8s.helm_plugin_manager import build_helm_client_from_cred
 
 class K8SProviderDataNative(BlueprintNGProviderData):
     namespaces: Optional[List[str]] = Field(default_factory=list)
+    reserved_ips: Optional[List[MultusInterface]] = Field(default_factory=list)
 
 
 class K8SProviderNativeException(K8SProviderException):
@@ -206,7 +210,25 @@ class K8SProviderNative(K8SProviderInterface):
                 k8s_delete_namespace(k8s_config, ns)
             except Exception as e:
                 self.logger.error(f"Error deleting k8s namespace '{ns}': {str(e)}")
+        for reserved_ip in self.data.reserved_ips:
+            self.logger.debug(f"Releasing reserved IP '{reserved_ip.ip_address}'")
+            self.topology_manager.release_k8s_multus_ip(self.k8s_cluster.name, reserved_ip.network_name, reserved_ip.ip_address)
 
     def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
         k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
         return get_logs_for_pod(k8s_config, helm_chart_resource.namespace.lower(), pod_name, tail_lines=tail_lines)
+
+    def reserve_k8s_multus_ip(self, area: int, network_name: str) -> MultusInterface:
+        multus_interface = self.topology_manager.reserve_k8s_multus_ip(self.k8s_cluster.name, network_name)
+        self.data.reserved_ips.append(multus_interface)
+        self.logger.debug(f"Reserved IP: {multus_interface.ip_address}")
+        return multus_interface
+
+    def release_k8s_multus_ip(self, area: int, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
+        release_ret = self.topology_manager.release_k8s_multus_ip(self.k8s_cluster.name, network_name, ip_address)
+        for reserved_ip in deepcopy(self.data.reserved_ips):
+            if reserved_ip.network_name == network_name and reserved_ip.ip_address == ip_address:
+                self.data.reserved_ips.remove(reserved_ip)
+                break
+        self.logger.debug(f"Released reserved IP: {ip_address}")
+        return release_ret

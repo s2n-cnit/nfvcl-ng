@@ -1,25 +1,25 @@
-import ipaddress
 import socket
+from ipaddress import AddressValueError
 from typing import Union, List
 
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core.models.network.network_models import IPv4Pool
 
 
-def is_ip_in_range(ip: Union[ipaddress.IPv4Address, str],
-                   ip_min: Union[ipaddress.IPv4Address, str],
-                   ip_max: Union[ipaddress.IPv4Address, str]) -> bool:
+def is_ip_in_range(ip: Union[SerializableIPv4Address, str],
+                   ip_min: Union[SerializableIPv4Address, str],
+                   ip_max: Union[SerializableIPv4Address, str]) -> bool:
     if type(ip) is str:
-        ip = ipaddress.IPv4Address(ip)
+        ip = SerializableIPv4Address(ip)
     if type(ip_min) is str:
-        ip_min = ipaddress.IPv4Address(ip_min)
+        ip_min = SerializableIPv4Address(ip_min)
     if type(ip_max) is str:
-        ip_max = ipaddress.IPv4Address(ip_max)
+        ip_max = SerializableIPv4Address(ip_max)
 
     return ip_min <= ip <= ip_max
 
 
-def check_range_in_cidr(ip_min: Union[ipaddress.IPv4Address, str], ip_max: Union[ipaddress.IPv4Address, str], cidr: Union[ipaddress.IPv4Network, str]) -> bool:
+def check_range_in_cidr(ip_min: Union[SerializableIPv4Address, str], ip_max: Union[SerializableIPv4Address, str], cidr: Union[SerializableIPv4Network, str]) -> bool:
     """
     Checks if the IP range <ip_min> and <ip_max> is contained in the CIDR range.
 
@@ -32,11 +32,11 @@ def check_range_in_cidr(ip_min: Union[ipaddress.IPv4Address, str], ip_max: Union
         True if the range is contained in CIDR.
     """
     if type(cidr) is str:
-        cidr = ipaddress.IPv4Network(cidr)
+        cidr = SerializableIPv4Network(cidr)
     if type(ip_min) is str:
-        ip_min = ipaddress.IPv4Address(ip_min)
+        ip_min = SerializableIPv4Address(ip_min)
     if type(ip_max) is str:
-        ip_max = ipaddress.IPv4Address(ip_max)
+        ip_max = SerializableIPv4Address(ip_max)
     return ip_min in cidr and ip_max in cidr
 
 def check_ipv4_valid(ipv4: str) -> SerializableIPv4Address | None:
@@ -51,10 +51,10 @@ def check_ipv4_valid(ipv4: str) -> SerializableIPv4Address | None:
     try:
         ipv4_model = SerializableIPv4Address(ipv4)
         return ipv4_model
-    except ipaddress.AddressValueError:
+    except AddressValueError:
         return None
 
-def get_available_network_ip(cidr: ipaddress.IPv4Network, reserved_ranges: List[IPv4Pool]) -> List[IPv4Pool]:
+def get_available_network_ip(cidr: SerializableIPv4Network, reserved_ranges: List[IPv4Pool]) -> List[IPv4Pool]:
     """
     Returns all the available intervals in a network, given the reserved ranges.
     Args:
@@ -74,9 +74,9 @@ def get_available_network_ip(cidr: ipaddress.IPv4Network, reserved_ranges: List[
 
     for reserved_range in ordered_reserved_ranges:
         if type(reserved_range.start) is str:
-            reserved_range.start = ipaddress.IPv4Address(reserved_range.start)
+            reserved_range.start = SerializableIPv4Address(reserved_range.start)
         if type(reserved_range.end) is str:
-            reserved_range.end = ipaddress.IPv4Address(reserved_range.end)
+            reserved_range.end = SerializableIPv4Address(reserved_range.end)
         if int(reserved_range.end) - int(reserved_range.start) < 0:
             raise ValueError("Reserved range [{}-{}] is not valid -> Starting address comes before ending address.".
                              format(reserved_range.start, reserved_range.end))
@@ -102,7 +102,7 @@ def get_available_network_ip(cidr: ipaddress.IPv4Network, reserved_ranges: List[
     return available_ranges
 
 
-def get_range_length(ip_min: ipaddress.IPv4Address, ip_max: ipaddress.IPv4Address) -> int:
+def get_range_length(ip_min: SerializableIPv4Address, ip_max: SerializableIPv4Address) -> int:
     """
     Returns the number of IP address in a range.
     Args:
@@ -114,7 +114,7 @@ def get_range_length(ip_min: ipaddress.IPv4Address, ip_max: ipaddress.IPv4Addres
     return int(ip_max) - int(ip_min)
 
 
-def get_range_in_cidr(cidr: ipaddress.IPv4Network, reserved_ranges: List[IPv4Pool],
+def get_range_in_cidr(cidr: SerializableIPv4Network, reserved_ranges: List[IPv4Pool],
                       range_length: int) -> IPv4Pool:
     """
     Return a free interval of sequential IP addresses in the network.

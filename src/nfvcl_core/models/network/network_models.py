@@ -1,6 +1,5 @@
-import ipaddress
 from enum import Enum
-from ipaddress import IPv4Network, IPv4Address
+from ipaddress import AddressValueError, IPv4Address
 from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
@@ -43,9 +42,9 @@ class IPv4Pool(NFVCLBaseModel):
         """
         Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')
         """
-        to_ret: IPv4Address
+        to_ret: SerializableIPv4Address
         if isinstance(val, str):
-            return IPv4Address(val)
+            return SerializableIPv4Address(val)
         elif isinstance(val, IPv4Address):
             return val
         else:
@@ -56,9 +55,9 @@ class IPv4Pool(NFVCLBaseModel):
         """
         Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')
         """
-        to_ret: IPv4Address
+        to_ret: SerializableIPv4Address
         if isinstance(val, str):
-            return IPv4Address(val)
+            return SerializableIPv4Address(val)
         elif isinstance(val, IPv4Address):
             return val
         else:
@@ -175,7 +174,7 @@ class NetworkModel(BaseModel):
     dns_nameservers: List[SerializableIPv4Address] = Field(default=[], description='List of DNS server IPs available in this network')
 
     @classmethod
-    def build_network_model(cls, name: str, type: NetworkTypeEnum, cidr: IPv4Network):
+    def build_network_model(cls, name: str, type: NetworkTypeEnum, cidr: SerializableIPv4Network):
         return NetworkModel(name=name, type=type, cidr=cidr)
 
     def __eq__(self, other):
@@ -233,7 +232,7 @@ class NetworkModel(BaseModel):
         try:
             ipv4_model = SerializableIPv4Address(val)
             return ipv4_model
-        except ipaddress.AddressValueError:
+        except AddressValueError:
             return None
 
     def add_reserved_range(self, reserved_range: IPv4ReservedRange):
@@ -350,7 +349,7 @@ class NetworkModel(BaseModel):
 
 class RouterPortModel(BaseModel):
     net: str
-    ip_addr: IPv4Address
+    ip_addr: SerializableIPv4Address
 
 
 class RouterModel(BaseModel):
@@ -375,7 +374,7 @@ class PduInterface(BaseModel):
     name: str
     mgt: bool = Field(alias='mgmt')
     intf_type: Optional[str] = Field(default=None)
-    ip_address: Union[str, IPv4Address] = Field(alias='ip-address')  # TODO pass to only str???
+    ip_address: Union[str, SerializableIPv4Address] = Field(alias='ip-address')  # TODO pass to only str???
     network_name: str = Field(alias='vim-network-name')
     port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
 
@@ -383,7 +382,7 @@ class PduInterface(BaseModel):
     def build_pdu(cls, vld: str, name: str, mgt: bool, ip_address: str, network_name: str):
         return PduInterface(vld=vld, name=name, mgt=mgt, ip_address=ip_address, network_name=network_name)
 
-    def get_ip(self) -> List[IPv4Address]:
+    def get_ip(self) -> List[SerializableIPv4Address]:
         """
         Return a list of IP of the VLD (Every interface can have multiple IPs
         Returns:
@@ -393,7 +392,7 @@ class PduInterface(BaseModel):
         return_list = []
         ip_list_str = self.ip_address.split(";")
         for ip in ip_list_str:
-            return_list.append(IPv4Address(ip))
+            return_list.append(SerializableIPv4Address(ip))
 
         return return_list
 
@@ -426,6 +425,7 @@ class NetworkInterfaceModel(NFVCLBaseModel):
 class MultusInterface(NFVCLBaseModel):
     ip_address: SerializableIPv4Address = Field(description="The IP address assigned to the multus interface")
     gateway_ip: Optional[SerializableIPv4Address] = Field(default=None, description="The IP address of the gateway for the multus interface")
+    network_cidr: Optional[SerializableIPv4Network] = Field(default=None, description="The CIDR of the network to which the multus interface is attached")
     host_interface: str = Field(description="The name of the host interface to which the multus interface is attached")
     prefixlen: int = Field(description="The prefix length of the IP address assigned to the multus interface")
     network_name: str = Field(description="The name of the network to which the multus interface is attached")

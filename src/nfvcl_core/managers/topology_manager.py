@@ -21,6 +21,9 @@ class TopologyManager(GenericManager):
         self._topology_repository = topology_repository
         self._topology: Optional[TopologyModel] = self._topology_repository.get_topology()
 
+    def save_to_db(self):
+        self._topology_repository.save_topology(self._topology)
+
     def get_topology(self) -> TopologyModel:
         if self._topology:
             return self._topology
@@ -56,16 +59,16 @@ class TopologyManager(GenericManager):
                 raise Exception(f"Some of the areas are already assigned to a VIM")
 
         self._topology.add_vim(vim)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return vim
 
     def delete_vim(self, vim_id: str) -> None:
         self._topology.del_vim(vim_id)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
     def update_vim(self, vim: VimModel) -> VimModel:
         self._topology.upd_vim(vim)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return vim
 
     ############################ Network ########################################
@@ -75,24 +78,24 @@ class TopologyManager(GenericManager):
 
     def create_network(self, network: NetworkModel) -> NetworkModel:
         self._topology.add_network(network)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return network
 
     def update_network(self, network: NetworkModel) -> NetworkModel:
         self._topology.upd_network(network)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return network
 
     def add_allocation_pool_to_network(self, network_id: str, allocation_pool: IPv4Pool) -> IPv4Pool:
         network = self._topology.get_network(network_id)
         added_pool = network.add_allocation_pool(allocation_pool)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return added_pool
 
     def remove_allocation_pool_from_network(self, network_id: str, allocation_pool_name: str) -> IPv4Pool:
         network = self._topology.get_network(network_id)
         removed_pool = network.remove_allocation_pool(allocation_pool_name)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return removed_pool
 
     def reserve_range_to_k8s_cluster(self, network_id: str, k8s_cluster_id: str, length: int) -> List[IPv4ReservedRange]:
@@ -105,7 +108,7 @@ class TopologyManager(GenericManager):
         # Adding to the K8s cluster the id of the reserved range
         k8s_network.ip_pools.extend([res_range.name for res_range in reserved_networks])
 
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return reserved_networks
 
     def release_range_from_k8s_cluster(self, network_id: str, reserved_range_name: str, k8s_cluster_id: str) -> IPv4ReservedRange:
@@ -122,7 +125,7 @@ class TopologyManager(GenericManager):
         k8s_cluster = self._topology.get_k8s_cluster(k8s_cluster_id)
         k8s_cluster.release_ip_pool(removed_range.name)
 
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return removed_range
 
     def get_reserved_ranges_from_network(self, network_id: str) -> List[IPv4ReservedRange]:
@@ -134,7 +137,7 @@ class TopologyManager(GenericManager):
 
     def delete_network(self, network_id: str) -> None:
         self._topology.delete_network(network_id)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
     ############################ Router ########################################
 
@@ -143,12 +146,12 @@ class TopologyManager(GenericManager):
 
     def create_router(self, router: RouterModel) -> RouterModel:
         self._topology.add_router(router)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return router
 
     def delete_router(self, router_id: str) -> None:
         self._topology.delete_router(router_id)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
     ############################ PDUs ########################################
 
@@ -172,7 +175,7 @@ class TopologyManager(GenericManager):
             pdu: The PDU to be inserted in the topology
         """
         self._topology.add_pdu(pdu)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return pdu
 
     def delete_pdu(self, pdu_id: str) -> None:
@@ -183,7 +186,7 @@ class TopologyManager(GenericManager):
             pdu_id: The name of PDU to be removed
         """
         self._topology.del_pdu(pdu_id)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
     def get_pdus(self) -> List[PduModel]:
         """
@@ -204,22 +207,22 @@ class TopologyManager(GenericManager):
 
     def add_kubernetes(self, k8s: TopologyK8sModel) -> TopologyK8sModel:
         self._topology.add_k8s_cluster(k8s)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return k8s
 
     def update_kubernetes(self, cluster: TopologyK8sModel, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> TopologyK8sModel:
         try:
             self.get_k8s_cluster_by_id(cluster.name)
         except ValueError:
-            run_pre_work_callback(pre_work_callback, PreWorkCallbackResponse(async_return=OssCompliantResponse(status=OssStatus.failed, detail="K8s cluster to update has not been found.")))
+            run_pre_work_callback(pre_work_callback, async_return=OssCompliantResponse(status=OssStatus.failed, detail="K8s cluster to update has not been found."))
 
         self._topology.upd_k8s_cluster(cluster)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return cluster
 
     def delete_kubernetes(self, k8s_id: str) -> None:
         self._topology.del_k8s_cluster(k8s_id)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
     def get_k8s_cluster_by_area(self, area_id: int) -> TopologyK8sModel:
         """
@@ -264,9 +267,16 @@ class TopologyManager(GenericManager):
         if assigned_ip is None:
             raise Exception(f"No available IP in the network {network_name} for the K8s cluster {k8s_id}. Reserved ranges are empty or all IPs have been reserved")
 
-        multus_info = MultusInterface(host_interface=cluster_network.interface_name, ip_address=assigned_ip, network_name=network.name, gateway_ip=network.gateway_ip, prefixlen=network.cidr.prefixlen)
+        multus_info = MultusInterface(
+            host_interface=cluster_network.interface_name,
+            ip_address=assigned_ip,
+            network_name=network.name,
+            gateway_ip=network.gateway_ip,
+            network_cidr=network.cidr,
+            prefixlen=network.cidr.prefixlen
+        )
 
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
         return multus_info
 
@@ -285,10 +295,8 @@ class TopologyManager(GenericManager):
         reserved_range = network.get_reserved_range_by_ip(ip_address)
         if reserved_range.assigned_to == PoolAssignation.K8S_CLUSTER.value and reserved_range.owner == k8s_id:
             reserved_range.release_ip_address(ip_address)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
         return ip_address
-
-
 
     ############################ Prometheus ########################################
 
@@ -300,15 +308,15 @@ class TopologyManager(GenericManager):
 
     def add_prometheus(self, prometheus: PrometheusServerModel):
         self._topology.add_prometheus_srv(prometheus)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
     def update_prometheus(self, prometheus: PrometheusServerModel):
         self._topology.upd_prometheus_srv(prometheus)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
     def delete_prometheus(self, prometheus_id: str):
         self._topology.del_prometheus_srv(prometheus_id, False)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()
 
     def update_pdu(self, pdu: PduModel):
         """
@@ -317,4 +325,4 @@ class TopologyManager(GenericManager):
             pdu: the pdu to be updated (identified by pdu.name) with updated data.
         """
         self._topology.upd_pdu(pdu)
-        self._topology_repository.save_topology(self._topology)
+        self.save_to_db()

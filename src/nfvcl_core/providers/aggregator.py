@@ -3,7 +3,8 @@ from typing import Dict, Optional, List, Any
 
 from nfvcl_core.managers import TopologyManager
 from nfvcl_core.models.blueprints.blueprint import BlueprintNGProviderModel
-from nfvcl_core.models.network.network_models import PduType, PduModel
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core.models.network.network_models import PduType, PduModel, MultusInterface
 from nfvcl_core.models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource
 from nfvcl_core.models.vim import VimTypeEnum
 from nfvcl_core.providers.blueprint.blueprint_provider import BlueprintProvider
@@ -176,6 +177,12 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     @register_performance()
     def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int] = None) -> str:
         return self.get_k8s_provider(helm_chart_resource.area).get_pod_log(helm_chart_resource, pod_name, tail_lines)
+
+    def reserve_k8s_multus_ip(self, area: int, network_name: str) -> MultusInterface:
+        return self.get_k8s_provider(area).reserve_k8s_multus_ip(area, network_name)
+
+    def release_k8s_multus_ip(self, area: int, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
+        return self.get_k8s_provider(area).release_k8s_multus_ip(area, network_name, ip_address)
 
     def find_pdu(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None, name: Optional[str] = None) -> PduModel:
         return self.get_pdu_provider().find_pdu(area, pdu_type, instance_type=instance_type, name=name)

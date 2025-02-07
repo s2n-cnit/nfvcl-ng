@@ -22,6 +22,7 @@ class Generic5GRANBlueprintNGState(BlueprintNGState):
     cu_up_id: Optional[str] = Field(default=None)
     du_id: Optional[str] = Field(default=None)
     gnb_id: Optional[str] = Field(default=None)
+    gnb_model: Optional[GNBBlueCreateModel] = Field(default=None)
 
 
 StateTypeVar5GRAN = TypeVar("StateTypeVar5GRAN", bound=Generic5GRANBlueprintNGState)
@@ -35,6 +36,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
     cuup_blue_type = None
     du_blue_type = None
     implementation_name = None
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GRANBlueprintNGState] = StateTypeVar5GRAN):
         super().__init__(blueprint_id, state_type)
 
@@ -48,7 +50,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
         self.state.current_config = copy.deepcopy(create_model)
         match self.state.current_config.split:
             case Split.GNB:
-                gnb_model = GNBBlueCreateModel(
+                self.state.gnb_model = GNBBlueCreateModel(
                     mcc=self.state.current_config.mcc,
                     mnc=self.state.current_config.mnc,
                     sst=self.state.current_config.sst,
@@ -59,11 +61,11 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
                         n2=self.state.current_config.networks.n2,
                         n3=self.state.current_config.networks.n3,
                         ru1=self.state.current_config.networks.ru1,
-                        ru2=self.state.current_config.networks.ru2  # TODO Check it
+                        ru2=self.state.current_config.networks.ru2
                     ),
                     usrp=self.state.current_config.usrp
                 )
-                self.state.gnb_id = self.provider.create_blueprint(self.gnb_blue_type, gnb_model)
+                self.state.gnb_id = self.provider.create_blueprint(self.gnb_blue_type, self.state.gnb_model)
                 self.register_children(self.state.gnb_id)
             case Split.CU_DU:
                 pass
@@ -88,17 +90,16 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
         self.state.current_config = copy.deepcopy(create_model)
         match self.state.current_config.split:
             case Split.GNB:
-                gnb_model = GNBBlueCreateModel(
-                    mcc=self.state.current_config.mcc,
-                    mnc=self.state.current_config.mnc,
-                    sst=self.state.current_config.sst,
-                    sd=self.state.current_config.sd,
-                    tac=self.state.current_config.tac,
-                    area_id=self.state.current_config.area_id,
-                    usrp=self.state.current_config.usrp,
-                    amf=self.state.current_config.amf
-                )
-                get_blueprint_manager().call_function(self.state.gnb_id, "update", gnb_model)
+                self.state.gnb_model.mcc = self.state.current_config.mcc
+                self.state.gnb_model.mnc = self.state.current_config.mnc
+                self.state.gnb_model.sst = self.state.current_config.sst
+                self.state.gnb_model.sd = self.state.current_config.sd
+                self.state.gnb_model.tac = self.state.current_config.tac
+                self.state.gnb_model.area_id = self.state.current_config.area_id
+                self.state.gnb_model.usrp = self.state.current_config.usrp
+                self.state.gnb_model.amf = self.state.current_config.amf
+
+                get_blueprint_manager().call_function(self.state.gnb_id, "update", self.state.gnb_model)
             case Split.CU_DU:
                 pass
             case _:
@@ -118,3 +119,27 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
         self.state.current_config.tac = str(model.tac)
         self.state.current_config.amf = model.amf_ip
 
+        match self.state.current_config.split:
+            case Split.GNB:
+                self.state.gnb_model.mcc = self.state.current_config.mcc
+                self.state.gnb_model.mnc = self.state.current_config.mnc
+                self.state.gnb_model.sst = self.state.current_config.sst
+                self.state.gnb_model.sd = self.state.current_config.sd
+                self.state.gnb_model.tac = self.state.current_config.tac
+                self.state.gnb_model.amf = self.state.current_config.amf
+
+                get_blueprint_manager().call_function(self.state.gnb_id, "update", self.state.gnb_model)
+            case Split.CU_DU:
+                pass
+            case _:
+                pass
+
+    def del_gnb_from_topology(self):
+        try:
+            self.provider.delete_pdu(f"{self.implementation_name}_GNB_{self.id}_{self.state.current_config.area_id}")
+        except Exception as e:
+            self.logger.warning(f"Error deleting PDU: {str(e)}")
+
+    def destroy(self):
+        self.del_gnb_from_topology()
+        super().destroy()

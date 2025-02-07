@@ -12,6 +12,7 @@ from nfvcl.blueprints_ng.pdu_configurators.implementations.gnb.ueransim_pdu_conf
 
 def register_pdu_implementations(pdu_manager: PDUManager):
     pdu_manager.register_implementation("UERANSIM", UERANSIMPDUConfigurator.get_class_path())
+    pdu_manager.register_implementation("GENERIC_RAN", UERANSIMPDUConfigurator.get_class_path())
     pdu_manager.register_implementation("GENERIC", GenericLinuxPDUConfigurator.get_class_path())
     pdu_manager.register_implementation("LiteONAIO", LiteonAIOPDUConfigurator.get_class_path())
     pdu_manager.register_implementation("AthonetCore", AthonetCorePDUConfigurator.get_class_path())

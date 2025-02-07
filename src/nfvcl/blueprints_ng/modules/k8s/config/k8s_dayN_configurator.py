@@ -16,7 +16,7 @@ class VmK8sDayNConfigurator(VmResourceAnsibleConfiguration):
         """
         This method need to be implemented, it should return the Ansible playbook as a string.
         """
-        ansible_builder = AnsiblePlaybookBuilder("Playbook VyOS NAT configuration")
+        ansible_builder = AnsiblePlaybookBuilder("Playbook K8S DayN Configurator")
 
         for task_description in self.task_list:
             ansible_builder.add_task_embedded(task_descr=task_description)

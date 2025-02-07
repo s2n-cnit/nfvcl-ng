@@ -396,7 +396,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                     dayNconf.delete_node(target_vm[0].get_name_k8s_format())  # Adding the action to remove it from the cmaster/controller.
                     vm_to_be_destroyed.append(target_vm[0])  # Appending the VM to be deleted.
                 else:
-                    self.deregister_resource(target_vm[0])
+                    self._remove_worker(target_vm[0], destroy_vm=False)
                     self.logger.error(f"Node >{node}< has not been created, it will be destroyed from the blueprint assuming there was a problem during the creation")
             else:
                 self.logger.error(f"Node >{node}< has not been found, cannot be deleted from cluster {self.id}. Moving to next nodes to be deleted")
@@ -404,12 +404,16 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.provider.configure_vm(dayNconf)  # Removing from the cluster every VM to be deleted before it will be destroyed (Nodes is removed from k8s cluster by master configurator)
 
         for vm in vm_to_be_destroyed:  # Destroying every VM to be removed from the cluster
+            self._remove_worker(vm)
+
+    def _remove_worker(self, vm: VmResource, destroy_vm: bool = True):
+        if destroy_vm:
             self.provider.destroy_vm(vm)  # Delete the VM from the provider
-            self.deregister_resource(vm)  # Delete from registered resources
-            # Destroying configurator and releasing the worker number, deregister worker resources from the state
-            conf_to_be_deregistered = self.state.remove_worker(vm)
-            for configurator in conf_to_be_deregistered:
-                self.deregister_resource(configurator)
+        self.deregister_resource(vm)  # Delete from registered resources
+        # Destroying configurator and releasing the worker number, deregister worker resources from the state
+        conf_to_be_deregistered = self.state.remove_worker(vm)
+        for configurator in conf_to_be_deregistered:
+            self.deregister_resource(configurator)
 
     @day2_function("/install_karmada", [HttpRequestType.POST])
     def configure_karmada(self, model: KarmadaInstallModel):

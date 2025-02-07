@@ -1,5 +1,5 @@
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_ran import Generic5GRANBlueprintNGState, Generic5GRANBlueprintNG
-from nfvcl.blueprints_ng.modules.oai.oai_ran.OpenAirInterfaceCUCP_blue import OAI_CUCP_BLUE_TYPE
+# from nfvcl.blueprints_ng.modules.oai.oai_ran.OpenAirInterfaceCUCP_blue import OAI_CUCP_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.oai.oai_ran.OpenAirInterfaceGNB_blue import OAI_GNB_BLUE_TYPE
 from nfvcl.models.blueprint_ng.g5.ran import RANBlueCreateModel
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
@@ -15,7 +15,7 @@ class OAIRanBlueprintNGState(Generic5GRANBlueprintNGState):
 class OpenAirInterfaceRan(Generic5GRANBlueprintNG[OAIRanBlueprintNGState, RANBlueCreateModel]):
     gnb_blue_type = OAI_GNB_BLUE_TYPE
     # cu_blue_type = OAI_CU_BLUE_TYPE
-    cucp_blue_type = OAI_CUCP_BLUE_TYPE
+    cucp_blue_type = None
     # cuup_blue_type = OAI_CUUP_BLUE_TYPE
     # du_blue_type = OAI_DU_BLUE_TYPE
     implementation_name = "OAI"

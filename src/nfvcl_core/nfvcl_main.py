@@ -462,6 +462,10 @@ class NFVCL:
 
     ############# Performance #############
 
+    @NFVCLPublic(path="/", section=PERFORMANCE_SECTION, method=NFVCLPublicMethod.GET, sync=True)
+    def get_all_performances(self, callback=None) -> List[BlueprintPerformance]:
+        return self.add_task(self.performance_manager.get_all_performaces, callback=callback)
+
     @NFVCLPublic(path="/{blueprint_id}", section=PERFORMANCE_SECTION, method=NFVCLPublicMethod.GET, sync=True)
     def get_performance(self, blueprint_id: str, callback=None) -> BlueprintPerformance:
         return self.add_task(self.performance_manager.get_blue_performance, blueprint_id, callback=callback)

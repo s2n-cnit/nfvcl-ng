@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from nfvcl_core.database.database_repository import DatabaseRepository
 from nfvcl_core.managers.persistence_manager import PersistenceManager
@@ -14,6 +14,12 @@ class PerformanceRepository(DatabaseRepository[BlueprintPerformance]):
             return self.find_one({'blueprint_id': blueprint_id})
         except Exception as e:
             return None
+
+    def get_all_performace(self) -> List[BlueprintPerformance]:
+        """
+        Get all the performance metrics, for each blueprint
+        """
+        return self.get_all()
 
     def update_blueprint_performance(self, blueprint_performance: BlueprintPerformance) -> BlueprintPerformance:
         self.collection.update_one({ "blueprint_id": blueprint_performance.blueprint_id }, { "$set": blueprint_performance.model_dump()}, upsert=True)

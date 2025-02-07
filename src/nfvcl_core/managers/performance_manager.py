@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from nfvcl_core.database import BlueprintRepository
 from nfvcl_core.database.performance_repository import PerformanceRepository
@@ -63,6 +63,12 @@ class PerformanceManager(GenericManager):
         if element:
             return BlueprintPerformance.model_validate(element)
         raise ValueError(f"No performance metrics found for blueprint '{blueprint_id}'")
+
+    def get_all_performaces(self) -> List[BlueprintPerformance]:
+        """
+        Get all the performance metrics for all blueprints, even the one that has been deleted.
+        """
+        return self._performance_repository.get_all_performace()
 
     def get_pending_operation_id(self, blueprint_id: str) -> Optional[str]:
         """

@@ -387,12 +387,17 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 f"The number of workers cannot be lower than 1. Pods are scheduled only on workers node, there will be no schedule.")
             return
 
+
         dayNconf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster requires actions performed on the master node.
         for node in model.node_names:
             target_vm = [vm for vm in self.state.vm_workers if vm.name == node]  # Checking that the node to be removed EXISTS
             if len(target_vm) >= 1:
-                dayNconf.delete_node(target_vm[0].get_name_k8s_format())  # Adding the action to remove it from the cmaster/controller.
-                vm_to_be_destroyed.append(target_vm[0])  # Appending the VM to be deleted.
+                if target_vm[0].created: # Checking that the node to be removed has been created and didn't crash
+                    dayNconf.delete_node(target_vm[0].get_name_k8s_format())  # Adding the action to remove it from the cmaster/controller.
+                    vm_to_be_destroyed.append(target_vm[0])  # Appending the VM to be deleted.
+                else:
+                    self.deregister_resource(target_vm[0])
+                    self.logger.error(f"Node >{node}< has not been created, it will be destroyed from the blueprint assuming there was a problem during the creation")
             else:
                 self.logger.error(f"Node >{node}< has not been found, cannot be deleted from cluster {self.id}. Moving to next nodes to be deleted")
 

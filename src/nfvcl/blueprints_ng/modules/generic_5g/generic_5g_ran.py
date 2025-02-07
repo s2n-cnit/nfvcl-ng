@@ -99,7 +99,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
                 self.state.gnb_model.usrp = self.state.current_config.usrp
                 self.state.gnb_model.amf = self.state.current_config.amf
 
-                get_blueprint_manager().call_function(self.state.gnb_id, "update", self.state.gnb_model)
+                self.provider.call_blueprint_function(self.state.gnb_id, "update", self.state.gnb_model)
             case Split.CU_DU:
                 pass
             case _:
@@ -128,7 +128,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
                 self.state.gnb_model.tac = self.state.current_config.tac
                 self.state.gnb_model.amf = self.state.current_config.amf
 
-                get_blueprint_manager().call_function(self.state.gnb_id, "update", self.state.gnb_model)
+                self.provider.call_blueprint_function(self.state.gnb_id, "update", self.state.gnb_model)
             case Split.CU_DU:
                 pass
             case _:

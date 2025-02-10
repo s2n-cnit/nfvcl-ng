@@ -1,6 +1,6 @@
 services:
+
   nfvcl:
-    image: registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
     depends_on:
       - mongo
       - redis
@@ -10,9 +10,9 @@ services:
     ports:
       - 5002:5002
     volumes:
-      - ./config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
-      - ./logs/:/app/nfvcl-ng/logs/
-      - ./tmp/:/tmp/nfvcl/
+      - ../config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
+      - ../logs/:/app/nfvcl-ng/logs/
+      - ../tmp/:/tmp/nfvcl/
 
   redis:
     image: redis:alpine
@@ -29,15 +29,4 @@ services:
       - 27017:27017
     volumes:
       - mongo_data:/data/db
-
-volumes:
-  mongo_data:
-  redis_data:
-
-networks:
-  default:
-    ipam:
-      driver: default
-      config:
-        - subnet: "10.224.52.0/24"
 

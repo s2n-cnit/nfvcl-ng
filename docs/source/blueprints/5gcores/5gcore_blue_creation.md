@@ -26,6 +26,9 @@ a specific core check the following pages:
   ```
   kubectl get ipaddresspool -A
   ```
+- The networks used in the blueprint must be present in the topology.
+- To use Multus networks, the Multus CNI must be installed in the cluster.
+- If Multus is used a pool of IPs must be available for the Multus networks, this pool need to be added to the network in the topology and assigned to the k8s cluster.
 
 ## Deployment
 
@@ -37,6 +40,7 @@ a specific core check the following pages:
 In the following example `{{ blueprint_type }}` need to be replaced with the type of the blueprint that you want to deploy, for example:
 - sdcore
 - oai
+- free5gc
 
 > API (POST): *{{ base_url }}/nfvcl/v2/api/blue/{{ blueprint_type }}*
 
@@ -44,8 +48,17 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
 {
    "config":{
       "network_endpoints":{
-         "mgt":"dmz-internal",
-         "wan":"alderico-net",
+         "mgt":{
+            "net_name":"dmz-internal"
+         },
+         "n2":{
+            "net_name":"alderico-net",
+            "type":"MULTUS"
+         },
+         "n4":{
+            "net_name":"alderico-net",
+            "type":"MULTUS"
+         },
          "data_nets":[
             {
                "net_name":"internet",
@@ -132,10 +145,21 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
          "upf":{
             "type":"sdcore_upf"
          },
+         "gnb":{
+            "configure":true
+         },
          "networks":{
-            "n3":"alderico-n3",
-            "n6":"alderico-n6",
-            "gnb":"alderico-gnb"
+            "n3":{
+               "net_name":"alderico-n3",
+               "type":"MULTUS"
+            },
+            "n6":{
+               "net_name":"alderico-n6",
+               "type":"MULTUS"
+            },
+            "gnb":{
+               "net_name":"alderico-gnb"
+            }
          },
          "slices":[
             {
@@ -149,19 +173,29 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
 ```
 
 - In the `network_endpoints` section:
-  - `mgt` is the management network.
-  - `wan` is the network on which the K8s load balancer will assign the addresses to the core network functions.
-  - `n3` the N3 network for UPF <-> gNB connection.
-  - `n6` the N6 network for UPF <-> internet connection.
+  - `mgt` is the management network, used when the UPF/Router is a VM.
+  - `n2` is the network used for AMF <-> gNB connection.
+  - `n4` is the network used for SMF <-> UPF connection.
 - The `dnn` and `net_name` fields in `data_nets` section can be chosen as desired, but it must be the same for both.
   Furthermore, when you create a UERANSIM blueprint you must set the field `apn` equal to `dnn` and `net_name` value.
 - Dnn `cidrs` must not overlap.
 - In the `areas` section for each are you need to set:
-  - `upf.type`: the UPF implementation to deploy in this area, currently you can choose between `sdcore_upf` and `oai_upf`, beware that using an UPF implementation different from the core may not work.
+  - `upf.type`: the UPF implementation to deploy in this area, currently you can choose between:
+    - `sdcore_upf`
+    - `oai_upf`
+    - `oai_upf_k8s`: This is the UPF implementation for the OAI blueprint deployed in a K8s cluster.
+    - `free5gc_upf`
+  
+    NFVCL will configure every Core and UPF combination but mixing the implementations may not work.  
   - `networks`:
     - `n3`: The network to use for user plane data between gNB and UPF (going through the router)
     - `n6`: The network to use for user plane data between UPF and internet (going through the router)
     - `gnb`: The network between gNB and Router
+
+Some networks have a `type` field, this is used to specify the network type, currently supported types are `MULTUS` and `LB` (LoadBalancer), the `type` field is ignored when the component is not deployed on k8s.
+> ⚠️ Mixing the network types may not work.
+> 
+> Currently not all implementations support Multus, only `oai`
 
 For more details about the networks check 5G topology TODO
 
@@ -171,8 +205,17 @@ Example payload for two areas, two slice and two subscribers.
 {
    "config":{
       "network_endpoints":{
-         "mgt":"dmz-internal",
-         "wan":"alderico-net",
+         "mgt":{
+            "net_name":"dmz-internal"
+         },
+         "n2":{
+            "net_name":"alderico-net",
+            "type":"MULTUS"
+         },
+         "n4":{
+            "net_name":"alderico-net",
+            "type":"MULTUS"
+         },
          "data_nets":[
             {
                "net_name":"internet",
@@ -328,9 +371,17 @@ Example payload for two areas, two slice and two subscribers.
             "type":"sdcore_upf"
          },
          "networks":{
-            "n3":"alderico-n3",
-            "n6":"alderico-n6",
-            "gnb":"alderico-gnb"
+            "n3":{
+               "net_name":"alderico-n3",
+               "type":"MULTUS"
+            },
+            "n6":{
+               "net_name":"alderico-n6",
+               "type":"MULTUS"
+            },
+            "gnb":{
+               "net_name":"alderico-gnb"
+            }
          },
          "slices":[
             {
@@ -348,9 +399,17 @@ Example payload for two areas, two slice and two subscribers.
             "type":"sdcore_upf"
          },
          "networks":{
-            "n3":"alderico-n3",
-            "n6":"alderico-n6",
-            "gnb":"alderico-gnb"
+            "n3":{
+               "net_name":"alderico-n3",
+               "type":"MULTUS"
+            },
+            "n6":{
+               "net_name":"alderico-n6",
+               "type":"MULTUS"
+            },
+            "gnb":{
+               "net_name":"alderico-gnb"
+            }
          },
          "slices":[
             {

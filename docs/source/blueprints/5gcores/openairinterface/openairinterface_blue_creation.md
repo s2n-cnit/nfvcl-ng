@@ -1,5 +1,7 @@
 # OpenAirInterface Blueprint creation and usage
 
+> ⚠️ **This page is WIP, check the generic 5G deployment one**
+
 In this page there is described how to deploy and use OpenAirInterface blueprint.
 
 ## Requirements

@@ -6,6 +6,7 @@ from .example_pdu import *
 from .k8s import *
 from .oai.oai_core import *
 from .oai.oai_upf import *
+from .oai.oai_upf_k8s import *
 from .oai.oai_ran import *
 from .router_5g import *
 from .sdcore import *

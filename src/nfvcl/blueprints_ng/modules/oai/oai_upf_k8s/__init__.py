@@ -1,0 +1,1 @@
+from .oai_upf_k8s_blue import OpenAirInterfaceUpfK8s

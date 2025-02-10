@@ -1,16 +1,15 @@
 from abc import abstractmethod
-from typing import Generic, TypeVar, Dict, Optional, List
+from typing import Generic, TypeVar, Dict, Optional
 
-from nfvcl_core.models.base_model import NFVCLBaseModel
-
-from nfvcl_core.models.linux.ip import Route
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBlueprintNGState, Generic5GUPFBlueprintNG
 from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel, Router5GCreateModelNetworks, Router5GAddRouteModel
 from nfvcl.models.blueprint_ng.core5g.common import Router5GNetworkInfo
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel
-from nfvcl_core.models.resources import VmResource, NetResource
+from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.linux.ip import Route
+from nfvcl_core.models.resources import VmResource
 
 
 class Router5GInfo(NFVCLBaseModel):
@@ -45,7 +44,6 @@ class Generic5GUPFVMBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFVMBlueprintN
         if self.router_needed:
             router_info: Router5GInfo
             if True: #not area.networks.external_router: TODO fix this
-                self._create_upf_data_networks()
                 router_info = self.deploy_router_blueprint()
             else:
                 pass
@@ -63,11 +61,11 @@ class Generic5GUPFVMBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFVMBlueprintN
         router_5g_create_model = Router5GCreateModel(
             area_id=self.state.current_config.area_id,
             networks=Router5GCreateModelNetworks(
-                mgt=self.state.current_config.networks.mgt,
-                gnb=self.state.current_config.networks.gnb,
-                core=self.state.current_config.networks.n4,
-                n3=self.state.current_config.networks.n3,
-                n6=self.state.current_config.networks.n6
+                mgt=self.state.current_config.networks.mgt.net_name,
+                gnb=self.state.current_config.networks.gnb.net_name,
+                core=self.state.current_config.networks.n4.net_name,
+                n3=self.state.current_config.networks.n3.net_name,
+                n6=self.state.current_config.networks.n6.net_name
             )
         )
 
@@ -101,26 +99,6 @@ class Generic5GUPFVMBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFVMBlueprintN
                 Route(network_cidr=cidr, next_hop=nexthop)
             ]))
 
-    def _create_upf_data_networks(self):
-        """
-        Create the data networks for the UPF if not overridden by the user
-        """
-        area_id = self.state.current_config.area_id
-        if not self.state.current_config.networks.n3:
-            n3_net_name = f"{self.id}_{area_id}_n3"
-            network = NetResource(area=area_id, name=n3_net_name, cidr=f"10.{168 + area_id}.3.0/24")
-            self.register_resource(network)
-            self.provider.create_net(network)
-            self.state.current_config.networks.n3 = n3_net_name
-            self.to_db()
-        if not self.state.current_config.networks.n6:
-            n6_net_name = f"{self.id}_{area_id}_n6"
-            network = NetResource(area=area_id, name=n6_net_name, cidr=f"10.{168 + area_id}.6.0/24")
-            self.register_resource(network)
-            self.provider.create_net(network)
-            self.state.current_config.networks.n6 = n6_net_name
-            self.to_db()
-
     def update_router_routes(self):
         # The router need to route the traffic for the DNN ip pool through the UPF N6 interface
         if self.router_needed:
@@ -146,7 +124,6 @@ class Generic5GUPFVMBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFVMBlueprintN
         self.state.current_config.n3_gateway_ip = self.state.router.network.n3_ip
         self.state.current_config.n6_gateway_ip = self.state.router.network.n6_ip
         self.state.current_config.gnb_cidr = self.state.router.network.gnb_cidr
-
         self.update_router_routes()
 
     @abstractmethod

@@ -13,7 +13,7 @@ from nfvcl.blueprints_ng.modules.oai import oai_default_upf_config
 from nfvcl.blueprints_ng.modules.oai import oai_utils
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 from nfvcl_core.models.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import Upfconfig, Snssai, DnnItem
+from nfvcl.models.blueprint_ng.core5g.OAI_Models import Upfconfig, Snssai, DnnItem, AvailableSmf
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
 from nfvcl_core.utils.blue_utils import rel_path
 
@@ -80,8 +80,8 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
             flavor=VmResourceFlavor(),
             username="ubuntu",
             password="ubuntu",
-            management_network=self.state.current_config.networks.mgt,
-            additional_networks=[self.state.current_config.networks.n4, self.state.current_config.networks.n3, self.state.current_config.networks.n6]
+            management_network=self.state.current_config.networks.mgt.net_name,
+            additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name]
         )
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)
@@ -105,11 +105,11 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
         upf_vm = next(iter(self.state.vm_resources.values()))
 
         self.state.upf_conf.nfs.upf.host = f"oai-upf{self.state.current_config.area_id}"
-        self.state.upf_conf.nfs.upf.sbi.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n4][0].fixed.interface_name
-        self.state.upf_conf.nfs.upf.n3.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n3][0].fixed.interface_name
-        self.state.upf_conf.nfs.upf.n4.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n4][0].fixed.interface_name
-        self.state.upf_conf.nfs.upf.n6.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n6][0].fixed.interface_name
-        self.state.upf_conf.nfs.upf.n9.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n4][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.sbi.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.n3.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.n4.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.n6.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name
+        self.state.upf_conf.nfs.upf.n9.interface_name = upf_vm.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.interface_name
         self.state.upf_conf.upf.remote_n6_gw = self.state.current_config.n6_gateway_ip.exploded
 
         for new_slice in self.state.current_config.slices:
@@ -122,9 +122,12 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
                 oai_utils.add_dnn_dnns(self.state.upf_conf, dnn.name, dnn.cidr)
                 oai_utils.add_dnn_snssai_upf_info_list_item(self.state.upf_conf, new_snssai, dnn_item)
 
+        if self.state.current_config.smf_ip:
+            self.state.upf_conf.upf.smfs = [AvailableSmf(host=self.state.current_config.smf_ip.exploded)]
+
         upf_conf_yaml = yaml.dump(json.loads(self.state.upf_conf.model_dump_json(by_alias=True)))
 
-        if self.state.current_config.nrf_ip:
+        if self.state.current_config.nrf_ip and self.state.current_config.smf_ip:
             self.state.upf_vm_configurator.upf_id = self.state.current_config.area_id
             self.state.upf_vm_configurator.nrf_ipv4_address = self.state.current_config.nrf_ip.exploded
             self.state.upf_vm_configurator.upf_conf = upf_conf_yaml
@@ -146,12 +149,12 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
             vm_resource_id=upf_vm.id,
             vm_configurator_id=self.state.upf_vm_configurator.id,
             network_info=UPFNetworkInfo(
-                n4_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.state.current_config.networks.n4][0].fixed.cidr),
-                n3_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.state.current_config.networks.n3][0].fixed.cidr),
-                n6_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.state.current_config.networks.n6][0].fixed.cidr),
-                n4_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.state.current_config.networks.n4][0].fixed.ip),
-                n3_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.state.current_config.networks.n3][0].fixed.ip),
-                n6_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.state.current_config.networks.n6][0].fixed.ip)
+                n4_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.cidr),
+                n3_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.cidr),
+                n6_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.cidr),
+                n4_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.ip),
+                n3_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.ip),
+                n6_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.ip)
             )
         )
         self.state.upf_list.clear()

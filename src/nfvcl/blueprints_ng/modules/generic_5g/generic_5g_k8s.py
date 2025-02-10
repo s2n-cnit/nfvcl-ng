@@ -4,10 +4,10 @@ from typing import Generic, TypeVar, Optional, Dict, Tuple, final, List
 from pydantic import Field, RootModel
 
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState, NFNetworkEndpoint
 from nfvcl_core.models.resources import HelmChartResource
 from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
+from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, NetworkEndPointType
 from nfvcl.models.blueprint_ng.g5.core import NF5GType, NetworkFunctionScaling
 from nfvcl_core.models.http_models import HttpRequestType
 from nfvcl.models.k8s.cadvisor import cadvisor_exposed_metrics
@@ -62,12 +62,43 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
         self.state.core_deployed = True
 
     @final
+    def prepare_network(self):
+        if self.state.current_config.config.network_endpoints.n2.type == NetworkEndPointType.MULTUS:
+            multus_interface = self.provider.reserve_k8s_multus_ip(self.get_core_area_id(), self.state.current_config.config.network_endpoints.n2.net_name)
+            self.state.network_endpoints.n2 = NFNetworkEndpoint(
+                net_name=self.state.current_config.config.network_endpoints.n2.net_name,
+                type=self.state.current_config.config.network_endpoints.n2.type,
+                multus=multus_interface,
+                ip_address=multus_interface.ip_address,
+                network_cidr=multus_interface.network_cidr
+            )
+        if self.state.current_config.config.network_endpoints.n4.type == NetworkEndPointType.MULTUS:
+            multus_interface = self.provider.reserve_k8s_multus_ip(self.get_core_area_id(), self.state.current_config.config.network_endpoints.n4.net_name)
+            self.state.network_endpoints.n4 = NFNetworkEndpoint(
+                net_name=self.state.current_config.config.network_endpoints.n4.net_name,
+                type=self.state.current_config.config.network_endpoints.n4.type,
+                multus=multus_interface,
+                ip_address=multus_interface.ip_address,
+                network_cidr=multus_interface.network_cidr
+            )
+
+    @final
     def get_amf_ip(self) -> str:
-        return self.state.k8s_network_functions[NF5GType.AMF].service.external_ip[0]
+        if self.state.current_config.config.network_endpoints.n2.type == NetworkEndPointType.MULTUS:
+            return self.state.network_endpoints.n2.ip_address.exploded
+        else:
+            return self.state.k8s_network_functions[NF5GType.AMF].service.external_ip[0]
 
     @final
     def get_nrf_ip(self) -> str:
         return self.state.k8s_network_functions[NF5GType.NRF].service.external_ip[0]
+
+    @final
+    def get_smf_ip(self) -> str:
+        if self.state.current_config.config.network_endpoints.n4.type == NetworkEndPointType.MULTUS:
+            return self.state.network_endpoints.n4.ip_address.exploded
+        else:
+            return self.state.k8s_network_functions[NF5GType.SMF].service.external_ip[0]
 
     @day2_function("/scale_nf", [HttpRequestType.PUT])
     def day2_scale_nf(self, nf_scaling: NetworkFunctionScaling):

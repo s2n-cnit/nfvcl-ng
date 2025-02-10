@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import List, Optional
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic import constr
 
 from nfvcl_core.models.base_model import NFVCLBaseModel
@@ -13,7 +14,6 @@ from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, Seria
 # ===================================== SubClasses of subconfig section ================================================
 class Pool(NFVCLBaseModel):
     cidr: str
-
 
 class SubDataNets(NFVCLBaseModel):
     net_name: str = Field(..., description="set net-name, exp: 'internet'")
@@ -30,10 +30,38 @@ class Router5GNetworkInfo(NFVCLBaseModel):
     gnb_ip: SerializableIPv4Address = Field()
     gnb_cidr: SerializableIPv4Network = Field()
 
+class MultusRoute(NFVCLBaseModel):
+    dst: str
+    gw: str
+
+class NetworkEndPointType(str, Enum):
+    MULTUS = "MULTUS"
+    LB = "LB" # Load Balancer
+
+class NetworkEndPoint(NFVCLBaseModel):
+    net_name: str = Field(description="Name of the network, need to be present in the topology")
+    routes: Optional[List[MultusRoute]] = Field(default_factory=list)
+
+class NetworkEndPointWithType(NetworkEndPoint):
+    type: Optional[NetworkEndPointType] = Field(default=NetworkEndPointType.LB, description="Type of the network endpoint, default is Load Balancer. If this network is used for a VM the type is ignored")
+
 class NetworkEndPoints(NFVCLBaseModel):
-    mgt: Optional[str] = Field(default=None)
-    wan: Optional[str] = Field(default=None)
+    mgt: Optional[NetworkEndPoint] = Field(default=None, description="Used as the management network for VMs, if everything is on K8S this is not needed")
+    n2: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N2 interface, can be omitted if the core has a fixed network (like Athonet)")
+    n4: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N4 interface, can be omitted if the core has a fixed network (like Athonet)")
     data_nets: List[SubDataNets]
+
+    @field_validator("mgt", mode="before")
+    def str_to_network_endpoint(cls, v: object) -> object:
+        if isinstance(v, str):
+            return NetworkEndPoint(net_name=v)
+        return v
+
+    @field_validator("n2", "n4", mode="before")
+    def str_to_network_endpoint_with_type(cls, v: object) -> object:
+        if isinstance(v, str):
+            return NetworkEndPointWithType(net_name=v)
+        return v
 
 
 class SubFlows(NFVCLBaseModel):
@@ -115,10 +143,22 @@ class SubSlices(NFVCLBaseModel):
     sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
 
 class SubAreaNetwork(NFVCLBaseModel):
-    n3: Optional[str] = Field(default=None)
-    n6: Optional[str] = Field(default=None)
-    gnb: Optional[str] = Field(default=None)
+    n3: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N3 interface")
+    n6: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N3 interface")
+    gnb: Optional[NetworkEndPoint] = Field(default=None, description="Network endpoint for GNB network, only required if a router is needed for this UPF configuration")
     external_router: Optional[Router5GNetworkInfo] = Field(default=None)
+
+    @field_validator("gnb", mode="before")
+    def str_to_network_endpoint(cls, v: object) -> object:
+        if isinstance(v, str):
+            return NetworkEndPoint(net_name=v)
+        return v
+
+    @field_validator("n3", "n6", mode="before")
+    def str_to_network_endpoint_with_type(cls, v: object) -> object:
+        if isinstance(v, str):
+            return NetworkEndPointWithType(net_name=v)
+        return v
 
 class SubAreaUPF(NFVCLBaseModel):
     type: Optional[str] = Field(default=None)

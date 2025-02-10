@@ -6,6 +6,7 @@ from pydantic import Field
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_gnb import Generic5GGNBBlueprintNGState, Generic5GGNBBlueprintNG
 from nfvcl.blueprints_ng.modules.oai import oai_default_gnb_config
 from nfvcl.models.blueprint_ng.core5g.OAI_Models import GNB
+from nfvcl.models.blueprint_ng.core5g.common import NetworkEndPointType
 from nfvcl.models.blueprint_ng.g5.ran import GNBBlueCreateModel
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core.models.resources import HelmChartResource
@@ -41,21 +42,21 @@ class OpenAirInterfaceGnb(Generic5GGNBBlueprintNG[OAIGnbBlueprintNGState, GNBBlu
         )
         self.register_resource(self.state.gnb_helm_chart)
 
-        if self.state.current_config.networks.n2.multus:
+        if self.state.current_config.networks.n2.type == NetworkEndPointType.MULTUS:
             net_n2 = self.provider.reserve_k8s_multus_ip(self.state.current_config.area_id, self.state.current_config.networks.n2.net_name)
-            self.state.oai_gnb_config_values.multus.n2_interface.set_multus(self.state.current_config.networks.n2, net_n2)
+            self.state.oai_gnb_config_values.multus.n2_interface.set_multus(True, net_n2, self.state.current_config.networks.n2.routes)
 
-        if self.state.current_config.networks.n3.multus:
+        if self.state.current_config.networks.n3.type == NetworkEndPointType.MULTUS:
             net_n3 = self.provider.reserve_k8s_multus_ip(self.state.current_config.area_id, self.state.current_config.networks.n3.net_name)
-            self.state.oai_gnb_config_values.multus.n3_interface.set_multus(self.state.current_config.networks.n3, net_n3)
+            self.state.oai_gnb_config_values.multus.n3_interface.set_multus(True, net_n3, self.state.current_config.networks.n3.routes)
 
-        if self.state.current_config.networks.ru1.multus:
+        if self.state.current_config.networks.ru1.type == NetworkEndPointType.MULTUS:
             net_ru1 = self.provider.reserve_k8s_multus_ip(self.state.current_config.area_id, self.state.current_config.networks.ru1.net_name)
-            self.state.oai_gnb_config_values.multus.ru1_interface.set_multus(self.state.current_config.networks.ru1, net_ru1)
+            self.state.oai_gnb_config_values.multus.ru1_interface.set_multus(True, net_ru1, self.state.current_config.networks.ru1.routes)
 
-        if self.state.current_config.networks.ru2.multus:
+        if self.state.current_config.networks.ru2.type == NetworkEndPointType.MULTUS:
             net_ru2 = self.provider.reserve_k8s_multus_ip(self.state.current_config.area_id, self.state.current_config.networks.ru2.net_name)
-            self.state.oai_gnb_config_values.multus.ru2_interface.set_multus(self.state.current_config.networks.ru2, net_ru2)
+            self.state.oai_gnb_config_values.multus.ru2_interface.set_multus(True, net_ru2, self.state.current_config.networks.ru2.routes)
 
         self.update_gnb_values()
 

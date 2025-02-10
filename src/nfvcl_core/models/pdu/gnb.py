@@ -8,7 +8,7 @@ from nfvcl_core.models.base_model import NFVCLBaseModel
 
 class GNBPDUSlice(NFVCLBaseModel):
     sst: int = Field()
-    sd: int = Field()
+    sd: str = Field(pattern=r'^([a-fA-F0-9]{6})$')
 
 class GNBPDUConfigure(NFVCLBaseModel):
     area: int = Field()

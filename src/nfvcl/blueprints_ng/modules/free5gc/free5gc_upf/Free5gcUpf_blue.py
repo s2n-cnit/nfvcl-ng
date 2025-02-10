@@ -98,8 +98,8 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
             flavor=VmResourceFlavor(),
             username="ubuntu",
             password="ubuntu",
-            management_network=self.state.current_config.networks.mgt,
-            additional_networks=[self.state.current_config.networks.n4, self.state.current_config.networks.n3, self.state.current_config.networks.n6]
+            management_network=self.state.current_config.networks.mgt.net_name,
+            additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name]
         )
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)

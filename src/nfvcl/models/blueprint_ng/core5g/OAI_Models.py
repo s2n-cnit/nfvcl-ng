@@ -1,14 +1,13 @@
+from __future__ import annotations
+
 from typing import *
 
 from pydantic import Field
 
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubArea
+from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubArea, MultusRoute
 from nfvcl.models.k8s.k8s_objects import K8sService
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.network.network_models import MultusInterface
-
-from nfvcl.models.blueprint_ng.g5.ran import RANBlueCreateModelInterface
-
 
 class OAIAreaModel(NFVCLBaseModel):
     id: int
@@ -494,6 +493,7 @@ class StartAmf(Start):
 class OaiAmf(OaiNF):
     start: StartAmf
     security_context: SecurityContext = Field(..., alias='securityContext')
+    multus: Optional[OAIMultusAMF] = Field(default=None)
 
 
 class StartSmf(Start):
@@ -502,6 +502,7 @@ class StartSmf(Start):
 
 class OaiSmf(OaiNF):
     start: StartSmf
+    multus: Optional[OAIMultusSMF] = Field(default=None)
 
 
 class OaiCoreValuesModel(NFVCLBaseModel):
@@ -516,10 +517,41 @@ class OaiCoreValuesModel(NFVCLBaseModel):
     oai_smf: Optional[OaiSmf] = Field(None, alias='oai-smf')
     coreconfig: Optional[Coreconfig] = Field(None, alias='currentconfig')
 
+class OAIMultusInterface(NFVCLBaseModel):
+    create: bool
+    ip_add: str = Field(..., alias='ipAdd')
+    netmask: str
+    name: str
+    mac: Optional[str] = Field(default="")
+    gateway: Optional[str] = Field(default="")
+    routes: Optional[List[MultusRoute]] = Field(default_factory=list)
+    host_interface: str = Field(alias='hostInterface')
+
+    def set_multus(self, create: bool, multus_interface: MultusInterface, routes: Optional[List[MultusRoute]] = None):
+        self.create = create
+        self.ip_add = multus_interface.ip_address.exploded
+        self.netmask = str(multus_interface.prefixlen)
+        self.gateway = multus_interface.gateway_ip.exploded if multus_interface.gateway_ip else None
+        self.routes = routes if routes else []
+        self.host_interface = multus_interface.host_interface
+
+class OAIMultusUPF(NFVCLBaseModel):
+    defaultGateway: Optional[str] = Field(default=None)
+    n3Interface: OAIMultusInterface
+    n4Interface: OAIMultusInterface
+    n6Interface: OAIMultusInterface
+
+class OAIMultusAMF(NFVCLBaseModel):
+    defaultGateway: Optional[str] = Field(default=None)
+    n2Interface: OAIMultusInterface
+
+class OAIMultusSMF(NFVCLBaseModel):
+    defaultGateway: Optional[str] = Field(default=None)
+    n4Interface: OAIMultusInterface
 
 class OaiUpfValuesModel(NFVCLBaseModel):
     upfconfig: Optional[Upfconfig] = Field(None, alias='currentconfig')
-
+    multus: OAIMultusUPF
 
 # UE Model
 class LastIndexes(NFVCLBaseModel):
@@ -575,35 +607,11 @@ class ServiceAccount(NFVCLBaseModel):
     name: str
 
 
-class Route(NFVCLBaseModel):
-    dst: str
-    gw: str
-
-
-class OaiMultusInterface(NFVCLBaseModel):
-    create: bool
-    ip_add: str = Field(..., alias='ipAdd')
-    netmask: str
-    mac: Optional[str] = Field(default="", alias='mac')
-    name: str
-    gateway: str
-    routes: List[Route]
-    host_interface: str = Field(..., alias='hostInterface')
-
-    def set_multus(self, config: RANBlueCreateModelInterface, net: MultusInterface):
-        self.create = config.multus
-        self.ip_add = net.ip_address.exploded
-        self.netmask = str(net.prefixlen)
-        self.gateway = net.gateway_ip.exploded if net.gateway_ip else None
-        self.routes = config.routes
-        self.host_interface = net.host_interface
-
-
 class CUMultus(NFVCLBaseModel):
     default_gateway: str = Field(..., alias='defaultGateway')
-    f1_interface: OaiMultusInterface = Field(..., alias='f1Interface')
-    n2_interface: OaiMultusInterface = Field(..., alias='n2Interface')
-    n3_interface: OaiMultusInterface = Field(..., alias='n3Interface')
+    f1_interface: OAIMultusInterface = Field(..., alias='f1Interface')
+    n2_interface: OAIMultusInterface = Field(..., alias='n2Interface')
+    n3_interface: OAIMultusInterface = Field(..., alias='n3Interface')
 
 
 class CUConfig(NFVCLBaseModel):
@@ -696,9 +704,9 @@ class CU(NFVCLBaseModel):
 
 class CUCPMultus(NFVCLBaseModel):
     default_gateway: str = Field(..., alias='defaultGateway')
-    e1_interface: OaiMultusInterface = Field(..., alias='e1Interface')
-    n2_interface: OaiMultusInterface = Field(..., alias='n2Interface')
-    f1c_interface: OaiMultusInterface = Field(..., alias='f1cInterface')
+    e1_interface: OAIMultusInterface = Field(..., alias='e1Interface')
+    n2_interface: OAIMultusInterface = Field(..., alias='n2Interface')
+    f1c_interface: OAIMultusInterface = Field(..., alias='f1cInterface')
 
 
 class CUCPConfig(NFVCLBaseModel):
@@ -748,9 +756,9 @@ class CUCP(NFVCLBaseModel):
 
 class CUUPMultus(NFVCLBaseModel):
     default_gateway: str = Field(..., alias='defaultGateway')
-    e1_interface: OaiMultusInterface = Field(..., alias='e1Interface')
-    n3_interface: OaiMultusInterface = Field(..., alias='n3Interface')
-    f1u_interface: OaiMultusInterface = Field(..., alias='f1uInterface')
+    e1_interface: OAIMultusInterface = Field(..., alias='e1Interface')
+    n3_interface: OAIMultusInterface = Field(..., alias='n3Interface')
+    f1u_interface: OAIMultusInterface = Field(..., alias='f1uInterface')
 
 
 class CUUPConfig(NFVCLBaseModel):
@@ -802,9 +810,9 @@ class CUUP(NFVCLBaseModel):
 
 class DUMultus(NFVCLBaseModel):
     default_gateway: str = Field(..., alias='defaultGateway')
-    f1_interface: OaiMultusInterface = Field(..., alias='f1Interface')
-    ru1_interface: OaiMultusInterface = Field(..., alias='ru1Interface')
-    ru2_interface: OaiMultusInterface = Field(..., alias='ru2Interface')
+    f1_interface: OAIMultusInterface = Field(..., alias='f1Interface')
+    ru1_interface: OAIMultusInterface = Field(..., alias='ru1Interface')
+    ru2_interface: OAIMultusInterface = Field(..., alias='ru2Interface')
 
 
 class DUConfig(NFVCLBaseModel):
@@ -854,10 +862,10 @@ class DU(NFVCLBaseModel):
 
 class GNBMultus(NFVCLBaseModel):
     default_gateway: str = Field(..., alias='defaultGateway')
-    n2_interface: OaiMultusInterface = Field(..., alias='n2Interface')
-    n3_interface: OaiMultusInterface = Field(..., alias='n3Interface')
-    ru1_interface: OaiMultusInterface = Field(..., alias='ru1Interface')
-    ru2_interface: OaiMultusInterface = Field(..., alias='ru2Interface')
+    n2_interface: OAIMultusInterface = Field(..., alias='n2Interface')
+    n3_interface: OAIMultusInterface = Field(..., alias='n3Interface')
+    ru1_interface: OAIMultusInterface = Field(..., alias='ru1Interface')
+    ru2_interface: OAIMultusInterface = Field(..., alias='ru2Interface')
 
 
 class GNBConfig(NFVCLBaseModel):

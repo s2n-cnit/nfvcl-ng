@@ -7,7 +7,7 @@ from pydantic import Field
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
-    SstConvertion, SubDataNets
+    SstConvertion, SubDataNets, NetworkEndPointWithType
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel
 from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, SliceModel
@@ -17,8 +17,8 @@ from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.http_models import HttpRequestType
 from nfvcl_core.models.linux.ip import Route
 from nfvcl_core.models.network import PduModel
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
-from nfvcl_core.models.network.network_models import PduType
+from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl_core.models.network.network_models import PduType, MultusInterface
 from nfvcl_core.models.pdu.gnb import GNBPDUSlice, GNBPDUConfigure
 
 
@@ -37,11 +37,24 @@ class EdgeAreaInfo(NFVCLBaseModel):
     area: int = Field()
     upf: Optional[UPFInfo] = Field(default=None)
 
+class NFNetworkEndpoint(NetworkEndPointWithType):
+    """
+    Used only in the 5g blueprints state
+    """
+    ip_address: Optional[SerializableIPv4Address] = Field(default=None)
+    network_cidr: Optional[SerializableIPv4Network] = Field(default=None)
+    multus: Optional[MultusInterface] = Field(default=None)
+
+class NFNetworkEndpoints(NFVCLBaseModel):
+    n2: Optional[NFNetworkEndpoint] = Field(default=None)
+    n4: Optional[NFNetworkEndpoint] = Field(default=None)
+
 class Generic5GBlueprintNGState(BlueprintNGState):
     current_config: Optional[Create5gModel] = Field(default=None)
     edge_areas: Dict[str, EdgeAreaInfo] = Field(default_factory=dict)
     ran_areas: Dict[str, RANAreaInfo] = Field(default_factory=dict)
     core_deployed: bool = Field(default=False)
+    network_endpoints: Optional[NFNetworkEndpoints] = Field(default_factory=NFNetworkEndpoints)
 
 
 StateTypeVar5G = TypeVar("StateTypeVar5G", bound=Generic5GBlueprintNGState)
@@ -64,6 +77,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         self.configuration_feasibility_check(create_model)
         self.pre_creation_checks()
 
+        # Prepare the network for the 5G core
+        self.prepare_network()
         # Update the edge areas creating the router (if needed) and the UPFs
         self.update_edge_areas()
         # Deploy the 5G core itself
@@ -75,6 +90,14 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         # Update the attached GNBs
         self.update_gnb_config()
         self.logger.success("5G Blueprint completely deployed")
+
+    def get_core_area_id(self) -> int:
+        """
+        Get the core area id
+
+        Returns: Area id of the core
+        """
+        return int(list(filter(lambda x: x.core == True, self.state.current_config.areas))[0].id)
 
     def pre_creation_checks(self):
         """
@@ -99,6 +122,10 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             raise BlueprintNGException("Cannot have multiple slices with the same DNN")
 
     @abstractmethod
+    def prepare_network(self):
+        pass
+
+    @abstractmethod
     def create_5g(self, create_model: Create5gModel):
         pass
 
@@ -112,6 +139,10 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     @abstractmethod
     def get_nrf_ip(self) -> str:
+        pass
+
+    @abstractmethod
+    def get_smf_ip(self) -> str:
         pass
 
     @abstractmethod
@@ -177,14 +208,15 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             area_id=area_id,
             networks=BlueCreateModelNetworks(
                 mgt=self.state.current_config.config.network_endpoints.mgt,
-                n4=self.state.current_config.config.network_endpoints.wan,
+                n4=self.state.current_config.config.network_endpoints.n4,
                 n3=self.state.current_config.get_area(area_id).networks.n3,
                 n6=self.state.current_config.get_area(area_id).networks.n6,
                 gnb=self.state.current_config.get_area(area_id).networks.gnb
             ),
             slices=slices,
             start=True,
-            nrf_ip=SerializableIPv4Address(self.get_nrf_ip()) if self.state.core_deployed else None
+            nrf_ip=SerializableIPv4Address(self.get_nrf_ip()) if self.state.core_deployed else None,
+            smf_ip=SerializableIPv4Address(self.get_smf_ip()) if self.state.core_deployed else None,
         )
         return upf_create_model
 

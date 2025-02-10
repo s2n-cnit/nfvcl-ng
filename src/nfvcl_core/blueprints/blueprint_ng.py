@@ -287,10 +287,15 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 instance.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
 
         # Register the reloaded resources of type ResourceConfiguration, also resolve the references within and link them to the same object instance registered above
-        for resource_id, resource in deserialized_dict["registered_resources"].items():
-            if resource["value"]["type"] == "ResourceConfiguration":
-                instance.__override_variables_in_dict_ref(resource["value"], resource["value"], instance.base_model.registered_resources)
-                instance.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
+        try:
+            for resource_id, resource in deserialized_dict["registered_resources"].items():
+                if resource["value"]["type"] == "ResourceConfiguration":
+                    instance.__override_variables_in_dict_ref(resource["value"], resource["value"], instance.base_model.registered_resources)
+                    instance.register_resource(get_class_from_path(resource["type"]).model_validate(resource["value"]))
+        except ValidationError as e:
+            instance.logger.error(f"Unable to load state: {str(e)}")
+            instance.base_model.corrupted = True
+            instance.logger.error(f"Blueprint set as corrupted")
 
         # Here the registered_resources should be in the same state as before saving the blueprint to the db
 

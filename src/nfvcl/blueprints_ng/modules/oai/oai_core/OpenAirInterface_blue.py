@@ -15,7 +15,7 @@ from nfvcl_core.models.resources import HelmChartResource
 from nfvcl.models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, \
     SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile, OaiCoreValuesModel
 from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubArea, SubSubscribers, SubDataNets, \
-    SubSliceProfiles, Create5gModel
+    SubSliceProfiles, Create5gModel, NetworkEndPointType
 from nfvcl.models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
     Core5GUpdateSliceModel, NF5GType, Core5GAddSubscriberModel
@@ -121,6 +121,13 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.state.oai_config_values.coreconfig.amf.served_guami_list.clear()
         oai_utils.add_served_guami_list_item(config=self.state.oai_config_values.coreconfig, mcc=self.state.mcc, mnc=self.state.mnc)
         self.state.oai_config_values.coreconfig.lmf.num_gnb = len(self.state.current_config.areas)
+
+        if self.state.network_endpoints.n2 and self.state.network_endpoints.n2.type == NetworkEndPointType.MULTUS:
+            self.state.oai_config_values.oai_amf.multus.n2Interface.set_multus(True, self.state.network_endpoints.n2.multus)
+            self.state.oai_config_values.coreconfig.nfs.amf.n2.interface_name = "n2" if self.state.network_endpoints.n2.multus else "eth0"
+        if self.state.network_endpoints.n4 and self.state.network_endpoints.n4.type == NetworkEndPointType.MULTUS:
+            self.state.oai_config_values.oai_smf.multus.n4Interface.set_multus(True, self.state.network_endpoints.n4.multus)
+            self.state.oai_config_values.coreconfig.nfs.smf.n4.interface_name = "n4" if self.state.network_endpoints.n4.multus else "eth0"
 
         # self.state.oai_config_values.oai_smf.hostAliases.clear()
         self.state.oai_config_values.coreconfig.smf.upfs.clear()

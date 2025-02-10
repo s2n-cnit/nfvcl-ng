@@ -19,7 +19,8 @@ class EventManager(GenericManager):
         self.redis_instance = Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8")
         self.publish_to_redis = True
         self.sub_to_redis = True
-        self.subscribe_all_debug()
+        # Subscribe to all topics and print events to console for debug
+        #self.subscribe_all_debug()
 
         self.redis_subscriber = self.redis_instance.pubsub()
         self.redis_subscriber.subscribe(NFVCLEventTopics.K8S_MANAGEMENT_TOPIC)

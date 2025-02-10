@@ -46,7 +46,7 @@ class LiteonAIOPDUConfigurator(GNBPDUConfigurator):
             nci=str(config.tac),
             pci=str(config.tac),
             sst=str(config.nssai[0].sst),
-            sd=str(config.nssai[0].sd),
+            sd=config.nssai[0].sd,
             amf_ip=config.amf_ip,
             upf_ip=config.upf_ip,
             frequency=self.pdu_model.config["frequency"]

@@ -3,20 +3,9 @@ from typing import List, Optional
 
 from pydantic import Field
 
+from nfvcl.models.blueprint_ng.core5g.common import NetworkEndPointWithType
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
-
-
-class RanInterfaceRoute(NFVCLBaseModel):
-    dst: str
-    gw: str
-
-
-class RANBlueCreateModelInterface(NFVCLBaseModel):
-    multus: bool = Field(default=False)
-    net_name: str = Field(default="")
-    routes: Optional[List[RanInterfaceRoute]] = Field(default_factory=list)
-
 
 class RANBlueCreateModelGeneric(BlueprintNGCreateModel):
     mcc: str = Field(alias='mcc', pattern=r'^[0-9]*$', min_length=3, max_length=3)
@@ -30,9 +19,9 @@ class RANBlueCreateModelGeneric(BlueprintNGCreateModel):
 ################################ CU ###############################################
 
 class CUBlueCreateModelNetwork(NFVCLBaseModel):
-    f1: RANBlueCreateModelInterface = Field(alias='f1')
-    n2: RANBlueCreateModelInterface = Field(alias='n2')
-    n3: RANBlueCreateModelInterface = Field(alias='n3')
+    f1: NetworkEndPointWithType = Field(alias='f1')
+    n2: NetworkEndPointWithType = Field(alias='n2')
+    n3: NetworkEndPointWithType = Field(alias='n3')
 
 
 class CUBlueCreateModel(RANBlueCreateModelGeneric):
@@ -61,9 +50,9 @@ class CUBlueCreateModel(RANBlueCreateModelGeneric):
 ################################ CU-CP ############################################
 
 class CUCPBlueCreateModelNetwork(NFVCLBaseModel):
-    e1: RANBlueCreateModelInterface = Field(alias='e1')
-    n2: RANBlueCreateModelInterface = Field(alias='n2')
-    f1: RANBlueCreateModelInterface = Field(alias='f1')
+    e1: NetworkEndPointWithType = Field(alias='e1')
+    n2: NetworkEndPointWithType = Field(alias='n2')
+    f1: NetworkEndPointWithType = Field(alias='f1')
 
 
 class CUCPBlueCreateModel(RANBlueCreateModelGeneric):
@@ -74,9 +63,9 @@ class CUCPBlueCreateModel(RANBlueCreateModelGeneric):
 ################################ CU-UP ############################################
 
 class CUUPBlueCreateModelNetwork(NFVCLBaseModel):
-    e1: RANBlueCreateModelInterface = Field(alias='e1')
-    n3: RANBlueCreateModelInterface = Field(alias='n3')
-    f1: RANBlueCreateModelInterface = Field(alias='f1')
+    e1: NetworkEndPointWithType = Field(alias='e1')
+    n3: NetworkEndPointWithType = Field(alias='n3')
+    f1: NetworkEndPointWithType = Field(alias='f1')
 
 
 class CUUPBlueCreateModel(RANBlueCreateModelGeneric):
@@ -86,9 +75,9 @@ class CUUPBlueCreateModel(RANBlueCreateModelGeneric):
 ################################ DU ############################################
 
 class DUBlueCreateModelNetwork(NFVCLBaseModel):
-    f1: RANBlueCreateModelInterface = Field(alias='f1')
-    ru1: RANBlueCreateModelInterface = Field(alias='ru1')
-    ru2: RANBlueCreateModelInterface = Field(alias='ru2')
+    f1: NetworkEndPointWithType = Field(alias='f1')
+    ru1: NetworkEndPointWithType = Field(alias='ru1')
+    ru2: NetworkEndPointWithType = Field(alias='ru2')
 
 
 class DUBlueCreateModel(RANBlueCreateModelGeneric):
@@ -99,10 +88,10 @@ class DUBlueCreateModel(RANBlueCreateModelGeneric):
 ################################ GNB ############################################
 
 class GNBBlueCreateModelNetwork(NFVCLBaseModel):
-    n2: RANBlueCreateModelInterface = Field(alias='n2')
-    n3: RANBlueCreateModelInterface = Field(alias='n3')
-    ru1: RANBlueCreateModelInterface = Field(alias='ru1')
-    ru2: RANBlueCreateModelInterface = Field(alias='ru2')
+    n2: NetworkEndPointWithType = Field(alias='n2')
+    n3: NetworkEndPointWithType = Field(alias='n3')
+    ru1: NetworkEndPointWithType = Field(alias='ru1')
+    ru2: NetworkEndPointWithType = Field(alias='ru2')
 
 
 class GNBBlueCreateModel(RANBlueCreateModelGeneric):
@@ -119,12 +108,12 @@ class Split(str, Enum):
 
 
 class RANBlueCreateModelNetwork(NFVCLBaseModel):
-    f1: Optional[RANBlueCreateModelInterface] = Field(default=None, alias='f1')
-    e1: Optional[RANBlueCreateModelInterface] = Field(default=None, alias='e1')
-    n2: Optional[RANBlueCreateModelInterface] = Field(default=None, alias='n2')
-    n3: Optional[RANBlueCreateModelInterface] = Field(default=None, alias='n3')
-    ru1: Optional[RANBlueCreateModelInterface] = Field(default=None, alias='ru1')
-    ru2: Optional[RANBlueCreateModelInterface] = Field(default=None, alias='ru2')
+    f1: Optional[NetworkEndPointWithType] = Field(default=None, alias='f1')
+    e1: Optional[NetworkEndPointWithType] = Field(default=None, alias='e1')
+    n2: Optional[NetworkEndPointWithType] = Field(default=None, alias='n2')
+    n3: Optional[NetworkEndPointWithType] = Field(default=None, alias='n3')
+    ru1: Optional[NetworkEndPointWithType] = Field(default=None, alias='ru1')
+    ru2: Optional[NetworkEndPointWithType] = Field(default=None, alias='ru2')
 
 
 class RANBlueCreateModelSplit(NFVCLBaseModel):

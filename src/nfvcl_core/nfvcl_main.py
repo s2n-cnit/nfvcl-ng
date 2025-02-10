@@ -13,7 +13,7 @@ from pydantic import Field, PositiveInt
 from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_implementations
 from nfvcl.models.k8s.common_k8s_model import Labels
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall
-from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sQuota
+from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
 from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
 from nfvcl_core.config import NFVCLConfigModel, load_nfvcl_config
@@ -363,7 +363,7 @@ class NFVCL:
         description=ADD_EXTERNAL_K8SCLUSTER
     )
     def create_kubernetes_external(self, kubernetes_model: TopologyK8sModel, callback=None):
-        kubernetes_model.provided_by = 'external'
+        kubernetes_model.provided_by = ProvidedBy.EXTERNAL
         return self.add_task(self.topology_manager.add_kubernetes, kubernetes_model, callback=callback)
 
     @NFVCLPublic(path="/kubernetes/update",section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_K8SCLUSTER_SUMMARY, description=UPD_K8SCLUSTER_DESCRIPTION)

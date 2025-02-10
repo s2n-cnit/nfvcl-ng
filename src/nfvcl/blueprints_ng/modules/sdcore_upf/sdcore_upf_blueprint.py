@@ -135,8 +135,8 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             flavor=self.sdcore_upf_flavor,
             username="ubuntu",
             password="ubuntu",
-            management_network=self.state.current_config.networks.mgt,
-            additional_networks=[self.state.current_config.networks.n4, self.state.current_config.networks.n3, self.state.current_config.networks.n6],
+            management_network=self.state.current_config.networks.mgt.net_name,
+            additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name],
             require_port_security_disabled=True
         )
         self.register_resource(upf_vm)
@@ -144,12 +144,12 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
 
         upf_vm_configurator = SDCoreUPFConfigurator(vm_resource=upf_vm, configuration=SDCoreUPFConfiguration(
             upf_mode="dpdk",
-            n3_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n3][0].fixed.interface_name,
-            n6_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n6][0].fixed.interface_name,
-            n3_net_cidr=upf_vm.network_interfaces[self.state.current_config.networks.n3][0].fixed.get_ip_prefix(),
-            n6_net_cidr=upf_vm.network_interfaces[self.state.current_config.networks.n6][0].fixed.get_ip_prefix(),
-            n3_nic_mac=upf_vm.network_interfaces[self.state.current_config.networks.n3][0].fixed.mac,
-            n6_nic_mac=upf_vm.network_interfaces[self.state.current_config.networks.n6][0].fixed.mac,
+            n3_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.interface_name,
+            n6_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name,
+            n3_net_cidr=upf_vm.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.get_ip_prefix(),
+            n6_net_cidr=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.get_ip_prefix(),
+            n3_nic_mac=upf_vm.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.mac,
+            n6_nic_mac=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.mac,
             n3_nh_ip=self.state.current_config.n3_gateway_ip.exploded,
             n6_nh_ip=self.state.current_config.n6_gateway_ip.exploded,
             n3_route=self.state.current_config.gnb_cidr.exploded,
@@ -170,12 +170,12 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             vm_resource_id=upf_vm.id,
             vm_configurator_id=upf_vm_configurator.id,
             network_info=UPFNetworkInfo(
-                n4_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.create_config.networks.n4][0].fixed.cidr),
-                n3_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.create_config.networks.n3][0].fixed.cidr),
-                n6_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.create_config.networks.n6][0].fixed.cidr),
-                n4_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.create_config.networks.n4][0].fixed.ip),
-                n3_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.create_config.networks.n3][0].fixed.ip),
-                n6_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.create_config.networks.n6][0].fixed.ip)
+                n4_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.create_config.networks.n4.net_name][0].fixed.cidr),
+                n3_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.create_config.networks.n3.net_name][0].fixed.cidr),
+                n6_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.create_config.networks.n6.net_name][0].fixed.cidr),
+                n4_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.create_config.networks.n4.net_name][0].fixed.ip),
+                n3_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.create_config.networks.n3.net_name][0].fixed.ip),
+                n6_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.create_config.networks.n6.net_name][0].fixed.ip)
             )
         )
 

@@ -166,6 +166,18 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
         "persistent": {
             "sharedvolume": False
         },
+        "multus": {
+            "defaultGateway": "",
+            "n2Interface": {
+                "create": False,
+                "ipAdd": "192.168.24.2",
+                "netmask": "24",
+                "name": "n2",
+                "mac": "",
+                "routes": [],
+                "hostInterface": "bond0"
+            }
+        },
         "start": {
             "amf": True,
             "tcpdump": False
@@ -197,6 +209,18 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
         "start": {
             "smf": True,
             "tcpdump": False
+        },
+        "multus": {
+            "defaultGateway": "",
+            "n4Interface": {
+                "create": False,
+                "ipAdd": "192.168.24.2",
+                "netmask": "24",
+                "name": "n4",
+                "mac": "",
+                "routes": [],
+                "hostInterface": "bond0"
+            }
         },
         "config": {
             "logLevel": "debug"

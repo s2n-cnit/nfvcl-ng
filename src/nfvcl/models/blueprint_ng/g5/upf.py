@@ -1,20 +1,21 @@
 from __future__ import annotations
+
 from typing import Optional, Literal, List
 
 from pydantic import Field
 
+from nfvcl.models.blueprint_ng.core5g.common import SubSliceProfiles, SubDataNets, NetworkEndPoint, NetworkEndPointWithType
 from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.core5g.common import SubSliceProfiles, SubDataNets
 from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 
 
 class BlueCreateModelNetworks(NFVCLBaseModel):
-    mgt: str = Field()
-    n4: str = Field()
-    n3: str = Field()
-    n6: str = Field()
-    gnb: Optional[str] = Field(default=None)
+    mgt: NetworkEndPoint = Field()
+    n4: NetworkEndPointWithType = Field()
+    n3: NetworkEndPointWithType = Field()
+    n6: NetworkEndPointWithType = Field()
+    gnb: Optional[NetworkEndPoint] = Field(default=None)
 
 class UPFNetworkInfo(NFVCLBaseModel):
     n4_cidr: SerializableIPv4Network = Field()
@@ -28,6 +29,7 @@ class UPFBlueCreateModel(BlueprintNGCreateModel):
     area_id: int = Field()
     networks: BlueCreateModelNetworks = Field()
     nrf_ip: Optional[SerializableIPv4Address] = Field(default=None)
+    smf_ip: Optional[SerializableIPv4Address] = Field(default=None)
     slices: List[SliceModel] = Field(default_factory=list)
     start: Optional[bool] = Field(default=True)
     # Optional because if the UPF is a PDU the routing is fixed

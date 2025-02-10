@@ -20,12 +20,7 @@ class IPv4Pool(NFVCLBaseModel):
     name: str = Field(default_factory=generate_id)
     start: SerializableIPv4Address
     end: SerializableIPv4Address
-    used: Optional[List[bool]] = Field(default=None)
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        if self.used is None:
-            self.used = [False] * (int(self.end) - int(self.start) + 1)
 
     def __eq__(self, other):
         """
@@ -133,9 +128,12 @@ class IPv4ReservedRange(IPv4Pool):
     """
     owner: str = Field(description="The owner of the reserved range, could be the ID of a kubernetes cluster an ID of a Blueprint....")
     assigned_to: Optional[PoolAssignation] = Field(default=None, description="Type of assignation")
+    used: Optional[List[bool]] = Field(default=None)
 
     def __init__(self, **data):
         super().__init__(**data)
+        if self.used is None:
+            self.used = [False] * (int(self.end) - int(self.start) + 1)
 
     def is_ip_in_range(self, ip: SerializableIPv4Address) -> bool:
         """

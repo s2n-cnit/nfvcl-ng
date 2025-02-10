@@ -58,7 +58,7 @@ class ProvidedBy(str, Enum):
 
 
 class K8sNetworkInfo(NFVCLBaseModel):
-    name: str = Field(description="The name of the network to be used by the k8s cluster")
+    name: str = Field(description="The name of the network to be used by the k8s cluster. This name should be the same of one network in the topology. This allow to assign IP pools from the Topology to the k8s cluster automatically.")
     interface_name: Optional[str] = Field(default=None, description="The name of the interface connected to this network. The interface name must be same for all nodes in the cluster.")
     multus_enabled: Optional[bool] = Field(default=False, description="If true, the network is a Multus network")
     ip_pools: Optional[List[str]] = Field(default_factory=list, description="The list of IP pools ids that can be used by blueprints to deploy services. The IP pools must be assigned by the topology.")
@@ -71,7 +71,7 @@ class TopologyK8sModel(NFVCLBaseModel):
     credentials: str = Field(title="Content of k8s credential file (example admin.conf)")
     vim_name: Optional[str] = Field(default=None, description="Reference VIM, where k8s cluster is deployed.")
     k8s_version: K8sVersion = Field(default=K8sVersion.V1_30, description="The version of the k8s cluster")
-    networks: List[K8sNetworkInfo] = Field(description="List of attached networks to the cluster", min_length=1)
+    networks: List[K8sNetworkInfo] = Field(description="List of attached networks to the cluster")
     areas: List[int] = Field(description="Competence areas of the k8s cluster", min_length=1)
     cni: Optional[str] = Field(default=None, description="The CNI plugin used in the cluster")
     cadvisor_node_port: Optional[int] = Field(default=None, description="The node port on which the cadvisor service is exposed")

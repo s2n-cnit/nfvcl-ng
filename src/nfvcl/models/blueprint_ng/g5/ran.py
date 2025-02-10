@@ -7,6 +7,7 @@ from nfvcl.models.blueprint_ng.core5g.common import NetworkEndPointWithType
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
 
+
 class RANBlueCreateModelGeneric(BlueprintNGCreateModel):
     mcc: str = Field(alias='mcc', pattern=r'^[0-9]*$', min_length=3, max_length=3)
     mnc: str = Field(alias='mnc', pattern=r'^[0-9]*$', min_length=2, max_length=3)
@@ -46,6 +47,7 @@ class CUBlueCreateModel(RANBlueCreateModelGeneric):
     #     sd = self.state.current_config.sd,
     #     tac = self.state.current_config.tac,
     #     area_id = self.state.current_config.area_id,
+
 
 ################################ CU-CP ############################################
 
@@ -116,18 +118,9 @@ class RANBlueCreateModelNetwork(NFVCLBaseModel):
     ru2: Optional[NetworkEndPointWithType] = Field(default=None, alias='ru2')
 
 
-class RANBlueCreateModelSplit(NFVCLBaseModel):
-    cu: bool = Field(default=False, alias='cu')
-    cu_cp: bool = Field(default=False, alias='cu-cp')
-    cu_up: bool = Field(default=False, alias='cu-up')
-    du: bool = Field(default=False, alias='du')
-    gnb: bool = Field(default=True, alias='gnb')
-
-
 class RANBlueCreateModel(RANBlueCreateModelGeneric):
     split: Split = Field(default=Split.GNB, alias='split')
     networks: RANBlueCreateModelNetwork = Field(alias='networks')
-    ran: RANBlueCreateModelSplit = Field(alias='ran')
-    cuCpHost: str = Field(alias='cucpHost')
-    amf: str = Field(alias='amf')
+    cuCpHost: Optional[str] = Field(default="oai-cu-cp", alias='cucpHost')
+    amf: Optional[str] = Field(default="oai-amf", alias='amf')
     usrp: str = Field(alias='usrp')

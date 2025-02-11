@@ -255,6 +255,12 @@ def check_py_version():
                      f"You are using the {sys.version}")
         exit(-1)
 
+def readiness():
+    """
+    Readiness check for the NFVCL
+    """
+    return Response(status_code=status.HTTP_200_OK)
+
 def setup_main_routes():
     app.mount("/files", StaticFiles(directory=accessible_folder, html=True), name="mounted_files")
     #Redirect to docs page for APIS
@@ -264,6 +270,7 @@ def setup_main_routes():
     ##### PROTECTED MAIN ROUTES #####
     app.add_api_route("/close", set_auth_on_api_function(close_nfvcl), methods=["GET"], status_code=status.HTTP_202_ACCEPTED)
     app.add_api_route("/logs", set_auth_on_api_function(logs), methods=["GET"], response_class=PlainTextResponse)
+    app.add_api_route("/ready", readiness, methods=["GET"])
 
 if __name__ == "__main__":
     check_py_version()

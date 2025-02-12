@@ -14,5 +14,6 @@ class UserRepository(DatabaseRepository[User]):
             self.collection.insert_one(user.model_dump())
 
     def delete_user(self, username: str):
+        assert username != "admin", "Cannot delete admin user"
         self.collection.delete_one({'username': username})
 

@@ -31,6 +31,7 @@ from nfvcl_core.models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl_core.models.response_model import OssCompliantResponse
 from nfvcl_core.models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
 from nfvcl_core.models.topology_models import TopologyModel
+from nfvcl_core.models.user import UserNoConfidence, UserCreateREST
 from nfvcl_core.models.vim import VimModel
 from nfvcl_core.public_methods_description import GET_PROM_SRV_SUMMARY, GET_PROM_SRV_DESCRIPTION, GET_PROM_LIST_SRV_SUMMARY, GET_PROM_LIST_SRV_DESCRIPTION, DEL_PROM_SRV_SUMMARY, DEL_PROM_SRV_DESCRIPTION, UPD_PROM_SRV_SUMMARY, UPD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_SUMMARY, UPD_K8SCLUSTER_SUMMARY, UPD_K8SCLUSTER_DESCRIPTION, ADD_EXTERNAL_K8SCLUSTER_SUMMARY, ADD_EXTERNAL_K8SCLUSTER
 from nfvcl_core.utils.log import create_logger
@@ -593,6 +594,22 @@ class NFVCL:
         return self.add_task(self.kubernetes_manager.scale_k8s_deployment, cluster_id, namespace, deployment_name, replica_number, callback=callback)
 
     ############# User management #############
+
+    @NFVCLPublic(path="/{username}", section=USER_SECTION, method=NFVCLPublicMethod.GET, sync=True)
+    def get_user(self, username: str, callback=None) -> UserNoConfidence:
+        return self.add_task(self.user_manager.get_censored_user_by_username, username, callback=callback)
+
+    @NFVCLPublic(path="/", section=USER_SECTION, method=NFVCLPublicMethod.GET, sync=True)
+    def get_user_list(self, callback=None) -> List[UserNoConfidence]:
+        return self.add_task(self.user_manager.get_censored_users, callback=callback)
+
+    @NFVCLPublic(path="/", section=USER_SECTION, method=NFVCLPublicMethod.POST, sync=True)
+    def create_user(self, user: UserCreateREST, callback=None) -> UserNoConfidence:
+        return self.add_task(self.user_manager.add_user_rest, user, callback=callback)
+
+    @NFVCLPublic(path="/{username}", section=USER_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
+    def delete_user(self, username: str, callback=None) -> UserNoConfidence:
+        return self.add_task(self.user_manager.delete_user, username, callback=callback)
 
 
 def configure_injection(config_path: Optional[str] = None):

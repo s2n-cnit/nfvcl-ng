@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from nfvcl_core.managers import GenericManager
 from nfvcl_core.database.user_repository import UserRepository, User
-from nfvcl_core.models.user import UserRole
+from nfvcl_core.models.user import UserRole, UserCreateREST, UserNoConfidence
 from nfvcl_core.utils.auth.tokens import decode_token, create_tokens_for_user, DB_TOKEN_HASH_ALGORITHM
 
 
@@ -41,19 +41,41 @@ class UserManager(GenericManager):
 
 
     def get_user_by_username(self, username: str) -> User:
-        element = self.users[username]
-        if element:
-            return element
+        if username in self.users:
+            element = self.users[username]
+            if element:
+                return element
         raise Exception(f"No user found with username '{username}'")
+
+    def get_censored_user_by_username(self, username: str) -> UserNoConfidence:
+        return self.get_user_by_username(username).get_no_confidence_model()
 
     def get_users(self) -> List[User]:
         return list(self.users.values())
 
-    def add_user(self, user: User):
+    def get_censored_users(self) -> List[UserNoConfidence]:
+        censored_list = [user.get_no_confidence_model() for user in list(self.users.values())]
+        return censored_list
+
+    def add_user(self, user: User) -> User:
         if user.username in self.users:
             raise Exception(f"User with username '{user.username}' already exists")
         self.users[user.username] = user
         self._user_repository.save_user(user)
+        return user
+
+    def add_user_rest(self, user: UserCreateREST) -> UserNoConfidence:
+        """
+        Add a user to the system using the REST model.
+        Args:
+            user: The user to be added.
+
+        Returns:
+        UserNoConfidence: The user added to the system without confidence data.
+        """
+        complete_user = User(username=user.username, password_hash=hashlib.sha256(user.password.encode()).hexdigest(), role=user.role, email=user.email)
+        self.add_user(complete_user)
+        return complete_user.get_no_confidence_model()
 
     def update_user(self, user: User):
         if user.username in self.users:
@@ -63,10 +85,14 @@ class UserManager(GenericManager):
             return
         raise Exception(f"User with username '{user.username}' already exists")
 
-    def delete_user(self, username: str):
+    def delete_user(self, username: str) -> UserNoConfidence:
+        if username == "admin":
+            raise Exception("Cannot delete the admin user")
         if username in self.users:
+            deleted_user = self.users[username]
             del self.users[username]
             self._user_repository.delete_user(username)
+            return deleted_user.get_no_confidence_model()
         else:
             raise Exception(f"No user found with id '{username}'")
 

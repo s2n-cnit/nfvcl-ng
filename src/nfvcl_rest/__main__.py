@@ -267,7 +267,7 @@ def setup_main_routes():
     app.add_api_route("/", lambda: RedirectResponse("/docs"), methods=["GET"], status_code=status.HTTP_308_PERMANENT_REDIRECT, include_in_schema=False)
     # app.add_api_route("/token", login_for_access_token, methods=["POST"])
     app.add_api_route("/token", login , methods=["POST"])
-    app.add_api_route("/token", logout , methods=["POST"])
+    app.add_api_route("/logout", logout , methods=["POST"])
     ##### PROTECTED MAIN ROUTES #####
     app.add_api_route("/close", set_auth_on_api_function(close_nfvcl), methods=["GET"], status_code=status.HTTP_202_ACCEPTED)
     app.add_api_route("/logs", set_auth_on_api_function(logs), methods=["GET"], response_class=PlainTextResponse)

@@ -1,4 +1,5 @@
 import traceback
+from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
@@ -33,7 +34,7 @@ def get_nfvcl_config(config: NFVCLConfigModel = Depends()) -> NFVCLConfigModel:
         nfvcl_config = load_nfvcl_config()
     return nfvcl_config
 
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     """
     Handle user login and return access and refresh tokens.
 

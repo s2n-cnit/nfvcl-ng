@@ -29,7 +29,7 @@ from nfvcl_core.models.task import NFVCLTaskResult
 from nfvcl_core.nfvcl_main import NFVCLPublicModel
 from nfvcl_core.utils.file_utils import create_folder
 from nfvcl_core.utils.log import mod_logger, create_logger, LOG_FILE_PATH
-from nfvcl_rest.middleware.authentication_middleware import login, control_token, set_user_manager
+from nfvcl_rest.middleware.authentication_middleware import login, control_token, set_user_manager, logout
 from nfvcl_rest.middleware.exception_middleware import ExceptionMiddleware
 from nfvcl_rest.models.rest import RestAnswer202, CallbackModel
 
@@ -267,10 +267,12 @@ def setup_main_routes():
     app.add_api_route("/", lambda: RedirectResponse("/docs"), methods=["GET"], status_code=status.HTTP_308_PERMANENT_REDIRECT, include_in_schema=False)
     # app.add_api_route("/token", login_for_access_token, methods=["POST"])
     app.add_api_route("/token", login , methods=["POST"])
+    app.add_api_route("/token", logout , methods=["POST"])
     ##### PROTECTED MAIN ROUTES #####
     app.add_api_route("/close", set_auth_on_api_function(close_nfvcl), methods=["GET"], status_code=status.HTTP_202_ACCEPTED)
     app.add_api_route("/logs", set_auth_on_api_function(logs), methods=["GET"], response_class=PlainTextResponse)
     app.add_api_route("/ready", readiness, methods=["GET"])
+
 
 if __name__ == "__main__":
     check_py_version()

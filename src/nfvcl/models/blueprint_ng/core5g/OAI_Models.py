@@ -521,7 +521,7 @@ class OAIMultusInterface(NFVCLBaseModel):
     create: bool
     ip_add: str = Field(..., alias='ipAdd')
     netmask: str
-    name: str
+    name: Optional[str] = Field(default="")
     mac: Optional[str] = Field(default="")
     gateway: Optional[str] = Field(default="")
     routes: Optional[List[MultusRoute]] = Field(default_factory=list)
@@ -909,16 +909,7 @@ class GNB(NFVCLBaseModel):
 
 ############################################### UE ##############################################
 
-class UEMultus(NFVCLBaseModel):
-    create: bool
-    ipadd: str
-    netmask: str
-    mac: str
-    default_gateway: str = Field(..., alias='defaultGateway')
-    host_interface: str = Field(..., alias='hostInterface')
-
-
-class UEConfig(NFVCLBaseModel):
+class OAIUEConfig(NFVCLBaseModel):
     time_zone: str = Field(..., alias='timeZone')
     rf_sim_server: str = Field(..., alias='rfSimServer')
     full_imsi: str = Field(..., alias='fullImsi')
@@ -930,35 +921,6 @@ class UEConfig(NFVCLBaseModel):
     usrp: str
     use_additional_options: str = Field(..., alias='useAdditionalOptions')
 
-
-class Capabilities(NFVCLBaseModel):
-    add: List[str]
-    drop: List[str]
-
-
-class UESecurityContext(NFVCLBaseModel):
-    capabilities: Capabilities
-
-
-class UEStart(NFVCLBaseModel):
-    nrue: bool
-    tcpdump: bool
-
-
-class UE(NFVCLBaseModel):
-    kubernetes_distribution: Optional[str] = Field(None, alias='kubernetesDistribution')
-    nfimage: Optional[Nfimage] = None
-    service_account: Optional[ServiceAccount] = Field(None, alias='serviceAccount')
-    image_pull_secrets: Optional[List[ImagePullSecret]] = Field(None, alias='imagePullSecrets')
-    multus: Optional[UEMultus] = None
-    config: Optional[UEConfig] = None
-    pod_security_context: Optional[PodSecurityContext] = Field(None, alias='podSecurityContext')
-    security_context: Optional[UESecurityContext] = Field(None, alias='securityContext')
-    start: Optional[UEStart] = None
-    include_tcp_dump_container: Optional[bool] = Field(None, alias='includeTcpDumpContainer')
-    tcpdumpimage: Optional[Tcpdumpimage] = None
-    resources: Optional[Resources] = None
-    persistent: Optional[GenericRanPersistent] = None
-    termination_grace_period_seconds: Optional[int] = Field(None, alias='terminationGracePeriodSeconds')
-    node_selector: Optional[Dict[str, Any]] = Field(None, alias='nodeSelector')
-    node_name: Optional[Any] = Field(None, alias='nodeName')
+class OAIUE(NFVCLBaseModel):
+    multus: Optional[OAIMultusInterface] = None
+    config: Optional[OAIUEConfig] = None

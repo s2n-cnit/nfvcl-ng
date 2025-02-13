@@ -878,6 +878,8 @@ class GNBConfig(NFVCLBaseModel):
     sst: str
     sd: str
     usrp: str
+    n2_if_name: str = Field(default="eth0", alias='n2IfName')
+    n3_if_name: str = Field(default="eth0", alias='n3IfName')
     amf_ip_address: str = Field(..., alias='amfIpAddress')
 
 

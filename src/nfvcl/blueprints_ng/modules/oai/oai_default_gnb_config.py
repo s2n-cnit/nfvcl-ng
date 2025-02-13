@@ -70,6 +70,8 @@ default_gnb_config: GNB = GNB.model_validate({
         "sst": "1",
         "sd": "000001",
         "usrp": "rfsim",
+        "n2IfName": "eth0",
+        "n3IfName": "eth0",
         "amfIpAddress": "oai-amf"
     },
     "start": {

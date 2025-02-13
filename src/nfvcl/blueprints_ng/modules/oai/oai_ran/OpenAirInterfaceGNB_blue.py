@@ -35,7 +35,7 @@ class OpenAirInterfaceGnb(Generic5GGNBBlueprintNG[OAIGnbBlueprintNGState, GNBBlu
             area=self.state.current_config.area_id,
             name="gnb",
             # repo="https://mysql.github.io/mysql-operator/",
-            chart="helm_charts/charts/oai5grangnb-2.1.0.tgz",
+            chart="helm_charts/charts/oai-gnb-2.1.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
             namespace=self.id
@@ -45,10 +45,12 @@ class OpenAirInterfaceGnb(Generic5GGNBBlueprintNG[OAIGnbBlueprintNGState, GNBBlu
         if self.state.current_config.networks.n2.type == NetworkEndPointType.MULTUS:
             net_n2 = self.provider.reserve_k8s_multus_ip(self.state.current_config.area_id, self.state.current_config.networks.n2.net_name)
             self.state.oai_gnb_config_values.multus.n2_interface.set_multus(True, net_n2, self.state.current_config.networks.n2.routes)
+            self.state.oai_gnb_config_values.config.n2_if_name = "n2"
 
         if self.state.current_config.networks.n3.type == NetworkEndPointType.MULTUS:
             net_n3 = self.provider.reserve_k8s_multus_ip(self.state.current_config.area_id, self.state.current_config.networks.n3.net_name)
             self.state.oai_gnb_config_values.multus.n3_interface.set_multus(True, net_n3, self.state.current_config.networks.n3.routes)
+            self.state.oai_gnb_config_values.config.n3_if_name = "n3"
 
         if self.state.current_config.networks.ru1.type == NetworkEndPointType.MULTUS:
             net_ru1 = self.provider.reserve_k8s_multus_ip(self.state.current_config.area_id, self.state.current_config.networks.ru1.net_name)

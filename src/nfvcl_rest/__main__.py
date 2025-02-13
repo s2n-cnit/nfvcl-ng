@@ -250,6 +250,7 @@ def check_py_version():
     Checks that the python version is equal or grater that the required one
     """
     v_info = sys.version_info
+    logger.info(f"Running on Python {v_info.major}.{v_info.minor}")
     if v_info.major < PY_MIN_MAJOR or v_info.minor < PY_MIN_MINOR:
         logger.error(f"The version of Python must be greater then {PY_MIN_MAJOR}.{PY_MIN_MINOR}. "
                      f"You are using the {sys.version}")

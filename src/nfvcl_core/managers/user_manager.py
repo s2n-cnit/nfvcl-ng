@@ -173,5 +173,10 @@ class UserManager(GenericManager):
         assert len(one_user_list_b) == 1
         assert len(one_user_list_a) == 1
         assert len(zero_user_list_c) == 0
+        # Checking admin cannot be deleted
+        self.add_user(User(username="admin", password_hash="abcd"))
+        self.delete_user("admin")
+        list_only_admin = self.get_users()
+        assert len(list_only_admin) == 1
 
 

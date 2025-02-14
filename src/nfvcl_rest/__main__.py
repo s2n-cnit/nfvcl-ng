@@ -13,7 +13,7 @@ from typing import Callable, Dict
 
 import httpx
 import uvicorn
-from fastapi import APIRouter, FastAPI, Request, Depends, Body
+from fastapi import APIRouter, FastAPI, Request, Depends, Body, HTTPException
 from starlette import status
 from starlette.responses import RedirectResponse, PlainTextResponse, Response
 from starlette.staticfiles import StaticFiles
@@ -23,6 +23,7 @@ from file_read_backwards import FileReadBackwards
 from nfvcl_core import configure_injection, NFVCL, global_ref
 from nfvcl_core.config import NFVCLConfigModel
 from nfvcl_core.global_ref import get_nfvcl_config
+from nfvcl_core.models.custom_types import NFVCLCoreException
 from nfvcl_core.models.http_models import HttpRequestType
 from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
 from nfvcl_core.models.task import NFVCLTaskResult
@@ -64,6 +65,9 @@ def call_callback_url(callback_url: str, result: NFVCLTaskResult):
         logger.error(f"Error calling callback: {str(e)}")
 
 def dummy_callback(result: NFVCLTaskResult):
+    """
+    Dummy callback function to be used when the callback is not specified. DO NOT REMOVE
+    """
     pass
 
 def generate_function_signature(function: Callable, sync=False, override_name=None, override_args=None, override_args_type: Dict[str, typing.Any] = None, override_return_type=None, override_doc=None):
@@ -101,7 +105,13 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
         # Check if the function is sync or async
         if sync:
             response.status_code = status.HTTP_200_OK
-            return function(**kwargs)
+            try:
+                function_result = function(**kwargs)
+                return function_result
+            except NFVCLCoreException as caught_except:
+                raise HTTPException(status_code=caught_except.http_equivalent_code, detail=caught_except.message)
+            except Exception as caught_except:
+                raise caught_except
         else:
             # If the function is async we need to call it with a callback function
             callback_function = None

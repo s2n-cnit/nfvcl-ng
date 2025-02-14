@@ -3,12 +3,9 @@ from typing import List, Optional
 from pydantic import Field
 from nfvcl.models.blueprint_ng.core5g.common import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers, Create5gModel, SstConvertion
 from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl_core.utils.log import create_logger
-
-logger = create_logger('BlueSDCoreValuesConverter')
-
 
 # Models are incomplete, generated from the example values.yaml
+
 
 class Images(NFVCLBaseModel):
     repository: str
@@ -337,15 +334,16 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
         if data_net_for_this_slice.downlinkAmbr.split(" ")[1].lower() not in ["mbps", "gbps", "kbps"]:
             raise ValueError("Unsupported unit for downlinkAmbr/uplinkAmbr, use one of [mbps, gbps, kbps]")
 
-        logger.warning("config.network_endpoints.data_nets[].default5qi IGNORED")
-        logger.warning("config.sliceProfiles[].profileParams IGNORED")
-        logger.warning("config.sliceProfiles[].locationConstraints IGNORED")
-        logger.warning("config.sliceProfiles[].enabledUEList IGNORED, if a subscriber have a slice in snssai it will be added to the UE list for that slice")
-        logger.warning("config.subscribers[].authenticationMethod IGNORED")
-        logger.warning("config.subscribers[].authenticationManagementField IGNORED")
-        logger.warning("config.subscribers[].snssai[].sliceType IGNORED")
-        logger.warning("config.subscribers[].snssai[].pduSessionIds IGNORED")
-        logger.warning("config.subscribers[].snssai[].default_slice IGNORED")
+        # TODO check if we need to support these @Alderico
+        # logger.warning("config.network_endpoints.data_nets[].default5qi IGNORED")
+        # logger.warning("config.sliceProfiles[].profileParams IGNORED")
+        # logger.warning("config.sliceProfiles[].locationConstraints IGNORED")
+        # logger.warning("config.sliceProfiles[].enabledUEList IGNORED, if a subscriber have a slice in snssai it will be added to the UE list for that slice")
+        # logger.warning("config.subscribers[].authenticationMethod IGNORED")
+        # logger.warning("config.subscribers[].authenticationManagementField IGNORED")
+        # logger.warning("config.subscribers[].snssai[].sliceType IGNORED")
+        # logger.warning("config.subscribers[].snssai[].pduSessionIds IGNORED")
+        # logger.warning("config.subscribers[].snssai[].default_slice IGNORED")
 
         gnbs = [GNodeB(name=f"gnb{area_id}", tac=area_id)] if area_id is not None else []
 

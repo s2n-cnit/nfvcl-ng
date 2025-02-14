@@ -1,5 +1,3 @@
-from logging import Logger
-
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.network import NetworkModel, RouterModel, PduModel
 from nfvcl_core.models.prometheus.prometheus_model import PrometheusServerModel
@@ -7,9 +5,7 @@ from nfvcl_core.models.vim import VimModel
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
 from pydantic import HttpUrl, Field
 from typing import List, Optional
-from nfvcl_core.utils.log import create_logger
 
-logger: Logger = create_logger('TopologyModel')
 
 
 class TopoK8SHasBlueprintException(Exception):
@@ -41,7 +37,6 @@ class TopologyModel(NFVCLBaseModel):
         # The if is working because the __eq__ function has been overwritten in the PrometheusServerModel (on the id).
         if prom_srv in self.prometheus_srv:
             msg_err = "In the topology is already present a Prometheus server with id ->{}<-".format(prom_srv.id)
-            logger.error(msg_err)
             raise ValueError(msg_err)
         else:
             self.prometheus_srv.append(prom_srv)
@@ -53,7 +48,6 @@ class TopologyModel(NFVCLBaseModel):
         if len(prom_srv_to_del.targets) > 0 and not force:
             msg_err = ("The prometheus instance to be deleted has configured jobs. You have to remove active "
                        "jobs or force the deletion in the request.")
-            logger.error(msg_err)
             raise ValueError(msg_err)
 
         return self.prometheus_srv.pop(index)
@@ -101,7 +95,6 @@ class TopologyModel(NFVCLBaseModel):
         """
         if k8s_cluster in self.kubernetes:
             msg_err = 'Kubernetes cluster with name >{}< already exists in the topology'.format(k8s_cluster.name)
-            logger.error(msg_err)
             raise ValueError(msg_err)
 
         self.kubernetes.append(k8s_cluster)
@@ -142,7 +135,6 @@ class TopologyModel(NFVCLBaseModel):
         """
         if pdu in self.pdus:
             msg_err = 'PDU with name >{}< already exists in the topology'.format(pdu.name)
-            logger.error(msg_err)
             raise ValueError(msg_err)
 
         self.pdus.append(pdu)
@@ -204,7 +196,6 @@ class TopologyModel(NFVCLBaseModel):
         """
         if vim in self.vims:
             msg_err = "The VIM >{}< is already present in the topology.".format(vim.name)
-            logger.error(msg_err)
             raise ValueError(msg_err)
         else:
             self.vims.append(vim)
@@ -253,7 +244,6 @@ class TopologyModel(NFVCLBaseModel):
         vim = next((item for item in self.vims if area_id in item.areas), None)
         if vim is None:
             msg_err = "The VIM of area ->{}<- was not found in the topology.".format(area_id)
-            logger.error(msg_err)
             raise ValueError(msg_err)
 
         return vim
@@ -270,7 +260,6 @@ class TopologyModel(NFVCLBaseModel):
         vim_list = [item for item in self.vims if area_id in item.areas]
         if 0 >= len(vim_list):
             msg_err = "The VIM of area ->{}<- was not found in the topology.".format(area_id)
-            logger.error(msg_err)
             raise ValueError(msg_err)
 
         return vim_list
@@ -302,7 +291,6 @@ class TopologyModel(NFVCLBaseModel):
         """
         if network in self.networks:
             msg_err = "The network >{}< is already present in the topology.".format(network.name)
-            logger.error(msg_err)
             raise ValueError(msg_err)
         else:
             self.networks.append(network)
@@ -359,7 +347,6 @@ class TopologyModel(NFVCLBaseModel):
         """
         if router in self.routers:
             msg_err = "Router >{}< is already present in the topology.".format(router.name)
-            logger.error(msg_err)
             raise ValueError(msg_err)
         self.routers.append(router)
         return router
@@ -421,7 +408,6 @@ class TopologyModel(NFVCLBaseModel):
             prom_svr_index = self.prometheus_srv.index(prom_svr_to_search)
         except ValueError:
             msg_err = "The prometheus server ->{}<- has not been found".format(prom_srv_id)
-            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return prom_svr_index
@@ -473,7 +459,6 @@ class TopologyModel(NFVCLBaseModel):
         k8s_cluster_index = next((index for index, item in enumerate(self.kubernetes) if item.name == cluster_name), -1)
         if k8s_cluster_index < 0:
             msg_err = "The K8s cluster ->{}<- was not found in the topology.".format(cluster_name)
-            logger.debug(msg_err)
             raise TopoK8SNotFoundException(msg_err)
 
         return k8s_cluster_index
@@ -490,7 +475,6 @@ class TopologyModel(NFVCLBaseModel):
         k8s_cluster_index = next((index for index, item in enumerate(self.kubernetes) if area_id in item.areas), -1)
         if k8s_cluster_index < 0:
             msg_err = f"No K8S cluster has been found for area {area_id}"
-            logger.debug(msg_err)
             raise TopoK8SNotFoundException(msg_err)
 
         return k8s_cluster_index
@@ -507,7 +491,6 @@ class TopologyModel(NFVCLBaseModel):
         net_index = next((index for index, item in enumerate(self.networks) if item.name == net_name), -1)
         if net_index < 0:
             msg_err = "The network ->{}<- was not found in the topology.".format(net_name)
-            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return net_index
@@ -524,7 +507,6 @@ class TopologyModel(NFVCLBaseModel):
         vim_index = next((index for index, item in enumerate(self.vims) if item.name == vim_name), -1)
         if vim_index < 0:
             msg_err = "The VIM ->{}<- was not found in the topology.".format(vim_name)
-            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return vim_index
@@ -541,7 +523,6 @@ class TopologyModel(NFVCLBaseModel):
         router_index = next((index for index, item in enumerate(self.vims) if item.name == router_name), -1)
         if router_index < 0:
             msg_err = "The router ->{}<- was not found in the topology.".format(router_name)
-            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return router_index
@@ -561,7 +542,6 @@ class TopologyModel(NFVCLBaseModel):
         pdu_index = next((index for index, item in enumerate(self.pdus) if item.name == pdu_name), -1)
         if pdu_index < 0:
             msg_err = "The PDU ->{}<- was not found in the topology.".format(pdu_index)
-            logger.debug(msg_err)
             raise ValueError(msg_err)
 
         return pdu_index

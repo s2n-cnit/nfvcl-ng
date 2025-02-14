@@ -136,7 +136,6 @@ class UserManager(GenericManager):
             hash_function = getattr(hashlib, DB_TOKEN_HASH_ALGORITHM)
             hashed_token = hash_function(access_token.encode()).hexdigest()
             if user.access_token_hashed == hashed_token and user.access_token_hashed is not None:
-                # TODO we are setting the timezone to the one of the saved token, is this correct?
                 # The token is the same as in the DB but is it expired?
                 if user.access_token_expiration > datetime.now(user.access_token_expiration.tzinfo):
                     return True, user

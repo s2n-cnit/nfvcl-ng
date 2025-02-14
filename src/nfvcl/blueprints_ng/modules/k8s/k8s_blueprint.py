@@ -19,7 +19,8 @@ from nfvcl.models.k8s.common_k8s_model import Cni
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
 from nfvcl_core.models.topology_models import TopoK8SHasBlueprintException
-from nfvcl_core.utils.k8s import get_k8s_config_from_file_content, get_config_map, patch_config_map, get_k8s_cidr_info
+from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 
 K8S_BLUE_TYPE = "k8s"

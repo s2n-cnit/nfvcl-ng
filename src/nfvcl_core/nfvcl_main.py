@@ -6,7 +6,7 @@ from typing import Callable, Dict, List, Any, Optional, Annotated
 
 import urllib3
 from dependency_injector.wiring import Provide
-from fastapi import HTTPException # TODO Remove
+
 from nfvcl_core.models.network.network_models import IPv4Pool, IPv4ReservedRange
 from pydantic import Field, PositiveInt
 
@@ -324,7 +324,7 @@ class NFVCL:
     def create_router(self, router: RouterModel, callback=None) -> RouterModel:
         return self.add_task(self.topology_manager.create_router, router, callback=callback)
 
-    @NFVCLPublic(path="/router/{router_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)
+    @NFVCLPublic(path="/router/{router_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_router(self, router_id: str, callback=None) -> RouterModel:
         return self.add_task(self.topology_manager.delete_router, router_id, callback=callback)
 
@@ -336,11 +336,11 @@ class NFVCL:
     def get_pdu(self, pdu_id: str, callback=None) -> PduModel:
         return self.add_task(self.topology_manager.get_pdu, pdu_id, callback=callback)
 
-    @NFVCLPublic(path="/pdu", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST)
+    @NFVCLPublic(path="/pdu", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def create_pdu(self, pdu: PduModel, callback=None):
         return self.add_task(self.topology_manager.create_pdu, pdu, callback=callback)
 
-    @NFVCLPublic(path="/pdu/{pdu_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)
+    @NFVCLPublic(path="/pdu/{pdu_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_pdu(self, pdu_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_pdu, pdu_id, callback=callback)
 
@@ -361,17 +361,17 @@ class NFVCL:
         section=TOPOLOGY_SECTION,
         method=NFVCLPublicMethod.POST,
         summary=ADD_EXTERNAL_K8SCLUSTER_SUMMARY,
-        description=ADD_EXTERNAL_K8SCLUSTER
+        description=ADD_EXTERNAL_K8SCLUSTER, sync=True
     )
     def create_kubernetes_external(self, kubernetes_model: TopologyK8sModel, callback=None):
         kubernetes_model.provided_by = ProvidedBy.EXTERNAL
         return self.add_task(self.topology_manager.add_kubernetes, kubernetes_model, callback=callback)
 
-    @NFVCLPublic(path="/kubernetes/update",section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_K8SCLUSTER_SUMMARY, description=UPD_K8SCLUSTER_DESCRIPTION)
+    @NFVCLPublic(path="/kubernetes/update",section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_K8SCLUSTER_SUMMARY, description=UPD_K8SCLUSTER_DESCRIPTION, sync=True)
     def update_kubernetes(self, cluster: TopologyK8sModel, callback=None) -> TopologyK8sModel:
         return self.add_task(self.topology_manager.update_kubernetes, cluster, callback=callback)
 
-    @NFVCLPublic(path="/kubernetes/{cluster_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)
+    @NFVCLPublic(path="/kubernetes/{cluster_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_kubernetes(self, cluster_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_kubernetes, cluster_id, callback=callback)
 
@@ -402,7 +402,8 @@ class NFVCL:
         section=TOPOLOGY_SECTION,
         method=NFVCLPublicMethod.POST,
         summary=ADD_PROM_SRV_SUMMARY,
-        description=ADD_PROM_SRV_DESCRIPTION
+        description=ADD_PROM_SRV_DESCRIPTION,
+        sync=True
     )
     def create_prometheus(self, prometheus_model: PrometheusServerModel, callback=None):
         return self.add_task(self.topology_manager.add_prometheus, prometheus_model, callback=callback)
@@ -412,7 +413,8 @@ class NFVCL:
         section=TOPOLOGY_SECTION,
         method=NFVCLPublicMethod.PUT,
         summary=UPD_PROM_SRV_SUMMARY,
-        description=UPD_PROM_SRV_DESCRIPTION
+        description=UPD_PROM_SRV_DESCRIPTION,
+        sync=True
     )
     def update_prometheus(self, prometheus_model: PrometheusServerModel, callback=None):
         return self.add_task(self.topology_manager.update_prometheus, prometheus_model, callback=callback)
@@ -422,7 +424,8 @@ class NFVCL:
         section=TOPOLOGY_SECTION,
         method=NFVCLPublicMethod.DELETE,
         summary=DEL_PROM_SRV_SUMMARY,
-        description=DEL_PROM_SRV_DESCRIPTION
+        description=DEL_PROM_SRV_DESCRIPTION,
+        sync=True
     )
     def delete_prometheus(self, prometheus_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_prometheus, prometheus_id, callback=callback)
@@ -479,10 +482,7 @@ class NFVCL:
 
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_installed_plugins)
     def k8s_get_installed_plugins(self, cluster_id: str, callback=None) -> List[str]:
-        try:
-            return self.add_task(self.kubernetes_manager.get_k8s_installed_plugins, cluster_id, callback=callback)
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e)) # TODO do not return exception here
+        return self.add_task(self.kubernetes_manager.get_k8s_installed_plugins, cluster_id, callback=callback)
 
 
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.install_plugins)
@@ -503,11 +503,7 @@ class NFVCL:
 
     @NFVCLPublic(path="/{cluster_id}/storageclasses", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_storage_classes)
     def k8s_get_storage_classes(self, cluster_id: str, callback=None) -> List[str]:
-        dsc = self.add_task(self.kubernetes_manager.get_k8s_storage_classes, cluster_id, callback=callback)
-        if dsc is not None:
-            return dsc
-        else:
-            raise HTTPException(status_code=404, detail="No default storage class found") # TODO do not return exception here
+        return self.add_task(self.kubernetes_manager.get_k8s_storage_classes, cluster_id, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/defaultstorageclasses", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_default_storage_class)
     def k8s_get_default_storage_classes(self, cluster_id: str, callback=None) -> str:

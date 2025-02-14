@@ -1,16 +1,21 @@
 import time
 from logging import Logger
+from pathlib import Path
 from typing import List
 
 import kubernetes
+import kubernetes.client
+import kubernetes.utils
+import yaml
 from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccount, V1ClusterRoleList, V1ClusterRole, \
     V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, V1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1Container, V1ResourceQuota, \
-    V1ResourceQuotaSpec, V1ClusterRoleBinding, V1Node, V1NodeList, V1DeploymentList, V1Deployment, V1DeploymentSpec, V1StorageClassList
+    V1ResourceQuotaSpec, V1ClusterRoleBinding, V1Node, V1NodeList, V1DeploymentList, V1Deployment, V1DeploymentSpec, V1StorageClassList, V1PodList, V1DaemonSetList, V1ServiceList, V1ConfigMap, VersionInfo, V1StorageClass
 
 from nfvcl.models.k8s.common_k8s_model import Labels
-from nfvcl.models.k8s.topology_k8s_model import K8sQuota
+from nfvcl.models.k8s.topology_k8s_model import K8sQuota, K8sVersion
+from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
 
@@ -167,6 +172,9 @@ def get_k8s_namespaces(kube_client_config: kubernetes.client.Configuration, name
 
     Returns:
         an object V1NamespaceList containing a list of namespaces. Could be empty if specified namespace does not exist.
+
+    Raises:
+        ApiException if an error occurs during the API call.
     """
     field_selector = ''
     # Enter a context with an instance of the API kubernetes.client
@@ -678,7 +686,11 @@ def k8s_get_nodes(kube_client_config: kubernetes.client.Configuration, detailed:
     """
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         api_instance_core = kubernetes.client.CoreV1Api(api_client)
-        node_list: V1NodeList = api_instance_core.list_node()
+        try:
+            node_list: V1NodeList = api_instance_core.list_node()
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>list_node: {}\n".format(error))
+            raise error
         if detailed:
             return node_list
         else:
@@ -707,7 +719,11 @@ def k8s_add_label_to_k8s_node(kube_client_config: kubernetes.client.Configuratio
         existing_labels: dict[str, str] = metadata.labels
         existing_labels.update(labels.labels)
 
-        patched_node = api_instance_core.patch_node(node_name, node)
+        try:
+            patched_node = api_instance_core.patch_node(node_name, node)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>patch_node: {}\n".format(error))
+            raise error
 
         return patched_node
 
@@ -724,7 +740,11 @@ def k8s_get_deployments(kube_client_config: kubernetes.client.Configuration, nam
     """
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         api_instance_apps = kubernetes.client.AppsV1Api(api_client)
-        deployment_list: V1DeploymentList = api_instance_apps.list_namespaced_deployment(namespace=namespace)
+        try:
+            deployment_list: V1DeploymentList = api_instance_apps.list_namespaced_deployment(namespace=namespace)
+        except ApiException as error:
+            logger.error("Exception when calling AppsV1Api>list_namespaced_deployment: {}\n".format(error))
+            raise error
         if detailed:
             return deployment_list
         else:
@@ -753,7 +773,11 @@ def k8s_add_label_to_k8s_deployment(kube_client_config: kubernetes.client.Config
         existing_labels: dict[str, str] = metadata.labels
         existing_labels.update(labels.labels)
 
-        patched_node = api_instance_app.patch_namespaced_deployment(namespace=namespace, name=deployment_name, body=node)
+        try:
+            patched_node = api_instance_app.patch_namespaced_deployment(namespace=namespace, name=deployment_name, body=node)
+        except ApiException as error:
+            logger.error("Exception when calling AppsV1Api>read_namespaced_deployment: {}\n".format(error))
+            raise error
 
         return patched_node
 
@@ -776,11 +800,23 @@ def k8s_scale_k8s_deployment(kube_client_config: kubernetes.client.Configuration
         specs: V1DeploymentSpec = node.spec
         specs.replicas = replica_num
 
-        patched_node = api_instance_app.patch_namespaced_deployment(namespace=namespace, name=deployment_name, body=node)
+        try:
+            patched_node = api_instance_app.patch_namespaced_deployment(namespace=namespace, name=deployment_name, body=node)
+        except ApiException as error:
+            logger.error("Exception when calling AppsV1Api>patch_namespaced_deployment: {}\n".format(error))
+            raise error
 
         return patched_node
 
 def k8s_get_ipaddress_pool(kube_client_config: kubernetes.client.Configuration) -> List[str]:
+    """
+    Retrieve the IP address pool from the metallb.io/v1beta1 API
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+
+    Returns:
+        The list of IP addresses in the pool
+    """
     ipaddress_pool = []
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         api_instance_core = kubernetes.client.CustomObjectsApi(api_client)
@@ -798,6 +834,14 @@ def k8s_get_ipaddress_pool(kube_client_config: kubernetes.client.Configuration) 
     return ipaddress_pool
 
 def k8s_get_storage_classes(kube_client_config: kubernetes.client.Configuration) -> V1StorageClassList:
+    """
+    Retrieve the storage classes from the storage.k8s.io/v1 API
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+
+    Returns:
+        The list of storage classes (V1StorageClassList)
+    """
     with kubernetes.client.ApiClient(kube_client_config) as api_client:
         api_instance_core = kubernetes.client.StorageV1Api(api_client)
         try:
@@ -807,3 +851,371 @@ def k8s_get_storage_classes(kube_client_config: kubernetes.client.Configuration)
             raise error
         finally:
             api_client.close()
+
+
+def get_pods_for_k8s_namespace(kube_client_config: kubernetes.client.Configuration, namespace: str,
+                               label_selector: str = "") -> V1PodList:
+    """
+    Get pods from a k8s instance that belongs to the given namespace
+
+    Args:
+        kube_client_config: kube_client_config the configuration of K8s on which the client is built.
+        namespace: The namespace in witch this function looks.
+        label_selector: a label selector to allow filtering on the cluster side (e.g. k8s-app=metrics-server)
+
+    Returns:
+        Return the list of pods (as V1PodList) belonging to that namespace in the given k8s cluster.
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        pod_list: V1PodList = None
+        try:
+            pod_list = api_instance_core.list_namespaced_pod(namespace=namespace.lower(),
+                                                             label_selector=label_selector,
+                                                             timeout_seconds=TIMEOUT_SECONDS)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>list_namespaced_pod: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return pod_list
+
+
+def get_logs_for_pod(kube_client_config: kubernetes.client.Configuration, namespace: str, pod_name: str, tail_lines=None) -> str:
+    """
+    Get logs from a pod in a k8s instance that belongs to the given namespace
+    Args:
+        kube_client_config: kube_client_config the configuration of K8s on which the client is built.
+        namespace: The namespace in the cluster to which the pod belongs.
+        pod_name: The name of the pod from which the logs are to be retrieved.
+        tail_lines: The number of lines to be retrieved from the end of the log.
+
+    Returns:
+        Return the logs of the pod as a string.
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the API class
+        api_instance_core = kubernetes.client.CoreV1Api(api_client)
+        pod_log: str
+        try:
+            pod_log = api_instance_core.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=tail_lines)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1Api>read_namespaced_pod_log: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return pod_log
+
+
+def get_daemon_sets(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
+                    label_selector: str = None) -> V1DaemonSetList:
+    """
+    Search for all DaemonSets of a namespace. If a namespace is not specified, it will work on
+    all namespaces.
+
+    Args:
+        namespace: the optional namespace. If None the search is done on all namespaces.
+        kube_client_config: the configuration of K8s on which the client is built.
+        label_selector: The selector with witch is possible to filter the list of daemon set
+        (example 'k8s-app=metrics-server')
+
+    Returns: an object V1DaemonSetList containing a list of DaemonSets
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the apps API
+        api_instance_appsV1 = kubernetes.client.AppsV1Api(api_client)
+        try:
+            if namespace:
+                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_namespaced_daemon_set(namespace=namespace,
+                                                                                                  label_selector=label_selector,
+                                                                                                  timeout_seconds=TIMEOUT_SECONDS)
+            else:
+                daemon_set_list: V1DaemonSetList = api_instance_appsV1.list_daemon_set_for_all_namespaces(
+                    timeout_seconds=TIMEOUT_SECONDS)
+        except ApiException as error:
+            logger.error("Exception when calling appsV1->list_daemon_set: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return daemon_set_list
+
+
+def get_deployments(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
+                    label_selector: str = None) -> V1DeploymentList:
+    """
+    Search for all Deployments of a namespace. If a namespace is not specified, it will work on
+    all namespaces.
+
+    Args:
+        namespace: the optional namespace. If None the search is done on all namespaces.
+        kube_client_config: the configuration of K8s on which the client is built.
+        label_selector: The selector with witch is possible to filter the list of daemon set
+        (example 'k8s-app=metrics-server')
+
+    Returns: an object V1DaemonSetList containing a list of DaemonSets
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the apps API
+        api_instance_appsV1 = kubernetes.client.AppsV1Api(api_client)
+        try:
+            if namespace:
+                deploy_list = api_instance_appsV1.list_namespaced_deployment(namespace=namespace, label_selector=label_selector)
+            else:
+                deploy_list: V1DeploymentList = api_instance_appsV1.list_deployment_for_all_namespaces(
+                    timeout_seconds=TIMEOUT_SECONDS, label_selector=label_selector)
+        except ApiException as error:
+            logger.error("Exception when calling appsV1->list_deployments: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return deploy_list
+
+
+def get_services(kube_client_config: kubernetes.client.Configuration, namespace: str = None,
+                 label_selector: str = None) -> V1ServiceList:
+    """
+    Search for all Deployments of a namespace. If a namespace is not specified, it will work on
+    all namespaces.
+
+    Args:
+        namespace: the optional namespace. If None the search is done on all namespaces.
+        kube_client_config: the configuration of K8s on which the client is built.
+        label_selector: The selector with witch is possible to filter the list of daemon set
+        (example 'k8s-app=metrics-server')
+
+    Returns: an object V1DaemonSetList containing a list of DaemonSets
+    """
+    # Enter a context with an instance of the API kubernetes.client
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        # Create an instance of the apps API
+        api_instance_coreV1 = kubernetes.client.CoreV1Api(api_client)
+        try:
+            if namespace:
+                service_list = api_instance_coreV1.list_namespaced_service(namespace=namespace, label_selector=label_selector)
+            else:
+                service_list: V1ServiceList = api_instance_coreV1.list_service_for_all_namespaces(timeout_seconds=TIMEOUT_SECONDS, label_selector=label_selector)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1->list_namespaced_service: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return service_list
+
+
+def get_config_map(kube_client_config: kubernetes.client.Configuration, namespace: str, config_map_name: str) -> V1ConfigMap:
+    """
+        Retrieve a config map from a k8s cluster.
+
+        Args:
+            kube_client_config: the configuration of K8s on which the client is built.
+            namespace: the namespace in witch the configmap is located
+            config_map_name: The name of the config map
+
+        Returns: an object V1ConfigMap containing the desired configmap if found
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_configmap = kubernetes.client.CoreV1Api(api_client)
+        try:
+            config_map = api_instance_configmap.read_namespaced_config_map(config_map_name, namespace=namespace)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1->read_namespaced_config_map: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return config_map
+
+
+def patch_config_map(kube_client_config: kubernetes.client.Configuration, name, namespace, config_map: V1ConfigMap):
+    """
+        Patch a config map in a k8s cluster.
+
+        Args:
+            kube_client_config: the configuration of K8s on which the client is built.
+            name: the name of the configmap to be patched
+            namespace: the namespace in witch the configmap is located
+            config_map: The configmap to be patched
+
+        Returns: an object V1ConfigMap containing the patched configmap if patched
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_configmap = kubernetes.client.CoreV1Api(api_client)
+        try:
+            config_map = api_instance_configmap.patch_namespaced_config_map(name, namespace, config_map)
+        except ApiException as error:
+            logger.error("Exception when calling CoreV1->patch_namespaced_config_map: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return config_map
+
+
+def apply_def_to_cluster(kube_client_config: kubernetes.client.Configuration, dict_to_be_applied: dict = None,
+                         yaml_file_to_be_applied: Path = None):
+    """
+    This method can apply a definition (yaml) to a k8s cluster. The data origin to apply can be a dictionary or a yaml file.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        dict_to_be_applied: the definition (in dictionary form) to apply at the k8s cluster.
+        yaml_file_to_be_applied: string. Contains the path to yaml file.
+
+    Returns:
+        [result_dict, result_yaml] the result of the definition application, a tuple of k8s resource list.
+    """
+    result_dict = None
+    result_yaml = None
+
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        try:
+            if dict_to_be_applied:
+                result_dict = kubernetes.utils.create_from_dict(api_client, dict_to_be_applied)
+            if yaml_file_to_be_applied:
+                result_yaml = create_from_yaml_custom(api_client, str(yaml_file_to_be_applied))
+        except ApiException as error:
+            logger.error("Exception when calling create_from_yaml: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+    return result_dict, result_yaml
+
+
+def get_k8s_version(kube_client_config: kubernetes.client.Configuration) -> K8sVersion:
+    """
+    Return the k8s version of the cluster
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+
+    Returns:
+        K8sVersion: an enum containing k8s version
+
+    Raises:
+        ApiException: when an error occurs into kube client
+        ValueError: When k8s version is not included among those provided
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        version_api = kubernetes.client.VersionApi(api_client)
+        try:
+            api_version: VersionInfo = version_api.get_code(_request_timeout=10)
+        except ApiException as error:
+            logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        # Converting v.1.x.y -> v.1.x
+        main_ver = api_version.git_version[:api_version.git_version.rfind('.')]
+        if not K8sVersion.has_value(main_ver):
+            raise ValueError("K8s version is not included among those provided")
+        return K8sVersion(main_ver)
+
+
+def get_k8s_cidr_info(kube_client_config: kubernetes.client.Configuration) -> str:
+    """
+    Return the pod CIDR of a k8s cluster
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+
+    Returns:
+        A String representing the pod CIDR
+    """
+    config_map = read_namespaced_config_map(kube_client_config=kube_client_config, config_name="kubeadm-config",
+                                            namespace="kube-system")
+
+    cluster_conf_str: str = config_map.data['ClusterConfiguration']
+    cluster_conf_dict: dict = yaml.safe_load(cluster_conf_str)
+    pod_subnet_str: str = cluster_conf_dict['networking']['podSubnet']
+
+    return pod_subnet_str
+
+
+def read_namespaced_config_map(kube_client_config: kubernetes.client.Configuration, namespace: str,
+                               config_name: str) -> V1ConfigMap:
+    """
+    Read and return a config map from a namespace
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace: the namespace containing the config map
+        config_name: the name of the config map
+
+    Returns:
+        The desired config map in the target namespace
+
+    Raises:
+        ApiException when k8s client fail
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        core_v1_api = kubernetes.client.CoreV1Api(api_client)
+        try:
+            config_map: V1ConfigMap = core_v1_api.read_namespaced_config_map(name=config_name, namespace=namespace)
+        except ApiException as error:
+            logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
+            raise error
+        finally:
+            api_client.close()
+
+        return config_map
+
+
+def read_namespaced_storage_class(kube_client_config: kubernetes.client.Configuration, storage_class_name: str) -> V1StorageClass:
+    """
+    Read and return a storage class from a namespace
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        storage_class_name: the name of the storage class
+
+    Returns:
+        The V1StorageClass object representing the desired storage class in the target namespace
+
+    Raises:
+        ApiException when k8s client fails
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance = kubernetes.client.StorageV1Api(api_client)
+        try:
+            storage_class = api_instance.read_storage_class(name=storage_class_name)
+        except kubernetes.client.rest.ApiException as error:
+            logger.error(f"Exception when calling StorageV1Api->read_storage_class: {error}\n")
+            raise error
+        finally:
+            api_client.close()
+
+    return storage_class
+
+
+def patch_namespaced_storage_class(kube_client_config: kubernetes.client.Configuration, storage_class):
+    """
+    Patch a storage class in a k8s cluster.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        storage_class: The storage class to be patched
+
+    Returns:
+        The patched storage class
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance = kubernetes.client.StorageV1Api(api_client)
+        try:
+            patched_storage_class = api_instance.patch_storage_class(name=storage_class.metadata.name,
+                                                                     body=storage_class)
+        except kubernetes.client.rest.ApiException as error:
+            logger.error(f"Exception when calling StorageV1Api->patch_storage_class: {error}\n")
+            raise error
+        finally:
+            api_client.close()
+
+    return patched_storage_class

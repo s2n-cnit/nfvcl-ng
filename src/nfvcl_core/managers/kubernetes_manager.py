@@ -6,9 +6,10 @@ from kubernetes.utils import FailToCreateError
 from nfvcl.models.k8s.common_k8s_model import Labels
 from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
 from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sQuota
-from nfvcl_core.utils.k8s import get_k8s_config_from_file_content, get_k8s_cidr_info, get_pods_for_k8s_namespace, k8s_create_namespace, k8s_delete_namespace, apply_def_to_cluster
+from nfvcl_core.models.custom_types import NFVCLCoreException
+from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
-from nfvcl_core.utils.k8s.kube_api_utils import get_service_accounts, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, k8s_admin_role_over_namespace, k8s_cluster_admin, k8s_create_service_account, k8s_create_secret_for_user, k8s_get_secrets, k8s_cert_sign_req, k8s_add_quota_to_namespace, k8s_get_nodes, k8s_add_label_to_k8s_node, k8s_get_deployments, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_ipaddress_pool, k8s_get_storage_classes
+from nfvcl_core.utils.k8s.kube_api_utils import get_service_accounts, k8s_delete_namespace, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, k8s_admin_role_over_namespace, k8s_cluster_admin, k8s_create_service_account, k8s_create_secret_for_user, k8s_get_secrets, k8s_cert_sign_req, k8s_add_quota_to_namespace, k8s_get_nodes, k8s_add_label_to_k8s_node, k8s_get_deployments, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_ipaddress_pool, k8s_get_storage_classes, get_pods_for_k8s_namespace, apply_def_to_cluster, k8s_create_namespace, get_k8s_cidr_info
 from nfvcl_core.managers import TopologyManager, BlueprintManager, EventManager
 from nfvcl_core.managers.generic_manager import GenericManager
 from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
@@ -35,9 +36,13 @@ class KubernetesManager(GenericManager):
 
             A list of installed plugins
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        helm_plugin_manager = HelmPluginManager(cluster.credentials, "K8S REST UTILS")
-        return helm_plugin_manager.get_installed_plugins()
+        try:
+            cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
+            helm_plugin_manager = HelmPluginManager(cluster.credentials, "K8S REST UTILS")
+            return helm_plugin_manager.get_installed_plugins()
+        except ValueError as val_err:
+            self.logger.error(val_err)
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=404)
 
     def install_plugins(self, cluster_id: str, plug_to_install_list: K8sPluginsToInstall):
         """
@@ -116,10 +121,9 @@ class KubernetesManager(GenericManager):
 
         try:
             cidr_info = get_k8s_cidr_info(k8s_config)
-
-        except ValueError as val_err:
+        except ApiException as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return {"cidr": cidr_info}
 
@@ -145,9 +149,9 @@ class KubernetesManager(GenericManager):
         try:
             pod_list: V1PodList = get_pods_for_k8s_namespace(kube_client_config=k8s_config, namespace=namespace)
 
-        except ValueError as val_err:
+        except ApiException as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return pod_list.to_dict()
 
@@ -184,9 +188,9 @@ class KubernetesManager(GenericManager):
             # Try to install plugins to cluster
             created_namespace: V1Namespace = k8s_create_namespace(k8s_config, namespace_name=name, labels=labels)
 
-        except (ValueError, ApiException) as val_err:
+        except ApiException as val_err:
             self.logger.error(val_err, exc_info=val_err)
-            return OssCompliantResponse(status=OssStatus.failed, detail=str(val_err), result={})
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return OssCompliantResponse(status=OssStatus.ready, detail="Namespace created", result=created_namespace.to_dict())
 
@@ -212,10 +216,9 @@ class KubernetesManager(GenericManager):
             # Try to install plugins to cluster
             created_namespace: V1Namespace = k8s_delete_namespace(k8s_config, namespace_name=name)
 
-        except (ValueError, ApiException) as val_err:
+        except ApiException as val_err:
             self.logger.error(val_err)
-            resp = OssCompliantResponse(status=OssStatus.failed, detail=str(val_err), result={})
-            return resp
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         resp = OssCompliantResponse(status=OssStatus.ready, detail="Namespace deleted", result=created_namespace.to_dict())
         return resp
@@ -244,10 +247,9 @@ class KubernetesManager(GenericManager):
             user_accounts: V1ServiceAccountList = get_service_accounts(kube_client_config=k8s_config, username=username,
                                                                        namespace=namespace)
 
-        except (ValueError, ApiException) as val_err:
+        except ApiException as val_err:
             self.logger.error(val_err)
-            resp = OssCompliantResponse(status=OssStatus.failed, detail=str(val_err), result={})
-            return resp
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return user_accounts.to_dict()
 
@@ -272,13 +274,11 @@ class KubernetesManager(GenericManager):
 
         try:
             # Retrieving service account list filtered by username and namespace
-            role_list: V1ClusterRoleList = k8s_get_roles(kube_client_config=k8s_config, rolename=rolename,
-                                                         namespace=namespace)
+            role_list: V1ClusterRoleList = k8s_get_roles(kube_client_config=k8s_config, rolename=rolename, namespace=namespace)
 
-        except (ValueError, ApiException) as val_err:
+        except ApiException | ValueError as val_err:
             self.logger.error(val_err)
-            resp = OssCompliantResponse(status=OssStatus.failed, detail=str(val_err), result={})
-            return resp
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return role_list.to_dict()
 
@@ -302,9 +302,9 @@ class KubernetesManager(GenericManager):
         try:
             namespace_list: V1NamespaceList = get_k8s_namespaces(kube_client_config=k8s_config, namespace=namespace)
 
-        except (ValueError, ApiException) as val_err:
+        except ApiException as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return namespace_list.to_dict()
 
@@ -337,7 +337,7 @@ class KubernetesManager(GenericManager):
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return role_bind_res.to_dict()
 
@@ -372,7 +372,7 @@ class KubernetesManager(GenericManager):
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return role_bind_res.to_dict()
 
@@ -401,7 +401,7 @@ class KubernetesManager(GenericManager):
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return role_bind_res.to_dict()
 
@@ -431,7 +431,7 @@ class KubernetesManager(GenericManager):
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return user_creation_res.to_dict()
 
@@ -464,7 +464,7 @@ class KubernetesManager(GenericManager):
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return created_secret.to_dict()
 
@@ -495,7 +495,7 @@ class KubernetesManager(GenericManager):
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return auth_response.to_dict()
 
@@ -544,7 +544,7 @@ class KubernetesManager(GenericManager):
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return result
 
@@ -575,7 +575,7 @@ class KubernetesManager(GenericManager):
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            raise val_err
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return auth_response
 
@@ -606,7 +606,7 @@ class KubernetesManager(GenericManager):
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             resp = OssCompliantResponse(status=OssStatus.failed, detail=val_err.body, result={})
-            return resp
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         resp = OssCompliantResponse(status=OssStatus.ready, detail="Quota created", result=quota_resp.to_dict())
         return resp
@@ -626,13 +626,17 @@ class KubernetesManager(GenericManager):
         """
         cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        if detailed:
-            node_list: V1NodeList = k8s_get_nodes(k8s_config, detailed=detailed)
-            to_return = node_list.to_dict()
-        else:
-            name_list = k8s_get_nodes(k8s_config, detailed=detailed)
-            to_return = {"nodes": name_list}
-        return to_return
+        try:
+            if detailed:
+                node_list: V1NodeList = k8s_get_nodes(k8s_config, detailed=detailed)
+                to_return = node_list.to_dict()
+            else:
+                name_list = k8s_get_nodes(k8s_config, detailed=detailed)
+                to_return = {"nodes": name_list}
+            return to_return
+        except ApiException as val_err:
+            self.logger.error(val_err)
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
     def add_label_to_k8s_node(self, cluster_id: str, node_name: str, labels: Labels):
         """
@@ -651,8 +655,12 @@ class KubernetesManager(GenericManager):
         """
         cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        node: V1Node = k8s_add_label_to_k8s_node(k8s_config, node_name=node_name, labels=labels)
-        return node.to_dict()
+        try:
+            node: V1Node = k8s_add_label_to_k8s_node(k8s_config, node_name=node_name, labels=labels)
+            return node.to_dict()
+        except ApiException as api_exp:
+            self.logger.error(api_exp)
+            raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
 
     def get_deployment(self, cluster_id: str, namespace: str, detailed: bool = False):
         """
@@ -671,13 +679,17 @@ class KubernetesManager(GenericManager):
         """
         cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        if detailed:
-            deployment_list: V1DeploymentList = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
-            to_return = deployment_list.to_dict()
-        else:
-            name_list = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
-            to_return = {"deployments": name_list}
-        return to_return
+        try:
+            if detailed:
+                deployment_list: V1DeploymentList = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
+                to_return = deployment_list.to_dict()
+            else:
+                name_list = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
+                to_return = {"deployments": name_list}
+            return to_return
+        except ApiException as val_err:
+            self.logger.error(val_err)
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
     def add_label_to_k8s_deployment(self, cluster_id: str, namespace: str, deployment_name: str, labels: Labels):
         """
@@ -694,7 +706,11 @@ class KubernetesManager(GenericManager):
         """
         cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        deployment: V1Deployment = k8s_add_label_to_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, labels=labels)
+        try:
+            deployment: V1Deployment = k8s_add_label_to_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, labels=labels)
+        except ApiException as api_exp:
+            self.logger.error(api_exp)
+            raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
         return deployment.to_dict()
 
     def scale_k8s_deployment(self, cluster_id: str, namespace: str, deployment_name: str, replica_number: int):
@@ -712,7 +728,11 @@ class KubernetesManager(GenericManager):
         """
         cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        deployment: V1Deployment = k8s_scale_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, replica_num=replica_number)
+        try:
+            deployment: V1Deployment = k8s_scale_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, replica_num=replica_number)
+        except ApiException as api_exp:
+            self.logger.error(api_exp)
+            raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
         return deployment.to_dict()
 
     def get_k8s_ipaddress_pools(self, cluster_id: str) -> List[str]:
@@ -725,7 +745,11 @@ class KubernetesManager(GenericManager):
         """
         cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        ip_pool_list = k8s_get_ipaddress_pool(k8s_config)
+        try:
+            ip_pool_list = k8s_get_ipaddress_pool(k8s_config)
+        except ApiException as api_exp:
+            self.logger.error(api_exp)
+            raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
         return ip_pool_list
 
     def get_k8s_storage_classes(self, cluster_id: str) -> List[str]:
@@ -741,7 +765,12 @@ class KubernetesManager(GenericManager):
         """
         cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        storage_classes = k8s_get_storage_classes(k8s_config)
+        try:
+            storage_classes = k8s_get_storage_classes(k8s_config)
+        except ApiException as api_exp:
+            self.logger.error(api_exp)
+            raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
+
         sc_name_list = []
         for sc in storage_classes.items:
             sc_name_list.append(sc.metadata.name)
@@ -760,7 +789,12 @@ class KubernetesManager(GenericManager):
         """
         cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        storage_classes = k8s_get_storage_classes(k8s_config)
+        try:
+            storage_classes = k8s_get_storage_classes(k8s_config)
+        except ApiException as api_exp:
+            self.logger.error(api_exp)
+            raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
+
         for sc in storage_classes.items:
             if sc.metadata.annotations.get("storageclass.kubernetes.io/is-default-class") == "true":
                 return sc.metadata.name

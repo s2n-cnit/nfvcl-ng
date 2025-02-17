@@ -6,20 +6,20 @@ from typing import Optional, List, Dict, Tuple
 import httpx
 from pydantic import Field
 
-from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
-from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.modules.oai.oai_upf.OpenAirInterfaceUpf_blue import OAI_UPF_BLUE_TYPE
-from nfvcl_core.models.resources import HelmChartResource
 from nfvcl.models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, \
     SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile, OaiCoreValuesModel
-from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubArea, SubSubscribers, SubDataNets, \
+from nfvcl.models.blueprint_ng.core5g.common import SubArea, SubSubscribers, SubDataNets, \
     SubSliceProfiles, Create5gModel, NetworkEndPointType
 from nfvcl.models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
     Core5GUpdateSliceModel, NF5GType, Core5GAddSubscriberModel
-from nfvcl.models.blueprint_ng.g5.upf import DnnModel
+from nfvcl.models.blueprint_ng.g5.upf import DnnWithCidrModel
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
+from nfvcl_core.models.resources import HelmChartResource
 from nfvcl_core.utils.log import create_logger
 
 OAI_CORE_BLUE_TYPE = "oai"
@@ -148,14 +148,14 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                 oai_utils.add_plmn_item(self.state.oai_config_values.coreconfig, self.state.mcc, self.state.mnc, sub_area.id, new_snssai)
                 sub_slice = self.get_slice(_slice.sliceId)
                 for dnn in sub_slice.dnnList:
-                    dnn_payload = DnnModel()
+                    dnn_payload = DnnWithCidrModel()
 
                     dnn_item = DnnItem(
                         dnn=dnn
                     )
                     dnn_info = self.get_dnn(dnn)
 
-                    dnn_payload.name = dnn_info.net_name
+                    dnn_payload.dnn = dnn_info.dnn
                     dnn_payload.cidr = dnn_info.pools[0].cidr
 
                     oai_utils.add_local_subscription_info(self.state.oai_config_values.coreconfig, new_snssai, dnn_info)
@@ -233,8 +233,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             # Add Session Management Subscription to DB
             api_url_sms = f"/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data"
             single_nssai = Snssai(
-                sst=SstConvertion.to_int(subscriber.snssai[0].sliceType),
-                sd=str(int(subscriber.snssai[0].sliceId, 16))
+                sst=subscriber.snssai[0].sliceType,
+                sd=str(int(subscriber.snssai[0].sliceId, 16)) # Must be int without leading 0
             )
             # Only 1 slice for subscriber and plmn is supported by OAI
             self.state.ue_dict[imsi] = []

@@ -157,12 +157,12 @@ class AthonetApplicationUpfConfig(NFVCLBaseModel):
             for dnn in _slice.dnn_list:
                 for supported_dnn in dnn_vrf:
                     if supported_dnn.cidr == dnn.cidr:
-                        ingress = VrfLink(interface="core", direction="ingress", vrf=supported_dnn.vrf, network_instance=f"NI_{supported_dnn.vrf}", apn_dnn=dnn.name)
-                        egress = VrfLink(interface="core", direction="egress", vrf=supported_dnn.vrf, network_instance=f"NI_{supported_dnn.vrf}", apn_dnn=dnn.name)
+                        ingress = VrfLink(interface="core", direction="ingress", vrf=supported_dnn.vrf, network_instance=f"NI_{supported_dnn.vrf}", apn_dnn=dnn.dnn)
+                        egress = VrfLink(interface="core", direction="egress", vrf=supported_dnn.vrf, network_instance=f"NI_{supported_dnn.vrf}", apn_dnn=dnn.dnn)
                         self.data_plane.vrf_links.append(ingress)
                         self.data_plane.vrf_links.append(egress)
                         ip = ipaddress.ip_network(supported_dnn.cidr)
-                        pool = Pool(max=ip[-2].exploded, min=ip[1].exploded, name=f"{dnn.name}_pubblic_pool_v4_0", dnn=dnn.name, network_instance=f"NI_{supported_dnn.vrf}")
+                        pool = Pool(max=ip[-2].exploded, min=ip[1].exploded, name=f"{dnn.dnn}_pubblic_pool_v4_0", dnn=dnn.dnn, network_instance=f"NI_{supported_dnn.vrf}")
                         self.ip_pools.pools.append(pool)
 
 

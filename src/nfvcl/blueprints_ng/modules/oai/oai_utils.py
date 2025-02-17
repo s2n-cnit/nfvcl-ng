@@ -3,10 +3,10 @@ from typing import Optional
 from nfvcl.models.blueprint_ng.core5g.OAI_Models import Snssai, Baseconfig, Dnn, Upfconfig, \
     SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, UpfAvailable, \
     LocalSubscriptionInfo, QosProfile, SNssaiSmfInfoListItem, PlmnSupportListItem
-from nfvcl.models.blueprint_ng.core5g.common import SstConvertion, SubDataNets
+from nfvcl.models.blueprint_ng.core5g.common import SubDataNets
 
 
-def add_snssai(config: Baseconfig, slice_id: str, slice_type: str) -> Snssai:
+def add_snssai(config: Baseconfig, slice_id: str, slice_type: int) -> Snssai:
     """
     Add new "snssai" to OAI values configuration.
     :param config: config to add snssai to.
@@ -15,8 +15,8 @@ def add_snssai(config: Baseconfig, slice_id: str, slice_type: str) -> Snssai:
     :return: new snassai otherwise raise an error.
     """
     new_snssais = Snssai(
-        sst=SstConvertion.to_int(slice_type),
-        sd=slice_id.zfill(6)
+        sst=slice_type,
+        sd=slice_id
     )
     if new_snssais not in config.snssais:
         config.snssais.append(new_snssais)

@@ -4,47 +4,40 @@ from typing import List, Optional
 from pydantic import Field
 
 from nfvcl.models.blueprint_ng.core5g.common import SubSubscribers, SubSliceProfiles, SubArea, SubDataNets
+from nfvcl.models.blueprint_ng.g5.custom_types_5g import DNNType, SDType, IMSIType
 from nfvcl_core.models.base_model import NFVCLBaseModel
-
+from nfvcl_core.models.custom_types import AreaIDType
 
 class Core5GAttachGNBModel(NFVCLBaseModel):
-    area_id: int = Field()
+    area_id: AreaIDType = Field()
     gnb_blue_id: str = Field()
-
 
 class Core5GAddSubscriberModel(SubSubscribers):
     pass
 
-
 class Core5GDelSubscriberModel(NFVCLBaseModel):
-    imsi: str = Field()
-
+    imsi: IMSIType = Field()
 
 class Core5GAddSliceModel(SubSliceProfiles):
     area_ids: Optional[List[str]] = Field(default=None)
 
-
 class Core5GUpdateSliceModel(SubSliceProfiles):
     pass
 
-
 class Core5GDelSliceModel(NFVCLBaseModel):
-    sliceId: str = Field()
-
+    sliceId: SDType = Field()
 
 class Core5GAddTacModel(SubArea):
     pass
 
 class Core5GDelTacModel(NFVCLBaseModel):
-    areaId: int = Field()
-
+    areaId: AreaIDType = Field()
 
 class Core5GAddDnnModel(SubDataNets):
     pass
 
-
 class Core5GDelDnnModel(NFVCLBaseModel):
-    dnn: str = Field()
+    dnn: DNNType = Field()
 
 class NF5GType(str, Enum):
     AMF = 'AMF'
@@ -61,4 +54,4 @@ class NF5GType(str, Enum):
 
 class NetworkFunctionScaling(NFVCLBaseModel):
     nf: NF5GType = Field()
-    replica_count: int = Field()
+    replica_count: int = Field(gt=-1)

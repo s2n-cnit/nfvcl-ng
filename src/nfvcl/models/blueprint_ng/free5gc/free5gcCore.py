@@ -1,11 +1,12 @@
 from __future__ import annotations
+
+import re
 from typing import Optional, List, Dict, Union, Literal, Annotated
+
 from pydantic import Field, RootModel, field_validator
 
+from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
 from nfvcl_core.models.base_model import NFVCLBaseModel
-import re
-
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SstConvertion
 
 ok_regex = re.compile(r'^([a-fA-F0-9]{6})$')
 
@@ -1519,7 +1520,7 @@ class Free5gcSubScriber(NFVCLBaseModel):
                     for snssai in current_config.config.sliceProfiles:
                         if snssai.sliceId == _slice.sliceId and snssai.sliceType == _slice.sliceType:
                             temp_slice = Snssai(
-                                sst=SstConvertion.to_int(snssai.sliceType),
+                                sst=snssai.sliceType,
                                 sd=snssai.sliceId
                             )
 

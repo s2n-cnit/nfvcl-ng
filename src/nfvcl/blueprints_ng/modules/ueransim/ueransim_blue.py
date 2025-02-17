@@ -4,6 +4,7 @@ from typing import List, Optional, Dict
 
 from pydantic import Field
 
+from nfvcl.models.blueprint_ng.g5.ue import UESim
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
@@ -17,7 +18,7 @@ from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstan
     UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim
 from nfvcl_core.models.http_models import HttpRequestType
 from nfvcl_core.models.network import PduModel
-from nfvcl.models.blueprint_ng.blueprint_ueransim_model import UeransimSim, UeransimUe
+from nfvcl.models.blueprint_ng.blueprint_ueransim_model import UeransimUe
 from nfvcl_core.utils.blue_utils import rel_path
 
 UERANSIM_BLUE_TYPE = "ueransim"
@@ -74,11 +75,11 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
 
 
 class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
-    sims: List[UeransimSim] = Field()
+    sims: List[UESim] = Field()
     gnbSearchList: List[str] = Field()
-    sims_to_delete: List[UeransimSim] = Field(default_factory=list)
+    sims_to_delete: List[UESim] = Field(default_factory=list)
 
-    def update_sims(self, new_sims: List[UeransimSim]):
+    def update_sims(self, new_sims: List[UESim]):
         self.sims_to_delete = list(set(self.sims) - set(new_sims))
         self.sims = new_sims
 
@@ -97,9 +98,14 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
         self.sims_to_delete.clear()
 
         for sim in self.sims:
+            fixed_sim = sim.model_dump(exclude_none=True, by_alias=True)
+            for session in fixed_sim["sessions"]:
+                session["apn"] = session["dnn"]
+                del session["dnn"]
+
             ue_sim_config_path = f"/opt/UERANSIM/ue-sim-{sim.imsi}.conf"
             ansible_builder.add_template_task(rel_path("config/ue_conf_file.jinja2"), ue_sim_config_path,
-                                              {"sim": sim, "gnbSearchList": self.gnbSearchList})
+                                              {"sim": fixed_sim, "gnbSearchList": self.gnbSearchList})
 
             # Create a new service to start the UE with this SIM
             ue_sim_service_path = f"/etc/systemd/system/ueransim-ue-sim-{sim.imsi}.service"
@@ -250,7 +256,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         else:
             raise BlueprintNGException(f"No Gnb found in area {area_id}")
 
-    def _add_sim(self, area_id: str, ue_id: int, new_sim: UeransimSim):
+    def _add_sim(self, area_id: str, ue_id: int, new_sim: UESim):
         self.logger.info(f"Trying to add Sim with imsi {new_sim.imsi}, in area {area_id}, ue {ue_id}")
         for ue in self.state.areas[area_id].ues:
             if ue.ue_id == str(ue_id):

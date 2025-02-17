@@ -54,7 +54,7 @@ class OpenAirInterfaceUE(Generic5GUEBlueprintNG[OAIUEBlueprintNGState, UEBlueCre
         self.state.oai_ue_config_values.config.full_imsi = self.state.current_config.sims[0].imsi
         self.state.oai_ue_config_values.config.full_key = self.state.current_config.sims[0].key
         self.state.oai_ue_config_values.config.opc = self.state.current_config.sims[0].op
-        self.state.oai_ue_config_values.config.dnn = self.state.current_config.sims[0].sessions[0].apn
+        self.state.oai_ue_config_values.config.dnn = self.state.current_config.sims[0].sessions[0].dnn
         self.state.oai_ue_config_values.config.sst = str(self.state.current_config.sims[0].sessions[0].slice.sst)
         self.state.oai_ue_config_values.config.sd = str(self.state.current_config.sims[0].sessions[0].slice.sd)
         self.state.oai_ue_config_values.config.usrp = self.state.current_config.usrp

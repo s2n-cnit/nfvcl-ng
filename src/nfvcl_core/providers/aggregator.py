@@ -67,9 +67,9 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def get_virt_provider(self, area: int):
         vim = self.topology.get_vim_by_area(area)
         if area not in self.virt_providers_impl:
-            if vim.vim_type is VimTypeEnum.OPENSTACK:
+            if vim.vim_type == VimTypeEnum.OPENSTACK:
                 self.virt_providers_impl[area] = VirtualizationProviderOpenstack(area, self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, persistence_function=self.blueprint.to_db)
-            elif vim.vim_type is VimTypeEnum.PROXMOX:
+            elif vim.vim_type == VimTypeEnum.PROXMOX:
                 self.virt_providers_impl[area] = VirtualizationProviderProxmox(area, self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, persistence_function=self.blueprint.to_db)
 
             if str(area) not in self.blueprint.base_model.virt_providers:

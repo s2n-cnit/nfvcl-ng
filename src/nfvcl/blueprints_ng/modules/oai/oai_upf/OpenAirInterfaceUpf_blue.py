@@ -113,13 +113,13 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
         self.state.upf_conf.upf.remote_n6_gw = self.state.current_config.n6_gateway_ip.exploded
 
         for new_slice in self.state.current_config.slices:
-            new_snssai: Snssai = oai_utils.add_snssai(self.state.upf_conf, new_slice.id, new_slice.type)
+            new_snssai: Snssai = oai_utils.add_snssai(self.state.upf_conf, new_slice.sd, new_slice.sst)
             for dnn in new_slice.dnn_list:
                 dnn_item = DnnItem(
-                    dnn=dnn.name
+                    dnn=dnn.dnn
                 )
                 # Add DNNS
-                oai_utils.add_dnn_dnns(self.state.upf_conf, dnn.name, dnn.cidr)
+                oai_utils.add_dnn_dnns(self.state.upf_conf, dnn.dnn, dnn.cidr)
                 oai_utils.add_dnn_snssai_upf_info_list_item(self.state.upf_conf, new_snssai, dnn_item)
 
         if self.state.current_config.smf_ip:

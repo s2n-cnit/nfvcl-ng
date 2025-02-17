@@ -1,10 +1,9 @@
-from enum import Enum
-from typing import List, Any
+from typing import List, Any, Optional
 
-from pydantic import Field, constr, ConfigDict
+from pydantic import Field
 
+from nfvcl.models.blueprint_ng.g5.ue import UESim
 from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl_core.models.vim.vim_models import VimNetMap
 
 
 class UeransimNetworkEndpoints(NFVCLBaseModel):
@@ -15,62 +14,9 @@ class UeransimNetworkEndpoints(NFVCLBaseModel):
 class UeransimConfig(NFVCLBaseModel):
     network_endpoints: UeransimNetworkEndpoints
 
-
-class UeransimConfiguredNssaiItem(NFVCLBaseModel):
-    sst: int
-    sd: int
-
-
-class UeransimDefaultNssaiItem(NFVCLBaseModel):
-    sst: int
-    sd: int
-
-
-class UeransimSlice(NFVCLBaseModel):
-    sst: int
-    sd: int
-
-class PDUSessionType(Enum):
-    IPv4 = 'IPv4'
-    IPv6 = 'IPv6'
-
-
-class UeransimSession(NFVCLBaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
-        validate_default=True
-    )
-
-    type: PDUSessionType
-    apn: str
-    slice: UeransimSlice
-
-class OpType(Enum):
-    OPC = 'OPC'
-
-class UeransimSim(NFVCLBaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
-        validate_default=True
-    )
-
-    imsi: constr(pattern=r'^[0-9]*$', min_length=15, max_length=15)
-    plmn: constr(pattern=r'^[0-9]*$', min_length=5, max_length=5)
-    key: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
-    op: constr(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
-    opType: OpType
-    amf: constr(min_length=4, max_length=4) | None = None
-    configured_nssai: List[UeransimConfiguredNssaiItem] | None = Field(None, min_length=1)
-    default_nssai: List[UeransimDefaultNssaiItem] | None= Field(None, min_length=1)
-    sessions: List[UeransimSession] | None = Field(None, min_length=1)
-
-
 class UeransimUe(NFVCLBaseModel):
-    id: int = Field(None, description='UE identifier')
-    sims: List[UeransimSim] = Field(None, description='List of sims in the current UE virtual machine')
-    vim_gnbs_ips: List[str] = Field(default=[], description="List of IP of gNBs")
+    id: int = Field(description='UE identifier')
+    sims: List[UESim] = Field(description='List of sims in the current UE virtual machine')
 
     def __eq__(self, other: Any) -> bool:
         """
@@ -86,13 +32,11 @@ class UeransimUe(NFVCLBaseModel):
                 return True
         return False
 
-
 class UeransimArea(NFVCLBaseModel):
     id: int = Field(..., description='Area identifier, it will be used as TAC in the NodeB configuration')
-    nci: str | None = Field(None, description='gNodeB nci identifier')
-    idLength: int | None = Field(None, description='gNodeB nci identifier length')
+    nci: Optional[str] = Field(default=None, description='gNodeB nci identifier')
+    idLength: Optional[int] = Field(default=None, description='gNodeB nci identifier length')
     ues: List[UeransimUe] = Field(description='list of virtual UEs to be instantiated')
-    gnb_interface_list: List[VimNetMap] = Field(default=[], description="List of gnb interfaces, each area has one gNB")
 
     def __eq__(self, other: Any) -> bool:
         """
@@ -108,9 +52,7 @@ class UeransimArea(NFVCLBaseModel):
                 return True
         return False
 
-
 class UeransimModel(NFVCLBaseModel):
     type: str
     config: UeransimConfig
     areas: List[UeransimArea]
-

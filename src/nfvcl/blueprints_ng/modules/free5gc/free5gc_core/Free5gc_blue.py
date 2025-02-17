@@ -6,14 +6,14 @@ from typing import Optional, Dict, List, Tuple
 import httpx
 from pydantic import Field
 
-from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_core_config, free5gc_subscriber_config
 from nfvcl.blueprints_ng.modules.free5gc.free5gc_upf.Free5gcUpf_blue import FREE5GC_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNGState, Generic5GK8sBlueprintNG
-from nfvcl_core.models.resources import HelmChartResource
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubArea, SubSliceProfiles, SubSubscribers, SubDataNets, SstConvertion
+from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubArea, SubSliceProfiles, SubSubscribers, SubDataNets
 from nfvcl.models.blueprint_ng.free5gc.free5gcCore import Free5gcCoreConfig, Snssai, Free5gcLogin, Free5gcSubScriber
 from nfvcl.models.blueprint_ng.g5.core import Core5GDelTacModel, Core5GAddTacModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GDelSubscriberModel, Core5GAddSubscriberModel, NF5GType, Core5GAddDnnModel, Core5GDelDnnModel
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
+from nfvcl_core.models.resources import HelmChartResource
 from nfvcl_core.utils.log import create_logger
 
 FREE5GC_CORE_BLUE_TYPE = "free5gc"
@@ -153,12 +153,12 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
 
             for sub_slice in sub_area.slices:
                 _slice = Snssai(
-                    sst=SstConvertion.to_int(sub_slice.sliceType),
+                    sst=sub_slice.sliceType,
                     sd=sub_slice.sliceId
                 )
                 self.state.free5gc_config_values.add_plmn_amf_item(self.state.mcc, self.state.mnc, sub_area.id, _slice)
                 self.state.free5gc_config_values.add_supportedsnssailist_item_nssf(self.state.mcc, self.state.mnc, _slice)
-                self.state.free5gc_config_values.add_nsi_list_item_nssf(SstConvertion.to_int(sub_slice.sliceType), sub_slice.sliceId, self.state.nsi_nssf_id)
+                self.state.free5gc_config_values.add_nsi_list_item_nssf(sub_slice.sliceType, sub_slice.sliceId, self.state.nsi_nssf_id)
                 self.state.nsi_nssf_id = self.state.nsi_nssf_id + 1
                 self.state.free5gc_config_values.add_supported_nssai_nssf(self.state.supported_nssai_availability_nssf_id, self.state.mcc, self.state.mnc, str(sub_area.id).zfill(6), _slice)
                 self.state.supported_nssai_availability_nssf_id = self.state.supported_nssai_availability_nssf_id + 1
@@ -168,7 +168,7 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
                     _dnn = self.get_dnn(dnn)
                     self.state.free5gc_config_values.add_dnn_amf_item(dnn)
                     self.state.free5gc_config_values.add_dnn_info_smf_item(dnn, _dnn.dns, _slice)
-                    self.state.free5gc_config_values.add_dnnupfinfolist_smf(f"gNB{sub_area.id}", f"UPF{sub_area.id}", deployed_upf_info.network_info.n4_ip.exploded, deployed_upf_info.network_info.n3_ip.exploded, SstConvertion.to_int(sub_slice.sliceType), sub_slice.sliceId, dnn, _dnn.pools[0].cidr)
+                    self.state.free5gc_config_values.add_dnnupfinfolist_smf(f"gNB{sub_area.id}", f"UPF{sub_area.id}", deployed_upf_info.network_info.n4_ip.exploded, deployed_upf_info.network_info.n3_ip.exploded, sub_slice.sliceType, sub_slice.sliceId, dnn, _dnn.pools[0].cidr)
 
 
     def update_core(self):

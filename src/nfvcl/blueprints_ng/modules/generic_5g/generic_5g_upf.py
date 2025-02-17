@@ -5,7 +5,7 @@ from typing import Generic, TypeVar, Optional, final, List
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
 from pydantic import Field
 
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, SliceModel
+from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_core.models.base_model import NFVCLBaseModel
@@ -14,7 +14,7 @@ from nfvcl_core.models.http_models import HttpRequestType
 
 class DeployedUPFInfo(NFVCLBaseModel):
     area: int = Field()
-    served_slices: List[SliceModel] = Field(default_factory=list)
+    served_slices: List[Slice5GWithDNNs] = Field(default_factory=list)
     network_info: Optional[UPFNetworkInfo] = Field(default=None)
     vm_resource_id: Optional[str] = Field(default=None)
     vm_configurator_id: Optional[str] = Field(default=None)

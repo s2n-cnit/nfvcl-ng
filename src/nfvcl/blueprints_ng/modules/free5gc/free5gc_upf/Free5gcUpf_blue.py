@@ -124,11 +124,11 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
 
         vm_upf = next(iter(self.state.vm_resources.values()))
 
-        self.state.upf_conf.pfcp.addr = vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.ip
-        self.state.upf_conf.pfcp.node_id = vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.ip
+        self.state.upf_conf.pfcp.addr = vm_upf.network_interfaces[self.create_config.networks.n4.net_name][0].fixed.ip
+        self.state.upf_conf.pfcp.node_id = vm_upf.network_interfaces[self.create_config.networks.n4.net_name][0].fixed.ip
 
         if_list_item = IfListItem(
-            addr=vm_upf.network_interfaces[self.create_config.networks.n3][0].fixed.ip,
+            addr=vm_upf.network_interfaces[self.create_config.networks.n3.net_name][0].fixed.ip,
             type="N3"
         )
         self.state.upf_conf.gtpu.if_list.append(if_list_item)
@@ -136,7 +136,7 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
         for new_slice in self.state.current_config.slices:
             for dnn in new_slice.dnn_list:
                 dnn_item = DnnListItem(
-                    dnn=dnn.name,
+                    dnn=dnn.dnn,
                     cidr=dnn.cidr
                 )
                 if dnn_item not in self.state.upf_conf.dnn_list:
@@ -146,7 +146,7 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
 
         self.state.upf_vm_configurator.upf_id = self.state.current_config.area_id
         self.state.upf_vm_configurator.upf_conf = upf_conf_yaml
-        self.state.upf_vm_configurator.n6 = vm_upf.network_interfaces[self.state.current_config.networks.n6][0].fixed.interface_name
+        self.state.upf_vm_configurator.n6 = vm_upf.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name
         self.state.upf_vm_configurator.gnb_cidr = self.state.current_config.gnb_cidr.exploded
         self.state.upf_vm_configurator.n3_gateway = self.state.current_config.n3_gateway_ip.exploded
         self.state.upf_vm_configurator.n6_gateway = self.state.current_config.n6_gateway_ip.exploded
@@ -162,12 +162,12 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
             vm_resource_id=vm_upf.id,
             vm_configurator_id=self.state.upf_vm_configurator.id,
             network_info=UPFNetworkInfo(
-                n4_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n4][0].fixed.cidr),
-                n3_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n3][0].fixed.cidr),
-                n6_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n6][0].fixed.cidr),
-                n4_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n4][0].fixed.ip),
-                n3_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n3][0].fixed.ip),
-                n6_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n6][0].fixed.ip)
+                n4_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.cidr),
+                n3_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.cidr),
+                n6_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.cidr),
+                n4_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.ip),
+                n3_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.ip),
+                n6_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.ip)
             )
         )
         self.state.upf_list.clear()

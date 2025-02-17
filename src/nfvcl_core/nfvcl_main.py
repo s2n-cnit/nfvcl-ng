@@ -193,7 +193,6 @@ class NFVCL:
         namespace = {}
 
         if "pre_work_callback" in function_args:
-            print("setting pre_work_callback")
             event = threading.Event()
             kwargs["pre_work_callback"] = partial(pre_work_callback_function, event, namespace)
 

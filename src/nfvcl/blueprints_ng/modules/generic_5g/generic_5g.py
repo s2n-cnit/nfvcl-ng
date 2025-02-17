@@ -7,10 +7,11 @@ from pydantic import Field
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
 from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
-    SstConvertion, SubDataNets, NetworkEndPointWithType
+    SubDataNets, NetworkEndPointWithType
+from nfvcl.models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, SliceModel
+from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, Slice5GWithDNNs
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_core.models.base_model import NFVCLBaseModel
@@ -19,7 +20,7 @@ from nfvcl_core.models.linux.ip import Route
 from nfvcl_core.models.network import PduModel
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core.models.network.network_models import PduType, MultusInterface
-from nfvcl_core.models.pdu.gnb import GNBPDUSlice, GNBPDUConfigure
+from nfvcl_core.models.pdu.gnb import GNBPDUConfigure
 
 
 class UPFInfo(NFVCLBaseModel):
@@ -199,10 +200,10 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             area_id: Area of the UPF
         Returns: Model for the creation or update of an UPF blueprint
         """
-        slices: List[SliceModel] = []
+        slices: List[Slice5GWithDNNs] = []
 
         for slice_profile in self.state.current_config.get_slices_profiles_for_area(area_id):
-            slices.append(SliceModel.from_slice_profile(slice_profile, self.state.current_config.config.network_endpoints.data_nets))
+            slices.append(Slice5GWithDNNs.from_slice_profile(slice_profile, self.state.current_config.config.network_endpoints.data_nets))
 
         upf_create_model = UPFBlueCreateModel(
             area_id=area_id,
@@ -273,7 +274,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         upf_list_for_slice: List[DeployedUPFInfo] = []
         for edge_area in self.state.edge_areas.values():
             for upf_deployed in edge_area.upf.upf_list:
-                if len(list(filter(lambda x: x.id == slice_id.rjust(6, "0"), upf_deployed.served_slices))) > 0:
+                if len(list(filter(lambda x: x.sd == slice_id.rjust(6, "0"), upf_deployed.served_slices))) > 0:
                     upf_list_for_slice.append(upf_deployed)
         return upf_list_for_slice
 
@@ -331,7 +332,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             # TODO nci is calculated with tac, is this correct?
             slices = []
             for slice in list(filter(lambda x: x.id == pdu.area, self.state.current_config.areas))[0].slices:
-                slices.append(GNBPDUSlice(sd=slice.sliceId, sst=SstConvertion.to_int(slice.sliceType)))
+                slices.append(Slice5G(sd=slice.sliceId, sst=slice.sliceType))
 
             gnb_configuration_request = GNBPDUConfigure(
                 area=pdu.area,

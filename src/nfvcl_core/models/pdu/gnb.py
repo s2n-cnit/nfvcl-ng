@@ -1,14 +1,10 @@
 from typing import List, Optional
 
+from nfvcl.models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl_core.models.linux.ip import Route
 from pydantic import Field
 
 from nfvcl_core.models.base_model import NFVCLBaseModel
-
-
-class GNBPDUSlice(NFVCLBaseModel):
-    sst: int = Field()
-    sd: str = Field(pattern=r'^([a-fA-F0-9]{6})$')
 
 class GNBPDUConfigure(NFVCLBaseModel):
     area: int = Field()
@@ -20,6 +16,6 @@ class GNBPDUConfigure(NFVCLBaseModel):
     upf_ip: str = Field()
     amf_port: int = Field()
 
-    nssai: List[GNBPDUSlice] = Field()
+    nssai: List[Slice5G] = Field()
 
     additional_routes: Optional[List[Route]] = Field(default_factory=list)

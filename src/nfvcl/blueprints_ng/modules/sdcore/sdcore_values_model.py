@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Optional
 from pydantic import Field
-from nfvcl.models.blueprint_ng.core5g.common import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers, Create5gModel, SstConvertion
+from nfvcl.models.blueprint_ng.core5g.common import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers, Create5gModel
 from nfvcl_core.models.base_model import NFVCLBaseModel
 
 # Models are incomplete, generated from the example values.yaml
@@ -351,7 +351,7 @@ class SimAppYamlConfiguration(NFVCLBaseModel):
             name=slice_name,
             slice_id=SliceId(
                 sd=generic_slice.sliceId,
-                sst=SstConvertion.sstType[generic_slice.sliceType]
+                sst=generic_slice.sliceType
             ),
             site_device_group=[device_group_name],
             application_filtering_rules=[ApplicationFilteringRule(  # TODO read this from config

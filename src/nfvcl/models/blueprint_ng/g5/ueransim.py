@@ -4,8 +4,9 @@ from typing import List
 
 from pydantic import Field
 
+from nfvcl.models.blueprint_ng.g5.ue import UESim
 from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.blueprint_ueransim_model import UeransimArea, UeransimConfig, UeransimUe, UeransimSim
+from nfvcl.models.blueprint_ng.blueprint_ueransim_model import UeransimArea, UeransimConfig, UeransimUe
 from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
 
 
@@ -83,8 +84,7 @@ class UeransimBlueprintRequestDelUE(NFVCLBaseModel):
 class UeransimBlueprintRequestAddSim(NFVCLBaseModel):
     area_id: str = Field()
     ue_id: int = Field()
-    sim: UeransimSim = Field()
-
+    sim: UESim = Field()
 
 class UeransimBlueprintRequestDelSim(NFVCLBaseModel):
     area_id: str = Field()

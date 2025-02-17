@@ -4,10 +4,10 @@ from typing import List, Optional, Dict, Any
 
 from pydantic import Field, RootModel
 
-from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl.models.blueprint_ng.Athonet.upf import DnnVrf
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SstConvertion, SubSliceProfiles, SubDataNets
+from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubDataNets
 from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel
+from nfvcl_core.models.base_model import NFVCLBaseModel
 
 
 #################### ATHONET ACCESS TOKEN ####################
@@ -192,7 +192,7 @@ class AthonetApplicationAmfConfig(NFVCLBaseModel):
         for area in config.areas:
             for _slice in area.slices:
                 item = SNssaiListItem(
-                    sst=SstConvertion.to_int(_slice.sliceType),
+                    sst=_slice.sliceType,
                     sd=_slice.sliceId
                 )
                 plmn_snssai_item.s_nssai_list.append(item)
@@ -651,7 +651,7 @@ class AthonetApplicationSmfConfig(NFVCLBaseModel):
                             dnn_item = Dnn(
                                 dnn=dnn.dnn,
                                 s_nssai=SNssai(
-                                    sst=SstConvertion.to_int(_slice.sliceType),
+                                    sst=_slice.sliceType,
                                     sd=_slice.sliceId
                                 ),
                                 ip_allocation=IpAllocation(
@@ -665,7 +665,7 @@ class AthonetApplicationSmfConfig(NFVCLBaseModel):
                             upf_item = UpfProfile(
                                 dnn=dnn.dnn,
                                 s_nssai=SNssai(
-                                    sst=SstConvertion.to_int(_slice.sliceType),
+                                    sst=_slice.sliceType,
                                     sd=_slice.sliceId
                                 ),
                                 upfs=[
@@ -934,27 +934,27 @@ class ProvisionedDataProfile(NFVCLBaseModel):
                         data.am_data.nssai.default_single_nssais.append(
                             DefaultSingleNssai(
                                 sd=info.slice.sliceId,
-                                sst=SstConvertion.to_int(info.slice.sliceType),
+                                sst=info.slice.sliceType,
                             )
                         )
                     data.am_data.nssai.single_nssais.append(
                         SingleNssai(
                             sd=info.slice.sliceId,
-                            sst=SstConvertion.to_int(info.slice.sliceType)
+                            sst=info.slice.sliceType
                         )
                     )
 
                     datum = SmDatum(
                         single_nssai=SingleNssai(
                             sd=info.slice.sliceId,
-                            sst=SstConvertion.to_int(info.slice.sliceType)
+                            sst=info.slice.sliceType
                         ),
                         dnn_configurations=DnnConfigurations.model_validate({f"{info.dnn.dnn}": DnnConfiguration()})
                     )
                     datums.append(datum)
 
                     smf_sel_data = SmfSelData()
-                    smf_sel_data.subscribed_snssai_infos.root[f"{SstConvertion.to_int(info.slice.sliceType)}-{info.slice.sliceId}"] = SliceField(
+                    smf_sel_data.subscribed_snssai_infos.root[f"{info.slice.sliceType}-{info.slice.sliceId}"] = SliceField(
                         dnn_infos=[DnnInfo(
                             dnn=info.dnn.dnn
                         )]

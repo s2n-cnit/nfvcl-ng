@@ -6,8 +6,8 @@ from nfvcl_core.models.base_model import NFVCLBaseModel
 
 
 class ProxmoxTicket(NFVCLBaseModel):
-    ticket: str = Field(default=None)
-    csrfpreventiontoken: str = Field(default=None)
+    ticket: Optional[str] = Field(default=None)
+    csrfpreventiontoken: Optional[str] = Field(default=None)
 
 
 class ProxmoxMac(NFVCLBaseModel):

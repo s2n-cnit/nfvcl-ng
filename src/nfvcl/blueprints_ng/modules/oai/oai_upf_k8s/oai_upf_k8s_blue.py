@@ -85,13 +85,13 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
         self.state.upf_values.upfconfig.upf.remote_n6_gw = self.state.multus_network_info.n6.gateway_ip.exploded if self.state.multus_network_info.n6 and self.state.multus_network_info.n6.gateway_ip else "127.0.0.1"
 
         for new_slice in self.state.current_config.slices:
-            new_snssai: Snssai = oai_utils.add_snssai(self.state.upf_values.upfconfig, new_slice.id, new_slice.type)
+            new_snssai: Snssai = oai_utils.add_snssai(self.state.upf_values.upfconfig, new_slice.sd, new_slice.sst)
             for dnn in new_slice.dnn_list:
                 dnn_item = DnnItem(
-                    dnn=dnn.name
+                    dnn=dnn.dnn
                 )
                 # Add DNNS
-                oai_utils.add_dnn_dnns(self.state.upf_values.upfconfig, dnn.name, dnn.cidr)
+                oai_utils.add_dnn_dnns(self.state.upf_values.upfconfig, dnn.dnn, dnn.cidr)
                 oai_utils.add_dnn_snssai_upf_info_list_item(self.state.upf_values.upfconfig, new_snssai, dnn_item)
 
     def update_upf(self):

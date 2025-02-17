@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TypeVar, Optional, Generic, List, Dict, Any
 
-from pydantic import Field, ConfigDict, SerializeAsAny
+from pydantic import Field, SerializeAsAny
 
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.prometheus.prometheus_model import PrometheusTargetModel
@@ -28,12 +28,6 @@ class BlueprintNGStatus(NFVCLBaseModel):
     current_operation: CurrentOperation = Field(CurrentOperation.IDLE)
     detail: str = Field(default="")
 
-    model_config = ConfigDict(
-        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
-        validate_default=True
-    )
-
     @classmethod
     def deploying(cls, blue_id) -> BlueprintNGStatus:
         return BlueprintNGStatus(current_operation=CurrentOperation.DEPLOYING, detail=f"The blueprint {blue_id} is being deployed...")
@@ -56,12 +50,7 @@ class BlueprintNGStatus(NFVCLBaseModel):
 
 
 class BlueprintNGCreateModel(NFVCLBaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
-        validate_default=True
-    )
-
+    pass
 
 class RegisteredResource(NFVCLBaseModel):
     type: str = Field()
@@ -132,14 +121,7 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
 
 
 class BlueprintNGState(NFVCLBaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
-        validate_default=True,
-        validate_assignment=True
-    )
     last_update: Optional[datetime] = Field(default=None)
-
 
 class BlueprintNGException(Exception):
     pass

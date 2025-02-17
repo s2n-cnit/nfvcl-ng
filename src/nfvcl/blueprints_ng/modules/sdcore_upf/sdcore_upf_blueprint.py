@@ -11,7 +11,7 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInf
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, SliceModel
+from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
 from nfvcl_core.utils.blue_utils import rel_path
 
 SDCORE_UPF_BLUE_TYPE = "sdcore_upf"
@@ -95,7 +95,7 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         dnns_to_deploy: List[str] = []
         for slice in self.state.current_config.slices:
             for dnnslice in slice.dnn_list:
-                dnns_to_deploy.append(dnnslice.name)
+                dnns_to_deploy.append(dnnslice.dnn)
         for dnn in set(dnns_to_deploy):
             if dnn not in self.state.currently_deployed_dnns:
                 deployed_info = self.deploy_upf_vm(dnn)
@@ -111,7 +111,7 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         found_ip_pool: Optional[str] = None
         for slice in self.state.current_config.slices:
             for dnnslice in slice.dnn_list:
-                if dnnslice.name == dnn:
+                if dnnslice.dnn == dnn:
                     if found_ip_pool is None:
                         found_ip_pool = dnnslice.cidr
                     elif found_ip_pool != dnnslice.cidr:
@@ -120,10 +120,10 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             raise ValueError(f"Unable to find ip pool for dnn '{dnn}'")
         return found_ip_pool
 
-    def get_slices_for_dnn(self, dnn: str) -> List[SliceModel]:
-        served_slices: List[SliceModel] = []
+    def get_slices_for_dnn(self, dnn: str) -> List[Slice5GWithDNNs]:
+        served_slices: List[Slice5GWithDNNs] = []
         for slice in self.state.current_config.slices:
-            if dnn in list(map(lambda x: x.name, slice.dnn_list)):
+            if dnn in list(map(lambda x: x.dnn, slice.dnn_list)):
                 served_slices.append(slice)
         return served_slices
 

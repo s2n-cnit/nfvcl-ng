@@ -5,9 +5,10 @@ from typing import List, Optional
 from typing import Literal
 
 from pydantic import Field, field_validator
-from pydantic import constr
 
+from nfvcl.models.blueprint_ng.g5.custom_types_5g import SDType, SSTType, BitrateStringType, DNNType, OPCType, KEYType, IMSIType, PLMNType
 from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core.models.custom_types import AreaIDType
 from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 
 
@@ -16,12 +17,12 @@ class Pool(NFVCLBaseModel):
     cidr: str
 
 class SubDataNets(NFVCLBaseModel):
-    net_name: str = Field(..., description="set net-name, exp: 'internet'")
-    dnn: str = Field(..., description="set dnn, exp: 'internet'")
-    dns: str
-    pools: List[Pool]
-    uplinkAmbr: Optional[str] = Field(default=None)
-    downlinkAmbr: Optional[str] = Field(default=None)
+    net_name: str = Field(description="Name of the network, currently unused")
+    dnn: DNNType = Field(description="Name of the DNN")
+    dns: str = Field(description="DNS server IP address")
+    pools: List[Pool] = Field(default_factory=list, description="List of IP pools for the DNN")
+    uplinkAmbr: Optional[BitrateStringType] = Field(default=None, description="Uplink Aggregate Maximum Bit Rate")
+    downlinkAmbr: Optional[BitrateStringType] = Field(default=None, description="Downlink Aggregate Maximum Bit Rate")
     default5qi: Optional[str] = Field(default=None)
 
 class Router5GNetworkInfo(NFVCLBaseModel):
@@ -31,8 +32,8 @@ class Router5GNetworkInfo(NFVCLBaseModel):
     gnb_cidr: SerializableIPv4Network = Field()
 
 class MultusRoute(NFVCLBaseModel):
-    dst: str
-    gw: str
+    dst: str = Field(description="Destination network CIDR")
+    gw: str = Field(description="Gateway IP address")
 
 class NetworkEndPointType(str, Enum):
     MULTUS = "MULTUS"
@@ -40,7 +41,7 @@ class NetworkEndPointType(str, Enum):
 
 class NetworkEndPoint(NFVCLBaseModel):
     net_name: str = Field(description="Name of the network, need to be present in the topology")
-    routes: Optional[List[MultusRoute]] = Field(default_factory=list)
+    routes: Optional[List[MultusRoute]] = Field(default_factory=list, description="Optional routes for the network")
 
 class NetworkEndPointWithType(NetworkEndPoint):
     type: Optional[NetworkEndPointType] = Field(default=NetworkEndPointType.LB, description="Type of the network endpoint, default is Load Balancer. If this network is used for a VM the type is ignored")
@@ -49,7 +50,7 @@ class NetworkEndPoints(NFVCLBaseModel):
     mgt: Optional[NetworkEndPoint] = Field(default=None, description="Used as the management network for VMs, if everything is on K8S this is not needed")
     n2: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N2 interface, can be omitted if the core has a fixed network (like Athonet)")
     n4: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N4 interface, can be omitted if the core has a fixed network (like Athonet)")
-    data_nets: List[SubDataNets]
+    data_nets: List[SubDataNets] = Field(default_factory=list, description="List of data networks (DNN)", min_length=1)
 
     @field_validator("mgt", mode="before")
     def str_to_network_endpoint(cls, v: object) -> object:
@@ -65,58 +66,58 @@ class NetworkEndPoints(NFVCLBaseModel):
 
 
 class SubFlows(NFVCLBaseModel):
-    flowId: str = Field(..., description="set flow Id, exp: f0")
-    ipAddrFilter: Optional[str] = Field(None, description="set IP address filter")
-    qi: constr(pattern=r"[0-9]")
-    gfbr: Optional[str] = Field(default=None, description="set gfbr, exp: 100Mbps")
+    flowId: str = Field(description="ID of the flow")
+    ipAddrFilter: Optional[str] = Field(default=None, description="IP address filter to match this flow")
+    qi: str = Field(pattern=r"[0-9]", description="5QI value for this flow")
+    gfbr: Optional[BitrateStringType] = Field(default=None, description="Guaranteed Flow Bit Rate, exp: 10 Mbps")
 
 
 class SubpduSessions(NFVCLBaseModel):
-    pduSessionId: str = Field(..., description="set pduSession Id, exp: p0")
-    pduSessionAmbr: Optional[str] = Field(default=None, description="set pduSessionAmbr, exp: 10Mbps")
-    flows: List[SubFlows] = Field(default=[])
+    pduSessionId: str = Field(description="ID of the PDU session")
+    pduSessionAmbr: Optional[BitrateStringType] = Field(default=None, description="Aggregate Maximum Bit Rate for this PDU session, exp: 10 Mbps")
+    flows: List[SubFlows] = Field(default_factory=list, description="List of flows for this PDU session")
 
 
 class SubProfileParams(NFVCLBaseModel):
     isolationLevel: Literal["ISOLATION", "NO_ISOLATION"]
-    sliceAmbr: Optional[str] = Field('1000Mbps', description="Set sliceAmbr, exp: 1000Mbps")
-    ueAmbr: Optional[str] = Field('50Mbps', description="Set ueAmbr, exp: 50Mbps")
-    maximumNumberUE: Optional[int] = Field(default=None)
-    pduSessions: List[SubpduSessions]
+    sliceAmbr: Optional[BitrateStringType] = Field(default='1000 Mbps', description="Aggregate Maximum Bit Rate for this slice, exp: 1000 Mbps")
+    ueAmbr: Optional[BitrateStringType] = Field(default='50 Mbps', description="Aggregate Maximum Bit Rate for each UE on this slice, exp: 50 Mbps")
+    maximumNumberUE: Optional[int] = Field(default=None, description="Maximum number of UEs on this slice")
+    pduSessions: List[SubpduSessions] = Field(default_factory=list, description="List of PDU sessions for this slice")
 
 
 class SubLocationConstraints(NFVCLBaseModel):
     geographicalAreaId: str
     # fixme: Double check for the length
-    tai: constr(pattern=r"^[0-9]+$") = Field(..., min_length=10, max_length=11)
+    tai: str = Field(pattern=r"^[0-9]+$", min_length=10, max_length=11, description="Tracking Area Identity, constructed from: MCC, MNC and TAC.")
 
 
 class SubEnabledUEList(NFVCLBaseModel):
-    ICCID: str = Field("*", description="set the ICCID")
+    ICCID: str = Field("*", description="ICCID")
 
 
 class SubSliceProfiles(NFVCLBaseModel):
     area_ids: Optional[List[str]] = Field(default=None)
-    sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
-    sliceType: Literal["EMBB", "URLLC", "MMTC"]
-    dnnList: List[str] = Field([], description="set dnn-list as a listst on names")
-    profileParams: SubProfileParams
-    locationConstraints: Optional[List[SubLocationConstraints]] = Field(default_factory=list)
-    enabledUEList: Optional[List[SubEnabledUEList]] = Field(default_factory=list)
+    sliceId: SDType = Field(description="Slice ID (SD)")
+    sliceType: SSTType = Field(description="Slice Type (SST)")
+    dnnList: List[str] = Field(default_factory=list, description="List of DNN available for this slice, the DNN must be present in the data_nets list")
+    profileParams: SubProfileParams = Field(description="QoS for this slice")
+    locationConstraints: Optional[List[SubLocationConstraints]] = Field(default_factory=list, description="Location constraints for this slice, CURRENTLY UNUSED")
+    enabledUEList: Optional[List[SubEnabledUEList]] = Field(default_factory=list, description="List of enabled UEs for this slice, CURRENTLY UNUSED")
 
 
 class SubSnssai(NFVCLBaseModel):
-    sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
-    sliceType: Literal["EMBB", "URLLC", "MMTC"]
-    pduSessionIds: List[str] = Field(..., description="Set Default slices parameters, exp: ['p0', 'p1']")
-    default_slice: Optional[bool] = Field(default=None)
+    sliceId: SDType = Field(description="Slice ID (SD)")
+    sliceType: SSTType = Field(description="Slice Type (SST)")
+    pduSessionIds: List[str] = Field(default_factory=list, description="List of PDU session IDs for this SNSSAI, need to be present in the pduSessions list of the corresponding slice profile")
+    default_slice: Optional[bool] = Field(default=None, description="Set this slice as the default for the subscriber")
 
 
 class SubSubscribers(NFVCLBaseModel):
-    imsi: str = Field(pattern=r'^[0-9]*$', min_length=15, max_length=15)
-    k: str = Field(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
-    opc: str = Field(pattern=r'^[a-fA-F0-9]+$', min_length=32, max_length=32)
-    snssai: List[SubSnssai]
+    imsi: IMSIType = Field()
+    k: KEYType = Field()
+    opc: OPCType = Field()
+    snssai: List[SubSnssai] = Field(default_factory=list, description="List of slices for this subscriber")
     authenticationMethod: Optional[str] = Field(default="5G_AKA")
     authenticationManagementField: Optional[str] = Field(default="8000")
 
@@ -127,24 +128,22 @@ class SubPersistence(NFVCLBaseModel):
 
 class SubConfig(NFVCLBaseModel):
     network_endpoints: NetworkEndPoints
-    plmn: str = Field(..., pattern=r'^[0-9]*$', min_length=5, max_length=6,
-                      description='PLMN identifier of the mobile network'
-                      )
-    sliceProfiles: Optional[List[SubSliceProfiles]] = Field(default=None, description="Set Default slices parameters")
-    subscribers: List[SubSubscribers]
-    persistence: Optional[SubPersistence] = Field(default_factory=SubPersistence)
+    plmn: PLMNType = Field(description="PLMN identifier of the mobile network")
+    sliceProfiles: Optional[List[SubSliceProfiles]] = Field(default=None, description="Slices for this core")
+    subscribers: List[SubSubscribers] = Field(default_factory=list, description="List of subscribers")
+    persistence: Optional[SubPersistence] = Field(default_factory=SubPersistence, description="Persistence configuration for the core")
 
 
 # =================================================== End of Config class =============================================
 # ====================================================sub area SubClasses =============================================
 
 class SubSlices(NFVCLBaseModel):
-    sliceType: Literal["EMBB", "URLLC", "MMTC"]
-    sliceId: constr(to_upper=True) = Field(pattern=r'^([a-fA-F0-9]{6})$')
+    sliceType: SSTType
+    sliceId: SDType
 
 class SubAreaNetwork(NFVCLBaseModel):
     n3: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N3 interface")
-    n6: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N3 interface")
+    n6: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N6 interface")
     gnb: Optional[NetworkEndPoint] = Field(default=None, description="Network endpoint for GNB network, only required if a router is needed for this UPF configuration")
     external_router: Optional[Router5GNetworkInfo] = Field(default=None)
 
@@ -169,14 +168,15 @@ class SubAreaGNB(NFVCLBaseModel):
     pduList: Optional[List[str]] = Field(default=None)
 
 class SubArea(NFVCLBaseModel):
-    id: int
-    nci: str
-    idLength: int
-    core: bool = Field(default=True)
-    gnb: Optional[SubAreaGNB] = Field(default_factory=SubAreaGNB)
-    upf: Optional[SubAreaUPF] = Field(default_factory=SubAreaUPF)
-    networks: SubAreaNetwork = Field()
-    slices: Optional[List[SubSlices]] = Field(default=[], description="set slices ")
+    id: AreaIDType = Field(description="ID of the area")
+    # TODO need validator
+    nci: str = Field(description="NR Cell Identity in hex format")
+    idLength: int = Field(description="Length of the NCI in bits", default=36, ge=32, le=36)
+    core: bool = Field(default=True, description="Set this area as the core area, only one area can be set as core")
+    gnb: Optional[SubAreaGNB] = Field(default_factory=SubAreaGNB, description="Additional GNB configuration")
+    upf: Optional[SubAreaUPF] = Field(default_factory=SubAreaUPF, description="Additional UPF configuration")
+    networks: SubAreaNetwork = Field(description="Network configuration specific for this area")
+    slices: Optional[List[SubSlices]] = Field(default_factory=list, description="List of slices for this area")
 
 
 # ===============================================end of sub area ======================================================
@@ -184,8 +184,8 @@ class SubArea(NFVCLBaseModel):
 
 
 class Create5gModel(NFVCLBaseModel):
-    config: SubConfig
-    areas: List[SubArea] = Field(..., description="Set area")
+    config: SubConfig = Field(description="Core configuration")
+    areas: List[SubArea] = Field(description="Areas configuration")
 
     def get_area(self, area_id: int):
         for area in self.areas:
@@ -193,10 +193,11 @@ class Create5gModel(NFVCLBaseModel):
                 return area
         return None
 
-    def get_slice_profile(self, slice_id: str) -> SubSliceProfiles:
+    def get_slice_profile(self, slice_id: str) -> Optional[SubSliceProfiles]:
         for slice in self.config.sliceProfiles:
             if slice.sliceId == slice_id:
                 return slice
+        return None
 
     def get_slices_profiles_for_area(self, area_id: int) -> List[SubSliceProfiles]:
         slice_profiles: List[SubSliceProfiles] = []
@@ -206,30 +207,4 @@ class Create5gModel(NFVCLBaseModel):
                     slice_profiles.append(self.get_slice_profile(slice.sliceId))
         return slice_profiles
 
-
-
 # =========================================== End of main section =====================================================
-
-class SstConvertion:
-    sstType = {"EMBB": 1, "URLLC": 2, "MMTC": 3}
-
-    def __init__(self) -> None:
-        pass
-
-    @classmethod
-    def to_string(cls, value: int = None) -> str:
-        return next((k for k, v in cls.sstType.items() if v == value), None)
-
-    @classmethod
-    def to_int(cls, value: str = None) -> int:
-        return next((v for k, v in cls.sstType.items() if k == value), None)
-
-
-class NssiConvertion(SstConvertion):
-    @classmethod
-    def toNssi(cls, fromSlice: SubSlices = None):
-        return {"sst": cls.to_int(fromSlice.sliceType), "sd": fromSlice.sliceId}
-
-    @classmethod
-    def toSlice(cls, fromNssi: dict = None) -> SubSlices:
-        return SubSlices.model_validate({"sliceType": cls.to_string(fromNssi["sst"]), "sliceId": fromNssi["sd"]})  # TODO workaround for Literal type

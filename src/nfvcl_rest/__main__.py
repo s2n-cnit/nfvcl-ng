@@ -14,11 +14,11 @@ from typing import Callable, Dict
 import httpx
 import uvicorn
 from fastapi import APIRouter, FastAPI, Request, Depends, Body, HTTPException
+from file_read_backwards import FileReadBackwards
 from starlette import status
-from starlette.responses import RedirectResponse, PlainTextResponse, Response
+from starlette.responses import RedirectResponse, PlainTextResponse, Response, JSONResponse
 from starlette.staticfiles import StaticFiles
 from verboselogs import VerboseLogger
-from file_read_backwards import FileReadBackwards
 
 from nfvcl_core import configure_injection, NFVCL, global_ref
 from nfvcl_core.config import NFVCLConfigModel
@@ -30,8 +30,9 @@ from nfvcl_core.models.task import NFVCLTaskResult
 from nfvcl_core.nfvcl_main import NFVCLPublicModel
 from nfvcl_core.utils.file_utils import create_folder
 from nfvcl_core.utils.log import mod_logger, create_logger, LOG_FILE_PATH
-from nfvcl_rest.middleware.authentication_middleware import login, control_token, set_user_manager, logout
+from nfvcl_rest.middleware.authentication_middleware import token, control_token, set_user_manager, logout
 from nfvcl_rest.middleware.exception_middleware import ExceptionMiddleware
+from nfvcl_rest.models.auth import Oauth2CustomException, Oauth2Errors, OAuth2Response
 from nfvcl_rest.models.rest import RestAnswer202, CallbackModel
 
 ########### VARS ############
@@ -41,6 +42,7 @@ logger: VerboseLogger = create_logger("NFVCL_REST")
 PY_MIN_MAJOR = 3
 PY_MIN_MINOR = 11
 DEFAULT_USER = "admin"
+
 
 ########### FUNCTIONS ############
 
@@ -64,11 +66,13 @@ def call_callback_url(callback_url: str, result: NFVCLTaskResult):
     except Exception as e:
         logger.error(f"Error calling callback: {str(e)}")
 
+
 def dummy_callback(result: NFVCLTaskResult):
     """
     Dummy callback function to be used when the callback is not specified. DO NOT REMOVE
     """
     pass
+
 
 def generate_function_signature(function: Callable, sync=False, override_name=None, override_args=None, override_args_type: Dict[str, typing.Any] = None, override_return_type=None, override_doc=None):
     """
@@ -198,6 +202,7 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
 def sort_by_indexes(lst, indexes, reverse=False):
     return [val for (_, val) in sorted(zip(indexes, lst), key=lambda x: x[0], reverse=reverse)]
 
+
 def set_auth_on_api_function(api_function: Callable):
     """
     Set the authentication on the API function if it is required by the configuration.
@@ -216,12 +221,14 @@ def set_auth_on_api_function(api_function: Callable):
         api_function.__signature__ = sig.replace(parameters=list(params.values()))
     return api_function
 
+
 def close_nfvcl(logged_user: str = DEFAULT_USER) -> RestAnswer202:
     """
     Terminate the NFVCL.
     """
     os.kill(os.getpid(), signal.SIGTERM)
     return RestAnswer202(id="close", description="Closing")
+
 
 def logs(max_lines: int = 500, logged_user: str = DEFAULT_USER) -> str:
     """
@@ -243,6 +250,7 @@ def logs(max_lines: int = 500, logged_user: str = DEFAULT_USER) -> str:
     else:
         return f"Log level({nfvcl_config.log_level}) is higher than DEBUG(10), HTML logging is disabled."
 
+
 @asynccontextmanager
 async def lifespan(fastapp: FastAPI):
     """
@@ -255,6 +263,7 @@ async def lifespan(fastapp: FastAPI):
     yield
     # If something need to be done after shutdown of the app, it can be done here.
 
+
 def check_py_version():
     """
     Checks that the python version is equal or grater that the required one
@@ -266,19 +275,24 @@ def check_py_version():
                      f"You are using the {sys.version}")
         exit(-1)
 
+
 def readiness():
     """
     Readiness check for the NFVCL
     """
     return Response(status_code=status.HTTP_200_OK)
 
+
 def setup_main_routes():
+    """
+    Set up the main routes for the NFVCL
+    """
     app.mount("/files", StaticFiles(directory=accessible_folder, html=True), name="mounted_files")
-    #Redirect to docs page for APIS
+    # Redirect to docs page for APIS
     app.add_api_route("/", lambda: RedirectResponse("/docs"), methods=["GET"], status_code=status.HTTP_308_PERMANENT_REDIRECT, include_in_schema=False)
     # app.add_api_route("/token", login_for_access_token, methods=["POST"])
-    app.add_api_route("/token", login , methods=["POST"])
-    app.add_api_route("/logout", logout , methods=["POST"])
+    app.add_api_route("/token", token, methods=["POST"])
+    app.add_api_route("/logout", logout, methods=["POST"])
     ##### PROTECTED MAIN ROUTES #####
     app.add_api_route("/close", set_auth_on_api_function(close_nfvcl), methods=["GET"], status_code=status.HTTP_202_ACCEPTED)
     app.add_api_route("/logs", set_auth_on_api_function(logs), methods=["GET"], response_class=PlainTextResponse)
@@ -314,6 +328,22 @@ if __name__ == "__main__":
     )
     app.add_middleware(ExceptionMiddleware)
 
+
+    @app.exception_handler(Oauth2CustomException)
+    async def oauth2_exception_handler(request: Request, exc: Oauth2CustomException):
+        """
+        Handle OAuth2 exceptions.
+        Args:
+            request:
+            exc:
+
+        Returns:
+
+        """
+        response = JSONResponse(status_code=exc.status_code, content=OAuth2Response(error=Oauth2Errors.INVALID_GRANT, error_description=exc.description).model_dump(exclude_none=True))
+        return response
+
+
     # TODO: check if working / remove
     accessible_folder = global_ref.nfvcl_config.nfvcl.mounted_folder
     create_folder(accessible_folder)
@@ -342,7 +372,6 @@ if __name__ == "__main__":
                 summary=nfvcl_public.summary,
                 status_code=status.HTTP_200_OK if nfvcl_public.sync else status.HTTP_202_ACCEPTED,
             )
-
 
     for module in nfvcl.get_loaded_blueprints():
         module_router = APIRouter(
@@ -397,7 +426,7 @@ if __name__ == "__main__":
                         override_doc=day2_route.function.__doc__,
                         sync=False
                     ),
-                    methods=["PUT"], # TODO can a day2 route use a different method?
+                    methods=["PUT"],  # TODO can a day2 route use a different method?
                     status_code=status.HTTP_202_ACCEPTED
                 )
 

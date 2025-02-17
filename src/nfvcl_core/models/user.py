@@ -3,8 +3,21 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
+
 from pydantic import Field, field_validator, EmailStr
+
 from nfvcl_core.models.base_model import NFVCLBaseModel
+
+
+class TokenStatus(int, Enum):
+    """
+    Enum representing the status of a token.
+    """
+    VALID = 0
+    INVALID = 1
+    EXPIRED = 2
+    DELETED = 3
+
 
 class UserRole(str, Enum):
     """
@@ -12,6 +25,7 @@ class UserRole(str, Enum):
     """
     ADMIN = 'admin'
     USER = 'user'
+
 
 class UserNoConfidence(NFVCLBaseModel):
     """
@@ -28,6 +42,7 @@ class UserNoConfidence(NFVCLBaseModel):
     username: str = Field()
     email: Optional[EmailStr] = Field(default=None)
     role: UserRole = Field(default=UserRole.USER)
+
 
 class UserCreateREST(NFVCLBaseModel):
     """

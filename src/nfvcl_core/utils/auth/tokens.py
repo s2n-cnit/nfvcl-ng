@@ -1,7 +1,7 @@
 import hashlib
 from datetime import datetime, timezone, timedelta
 
-from jose import jwt
+from jose import jwt, JWTError, ExpiredSignatureError
 
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.user import User
@@ -10,8 +10,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 480
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 USER_TOKEN_HASH_ALGORITHM = 'HS256'
 DB_TOKEN_HASH_ALGORITHM = 'sha256'
-SECRET_KEY = "A3fdsfvvX4vKa4loiiuv" # TODO urgent, save this in safe place
-REFRESH_SECRET_KEY = "Ks5jCms5esdUoIRM34gd9" # TODO urgent, save this in safe place
+SECRET_KEY = "A3fdsfvvX4vKa4loiiuv"  # TODO urgent, save this in safe place
+REFRESH_SECRET_KEY = "Ks5jCms5esdUoIRM34gd9"  # TODO urgent, save this in safe place
+
 
 class TokenPayload(NFVCLBaseModel):
     """
@@ -28,6 +29,7 @@ class TokenPayload(NFVCLBaseModel):
     exp: datetime
     algorithm: str = USER_TOKEN_HASH_ALGORITHM
 
+
 def generate_tokens_payload(username) -> tuple[TokenPayload, TokenPayload]:
     """
     Generates access and refresh token payloads.
@@ -42,6 +44,7 @@ def generate_tokens_payload(username) -> tuple[TokenPayload, TokenPayload]:
     refresh_payload = TokenPayload(username=username, iat=datetime.now(timezone.utc), exp=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
 
     return access_payload, refresh_payload
+
 
 def generate_tokens(access_payload: TokenPayload, refresh_payload: TokenPayload) -> tuple[str, str]:
     """
@@ -58,6 +61,7 @@ def generate_tokens(access_payload: TokenPayload, refresh_payload: TokenPayload)
     refresh_token = jwt.encode(refresh_payload.model_dump(), REFRESH_SECRET_KEY, algorithm=USER_TOKEN_HASH_ALGORITHM)
 
     return access_token, refresh_token
+
 
 def create_tokens_for_user(user: User) -> tuple[str, str]:
     """
@@ -80,52 +84,49 @@ def create_tokens_for_user(user: User) -> tuple[str, str]:
     user.refresh_token_hash_algorithm = DB_TOKEN_HASH_ALGORITHM
     return access_token, refresh_token
 
-def decode_token(token) -> TokenPayload | None:
+
+def decode_token(token: str, secret_key: str) -> TokenPayload | None:
     """
     Decodes and validates a JWT token.
 
     Args:
         token (str): The JWT token to decode.
+        secret_key: The secret key to use for decoding.
 
     Returns:
         TokenPayload | None: The decoded payload if valid, None otherwise.
     """
     try:
         # Decode the token
-        decoded_payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        decoded_payload = jwt.decode(token, secret_key, algorithms=[USER_TOKEN_HASH_ALGORITHM])
         return TokenPayload.model_validate(decoded_payload)
-    except jwt.ExpiredSignatureError:
+    except ExpiredSignatureError:
         return None
-    except jwt.InvalidTokenError:
+    except JWTError:
         return None
 
-def check_token(token) -> bool:
+
+def decode_access_token(token) -> TokenPayload | None:
     """
-    Checks if a token is valid.
+    Decodes and validates an access token.
 
     Args:
-        token (str): The token to check.
+        token (str): The access token to decode.
 
     Returns:
-        bool: True if valid, False otherwise.
+        TokenPayload | None: The decoded payload if valid, None otherwise.
     """
-    return decode_token(token) is not None
+    return decode_token(token, SECRET_KEY)
 
-def renew_token(refresh_token: str) -> tuple:
+
+def decode_refresh_token(token) -> TokenPayload | None:
     """
-    Renews the access token using the refresh token.
+    Decodes and validates an access token.
 
     Args:
-        refresh_token (str): The refresh token.
+        token (str): The access token to decode.
 
     Returns:
-        tuple: The new access token and refresh token.
+        TokenPayload | None: The decoded payload if valid, None otherwise.
     """
-    # Validate the refresh token
-    decoded = decode_token(refresh_token)
-    access_payload = TokenPayload.model_validate(decoded)
-
-    # Generate new tokens
-    access_token, new_refresh_token = generate_tokens(access_payload.username)
-
-    return access_token, new_refresh_token
+    return decode_token(token, REFRESH_SECRET_KEY)

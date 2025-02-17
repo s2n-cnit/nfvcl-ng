@@ -16,4 +16,3 @@ class UserRepository(DatabaseRepository[User]):
     def delete_user(self, username: str):
         assert username != "admin", "Cannot delete admin user"
         self.collection.delete_one({'username': username})
-

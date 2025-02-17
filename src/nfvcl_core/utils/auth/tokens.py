@@ -5,13 +5,16 @@ from jose import jwt, JWTError, ExpiredSignatureError
 
 from nfvcl_core.models.base_model import NFVCLBaseModel
 from nfvcl_core.models.user import User
+from nfvcl_core.utils.util import generate_id
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 USER_TOKEN_HASH_ALGORITHM = 'HS256'
 DB_TOKEN_HASH_ALGORITHM = 'sha256'
-SECRET_KEY = "A3fdsfvvX4vKa4loiiuv"  # TODO urgent, save this in safe place
-REFRESH_SECRET_KEY = "Ks5jCms5esdUoIRM34gd9"  # TODO urgent, save this in safe place
+SECRET_KEY_CHAR_SET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#@!$%^&*()_+-=[]{}|;:,.<>?/"
+# When NFVCL is restarted the secret keys are regenerated, this invalidates all the tokens but it should be fine.
+SECRET_KEY = generate_id(30, SECRET_KEY_CHAR_SET)
+REFRESH_SECRET_KEY = generate_id(30, SECRET_KEY_CHAR_SET)
 
 
 class TokenPayload(NFVCLBaseModel):

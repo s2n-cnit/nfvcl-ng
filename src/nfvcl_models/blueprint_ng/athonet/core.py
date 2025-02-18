@@ -4,10 +4,10 @@ from typing import List, Optional, Dict, Any
 
 from pydantic import Field, RootModel
 
-from nfvcl.models.blueprint_ng.Athonet.upf import DnnVrf
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubDataNets
-from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel
-from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_models.blueprint_ng.athonet.upf import DnnVrf
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubDataNets
+from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel
+from nfvcl_core_models.base_model import NFVCLBaseModel
 
 
 #################### ATHONET ACCESS TOKEN ####################

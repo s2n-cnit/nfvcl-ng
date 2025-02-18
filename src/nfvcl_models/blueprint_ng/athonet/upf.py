@@ -5,8 +5,8 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel
 
 
 ################### PDU INFO ####################

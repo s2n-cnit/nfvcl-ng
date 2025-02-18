@@ -15,6 +15,12 @@ class NFVCLTask:
         self.kwargs = kwargs
         self.callback_function = callback_function
 
+    def __str__(self):
+        """
+        String representation of the task. Used when printing the task object.
+        """
+        return f"Task ID: {self.task_id}, Callable: {self.callable_function}, Args: {self.args}, Kwargs: {self.kwargs}, Callback: {self.callback_function}"
+
 class NFVCLTaskResult:
     def __init__(self, task_id: str, result: Any, error = False, exception: Exception = None):
         self.task_id = task_id

@@ -7,12 +7,12 @@ from typing import Optional, List, Dict
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng import BlueprintNGCreateModel, BlueprintNGState, BlueprintNG, get_class_path_str_from_obj
-from nfvcl.blueprints_ng.providers import BlueprintsNgProviderDemo, BlueprintNGProviderDataDemo
-from nfvcl.blueprints_ng.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
-
-from nfvcl.blueprints_ng import VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResource, VmResourceImage, VmResourceFlavor, VmResourceConfiguration
-from nfvcl.models import NFVCLBaseModel
+from nfvcl_core.blueprints import BlueprintNG
+from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
+from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGState
+from nfvcl_core_models.resources import VmResource, VmResourceAnsibleConfiguration, VmResourceNativeConfiguration, VmResourceImage, VmResourceFlavor, VmResourceConfiguration
 
 
 class TestCreateModel(BlueprintNGCreateModel):

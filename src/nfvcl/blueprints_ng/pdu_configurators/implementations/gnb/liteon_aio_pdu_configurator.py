@@ -2,9 +2,9 @@ from pydantic import Field
 
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl_core.models.pdu.gnb import GNBPDUConfigure
-from nfvcl_core.models.resources import PDUResourceAnsibleConfiguration
-from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.resources import PDUResourceAnsibleConfiguration
+from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core.providers.configurators.ansible_utils import run_ansible_playbook
 from nfvcl_core.utils.blue_utils import rel_path
 

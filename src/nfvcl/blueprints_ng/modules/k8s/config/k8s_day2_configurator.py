@@ -1,5 +1,5 @@
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
-from nfvcl_core.models.resources import VmResourceAnsibleConfiguration
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 
 
 class VmK8sDay2Configurator(VmResourceAnsibleConfiguration):

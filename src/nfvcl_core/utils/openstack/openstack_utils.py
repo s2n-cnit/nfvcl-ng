@@ -1,8 +1,8 @@
 from typing import List
 from keystoneauth1.exceptions import Unauthorized
-from nfvcl_core.models.topology_models import TopologyModel
+from nfvcl_core_models.topology_models import TopologyModel
 from openstack.network.v2.network import Network
-from nfvcl_core.models.vim import VimModel
+from nfvcl_core_models.vim import VimModel
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.openstack.openstack_client import OpenStackClient
 

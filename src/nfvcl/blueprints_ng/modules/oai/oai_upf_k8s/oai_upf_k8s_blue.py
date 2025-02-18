@@ -1,18 +1,18 @@
 import copy
 from typing import Optional
 
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_k8s import Generic5GUPFK8SBlueprintNG, Generic5GUPFK8SBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_upf_config
 from nfvcl.blueprints_ng.modules.oai import oai_utils
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import Snssai, DnnItem, OaiUpfValuesModel, AvailableSmf
-from nfvcl.models.blueprint_ng.core5g.common import NetworkEndPointType
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import OaiUpfValuesModel, AvailableSmf, Snssai, DnnItem
+from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPointType
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.models.resources import HelmChartResource
+from nfvcl_core_models.resources import HelmChartResource
 
 OAI_UPF_K8S_BLUE_TYPE = "oai_upf_k8s"
 

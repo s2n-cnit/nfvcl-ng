@@ -2,7 +2,7 @@ from typing import List
 
 from pymongo.synchronous.database import Database
 
-from nfvcl.models.k8s.topology_k8s_model import K8sNetworkInfo
+from nfvcl_core_models.topology_k8s_model import K8sNetworkInfo
 from nfvcl_core.migrations import Migration
 from nfvcl_core.utils.log import create_logger
 

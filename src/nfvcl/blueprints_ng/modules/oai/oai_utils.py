@@ -1,9 +1,9 @@
 from typing import Optional
 
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import Snssai, Baseconfig, Dnn, Upfconfig, \
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import Snssai, Baseconfig, Dnn, Upfconfig, \
     SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, UpfAvailable, \
     LocalSubscriptionInfo, QosProfile, SNssaiSmfInfoListItem, PlmnSupportListItem
-from nfvcl.models.blueprint_ng.core5g.common import SubDataNets
+from nfvcl_models.blueprint_ng.core5g.common import SubDataNets
 
 
 def add_snssai(config: Baseconfig, slice_id: str, slice_type: int) -> Snssai:

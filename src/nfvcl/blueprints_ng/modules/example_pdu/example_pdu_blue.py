@@ -6,8 +6,8 @@ from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.pdu_configurators.implementations.generic_linux_pdu_configurator import GenericLinuxPDUConfigurator
-from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
-from nfvcl_core.models.resources import PDUResourceAnsibleConfiguration
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core_models.resources import PDUResourceAnsibleConfiguration
 
 
 #

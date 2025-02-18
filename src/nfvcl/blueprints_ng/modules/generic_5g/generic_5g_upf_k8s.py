@@ -4,10 +4,10 @@ from typing import Generic, TypeVar, Dict, Optional
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBlueprintNGState, Generic5GUPFBlueprintNG
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl_core.models.network.network_models import MultusInterface
-from nfvcl_core.models.resources import HelmChartResource
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.network.network_models import MultusInterface
+from nfvcl_core_models.resources import HelmChartResource
 
 
 class K8sUPFMultusNetworkInfo(NFVCLBaseModel):

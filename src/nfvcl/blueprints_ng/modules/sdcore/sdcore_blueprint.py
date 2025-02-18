@@ -12,8 +12,8 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBl
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_default_config import default_config
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_values_model import SDCoreValuesModel, SimAppYamlConfiguration
 from nfvcl.blueprints_ng.modules.sdcore_upf.sdcore_upf_blueprint import SDCORE_UPF_BLUE_TYPE
-from nfvcl_core.models.resources import HelmChartResource
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
+from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
 
 
 class BlueSDCoreCreateModel(Create5gModel):

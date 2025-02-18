@@ -5,11 +5,11 @@ from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_gnb import Generic5GGNBBlueprintNGState, Generic5GGNBBlueprintNG
 from nfvcl.blueprints_ng.modules.oai import oai_default_gnb_config
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import GNB
-from nfvcl.models.blueprint_ng.core5g.common import NetworkEndPointType
-from nfvcl.models.blueprint_ng.g5.ran import GNBBlueCreateModel
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import GNB
+from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPointType
+from nfvcl_models.blueprint_ng.g5.ran import GNBBlueCreateModel
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.models.resources import HelmChartResource
+from nfvcl_core_models.resources import HelmChartResource
 
 OAI_GNB_BLUE_TYPE = "oai_gnb"
 

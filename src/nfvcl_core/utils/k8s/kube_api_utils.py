@@ -12,9 +12,9 @@ from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccou
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1Container, V1ResourceQuota, \
     V1ResourceQuotaSpec, V1ClusterRoleBinding, V1Node, V1NodeList, V1DeploymentList, V1Deployment, V1DeploymentSpec, V1StorageClassList, V1PodList, V1DaemonSetList, V1ServiceList, V1ConfigMap, VersionInfo, V1StorageClass
+from nfvcl_core_models.k8s_management_models import Labels
 
-from nfvcl.models.k8s.common_k8s_model import Labels
-from nfvcl.models.k8s.topology_k8s_model import K8sQuota, K8sVersion
+from nfvcl_core_models.topology_k8s_model import K8sQuota, K8sVersion
 from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64

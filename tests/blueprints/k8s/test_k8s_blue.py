@@ -1,11 +1,13 @@
 import unittest
 from pathlib import Path
 from typing import Dict
-from nfvcl.blueprints_ng.lcm.blueprint_manager import BlueprintManager
-from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel
+
+from nfvcl_core.managers import BlueprintManager
 import json
 
-from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_pods_for_k8s_namespace
+from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.kube_api_utils import get_pods_for_k8s_namespace
+from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel
 
 CREATION_FILE_REQUESTS = Path('tests/blueprints/k8s/creation_requests.json')
 assert CREATION_FILE_REQUESTS.exists() and CREATION_FILE_REQUESTS.is_file()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 from typing import Callable, Optional, TYPE_CHECKING
 
-from nfvcl_core.models.providers.providers import BlueprintNGProviderData
+from nfvcl_core_models.providers.providers import BlueprintNGProviderData
 from nfvcl_core.utils.log import create_logger
 if TYPE_CHECKING:
     from nfvcl_core.managers import BlueprintManager, TopologyManager, PDUManager

@@ -3,10 +3,10 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl.models.blueprint_ng.vyos.vyos_models import VyOSDestNATRule, VyOSSourceNATRule, VyOS1to1NATRule
+from nfvcl_models.blueprint_ng.vyos.vyos_models import VyOSDestNATRule, VyOSSourceNATRule, VyOS1to1NATRule
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription
-from nfvcl_core.models.resources import VmResourceAnsibleConfiguration
-from nfvcl.models.blueprint_ng.vyos.vyos_models import AnsibleVyOSConfigTask, VyOSNATRuleAlreadyPresent, VyOSNATRuleNotFound
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
+from nfvcl_models.blueprint_ng.vyos.vyos_models import AnsibleVyOSConfigTask, VyOSNATRuleAlreadyPresent, VyOSNATRuleNotFound
 
 
 class VmVyOSNatConfigurator(VmResourceAnsibleConfiguration):

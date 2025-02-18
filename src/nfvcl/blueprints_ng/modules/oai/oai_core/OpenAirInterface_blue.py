@@ -9,17 +9,17 @@ from pydantic import Field
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.modules.oai.oai_upf.OpenAirInterfaceUpf_blue import OAI_UPF_BLUE_TYPE
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, \
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, \
     SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile, OaiCoreValuesModel
-from nfvcl.models.blueprint_ng.core5g.common import SubArea, SubSubscribers, SubDataNets, \
+from nfvcl_models.blueprint_ng.core5g.common import SubArea, SubSubscribers, SubDataNets, \
     SubSliceProfiles, Create5gModel, NetworkEndPointType
-from nfvcl.models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, \
+from nfvcl_models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
     Core5GUpdateSliceModel, NF5GType, Core5GAddSubscriberModel
-from nfvcl.models.blueprint_ng.g5.upf import DnnWithCidrModel
+from nfvcl_models.blueprint_ng.g5.upf import DnnWithCidrModel
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.models.resources import HelmChartResource
+from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_core.utils.log import create_logger
 
 OAI_CORE_BLUE_TYPE = "oai"

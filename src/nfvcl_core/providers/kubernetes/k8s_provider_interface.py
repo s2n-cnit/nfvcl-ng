@@ -3,12 +3,12 @@ from __future__ import annotations
 import abc
 from typing import Any, Dict, Optional
 
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
-from nfvcl_core.models.network.network_models import MultusInterface
+from nfvcl_core_models.network.network_models import MultusInterface
 from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderData, \
     BlueprintNGProviderInterface
-from nfvcl_core.models.resources import HelmChartResource
+from nfvcl_core_models.resources import HelmChartResource
 
 
 class K8SProviderData(BlueprintNGProviderData):

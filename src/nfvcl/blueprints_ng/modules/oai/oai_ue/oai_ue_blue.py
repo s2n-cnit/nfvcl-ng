@@ -4,12 +4,12 @@ from typing import Optional
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.oai import oai_default_ue_config
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import OAIUE
-from nfvcl.models.blueprint_ng.core5g.common import NetworkEndPointType
-from nfvcl_core.models.resources import HelmChartResource
+from nfvcl_core_models.resources import HelmChartResource
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_ue import Generic5GUEBlueprintNGState, Generic5GUEBlueprintNG
-from nfvcl.models.blueprint_ng.g5.ue import UEBlueCreateModelGeneric, USRPType
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import OAIUE
+from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPointType
+from nfvcl_models.blueprint_ng.g5.ue import UEBlueCreateModelGeneric, USRPType
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 
 OAI_UE_BLUE_TYPE = "oai_ue"

@@ -1,13 +1,12 @@
 import time
 import unittest
 
-from nfvcl.blueprints_ng.lcm.blueprint_manager import BlueprintManager
 from nfvcl.blueprints_ng.modules import OpenAirInterface, UeransimBlueprintNG
-from nfvcl.blueprints_ng.utils import get_yaml_parser
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import OAIBlueCreateModel
-from nfvcl.models.blueprint_ng.core5g.common import SubSubscribers
-from nfvcl.models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, Core5GDelSliceModel, Core5GAddSubscriberModel
-from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance
+from nfvcl_core.managers import BlueprintManager
+from nfvcl_core.utils.blue_utils import get_yaml_parser
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import OAIBlueCreateModel
+from nfvcl_models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, Core5GDelSliceModel, Core5GAddSubscriberModel
+from nfvcl_models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance
 from tests.models.config_unitest import ConfigUniteTest
 from tests.utils import check_tcp_server, SSH
 from ueransim import get_ueransim_tun_interface, get_gnb_ips

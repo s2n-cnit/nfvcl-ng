@@ -5,18 +5,18 @@ from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 
 from nfvcl_core.database import BlueprintRepository
 from nfvcl_core.managers import GenericManager, EventManager
-from nfvcl_core.models.event_types import BlueEventType, NFVCLEventTopics
-from nfvcl_core.models.performance import BlueprintPerformanceType
-from nfvcl_core.models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
+from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
+from nfvcl_core_models.performance import BlueprintPerformanceType
+from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
 
 if TYPE_CHECKING:
     from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager
 from nfvcl_core.blueprints import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.models.blueprints.blueprint import BlueprintNGStatus
-from nfvcl_core.models.resources import VmResource
-from nfvcl_core.models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
-from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus
+from nfvcl_core_models.resources import VmResource
+from nfvcl_core_models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
+from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
 from nfvcl_core.providers.aggregator import ProvidersAggregator
 from nfvcl_core.utils.util import generate_blueprint_id
 

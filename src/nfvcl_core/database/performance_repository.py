@@ -2,7 +2,7 @@ from typing import Optional, List
 
 from nfvcl_core.database.database_repository import DatabaseRepository
 from nfvcl_core.managers.persistence_manager import PersistenceManager
-from nfvcl_core.models.performance import BlueprintPerformance
+from nfvcl_core_models.performance import BlueprintPerformance
 
 
 class PerformanceRepository(DatabaseRepository[BlueprintPerformance]):

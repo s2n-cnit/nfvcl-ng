@@ -21,12 +21,12 @@ from starlette.staticfiles import StaticFiles
 from verboselogs import VerboseLogger
 
 from nfvcl_core import configure_injection, NFVCL, global_ref
-from nfvcl_core.config import NFVCLConfigModel
+from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core.global_ref import get_nfvcl_config
-from nfvcl_core.models.custom_types import NFVCLCoreException
-from nfvcl_core.models.http_models import HttpRequestType
-from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
-from nfvcl_core.models.task import NFVCLTaskResult
+from nfvcl_core_models.custom_types import NFVCLCoreException
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.task import NFVCLTaskResult
 from nfvcl_core.nfvcl_main import NFVCLPublicModel
 from nfvcl_core.utils.file_utils import create_folder
 from nfvcl_core.utils.log import mod_logger, create_logger, LOG_FILE_PATH

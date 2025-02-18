@@ -2,11 +2,11 @@ from functools import wraps
 from typing import Dict, Optional, List, Any
 
 from nfvcl_core.managers import TopologyManager
-from nfvcl_core.models.blueprints.blueprint import BlueprintNGProviderModel
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
-from nfvcl_core.models.network.network_models import PduType, PduModel, MultusInterface
-from nfvcl_core.models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource
-from nfvcl_core.models.vim import VimTypeEnum
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGProviderModel
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core_models.network.network_models import PduType, PduModel, MultusInterface
+from nfvcl_core_models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource
+from nfvcl_core_models.vim import VimTypeEnum
 from nfvcl_core.providers.blueprint.blueprint_provider import BlueprintProvider
 from nfvcl_core.providers.kubernetes import K8SProviderNative
 from nfvcl_core.providers.kubernetes.k8s_provider_interface import K8SProviderInterface

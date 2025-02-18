@@ -20,9 +20,9 @@ from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansibl
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
-from nfvcl_core.models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
-from nfvcl_core.models.vim import VimModel
+from nfvcl_core_models.vim import VimModel
 from nfvcl_core.utils.openstack.openstack_client import OpenStackClient
 
 

@@ -1,6 +1,6 @@
 import httpx
 
-from nfvcl.models.blueprint_ng.Athonet.core import AthonetAccessToken
+from nfvcl_models.blueprint_ng.athonet.core import AthonetAccessToken
 
 
 class AthonetAuth(httpx.Auth):

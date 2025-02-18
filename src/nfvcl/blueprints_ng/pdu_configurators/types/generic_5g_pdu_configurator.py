@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUConfigurator
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
 
 
 class Generic5GConfigurator(PDUConfigurator):

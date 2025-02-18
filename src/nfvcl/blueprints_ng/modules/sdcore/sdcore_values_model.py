@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import List, Optional
 from pydantic import Field
-from nfvcl.models.blueprint_ng.core5g.common import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers, Create5gModel
-from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_models.blueprint_ng.core5g.common import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers, Create5gModel
+from nfvcl_core_models.base_model import NFVCLBaseModel
 
 # Models are incomplete, generated from the example values.yaml
 

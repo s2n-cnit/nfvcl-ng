@@ -8,7 +8,7 @@ from typing import Dict, List
 import httpx
 import paramiko
 from httpx import Response
-from nfvcl_core.models.vim import VimModel
+from nfvcl_core_models.vim import VimModel
 from pydantic import Field
 
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit, CloudInitNetworkRoot
@@ -21,7 +21,7 @@ from nfvcl_core.providers.virtualization.proxmox.models.models import ProxmoxZon
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
-from nfvcl_core.models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
+from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
     VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource
 from nfvcl_core.utils.blue_utils import rel_path
 

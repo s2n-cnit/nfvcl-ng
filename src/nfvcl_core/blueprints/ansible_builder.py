@@ -6,7 +6,7 @@ from typing import List, Any, Dict, Optional, Union
 from pydantic import Field
 from ruamel.yaml.scalarstring import LiteralScalarString
 
-from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core.utils.blue_utils import get_yaml_parser
 
 

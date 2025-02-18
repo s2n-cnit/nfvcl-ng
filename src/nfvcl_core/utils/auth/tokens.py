@@ -3,8 +3,8 @@ from datetime import datetime, timezone, timedelta
 
 from jose import jwt, JWTError, ExpiredSignatureError
 
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl_core.models.user import User
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.user import User
 from nfvcl_core.utils.util import generate_id
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 480

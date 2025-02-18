@@ -4,8 +4,8 @@ from pydantic import Field
 
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.models.resources import VmResource, VmResourceImage
-from nfvcl.models.blueprint_ng.dns.dns_rest_models import DNSCreateModel
+from nfvcl_core_models.resources import VmResource, VmResourceImage
+from nfvcl_models.blueprint_ng.dns.dns_rest_models import DNSCreateModel
 
 DNS_BLUE_TYPE = "dns"
 BASE_IMAGE = "dns-server"

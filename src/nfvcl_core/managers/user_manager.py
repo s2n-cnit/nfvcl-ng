@@ -10,8 +10,8 @@ from pydantic import ValidationError
 
 from nfvcl_core.database.user_repository import UserRepository, User
 from nfvcl_core.managers import GenericManager
-from nfvcl_core.models.custom_types import NFVCLCoreException
-from nfvcl_core.models.user import UserRole, UserCreateREST, UserNoConfidence, TokenStatus
+from nfvcl_core_models.custom_types import NFVCLCoreException
+from nfvcl_core_models.user import UserRole, UserCreateREST, UserNoConfidence, TokenStatus
 from nfvcl_core.utils.auth.tokens import create_tokens_for_user, DB_TOKEN_HASH_ALGORITHM, decode_refresh_token, \
     decode_access_token
 

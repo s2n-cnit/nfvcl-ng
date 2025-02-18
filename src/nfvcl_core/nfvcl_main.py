@@ -7,32 +7,32 @@ from typing import Callable, Dict, List, Any, Optional, Annotated
 import urllib3
 from dependency_injector.wiring import Provide
 
-from nfvcl_core.models.network.network_models import IPv4Pool, IPv4ReservedRange
+from nfvcl_core_models.network.network_models import IPv4Pool, IPv4ReservedRange
 from pydantic import Field, PositiveInt
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_implementations
-from nfvcl.models.k8s.common_k8s_model import Labels
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginsToInstall
-from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
+from nfvcl_core_models.k8s_management_models import Labels
+from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall
+from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
 from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
-from nfvcl_core.config import NFVCLConfigModel, load_nfvcl_config
+from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config
 from nfvcl_core.containers import NFVCLContainer
 from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
 from nfvcl_core.managers.user_manager import UserManager
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel
-from nfvcl_core.models.network import PduModel, NetworkModel, RouterModel
-from nfvcl_core.models.performance import BlueprintPerformance
-from nfvcl_core.models.prometheus.prometheus_model import PrometheusServerModel
-from nfvcl_core.models.response_model import OssCompliantResponse
-from nfvcl_core.models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
-from nfvcl_core.models.topology_models import TopologyModel
-from nfvcl_core.models.user import UserNoConfidence, UserCreateREST
-from nfvcl_core.models.vim import VimModel
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core_models.network import PduModel, NetworkModel, RouterModel
+from nfvcl_core_models.performance import BlueprintPerformance
+from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
+from nfvcl_core_models.response_model import OssCompliantResponse
+from nfvcl_core_models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
+from nfvcl_core_models.topology_models import TopologyModel
+from nfvcl_core_models.user import UserNoConfidence, UserCreateREST
+from nfvcl_core_models.vim import VimModel
 from nfvcl_core.public_methods_description import GET_PROM_SRV_SUMMARY, GET_PROM_SRV_DESCRIPTION, GET_PROM_LIST_SRV_SUMMARY, GET_PROM_LIST_SRV_DESCRIPTION, DEL_PROM_SRV_SUMMARY, DEL_PROM_SRV_DESCRIPTION, UPD_PROM_SRV_SUMMARY, UPD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_SUMMARY, UPD_K8SCLUSTER_SUMMARY, UPD_K8SCLUSTER_DESCRIPTION, ADD_EXTERNAL_K8SCLUSTER_SUMMARY, ADD_EXTERNAL_K8SCLUSTER
 from nfvcl_core.utils.log import create_logger
 

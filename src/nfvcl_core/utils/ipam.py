@@ -2,8 +2,8 @@ import socket
 from ipaddress import AddressValueError
 from typing import Union, List
 
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
-from nfvcl_core.models.network.network_models import IPv4Pool
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl_core_models.network.network_models import IPv4Pool
 
 
 def is_ip_in_range(ip: Union[SerializableIPv4Address, str],

@@ -4,8 +4,8 @@ from typing import Optional, List, Dict
 from openstack.image.v2.image import Image
 from openstack.network.v2.network import Network
 
-from nfvcl_core.models.openstack.images import ImageRepo
-from nfvcl_core.models.vim import VimModel
+from nfvcl_core_models.openstack.images import ImageRepo
+from nfvcl_core_models.vim import VimModel
 from nfvcl_core.utils.log import create_logger
 import openstack
 import os

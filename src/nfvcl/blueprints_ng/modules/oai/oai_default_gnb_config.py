@@ -1,4 +1,4 @@
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import GNB
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import GNB
 
 default_gnb_config: GNB = GNB.model_validate({
     "kubernetesDistribution": "Vanilla",

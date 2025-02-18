@@ -5,10 +5,10 @@ from pydantic import Field
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.athonet.athonet_upf_blue import ATHONET_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState
-from nfvcl.models.blueprint_ng.Athonet.core import ProvisionedDataInfo, AthonetApplicationCoreConfig
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubSubscribers, SubArea, SubDataNets, SubSnssai
-from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GAddDnnModel, Core5GDelDnnModel
-from nfvcl_core.models.network.network_models import PduType
+from nfvcl_models.blueprint_ng.athonet.core import ProvisionedDataInfo,AthonetApplicationCoreConfig
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubSubscribers, SubArea, SubSnssai, SubDataNets
+from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GAddDnnModel, Core5GDelDnnModel
+from nfvcl_core_models.network.network_models import PduType
 
 ATHONET_BLUE_TYPE = "athonet"
 

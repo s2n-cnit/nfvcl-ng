@@ -1,18 +1,18 @@
 from typing import Optional, List, Union, Callable
 
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
-from nfvcl_core.models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
-from nfvcl_core.models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
+from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
 
-from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel
+from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core.database import TopologyRepository
 from nfvcl_core.managers import GenericManager
-from nfvcl_core.models.network import NetworkModel, RouterModel, PduModel
-from nfvcl_core.models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface
-from nfvcl_core.models.prometheus.prometheus_model import PrometheusServerModel
-from nfvcl_core.models.topology_models import TopologyModel
-from nfvcl_core.models.vim import VimModel
+from nfvcl_core_models.network import NetworkModel, RouterModel, PduModel
+from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface
+from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
+from nfvcl_core_models.topology_models import TopologyModel
+from nfvcl_core_models.vim import VimModel
 
 
 class TopologyManager(GenericManager):

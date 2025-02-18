@@ -2,14 +2,14 @@ import copy
 from abc import abstractmethod
 from typing import Generic, TypeVar, Optional, final, List
 
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from pydantic import Field
 
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl_core.models.http_models import HttpRequestType
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.http_models import HttpRequestType
 
 
 class DeployedUPFInfo(NFVCLBaseModel):

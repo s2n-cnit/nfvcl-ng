@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import List
 import os
 import json
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPlugin
-from nfvcl.models.k8s.topology_k8s_model import K8sVersion
+from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPlugin
+from nfvcl_core_models.topology_k8s_model import K8sVersion
 from nfvcl_core.utils.log import create_logger
 
 PLUGIN_BASE_PATH = 'src/nfvcl/config_templates/k8s/'

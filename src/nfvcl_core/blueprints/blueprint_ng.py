@@ -8,9 +8,9 @@ from typing import TypeVar, Generic
 
 from pydantic import ValidationError
 
-from nfvcl_core.models.blueprints import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource
-from nfvcl_core.models.http_models import BlueprintNotFoundException
-from nfvcl_core.models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, \
+from nfvcl_core_models.blueprints import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource
+from nfvcl_core_models.http_models import BlueprintNotFoundException
+from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, \
     HelmChartResource
 from nfvcl_core.providers.aggregator import ProvidersAggregator
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path

@@ -6,8 +6,8 @@ import kubernetes.client
 import kubernetes.utils
 from kubernetes import config
 from kubernetes.client import Configuration
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName
-from nfvcl.models.k8s.topology_k8s_model import K8sVersion
+from nfvcl_core_models.plugin_k8s_model import K8sPluginName
+from nfvcl_core_models.topology_k8s_model import K8sVersion
 from nfvcl_core.utils.k8s.kube_api_utils import get_k8s_version
 from nfvcl_core.utils.log import create_logger
 

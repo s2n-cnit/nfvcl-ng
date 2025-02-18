@@ -3,9 +3,8 @@ from __future__ import annotations
 import abc
 from typing import List
 
-from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, \
-    BlueprintNGProviderData
-from nfvcl_core.models.resources import VmResource, VmResourceConfiguration, NetResource
+from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
+from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, NetResource
 
 
 class VirtualizationProviderData(BlueprintNGProviderData):

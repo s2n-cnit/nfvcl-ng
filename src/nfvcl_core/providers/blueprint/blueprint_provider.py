@@ -1,8 +1,7 @@
 from typing import Any
 
 from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
-from nfvcl.models.blueprint_ng.worker_message import BlueprintOperationCallbackModel
-from nfvcl_core.models.providers.blueprint import BlueprintProviderData
+from nfvcl_core_models.providers.blueprint import BlueprintProviderData
 
 
 class BlueprintProvider(BlueprintNGProviderInterface):

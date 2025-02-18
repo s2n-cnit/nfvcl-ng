@@ -1,9 +1,4 @@
-from typing import Optional, Callable
-
 from dependency_injector.wiring import Provide, inject
-from nfvcl_core.models.response_model import OssCompliantResponse
-
-from nfvcl_core.models.base_model import NFVCLBaseModel
 
 from .generic_manager import GenericManager
 from .persistence_manager import PersistenceManager

@@ -3,7 +3,7 @@ from typing import List
 from pydantic import Field
 
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription, AnsibleShellTask
-from nfvcl_core.models.resources import VmResourceAnsibleConfiguration
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 
 
 class VmK8sDayNConfigurator(VmResourceAnsibleConfiguration):

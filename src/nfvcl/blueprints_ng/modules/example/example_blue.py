@@ -7,11 +7,11 @@ from pydantic import Field
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
-from nfvcl_core.models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGState
-from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGState
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     HelmChartResource
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl_core.models.http_models import HttpRequestType
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.http_models import HttpRequestType
 from nfvcl_core.utils.blue_utils import rel_path
 
 

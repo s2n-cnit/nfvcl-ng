@@ -4,8 +4,8 @@ from typing import Optional, Any, List
 from pydantic import Field
 
 from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderData, BlueprintNGProviderInterface
-from nfvcl_core.models.network import PduModel
-from nfvcl_core.models.network.network_models import PduType
+from nfvcl_core_models.network import PduModel
+from nfvcl_core_models.network.network_models import PduType
 from nfvcl_core.utils.blue_utils import get_class_from_path
 
 

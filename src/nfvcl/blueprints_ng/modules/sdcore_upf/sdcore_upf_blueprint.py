@@ -8,10 +8,10 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUP
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
-from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
 from nfvcl_core.utils.blue_utils import rel_path
 
 SDCORE_UPF_BLUE_TYPE = "sdcore_upf"

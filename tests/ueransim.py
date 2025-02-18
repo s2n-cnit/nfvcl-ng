@@ -3,13 +3,13 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.lcm.blueprint_manager import BlueprintManager
+from nfvcl_core.managers.blueprint_manager import BlueprintManager
 from nfvcl.blueprints_ng.modules import UeransimBlueprintNG
-from nfvcl.blueprints_ng.resources import VmResource
-from nfvcl.blueprints_ng.utils import get_yaml_parser
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestConfigureGNB
-from nfvcl.models.blueprint_ng.worker_message import WorkerMessageType
+from nfvcl_core.utils.blue_utils import get_yaml_parser
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.resources import VmResource
+from nfvcl_models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance
+from nfvcl_models.blueprint_ng.worker_message import WorkerMessageType
 from tests.models.config_unitest import ConfigUniteTest
 from tests.models.gnb_config import GNBConfig
 from tests.models.ue_config import UEConfig

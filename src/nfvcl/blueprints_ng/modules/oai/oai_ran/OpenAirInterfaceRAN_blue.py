@@ -1,7 +1,7 @@
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_ran import Generic5GRANBlueprintNGState, Generic5GRANBlueprintNG
 # from nfvcl.blueprints_ng.modules.oai.oai_ran.OpenAirInterfaceCUCP_blue import OAI_CUCP_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.oai.oai_ran.OpenAirInterfaceGNB_blue import OAI_GNB_BLUE_TYPE
-from nfvcl.models.blueprint_ng.g5.ran import RANBlueCreateModel
+from nfvcl_models.blueprint_ng.g5.ran import RANBlueCreateModel
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 
 OAI_RAN_BLUE_TYPE = "oai_ran"

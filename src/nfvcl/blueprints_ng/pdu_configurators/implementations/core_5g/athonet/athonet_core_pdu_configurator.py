@@ -4,11 +4,11 @@ import httpx
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations.core_5g.athonet.utils import AthonetAuth
 from nfvcl.blueprints_ng.pdu_configurators.types.generic_5g_pdu_configurator import Generic5GConfigurator
-from nfvcl.models.blueprint_ng.Athonet.core import AthonetApplicationCoreConfig, AthonetApplicationAmfConfig, AthonetApplicationSmfConfig, AthonetApplicationUdmConfig, ProvisionedDataProfile, Supi, UserProvisionedDataProfile, AuthenticationSubscription, AthonetAccessToken, ProvisionedDataInfo, Plmns, PlmnsDatum, AvailableSupis, AvailableSupisDatum
-from nfvcl.models.blueprint_ng.Athonet.upf import DnnVrfMapping
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
-from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel
-from nfvcl_core.models.network import PduModel
+from nfvcl_models.blueprint_ng.athonet.core import AthonetApplicationCoreConfig, AthonetApplicationAmfConfig, AthonetApplicationSmfConfig, AthonetApplicationUdmConfig, ProvisionedDataProfile, Supi, UserProvisionedDataProfile, AuthenticationSubscription, AthonetAccessToken, ProvisionedDataInfo, Plmns, PlmnsDatum, AvailableSupis, AvailableSupisDatum
+from nfvcl_models.blueprint_ng.athonet.upf import DnnVrfMapping
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
+from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel
+from nfvcl_core_models.network import PduModel
 
 
 class AthonetCorePDUConfigurator(Generic5GConfigurator):

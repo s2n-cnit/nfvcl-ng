@@ -7,7 +7,7 @@ from typing import Dict, Optional, List
 from nfvcl_core.database import BlueprintRepository
 from nfvcl_core.database.performance_repository import PerformanceRepository
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_core.models.performance import BlueprintPerformanceType, BlueprintPerformance, BlueprintPerformanceOperation, \
+from nfvcl_core_models.performance import BlueprintPerformanceType, BlueprintPerformance, BlueprintPerformanceOperation, \
     BlueprintPerformanceProviderCall
 
 

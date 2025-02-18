@@ -2,7 +2,7 @@ from typing import List, Optional, Dict
 
 from pydantic import Field
 
-from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core_models.base_model import NFVCLBaseModel
 
 
 class ProxmoxTicket(NFVCLBaseModel):

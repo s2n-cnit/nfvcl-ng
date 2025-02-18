@@ -1,6 +1,6 @@
 from nfvcl_core.database import DatabaseRepository
 from nfvcl_core.managers import PersistenceManager
-from nfvcl_core.models.topology_models import TopologyModel
+from nfvcl_core_models.topology_models import TopologyModel
 
 
 class TopologyRepository(DatabaseRepository[TopologyModel]):

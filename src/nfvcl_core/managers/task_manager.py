@@ -3,7 +3,7 @@ from threading import Thread
 from typing import Dict, Optional
 
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_core.models.task import NFVCLTask, NFVCLTaskResult
+from nfvcl_core_models.task import NFVCLTask, NFVCLTaskResult
 
 
 class TaskHistoryElement:

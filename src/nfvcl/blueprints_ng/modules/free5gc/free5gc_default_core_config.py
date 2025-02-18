@@ -1,4 +1,4 @@
-from nfvcl.models.blueprint_ng.free5gc.free5gcCore import Free5gcCoreConfig
+from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Free5gcCoreConfig
 
 default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
     {

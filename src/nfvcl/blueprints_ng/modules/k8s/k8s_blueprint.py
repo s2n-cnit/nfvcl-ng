@@ -4,21 +4,20 @@ from typing import Optional, List
 from netaddr.ip import IPNetwork
 from pydantic import Field
 
-from nfvcl.models.blueprint_ng.common import UbuntuVersion
+from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day2_configurator import VmK8sDay2Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
-from nfvcl_core.models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
+from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
     KarmadaInstallModel, K8sDelNodeModel
-from nfvcl_core.models.http_models import HttpRequestType
-from nfvcl.models.k8s.common_k8s_model import Cni
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
-from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
-from nfvcl_core.models.topology_models import TopoK8SHasBlueprintException
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
+from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
+from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException
 from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager

@@ -2,13 +2,13 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl.models.blueprint_ng.g5.common5g import Slice5G
+from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUException
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl_core.models.pdu.gnb import GNBPDUConfigure
-from nfvcl_core.models.resources import PDUResourceAnsibleConfiguration
-from nfvcl_core.models.base_model import NFVCLBaseModel
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.resources import PDUResourceAnsibleConfiguration
+from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core.providers.configurators.ansible_utils import run_ansible_playbook
 from nfvcl_core.utils.blue_utils import rel_path
 

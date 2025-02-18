@@ -4,15 +4,14 @@ from typing import Optional, TypeVar, Generic, final
 
 from pydantic import Field
 
-from nfvcl.models.blueprint_ng.g5.ran import RANBlueCreateModel, Split, GNBBlueCreateModel, GNBBlueCreateModelNetwork
+from nfvcl_models.blueprint_ng.g5.ran import RANBlueCreateModel, Split, GNBBlueCreateModel, GNBBlueCreateModelNetwork
 from nfvcl_core.blueprints import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
-from nfvcl_core.managers import get_blueprint_manager
-from nfvcl_core.models.blueprints import BlueprintNGState
-from nfvcl_core.models.http_models import HttpRequestType
-from nfvcl_core.models.network import PduModel
-from nfvcl_core.models.network.network_models import PduType
-from nfvcl_core.models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.blueprints import BlueprintNGState
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.network import PduModel
+from nfvcl_core_models.network.network_models import PduType
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
 
 
 class Generic5GRANBlueprintNGState(BlueprintNGState):

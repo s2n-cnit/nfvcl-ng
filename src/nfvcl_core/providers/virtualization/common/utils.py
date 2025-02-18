@@ -9,7 +9,7 @@ import verboselogs
 from nfvcl_core.providers.configurators.ansible_utils import run_ansible_playbook
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException
-from nfvcl_core.models.resources import VmResourceAnsibleConfiguration
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 from nfvcl_core.utils.file_utils import create_tmp_folder
 from nfvcl_core.utils.log import create_logger
 

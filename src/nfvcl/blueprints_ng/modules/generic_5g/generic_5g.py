@@ -6,21 +6,21 @@ from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
     SubDataNets, NetworkEndPointWithType
-from nfvcl.models.blueprint_ng.g5.common5g import Slice5G
-from nfvcl.models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
+from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
+from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, Slice5GWithDNNs
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, Slice5GWithDNNs
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl_core.models.http_models import HttpRequestType
-from nfvcl_core.models.linux.ip import Route
-from nfvcl_core.models.network import PduModel
-from nfvcl_core.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
-from nfvcl_core.models.network.network_models import PduType, MultusInterface
-from nfvcl_core.models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.linux.ip import Route
+from nfvcl_core_models.network import PduModel
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl_core_models.network.network_models import PduType, MultusInterface
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
 
 
 class UPFInfo(NFVCLBaseModel):

@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUConfigurator
-from nfvcl_core.models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
 
 
 class GNBPDUConfigurator(PDUConfigurator):

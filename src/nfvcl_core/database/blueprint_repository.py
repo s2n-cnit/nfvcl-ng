@@ -1,6 +1,6 @@
 from nfvcl_core.database.database_repository import DatabaseRepository
 from nfvcl_core.managers.persistence_manager import PersistenceManager
-from nfvcl_core.models.blueprints.blueprint import BlueprintNGBaseModel
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGBaseModel
 
 
 class BlueprintRepository(DatabaseRepository[BlueprintNGBaseModel]):

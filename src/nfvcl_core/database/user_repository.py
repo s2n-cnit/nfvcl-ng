@@ -1,6 +1,6 @@
 from nfvcl_core.database.database_repository import DatabaseRepository
 from nfvcl_core.managers.persistence_manager import PersistenceManager
-from nfvcl_core.models.user import User
+from nfvcl_core_models.user import User
 
 
 class UserRepository(DatabaseRepository[User]):

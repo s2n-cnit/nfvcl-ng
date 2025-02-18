@@ -5,13 +5,13 @@ from pydantic import Field, RootModel
 
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState, NFNetworkEndpoint
-from nfvcl_core.models.resources import HelmChartResource
-from nfvcl_core.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel, NetworkEndPointType
-from nfvcl.models.blueprint_ng.g5.core import NF5GType, NetworkFunctionScaling
-from nfvcl_core.models.http_models import HttpRequestType
-from nfvcl.models.k8s.cadvisor import cadvisor_exposed_metrics
-from nfvcl.models.k8s.k8s_objects import K8sService, K8sDeployment
+from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, NetworkEndPointType
+from nfvcl_models.blueprint_ng.g5.core import NF5GType, NetworkFunctionScaling
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_models.k8s.cadvisor import cadvisor_exposed_metrics
+from nfvcl_models.k8s.k8s_objects import K8sService, K8sDeployment
 from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import k8s_scale_k8s_deployment
 from nfvcl_core.utils.metrics.prometheus_utils import create_prometheus_query

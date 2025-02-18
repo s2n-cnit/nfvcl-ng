@@ -12,8 +12,8 @@ from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import get_daemon_sets, apply_def_to_cluster, read_namespaced_storage_class, patch_namespaced_storage_class
 from nfvcl_core.utils.file_utils import render_file_from_template_to_file, create_tmp_file
-from nfvcl_core.models.resources import HelmChartResource
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData
+from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData
 from pyhelm3 import Client
 
 

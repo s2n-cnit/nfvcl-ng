@@ -1,4 +1,4 @@
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import OAIUE
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import OAIUE
 
 # Class representing default config, it will be overwritten with the input one
 default_oai_ue_config: OAIUE = OAIUE.model_validate({

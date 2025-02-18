@@ -24,7 +24,7 @@ class DeployedUPFInfo(NFVCLBaseModel):
         served_dnns_list: List[str] = []
         for served_slice in self.served_slices:
             for served_dnn in served_slice.dnn_list:
-                served_dnns_list.append(served_dnn.name)
+                served_dnns_list.append(served_dnn.dnn)
         return served_dnns_list
 
 

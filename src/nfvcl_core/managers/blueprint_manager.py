@@ -330,22 +330,25 @@ class BlueprintManager(GenericManager):
         """
         return self.get_blueprint_instance(blueprint_id).to_dict(detailed)
 
-    def get_blueprint_summary_list(self, blue_type: str, detailed: bool = False) -> List[dict]:
+    def get_blueprint_summary_list(self, blue_type: str, detailed: bool = False, tree: bool = False) -> List[dict]:
         """
         Retrieves the blueprint summary for all the blueprints. If a blueprint is present in memory, return it from there instead of DB.
         Args:
             blue_type: The optional filter to be used to filter results on a type basis (e.g., 'vyos').
             detailed: If true, return all the info saved in the database about the blueprints.
+            tree: If true, return the tree structure of the blueprints.
 
         Returns:
             The summary/details of all blueprints that satisfy the given filter.
         """
         blue_list = self.get_blueprint_instances(blue_type)
-
-        if detailed:
-            return [blueprint.to_dict(detailed=True) for blueprint in blue_list]
+        if tree:
+            list_to_ret = []
+            for parent in filter(lambda x: x.base_model.parent_blue_id is None, blue_list):
+                list_to_ret.append(parent.to_dict(detailed=detailed, include_childrens=True))
+            return list_to_ret
         else:
-            return [blueprint.to_dict(detailed=False) for blueprint in blue_list]
+            return [blueprint.to_dict(detailed=detailed) for blueprint in blue_list]
 
     def get_vm_target_by_ip(self, ipv4: str) -> VmResource | None:
         """

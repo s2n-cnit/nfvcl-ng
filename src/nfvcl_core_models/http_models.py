@@ -25,7 +25,7 @@ class BlueprintProtectedException(HTTPException):
         super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Blueprint {blueprint_id} is protected and can NOT be destroyed. Use /nfvcl/v2/api/blue/protect/{blueprint_id} to remove protection", headers=None)
 
 
-class HttpRequestType(Enum):
+class HttpRequestType(str, Enum):
     GET = "GET"
     POST = "POST"
     PUT = "PUT"

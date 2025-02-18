@@ -321,7 +321,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     def del_sim(self, model: UeransimBlueprintRequestDelSim):
         self._del_sim(model.area_id, model.ue_id, model.imsi)
 
-    def to_dict(self, detailed: bool) -> dict:
+    def to_dict(self, detailed: bool, include_childrens: bool = False) -> dict:
         """
         OVERRIDE
         Return a dictionary representation of the UERANSIM blueprint instance.
@@ -329,14 +329,15 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
         Args:
             detailed: Return the same content saved in the database containing all the details of the blueprint.
+            include_childrens: Recursively include the children blueprints dict.
 
         Returns:
 
         """
         if detailed:
-            return super().to_dict(detailed)
+            return super().to_dict(detailed, include_childrens)
         else:
-            base_dict = super().to_dict(detailed)
+            base_dict = super().to_dict(detailed, include_childrens)
             base_dict['gnbs'] = {}
             for area in self.state.areas.items():
                 base_dict['gnbs'][area[0]] = {}

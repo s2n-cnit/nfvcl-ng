@@ -328,7 +328,7 @@ if __name__ == "__main__":
     )
     app.add_middleware(ExceptionMiddleware)
 
-
+    # TODO replace with app.add_exception_handler
     @app.exception_handler(Oauth2CustomException)
     async def oauth2_exception_handler(request: Request, exc: Oauth2CustomException):
         """
@@ -342,7 +342,6 @@ if __name__ == "__main__":
         """
         response = JSONResponse(status_code=exc.status_code, content=OAuth2Response(error=Oauth2Errors.INVALID_GRANT, error_description=exc.description).model_dump(exclude_none=True))
         return response
-
 
     # TODO: check if working / remove
     accessible_folder = global_ref.nfvcl_config.nfvcl.mounted_folder

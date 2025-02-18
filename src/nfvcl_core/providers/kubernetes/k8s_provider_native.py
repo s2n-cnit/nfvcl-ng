@@ -15,7 +15,7 @@ from nfvcl_core.providers.kubernetes.k8s_provider_interface import K8SProviderIn
 from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core.utils.file_utils import create_tmp_file, create_tmp_folder
-from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import get_pods_for_k8s_namespace, get_logs_for_pod, get_deployments, \
     get_services, k8s_delete_namespace
 from nfvcl_core.utils.k8s.helm_plugin_manager import build_helm_client_from_credential_file_content

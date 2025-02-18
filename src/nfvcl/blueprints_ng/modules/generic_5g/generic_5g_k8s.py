@@ -12,7 +12,7 @@ from nfvcl_models.blueprint_ng.g5.core import NF5GType, NetworkFunctionScaling
 from nfvcl_core_models.http_models import HttpRequestType
 from nfvcl_models.k8s.cadvisor import cadvisor_exposed_metrics
 from nfvcl_models.k8s.k8s_objects import K8sService, K8sDeployment
-from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import k8s_scale_k8s_deployment
 from nfvcl_core.utils.metrics.prometheus_utils import create_prometheus_query
 

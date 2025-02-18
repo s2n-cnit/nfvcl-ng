@@ -432,8 +432,8 @@ class NFVCL:
     ############# Blueprints #############
 
     @NFVCLPublic(path="", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.GET, sync=True)
-    def get_blueprints(self, blue_type: str = None, detailed: bool = False, callback=None) -> List[dict]:
-        return self.add_task(self.blueprint_manager.get_blueprint_summary_list, blue_type, detailed, callback=callback)
+    def get_blueprints(self, blue_type: str = None, detailed: bool = False, tree: bool = False, callback=None) -> List[dict]:
+        return self.add_task(self.blueprint_manager.get_blueprint_summary_list, blue_type, detailed, tree, callback=callback)
 
     @NFVCLPublic(path="/{blueprint_id}", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.GET, sync=True)
     def get_blueprint(self, blueprint_id: str = None, detailed: bool = False, callback=None) -> dict:

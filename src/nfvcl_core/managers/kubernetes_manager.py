@@ -7,8 +7,8 @@ from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota
 from nfvcl_core_models.custom_types import NFVCLCoreException
-from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import get_service_accounts, k8s_delete_namespace, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, k8s_admin_role_over_namespace, k8s_cluster_admin, k8s_create_service_account, k8s_create_secret_for_user, k8s_get_secrets, k8s_cert_sign_req, k8s_add_quota_to_namespace, k8s_get_nodes, k8s_add_label_to_k8s_node, k8s_get_deployments, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_ipaddress_pool, k8s_get_storage_classes, get_pods_for_k8s_namespace, apply_def_to_cluster, k8s_create_namespace, get_k8s_cidr_info
 from nfvcl_core.managers import TopologyManager, BlueprintManager, EventManager
 from nfvcl_core.managers.generic_manager import GenericManager

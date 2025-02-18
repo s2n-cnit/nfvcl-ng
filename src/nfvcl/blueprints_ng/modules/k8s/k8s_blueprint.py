@@ -18,7 +18,7 @@ from nfvcl_core_models.http_models import HttpRequestType
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
 from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException
-from nfvcl_core.utils.k8s import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 
@@ -450,7 +450,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 raise e
         super().destroy()
 
-    def to_dict(self, detailed: bool) -> dict:
+    def to_dict(self, detailed: bool, include_childrens: bool = False) -> dict:
         """
         OVERRIDE
         Return a dictionary representation of the K8S blueprint instance.
@@ -458,14 +458,15 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         Args:
             detailed: Return the same content saved in the database containing all the details of the blueprint.
+            include_childrens: Recursively include the children blueprints dict.
 
         Returns:
 
         """
         if detailed:
-            return super().to_dict(detailed)
+            return super().to_dict(detailed, include_childrens)
         else:
-            base_dict = super().to_dict(detailed)
+            base_dict = super().to_dict(detailed, include_childrens)
             if self.base_model.state.vm_master:
                 ip_list = [f"Controller {self.base_model.state.vm_master.name}: {self.base_model.state.vm_master.access_ip}"]
                 ip_list.extend([f"Worker {vm.name}: {vm.access_ip}" for vm in self.base_model.state.vm_workers])

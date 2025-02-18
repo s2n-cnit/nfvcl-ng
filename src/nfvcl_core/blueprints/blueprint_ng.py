@@ -339,12 +339,13 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
         return instance
 
-    def to_dict(self, detailed: bool) -> dict:
+    def to_dict(self, detailed: bool, include_childrens: bool = False) -> dict:
         """
         Return a dictionary representation of the blueprint instance.
 
         Args:
             detailed: Return the same content saved in the database containing all the details of the blueprint.
+            include_childrens: Recursively include the children blueprints dict.
 
         Returns:
 
@@ -353,6 +354,14 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             return self.serialize_base_model()
         else:
             dict_to_ret = {"id": self.base_model.id, "type": self.base_model.type, "status": self.base_model.status, "created": self.base_model.created, "protected": self.base_model.protected}
+            if include_childrens:
+                dict_to_ret["childrens"] = []
+                for children_id in self.base_model.children_blue_ids:
+                    try:
+                        children_blueprint = self.provider.blueprint_manager.get_blueprint_instance(children_id)
+                        dict_to_ret["childrens"].append(children_blueprint.to_dict(detailed=detailed, include_childrens=include_childrens))
+                    except BlueprintNotFoundException:
+                        self.logger.warning(f"The children blueprint {children_id} has not been found. Could be deleted before, skipping...")
             if self.base_model.corrupted:
                 dict_to_ret["corrupted"] = True
             return dict_to_ret

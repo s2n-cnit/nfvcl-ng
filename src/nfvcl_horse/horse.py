@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from nfvcl_core import NFVCL
+from nfvcl_core.nfvcl_main import NFVCL
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.resources import VmResource
 from nfvcl_core.nfvcl_main import NFVCLPublic, NFVCLPublicMethod

@@ -307,7 +307,7 @@ class NFVCL:
     def reserve_range_to_k8s_cluster(self, network: str, cluster_id: str, length: PositiveInt, callback=None) -> List[IPv4ReservedRange]:
         return self.add_task(self.topology_manager.reserve_range_to_k8s_cluster, network, cluster_id, length, callback=callback)
 
-    @NFVCLPublic(path="/network/{network}/K8s/release", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
+    @NFVCLPublic(path="/network/{network}/k8s/release", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def release_range_to_k8s_cluster(self, network: str, reserved_range_name: str, cluster_id: str, callback=None) -> IPv4ReservedRange:
         return self.add_task(self.topology_manager.release_range_from_k8s_cluster, network, reserved_range_name, cluster_id, callback=callback)
 
@@ -607,9 +607,9 @@ class NFVCL:
         return self.add_task(self.user_manager.delete_user, username, callback=callback)
 
 
-def configure_injection(config_path: Optional[str] = None):
+def configure_injection(nfvcl_config: NFVCLConfigModel):
     container = NFVCLContainer()
-    container.config.from_pydantic(load_nfvcl_config(path=config_path))
+    container.config.from_pydantic(nfvcl_config)
     container.init_resources()
     container.wire(modules=[__name__, "nfvcl_core.managers"])
     # register_loader_containers(Container)

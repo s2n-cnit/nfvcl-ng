@@ -20,20 +20,40 @@ from starlette.responses import RedirectResponse, PlainTextResponse, Response, J
 from starlette.staticfiles import StaticFiles
 from verboselogs import VerboseLogger
 
-from nfvcl_core import configure_injection, NFVCL, global_ref
-from nfvcl_core_models.config import NFVCLConfigModel
-from nfvcl_core.global_ref import get_nfvcl_config
-from nfvcl_core_models.custom_types import NFVCLCoreException
-from nfvcl_core_models.http_models import HttpRequestType
-from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
-from nfvcl_core_models.task import NFVCLTaskResult
-from nfvcl_core.nfvcl_main import NFVCLPublicModel
-from nfvcl_core.utils.file_utils import create_folder
-from nfvcl_core.utils.log import mod_logger, create_logger, LOG_FILE_PATH
-from nfvcl_rest.middleware.authentication_middleware import token, control_token, set_user_manager, logout
-from nfvcl_rest.middleware.exception_middleware import ExceptionMiddleware
-from nfvcl_rest.models.auth import Oauth2CustomException, Oauth2Errors, OAuth2Response
-from nfvcl_rest.models.rest import RestAnswer202, CallbackModel
+from nfvcl_core_models.custom_types import NFVCLCoreException # Order 1
+from nfvcl_core_models.http_models import HttpRequestType # Order 1
+from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus # Order 1
+from nfvcl_core_models.task import NFVCLTaskResult # Order 1
+from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config # Order 1
+from nfvcl_core.global_ref import get_nfvcl_config # Order 1
+from nfvcl_core.utils.file_utils import create_folder # Order 1
+from nfvcl_core.utils.log import mod_logger, create_logger, LOG_FILE_PATH, set_log_level # Order 1
+
+#### BEFORE IMPORTING ANYTHING FROM NFVCL() main file ####
+nfvcl_rest_config: NFVCLConfigModel
+
+def load_configuration():
+    config_path = os.getenv("NFVCL_CONFIG_PATH")
+    if config_path:
+        if Path(config_path).is_file():
+            config = load_nfvcl_config(config_path)
+        else:
+            logger.error(f"NFVCL_CONFIG_PATH is set to {config_path} but the file does not exist, loading from default location.")
+            config = load_nfvcl_config()
+    else:
+        config = load_nfvcl_config()
+
+    return config
+
+nfvcl_rest_config = load_configuration()
+set_log_level(nfvcl_rest_config.log_level)
+
+from nfvcl_core.nfvcl_main import NFVCLPublicModel # Order 2 (After logger modding)
+from nfvcl_core.nfvcl_main import configure_injection, NFVCL, global_ref # Order 2 (After logger modding)
+from nfvcl_rest.middleware.authentication_middleware import token, control_token, set_user_manager, logout # Order 2 (After logger modding)
+from nfvcl_rest.middleware.exception_middleware import ExceptionMiddleware # Order 2 (After logger modding)
+from nfvcl_rest.models.auth import Oauth2CustomException, Oauth2Errors, OAuth2Response # Order 2 (After logger modding)
+from nfvcl_rest.models.rest import RestAnswer202, CallbackModel # Order 2 (After logger modding)
 
 ########### VARS ############
 nfvcl: NFVCL
@@ -302,15 +322,7 @@ def setup_main_routes():
 if __name__ == "__main__":
     check_py_version()
 
-    config_path = os.getenv("NFVCL_CONFIG_PATH")
-    if config_path:
-        if Path(config_path).is_file():
-            configure_injection(config_path)
-        else:
-            logger.error(f"NFVCL_CONFIG_PATH is set to {config_path} but the file does not exist, loading from default location.")
-            configure_injection()
-    else:
-        configure_injection()
+    configure_injection(nfvcl_rest_config)
 
     nfvcl = NFVCL()
 
@@ -434,8 +446,7 @@ if __name__ == "__main__":
     for router in routers_dict.values():
         app.include_router(router)
 
-    config = get_nfvcl_config()
-    uvicorn.run(app, host=config.nfvcl.ip, port=config.nfvcl.port)
+    uvicorn.run(app, host=nfvcl_rest_config.nfvcl.ip, port=nfvcl_rest_config.nfvcl.port)
 
 ################### OLD CODE ############################
 

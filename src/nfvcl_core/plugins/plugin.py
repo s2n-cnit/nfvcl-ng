@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-from nfvcl_core import NFVCL
+from nfvcl_core.nfvcl_main import NFVCL
 
 
 class NFVCLPlugin:

@@ -80,44 +80,6 @@ class IPv4Pool(NFVCLBaseModel):
         """
         return self.start <= ip <= self.end
 
-    def assign_ip_address(self) -> SerializableIPv4Address | None:
-        """
-        Assign an IP address to a VM
-        Returns:
-            The IP address assigned, None if no IP is available
-        """
-        for i in range(len(self.used)):  # Iterate over the used list and take the first free address
-            if not self.used[i]:
-                self.used[i] = True
-                return self.start + i
-
-        return None
-
-    def release_ip_address(self, ip: SerializableIPv4Address) -> bool:
-        """
-        Release an IP address from the pool
-        Args:
-            ip: The IP address to be released
-
-        Returns:
-            True if the IP was released, False otherwise
-        """
-        if self.start <= ip <= self.end and self.used[int(ip) - int(self.start)]:  # Check if the IP is in the range and used
-            self.used[int(ip) - int(self.start)] = False
-            return True
-        return False
-
-    def extend_range_end(self, new_end: SerializableIPv4Address):
-        """
-        Extend the range of the pool to the end IP
-        Args:
-            new_end: The end IP of the pool
-        """
-        if new_end <= self.end:
-            raise ValueError("The end IP must be greater than the end IP of the pool")
-        self.used.extend([False] * (int(new_end) - int(self.end) + 1))
-        self.end = new_end
-
 class PoolAssignation(str, Enum):
     K8S_CLUSTER: str = 'K8S_CLUSTER'
     MANUAL: str = 'MANUAL'
@@ -156,6 +118,44 @@ class IPv4ReservedRange(IPv4Pool):
             if other.start <= self.start <= other.end or other.start <= self.end <= other.end:
                 return True
         return False
+
+    def assign_ip_address(self) -> SerializableIPv4Address | None:
+        """
+        Assign an IP address to a VM
+        Returns:
+            The IP address assigned, None if no IP is available
+        """
+        for i in range(len(self.used)):  # Iterate over the used list and take the first free address
+            if not self.used[i]:
+                self.used[i] = True
+                return self.start + i
+
+        return None
+
+    def release_ip_address(self, ip: SerializableIPv4Address) -> bool:
+        """
+        Release an IP address from the pool
+        Args:
+            ip: The IP address to be released
+
+        Returns:
+            True if the IP was released, False otherwise
+        """
+        if self.start <= ip <= self.end and self.used[int(ip) - int(self.start)]:  # Check if the IP is in the range and used
+            self.used[int(ip) - int(self.start)] = False
+            return True
+        return False
+
+    def extend_range_end(self, new_end: SerializableIPv4Address):
+        """
+        Extend the range of the pool to the end IP
+        Args:
+            new_end: The end IP of the pool
+        """
+        if new_end <= self.end:
+            raise ValueError("The end IP must be greater than the end IP of the pool")
+        self.used.extend([False] * (int(new_end) - int(self.end)))
+        self.end = new_end
 
 
 class NetworkModel(BaseModel):

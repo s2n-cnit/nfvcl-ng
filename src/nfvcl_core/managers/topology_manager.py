@@ -88,22 +88,63 @@ class TopologyManager(GenericManager):
         return network
 
     def add_allocation_pool_to_network(self, network_id: str, allocation_pool: IPv4Pool) -> IPv4Pool:
+        """
+        Add an allocation pool to the network. The allocation pool represent a range of IPs that can be assigned to entities from NFVCL.
+        An example of an entity that can be assigned an IP from an allocation pool is a K8s cluster belonging to the topology.
+
+        Args:
+
+            network_id: The network to add the allocation pool to
+
+            allocation_pool: The allocation pool to add
+
+        Returns:
+
+            The added allocation pool
+        """
         network = self._topology.get_network(network_id)
         added_pool = network.add_allocation_pool(allocation_pool)
         self.save_to_db()
         return added_pool
 
     def remove_allocation_pool_from_network(self, network_id: str, allocation_pool_name: str) -> IPv4Pool:
+        """
+        Remove an allocation pool from the network. The allocation pool represent a range of IPs that can be assigned to entities from NFVCL.
+        Args:
+
+            network_id: The network to remove the allocation pool from
+
+            allocation_pool_name: The name of the allocation pool to remove
+
+        Returns:
+
+            The removed allocation pool
+        """
         network = self._topology.get_network(network_id)
         removed_pool = network.remove_allocation_pool(allocation_pool_name)
         self.save_to_db()
         return removed_pool
 
-    def reserve_range_to_k8s_cluster(self, network_id: str, k8s_cluster_id: str, length: int) -> List[IPv4ReservedRange]:
+    def reserve_range_to_k8s_cluster(self, network_name: str, k8s_cluster_id: str, length: int) -> List[IPv4ReservedRange]:
+        """
+        Takes one or more allocation pools from the topology network and partially assign them to the K8s cluster, depending on the length requested.
+
+        Args:
+
+            network_name: The network to reserve the range from
+
+            k8s_cluster_id: The K8s cluster to assign the range to
+
+            length: How many IPs to reserve
+
+        Returns:
+
+            A list of reserved ranges, with the assigned IPs (With just one element if the IPs are coming from a continuous IP pool)
+        """
         # Getting info
-        network = self._topology.get_network(network_id)
+        network = self._topology.get_network(network_name)
         k8s_cluster = self._topology.get_k8s_cluster(k8s_cluster_id)
-        k8s_network = k8s_cluster.get_network(network_id)
+        k8s_network = k8s_cluster.get_network(network_name)
         # Looking for available ranges and reserve them
         reserved_networks = network.reserve_range(owner=k8s_cluster.name, assigned_to="K8S Topology cluster", length=length)
         # Adding to the K8s cluster the id of the reserved range
@@ -112,22 +153,40 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return reserved_networks
 
-    def release_range_from_k8s_cluster(self, network_id: str, reserved_range_name: str, k8s_cluster_id: str) -> IPv4ReservedRange:
-        # Getting info
-        network = self._topology.get_network(network_id)
-        removed_range: Union[IPv4ReservedRange, None] = None
-        for reserved_range in network.reserved_ranges:
-            if reserved_range.assigned_to == PoolAssignation.K8S_CLUSTER.value and reserved_range.name == reserved_range_name:
-                removed_range = network.release_range(reserved_range_name=reserved_range_name)
-                break
-        if removed_range is None:
-            raise NFVCLCoreException(f"Reserved range {reserved_range_name} not found in network {network_id}")
-        # Removing from the K8s cluster the id of the reserved range
-        k8s_cluster = self._topology.get_k8s_cluster(k8s_cluster_id)
-        k8s_cluster.release_ip_pool(removed_range.name)
+    def release_range_from_k8s_cluster(self, network_name: str, reserved_range_name: str, k8s_cluster_id: str) -> IPv4ReservedRange:
+        """
+        Release the reserved range from the K8s cluster and the topology network
 
-        self.save_to_db()
-        return removed_range
+        Args:
+
+            network_name: The network where the range is reserved
+
+            reserved_range_name: The name of the reserved range to release
+
+            k8s_cluster_id: The K8s cluster to release the range from
+
+        Returns:
+
+            The released range
+        """
+        try:
+            # Getting info
+            network = self._topology.get_network(network_name)
+            removed_range: Union[IPv4ReservedRange, None] = None
+            for reserved_range in network.reserved_ranges:
+                if reserved_range.assigned_to == PoolAssignation.K8S_CLUSTER.value and reserved_range.name == reserved_range_name:
+                    removed_range = network.release_range(reserved_range_name=reserved_range_name)
+                    break
+            if removed_range is None:
+                raise NFVCLCoreException(f"Reserved range {reserved_range_name} not found in network {network_name}")
+            # Removing from the K8s cluster the id of the reserved range
+            k8s_cluster = self._topology.get_k8s_cluster(k8s_cluster_id)
+            k8s_cluster.release_ip_pool(removed_range.name)
+
+            self.save_to_db()
+            return removed_range
+        except ValueError as e:
+            raise NFVCLCoreException(str(e), http_equivalent_code=404) # Not found
 
     def get_reserved_ranges_from_network(self, network_id: str) -> List[IPv4ReservedRange]:
         network = self._topology.get_network(network_id)

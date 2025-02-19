@@ -303,13 +303,13 @@ class NFVCL:
     def del_pool_network(self, network: str, pool_name: str, callback=None) -> IPv4Pool:
         return self.add_task(self.topology_manager.remove_allocation_pool_from_network, network, pool_name, callback=callback)
 
-    @NFVCLPublic(path="/network/{network}/k8s/reserve", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
-    def reserve_range_to_k8s_cluster(self, network: str, cluster_id: str, length: PositiveInt, callback=None) -> List[IPv4ReservedRange]:
-        return self.add_task(self.topology_manager.reserve_range_to_k8s_cluster, network, cluster_id, length, callback=callback)
+    @NFVCLPublic(path="/network/{network}/k8s/reserve", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=TopologyManager.reserve_range_to_k8s_cluster)
+    def reserve_range_to_k8s_cluster(self, network_name: str, k8s_cluster_id: str, length: PositiveInt, callback=None) -> List[IPv4ReservedRange]:
+        return self.add_task(self.topology_manager.reserve_range_to_k8s_cluster, network_name, k8s_cluster_id, length, callback=callback)
 
-    @NFVCLPublic(path="/network/{network}/k8s/release", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
-    def release_range_to_k8s_cluster(self, network: str, reserved_range_name: str, cluster_id: str, callback=None) -> IPv4ReservedRange:
-        return self.add_task(self.topology_manager.release_range_from_k8s_cluster, network, reserved_range_name, cluster_id, callback=callback)
+    @NFVCLPublic(path="/network/{network}/k8s/release", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True, doc_by=TopologyManager.release_range_from_k8s_cluster)
+    def release_range_to_k8s_cluster(self, network_name: str, reserved_range_name: str, k8s_cluster_id: str, callback=None) -> IPv4ReservedRange:
+        return self.add_task(self.topology_manager.release_range_from_k8s_cluster, network_name, reserved_range_name, k8s_cluster_id, callback=callback)
 
     @NFVCLPublic(path="/network/{network_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_network(self, network_id: str, callback=None):

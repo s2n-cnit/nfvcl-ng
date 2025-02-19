@@ -8,7 +8,8 @@ from typing import Dict, List
 
 from pydantic import ValidationError
 
-from nfvcl_core.database.user_repository import UserRepository, User
+from nfvcl_core.database.user_repository import UserRepository
+from nfvcl_core_models.user import User, USER_PASSWORD_HASH_ALGORITHM
 from nfvcl_core.managers import GenericManager
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.user import UserRole, UserCreateREST, UserNoConfidence, TokenStatus
@@ -187,7 +188,8 @@ class UserManager(GenericManager):
             NFVCLCoreException (401): If the password is incorrect.
         """
         user = self.get_user_by_username(username)  # Raise 401 if user not found
-        if user.password_hash == hashlib.sha256(password.encode()).hexdigest():
+        hash_function = getattr(hashlib, USER_PASSWORD_HASH_ALGORITHM)
+        if user.password_hash == hash_function(password.encode()).hexdigest():
             access_token, refresh_token = create_tokens_for_user(user)
             self.update_user(user)
             self.logger.debug(f"User {user.username} logged in")
@@ -230,7 +232,8 @@ class UserManager(GenericManager):
         decoded_token = decode_refresh_token(refresh_token)
         if decoded_token is not None:
             user = self.get_user_by_username(decoded_token.username)
-            if user.refresh_token_hashed == getattr(hashlib, DB_TOKEN_HASH_ALGORITHM)(refresh_token.encode()).hexdigest():
+            hash_function = getattr(hashlib, DB_TOKEN_HASH_ALGORITHM)
+            if user.refresh_token_hashed == hash_function(refresh_token.encode()).hexdigest():
                 access_token, refresh_token = create_tokens_for_user(user)
                 self.update_user(user)
                 self.logger.debug(f"User {user.username} has refreshed tokens")

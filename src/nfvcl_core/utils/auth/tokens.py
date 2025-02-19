@@ -9,7 +9,9 @@ from nfvcl_core.utils.util import generate_id
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+# USER_TOKEN_HASH_ALGORITHM is the algorithm used for hashing the user tokens.
 USER_TOKEN_HASH_ALGORITHM = 'HS256'
+# DB_TOKEN_HASH_ALGORITHM is the algorithm used for hashing the tokens (generated with USER_TOKEN_HASH_ALGORITHM)  stored in the database.
 DB_TOKEN_HASH_ALGORITHM = 'sha256'
 SECRET_KEY_CHAR_SET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#@!$%^&*()_+-=[]{}|;:,.<>?/"
 # When NFVCL is restarted the secret keys are regenerated, this invalidates all the tokens but it should be fine.

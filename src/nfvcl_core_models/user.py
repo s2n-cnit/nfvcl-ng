@@ -8,6 +8,8 @@ from pydantic import Field, field_validator, EmailStr
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
 
+# DB_TOKEN_HASH_ALGORITHM is the algorithm used for hashing the tokens (generated with USER_TOKEN_HASH_ALGORITHM)  stored in the database.
+USER_PASSWORD_HASH_ALGORITHM = 'sha256'
 
 class TokenStatus(int, Enum):
     """
@@ -79,6 +81,7 @@ class User(UserNoConfidence):
         refresh_token_expiration (Optional[datetime]): Expiration time of the refresh token, optional.
     """
     password_hash: str = Field()
+    password_hash_type: str = Field(default=USER_PASSWORD_HASH_ALGORITHM)
     created_at: datetime = Field(default=datetime.now(timezone.utc))
     updated_at: Optional[datetime] = Field(default=None)
     access_token_hashed: Optional[str] = Field(default=None)

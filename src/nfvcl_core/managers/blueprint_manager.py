@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 
 from nfvcl_core.database import BlueprintRepository
 from nfvcl_core.managers import GenericManager, EventManager
+from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
 from nfvcl_core_models.performance import BlueprintPerformanceType
 from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
@@ -193,7 +194,7 @@ class BlueprintManager(GenericManager):
 
         if blueprint is None:
             run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
-            raise Exception(f"Blueprint {blueprint_id} not found")
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} not found")
 
         with blueprint.lock:
             self.set_blueprint_status(blueprint.id, BlueprintNGStatus.running_day2())
@@ -224,7 +225,7 @@ class BlueprintManager(GenericManager):
         function = blueprint_type.get_function_to_be_called(path)
 
         if blueprint.lock.locked():
-            raise Exception(f"Blueprint {blueprint_id} is locked, since this request is synchronous, it is not possible to get data from a locked blueprint")
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} is locked, since this request is synchronous, it is not possible to get data from a locked blueprint")
 
         with blueprint.lock:
             try:
@@ -273,7 +274,7 @@ class BlueprintManager(GenericManager):
 
         if blueprint_instance is None:
             run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
-            raise Exception(f"Blueprint {blueprint_id} not found")
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} not found")
 
         with blueprint_instance.lock:
             performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DELETION, "delete")
@@ -328,7 +329,10 @@ class BlueprintManager(GenericManager):
         Returns:
             The summary/details of a blueprint
         """
-        return self.get_blueprint_instance(blueprint_id).to_dict(detailed)
+        blue = self.get_blueprint_instance(blueprint_id)
+        if blue is None:
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} not found")
+        return blue.to_dict(detailed)
 
     def get_blueprint_summary_list(self, blue_type: str, detailed: bool = False, tree: bool = False) -> List[dict]:
         """
@@ -361,7 +365,8 @@ class BlueprintManager(GenericManager):
             The VM that has the IP, None otherwise
         """
         for blue in self.blueprint_dict.values():
-            registered_vms = blue.get_registered_resources(type_filter="nfvcl_core.models.resources.VmResource")  # Getting only VMs
+            # TODO the type here need to be dynamic
+            registered_vms = blue.get_registered_resources(type_filter="nfvcl_core_models.resources.VmResource")  # Getting only VMs
             for registered_resource in registered_vms:
                 vm: VmResource
                 vm = registered_resource.value

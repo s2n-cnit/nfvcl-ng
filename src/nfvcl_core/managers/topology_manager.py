@@ -1,5 +1,6 @@
 from typing import Optional, List, Union, Callable
 
+from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
 from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
@@ -27,7 +28,7 @@ class TopologyManager(GenericManager):
     def get_topology(self) -> TopologyModel:
         if self._topology:
             return self._topology
-        raise Exception("No topology found")
+        raise NFVCLCoreException("No topology found")
 
     def create_topology(self, topology: TopologyModel) -> TopologyModel:
         self.logger.debug(topology)
@@ -52,11 +53,11 @@ class TopologyManager(GenericManager):
         for vim_already_present in self._topology.vims:
             # Check if vim with the same name already exists
             if vim_already_present.name == vim.name:
-                raise Exception(f"VIM with name {vim.name} already exists")
+                raise NFVCLCoreException(f"VIM with name {vim.name} already exists")
 
             # Check overlapping areas
             if len(set(vim_already_present.areas) & set(vim.areas)) > 0:
-                raise Exception(f"Some of the areas are already assigned to a VIM")
+                raise NFVCLCoreException(f"Some of the areas are already assigned to a VIM")
 
         self._topology.add_vim(vim)
         self.save_to_db()
@@ -120,7 +121,7 @@ class TopologyManager(GenericManager):
                 removed_range = network.release_range(reserved_range_name=reserved_range_name)
                 break
         if removed_range is None:
-            raise Exception(f"Reserved range {reserved_range_name} not found in network {network_id}")
+            raise NFVCLCoreException(f"Reserved range {reserved_range_name} not found in network {network_id}")
         # Removing from the K8s cluster the id of the reserved range
         k8s_cluster = self._topology.get_k8s_cluster(k8s_cluster_id)
         k8s_cluster.release_ip_pool(removed_range.name)
@@ -186,7 +187,7 @@ class TopologyManager(GenericManager):
             pdu_id: The name of PDU to be removed
         """
         if self._topology.get_pdu(pdu_id).locked_by:
-            raise Exception(f"PDU {pdu_id} is locked by {self._topology.get_pdu(pdu_id).locked_by}")
+            raise NFVCLCoreException(f"PDU {pdu_id} is locked by {self._topology.get_pdu(pdu_id).locked_by}")
 
         self._topology.del_pdu(pdu_id)
         self.save_to_db()
@@ -248,17 +249,16 @@ class TopologyManager(GenericManager):
         else:
             error_msg = f"K8s cluster not found in area {area_id}"
             self.logger.error(error_msg)
-            # TODO change exception type
-            raise Exception(error_msg)
+            raise NFVCLCoreException(error_msg)
 
     def reserve_k8s_multus_ip(self, k8s_id: str, network_name: str) -> MultusInterface:
         # Getting Info (raise error if not found)
         cluster = self.get_k8s_cluster_by_id(k8s_id)
         cluster_network = cluster.get_network(network_name)
         if cluster_network.ip_pools is None or len(cluster_network.ip_pools) == 0:
-            raise Exception(f"No IP pools assigned to the network {network_name} for the K8s cluster {k8s_id}")
+            raise NFVCLCoreException(f"No IP pools assigned to the network {network_name} for the K8s cluster {k8s_id}")
         if cluster_network.interface_name is None:
-            raise Exception(f"No interface name assigned to the network {network_name} in the K8s cluster {k8s_id}")
+            raise NFVCLCoreException(f"No interface name assigned to the network {network_name} in the K8s cluster {k8s_id}")
         network = self.get_network(network_name)
 
         assigned_ip: SerializableIPv4Address | None = None
@@ -268,7 +268,7 @@ class TopologyManager(GenericManager):
             if assigned_ip is not None:
                 break
         if assigned_ip is None:
-            raise Exception(f"No available IP in the network {network_name} for the K8s cluster {k8s_id}. Reserved ranges are empty or all IPs have been reserved")
+            raise NFVCLCoreException(f"No available IP in the network {network_name} for the K8s cluster {k8s_id}. Reserved ranges are empty or all IPs have been reserved")
 
         multus_info = MultusInterface(
             host_interface=cluster_network.interface_name,

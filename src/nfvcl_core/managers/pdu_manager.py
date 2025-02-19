@@ -2,8 +2,10 @@ from __future__ import annotations
 from typing import Dict
 
 from nfvcl_core.managers import GenericManager
+from nfvcl_core_models.custom_types import NFVCLCoreException
 
-class PDUManagerException(Exception):
+
+class PDUManagerException(NFVCLCoreException):
     pass
 
 

@@ -30,13 +30,16 @@ class UPFInfo(NFVCLBaseModel):
     upf_list: List[DeployedUPFInfo] = Field(default_factory=list)
     current_config: UPFBlueCreateModel = Field()
 
+
 class RANAreaInfo(NFVCLBaseModel):
     area: int = Field()
     pdu_names: List[str] = Field(default_factory=list)
 
+
 class EdgeAreaInfo(NFVCLBaseModel):
     area: int = Field()
     upf: Optional[UPFInfo] = Field(default=None)
+
 
 class NFNetworkEndpoint(NetworkEndPointWithType):
     """
@@ -46,9 +49,11 @@ class NFNetworkEndpoint(NetworkEndPointWithType):
     network_cidr: Optional[SerializableIPv4Network] = Field(default=None)
     multus: Optional[MultusInterface] = Field(default=None)
 
+
 class NFNetworkEndpoints(NFVCLBaseModel):
     n2: Optional[NFNetworkEndpoint] = Field(default=None)
     n4: Optional[NFNetworkEndpoint] = Field(default=None)
+
 
 class Generic5GBlueprintNGState(BlueprintNGState):
     current_config: Optional[Create5gModel] = Field(default=None)
@@ -56,10 +61,12 @@ class Generic5GBlueprintNGState(BlueprintNGState):
     ran_areas: Dict[str, RANAreaInfo] = Field(default_factory=dict)
     core_deployed: bool = Field(default=False)
     network_endpoints: Optional[NFNetworkEndpoints] = Field(default_factory=NFNetworkEndpoints)
+    gnb_ids: Optional[Dict[str, int]] = Field(default_factory=dict)
 
 
 StateTypeVar5G = TypeVar("StateTypeVar5G", bound=Generic5GBlueprintNGState)
 CreateConfigTypeVar5G = TypeVar("CreateConfigTypeVar5G")
+
 
 class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel], Generic[StateTypeVar5G, CreateConfigTypeVar5G]):
     default_upf_implementation: Optional[str] = None
@@ -286,6 +293,13 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
     ####                   START RAN SECTION                    ####
     ################################################################
 
+    def set_gnb_id(self, pdu_name: str):
+        used_ids = self.state.gnb_ids.values()
+        for i in range(0, 4095):
+            if i not in used_ids:
+                self.state.gnb_ids[pdu_name] = i
+                break
+
     def get_gnb_pdus(self) -> List[PduModel]:
         """
         Get the list of PDUs for the GNBs that need to be connected to this core instance
@@ -327,6 +341,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         for pdu in self.get_gnb_pdus():
             if not self.provider.is_pdu_locked_by_current_blueprint(pdu):
                 self.provider.lock_pdu(pdu)
+                self.set_gnb_id(pdu.name)
             configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu)
 
             # TODO nci is calculated with tac, is this correct?
@@ -339,10 +354,11 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                 plmn=self.state.current_config.config.plmn,
                 tac=pdu.area,
                 amf_ip=self.get_amf_ip(),
-                upf_ip=self.get_upfs_for_slice(str(slices[0].sd))[0].network_info.n3_ip.exploded, # This is not really right, but it's needed for LiteON AIO
+                upf_ip=self.get_upfs_for_slice(str(slices[0].sd))[0].network_info.n3_ip.exploded,  # This is not really right, but it's needed for LiteON AIO
                 amf_port=38412,
                 nssai=slices,
-                additional_routes=self._additional_routes_for_gnb(str(pdu.area))
+                additional_routes=self._additional_routes_for_gnb(str(pdu.area)),
+                gnb_id=self.state.gnb_ids.get(pdu.name)
             )
 
             configurator_instance.configure(gnb_configuration_request)
@@ -359,6 +375,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             ran_area_info = self.state.ran_areas[ran_area_id]
             for pdu in ran_area_info.pdu_names:
                 self.provider.unlock_pdu(self.provider.find_by_name(pdu))
+                del self.state.gnb_ids[pdu]
 
             # Delete edge area from state
             del self.state.ran_areas[ran_area_id]

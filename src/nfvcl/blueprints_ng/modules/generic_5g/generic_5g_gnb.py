@@ -43,3 +43,7 @@ class Generic5GGNBBlueprintNG(BlueprintNG[Generic5GGNBBlueprintNGState, GNBBlueC
     @abstractmethod
     def update_gnb(self):
         pass
+
+    @abstractmethod
+    def get_gnb_interfaces_ip(self):
+        pass

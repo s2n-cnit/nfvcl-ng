@@ -1,53 +1,41 @@
-from nfvcl_models.blueprint_ng.core5g.OAI_Models import GNB
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import DU
 
-default_gnb_config: GNB = GNB.model_validate({
+default_du_config: DU = DU.model_validate({
     "multus": {
         "defaultGateway": "",
-        "n2Interface": {
+        "f1Interface": {
             "create": False,
-            "ipAdd": "172.21.8.95",
+            "ipAdd": "172.21.16.100",
             "netmask": "22",
-            "name": "n2",
             "mac": "",
-            "gateway": "",
-            "routes": [],
-            "hostInterface": "bond0"
-        },
-        "n3Interface": {
-            "create": False,
-            "ipAdd": "172.21.8.96",
-            "netmask": "22",
-            "name": "n3",
-            "mac": "",
+            "name": "f1",
             "gateway": "",
             "routes": [],
             "hostInterface": "bond0"
         },
         "ru1Interface": {
             "create": False,
-            "ipAdd": "192.168.80.90",
-            "netmask": "22",
+            "ipAdd": "172.21.16.100",
             "name": "ru1",
+            "netmask": "22",
             "mac": "",
             "gateway": "",
-            "routes": [],
             "hostInterface": "bond0"
         },
         "ru2Interface": {
             "create": False,
-            "ipAdd": "192.168.80.91",
-            "netmask": "22",
+            "ipAdd": "172.21.16.102",
             "name": "ru2",
+            "netmask": "22",
             "mac": "",
             "gateway": "",
-            "routes": [],
             "hostInterface": "bond0"
         }
     },
     "config": {
         "timeZone": "Europe/Paris",
         "useAdditionalOptions": "--sa --rfsim --log_config.global_log_options level,nocolor,time",
-        "gnbName": "oai-gnb-rfsim",
+        "duName": "oai-du-rfsim",
         "mcc": "001",
         "mnc": "01",
         "tac": "1",
@@ -58,9 +46,10 @@ default_gnb_config: GNB = GNB.model_validate({
             }
         ],
         "usrp": "rfsim",
-        "n2IfName": "eth0",
-        "n3IfName": "eth0",
-        "amfIpAddress": "127.0.0.1",
+        "f1IfName": "eth0",
+        "cuHost": "oai-cu",
+        "f1cuPort": "2153",
+        "f1duPort": "2153",
         "gnbId": "0xe00"
     }
 })

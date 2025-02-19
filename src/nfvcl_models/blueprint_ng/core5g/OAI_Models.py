@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import *
+from typing import Optional, Dict, Any, Literal, List
 
 from pydantic import Field
 
-from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubArea, MultusRoute
-from nfvcl_models.k8s.k8s_objects import K8sService
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.network_models import MultusInterface
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, MultusRoute
+from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
+
 
 class OAIAreaModel(NFVCLBaseModel):
     id: int
@@ -19,71 +20,6 @@ class OAIAreaModel(NFVCLBaseModel):
 
 class OAIBlueCreateModel(Create5gModel):
     type: Literal["OpenAirInterface"]
-
-
-class OAIAddSubscriberModel(SubSubscribers):
-    type: Literal["OpenAirInterface"] = Field(default="OpenAirInterface")
-    operation: Literal["add_ues"] = Field(default="add_ues")
-
-
-class OAIDelSubscriberModel(NFVCLBaseModel):
-    type: Literal["OpenAirInterface"] = Field(default="OpenAirInterface")
-    operation: Literal["del_ues"] = Field(default="del_ues")
-    imsi: str = Field()
-
-
-class OAIAddSliceModel(SubSliceProfiles):
-    type: Literal["OpenAirInterface"] = Field(default="OpenAirInterface")
-    operation: Literal["add_slice"] = Field(default="add_slice")
-    area_id: Optional[int] = Field(default=None)
-
-
-class OAIDelSliceModel(NFVCLBaseModel):
-    type: Literal["OpenAirInterface"] = Field(default="OpenAirInterface")
-    operation: Literal["del_slice"] = Field(default="del_slice")
-    sliceId: str = Field()
-
-
-class OAIAddTacModel(SubArea):
-    type: Literal["OpenAirInterface"] = Field(default="OpenAirInterface")
-    operation: Literal["add_tac"] = Field(default="add_tac")
-
-
-class OAIDelTacModel(SubArea):
-    type: Literal["OpenAirInterface"] = Field(default="OpenAirInterface")
-    operation: Literal["del_tac"] = Field(default="del_tac")
-
-
-class OAIModelServices(NFVCLBaseModel):
-    amf: K8sService = Field(alias="oai-amf-svc-lb")
-    ausf: K8sService = Field(alias="oai-ausf-svc-lb")
-    nrf: K8sService = Field(alias="oai-nrf-svc-lb")
-    smf: K8sService = Field(alias="oai-smf-svc-lb")
-    udm: K8sService = Field(alias="oai-udm-svc-lb")
-    udr: K8sService = Field(alias="oai-udr-svc-lb")
-    mysql: K8sService = Field()
-
-
-class DNN(NFVCLBaseModel):
-    dnn: str = Field()
-    pdu_session_type: str = Field(default="IPv4")
-    ipv4_range: str = Field()
-    ipv6_prefix: str = Field(default="2001:1:2::/64")
-
-
-class SessionManagementSubscription(NFVCLBaseModel):
-    nssai_st: int = Field()
-    nssai_sd: str = Field(default="")
-    dnn: str = Field()
-    default_session_type: str = Field(default="IPv4")  # Not present in payload
-    session_ambr_ul: str = Field(default="1000Mbps")
-    session_ambr_dl: str = Field(default="1000Mbps")
-    qos_profile_5qi: int = Field()
-    default_ssc_mode: int = Field(default=1)
-    qos_profile_priority_level: int = Field(default=1)
-    qos_profile_arp_priority_level: int = Field(default=15)
-    qos_profile_arp_preemptcap: str = Field(default="NOT_PREEMPT")
-    qos_profile_arp_preemptvuln: str = Field(default="NOT_PREEMPT")
 
 
 class SscModes(NFVCLBaseModel):
@@ -517,6 +453,7 @@ class OaiCoreValuesModel(NFVCLBaseModel):
     oai_smf: Optional[OaiSmf] = Field(None, alias='oai-smf')
     coreconfig: Optional[Coreconfig] = Field(None, alias='currentconfig')
 
+
 class OAIMultusInterface(NFVCLBaseModel):
     create: bool
     ip_add: str = Field(..., alias='ipAdd')
@@ -535,23 +472,28 @@ class OAIMultusInterface(NFVCLBaseModel):
         self.routes = routes if routes else []
         self.host_interface = multus_interface.host_interface
 
+
 class OAIMultusUPF(NFVCLBaseModel):
     defaultGateway: Optional[str] = Field(default=None)
     n3Interface: OAIMultusInterface
     n4Interface: OAIMultusInterface
     n6Interface: OAIMultusInterface
 
+
 class OAIMultusAMF(NFVCLBaseModel):
     defaultGateway: Optional[str] = Field(default=None)
     n2Interface: OAIMultusInterface
+
 
 class OAIMultusSMF(NFVCLBaseModel):
     defaultGateway: Optional[str] = Field(default=None)
     n4Interface: OAIMultusInterface
 
+
 class OaiUpfValuesModel(NFVCLBaseModel):
     upfconfig: Optional[Upfconfig] = Field(None, alias='currentconfig')
     multus: OAIMultusUPF
+
 
 # UE Model
 class LastIndexes(NFVCLBaseModel):
@@ -621,14 +563,14 @@ class CUConfig(NFVCLBaseModel):
     mcc: str
     mnc: str
     tac: str
-    sst1: str
-    sd1: str
+    snssai_list: List[Slice5G] = Field(alias='snssaiList')
     amfhost: str
     n2_if_name: str = Field(..., alias='n2IfName')
     n3_if_name: str = Field(..., alias='n3IfName')
     f1_if_name: str = Field(..., alias='f1IfName')
     f1cu_port: str = Field(..., alias='f1cuPort')
     f1du_port: str = Field(..., alias='f1duPort')
+    gnb_id: str = Field(default="0xe00", alias='gnbId')
 
 
 class PodSecurityContext(NFVCLBaseModel):
@@ -680,24 +622,8 @@ class Resources(NFVCLBaseModel):
 
 
 class CU(NFVCLBaseModel):
-    kubernetes_distribution: Optional[str] = Field(None, alias='kubernetesDistribution')
-    nfimage: Optional[Nfimage] = None
-    image_pull_secrets: Optional[List[ImagePullSecret]] = Field(None, alias='imagePullSecrets')
-    service_account: Optional[ServiceAccount] = Field(None, alias='serviceAccount')
     multus: Optional[CUMultus] = None
     config: Optional[CUConfig] = None
-    pod_security_context: Optional[PodSecurityContext] = Field(None, alias='podSecurityContext')
-    security_context: Optional[SecurityContext] = Field(None, alias='securityContext')
-    start: Optional[CUStart] = None
-    include_tcp_dump_container: Optional[bool] = Field(None, alias='includeTcpDumpContainer')
-    tcpdumpimage: Optional[Tcpdumpimage] = None
-    persistent: Optional[GenericRanPersistent] = None
-    resources: Optional[Resources] = None
-    tolerations: Optional[List] = None
-    affinity: Optional[Dict[str, Any]] = None
-    termination_grace_period_seconds: Optional[int] = Field(None, alias='terminationGracePeriodSeconds')
-    node_selector: Optional[Dict[str, Any]] = Field(None, alias='nodeSelector')
-    node_name: Optional[Any] = Field(None, alias='nodeName')
 
 
 ############################################### CU-CP ##############################################
@@ -716,14 +642,14 @@ class CUCPConfig(NFVCLBaseModel):
     mcc: str
     mnc: str
     tac: str
-    sst1: str
-    sd1: str
+    snssai_list: List[Slice5G] = Field(alias='snssaiList')
     amfhost: str
     n2_if_name: str = Field(..., alias='n2IfName')
     f1_if_name: str = Field(..., alias='f1IfName')
     e1_if_name: str = Field(..., alias='e1IfName')
     f1cu_port: str = Field(..., alias='f1cuPort')
     f1du_port: str = Field(..., alias='f1duPort')
+    gnb_id: str = Field(default="0xe00", alias='gnbId')
 
 
 class CUCPStart(NFVCLBaseModel):
@@ -768,8 +694,7 @@ class CUUPConfig(NFVCLBaseModel):
     mcc: str
     mnc: str
     tac: str
-    sst1: str
-    sd1: str
+    snssai_list: List[Slice5G] = Field(alias='snssaiList')
     flexrichost: str
     cu_cp_host: str = Field(..., alias='cuCpHost')
     n2_if_name: str = Field(..., alias='n2IfName')
@@ -778,6 +703,7 @@ class CUUPConfig(NFVCLBaseModel):
     e1_if_name: str = Field(..., alias='e1IfName')
     f1cu_port: str = Field(..., alias='f1cuPort')
     f1du_port: str = Field(..., alias='f1duPort')
+    gnb_id: str = Field(default="0xe00", alias='gnbId')
 
 
 class CUUPStart(NFVCLBaseModel):
@@ -822,13 +748,13 @@ class DUConfig(NFVCLBaseModel):
     mcc: str
     mnc: str
     tac: str
-    sst: str
-    sd: str
+    snssai_list: List[Slice5G] = Field(alias='snssaiList')
     usrp: str
     f1_if_name: str = Field(..., alias='f1IfName')
     cu_host: str = Field(..., alias='cuHost')
     f1cu_port: str = Field(..., alias='f1cuPort')
     f1du_port: str = Field(..., alias='f1duPort')
+    gnb_id: str = Field(default="0xe00", alias='gnbId')
 
 
 class DUStart(NFVCLBaseModel):
@@ -837,24 +763,8 @@ class DUStart(NFVCLBaseModel):
 
 
 class DU(NFVCLBaseModel):
-    kubernetes_distribution: Optional[str] = Field(None, alias='kubernetesDistribution')
-    nfimage: Optional[Nfimage] = None
-    image_pull_secrets: Optional[List[ImagePullSecret]] = Field(None, alias='imagePullSecrets')
-    service_account: Optional[ServiceAccount] = Field(None, alias='serviceAccount')
     multus: Optional[DUMultus] = None
     config: Optional[DUConfig] = None
-    pod_security_context: Optional[PodSecurityContext] = Field(None, alias='podSecurityContext')
-    security_context: Optional[SecurityContext] = Field(None, alias='securityContext')
-    start: Optional[DUStart] = None
-    include_tcp_dump_container: Optional[bool] = Field(None, alias='includeTcpDumpContainer')
-    tcpdumpimage: Optional[Tcpdumpimage] = None
-    persistent: Optional[GenericRanPersistent] = None
-    resources: Optional[Resources] = None
-    tolerations: Optional[List] = None
-    affinity: Optional[Dict[str, Any]] = None
-    termination_grace_period_seconds: Optional[int] = Field(None, alias='terminationGracePeriodSeconds')
-    node_selector: Optional[Dict[str, Any]] = Field(None, alias='nodeSelector')
-    node_name: Optional[Any] = Field(None, alias='nodeName')
 
 
 ############################################### GNB ##############################################
@@ -875,12 +785,12 @@ class GNBConfig(NFVCLBaseModel):
     mcc: str
     mnc: str
     tac: str
-    sst: str
-    sd: str
+    snssai_list: List[Slice5G] = Field(alias='snssaiList')
     usrp: str
     n2_if_name: str = Field(default="eth0", alias='n2IfName')
     n3_if_name: str = Field(default="eth0", alias='n3IfName')
     amf_ip_address: str = Field(..., alias='amfIpAddress')
+    gnb_id: str = Field(default="0xe00", alias='gnbId')
 
 
 class GNBStart(NFVCLBaseModel):
@@ -889,24 +799,8 @@ class GNBStart(NFVCLBaseModel):
 
 
 class GNB(NFVCLBaseModel):
-    kubernetes_distribution: Optional[str] = Field(None, alias='kubernetesDistribution')
-    nfimage: Optional[Nfimage] = None
-    image_pull_secrets: Optional[List[ImagePullSecret]] = Field(None, alias='imagePullSecrets')
-    service_account: Optional[ServiceAccount] = Field(None, alias='serviceAccount')
     multus: Optional[GNBMultus] = None
     config: Optional[GNBConfig] = None
-    start: Optional[GNBStart] = None
-    include_tcp_dump_container: Optional[bool] = Field(None, alias='includeTcpDumpContainer')
-    pod_security_context: Optional[PodSecurityContext] = Field(None, alias='podSecurityContext')
-    security_context: Optional[SecurityContext] = Field(None, alias='securityContext')
-    tcpdumpimage: Optional[Tcpdumpimage] = None
-    persistent: Optional[GenericRanPersistent] = None
-    resources: Optional[Resources] = None
-    tolerations: Optional[List] = None
-    affinity: Optional[Dict[str, Any]] = None
-    termination_grace_period_seconds: Optional[int] = Field(None, alias='terminationGracePeriodSeconds')
-    node_selector: Optional[Dict[str, Any]] = Field(None, alias='nodeSelector')
-    node_name: Optional[Any] = Field(None, alias='nodeName')
 
 
 ############################################### UE ##############################################
@@ -922,6 +816,7 @@ class OAIUEConfig(NFVCLBaseModel):
     sd: str  # HEX is allowed?
     usrp: str
     use_additional_options: str = Field(..., alias='useAdditionalOptions')
+
 
 class OAIUE(NFVCLBaseModel):
     multus: Optional[OAIMultusInterface] = None

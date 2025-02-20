@@ -26,3 +26,7 @@ def get_task_manager(_task_manager: TaskManager = Provide[NFVCLContainer.task_ma
 @inject
 def get_event_manager(_event_manager: EventManager = Provide[NFVCLContainer.event_manager]) -> EventManager:
     return _event_manager
+
+@inject
+def get_persistence_manager(_persistence_manager: PersistenceManager = Provide[NFVCLContainer.persistence_manager]) -> PersistenceManager:
+    return _persistence_manager

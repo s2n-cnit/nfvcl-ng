@@ -1,0 +1,14 @@
+---
+log_level: 10
+nfvcl:
+  version: "0.3.0"
+  port: "5002"
+  ip: "0.0.0.0"
+  authentication: False
+mongodb:
+  host: "127.0.0.1"
+  port: "27017"
+  db: "nfvcl_test"
+redis:
+  host: "127.0.0.1"
+  port: "6379"

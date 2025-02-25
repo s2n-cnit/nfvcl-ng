@@ -76,6 +76,7 @@ class MongoParameters(NFVCLBaseModel):
 class RedisParameters(BaseModel):
     host: str
     port: int
+    password: Optional[str] = None
 
     class Config:
         validate_assignment = True

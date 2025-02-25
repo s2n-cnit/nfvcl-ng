@@ -13,10 +13,10 @@ from nfvcl_core_models.task import NFVCLTask
 
 
 class EventManager(GenericManager):
-    def __init__(self, task_manager: TaskManager, redis_host: str, redis_port: int):
+    def __init__(self, task_manager: TaskManager, redis_host: str, redis_port: int, redis_password: str = None):
         super().__init__()
         self._task_manager = task_manager
-        self.redis_instance = Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8")
+        self.redis_instance = Redis(host=redis_host, port=redis_port, decode_responses=True, encoding="utf-8", password=redis_password)
         self.publish_to_redis = True
         self.sub_to_redis = True
         # Subscribe to all topics and print events to console for debug

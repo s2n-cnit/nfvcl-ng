@@ -30,6 +30,7 @@ class NFVCLContainer(containers.DeclarativeContainer):
         task_manager=task_manager,
         redis_host=config.redis.host,
         redis_port=config.redis.port,
+        redis_password=config.redis.password
     )
 
     topology_repository = providers.Singleton(

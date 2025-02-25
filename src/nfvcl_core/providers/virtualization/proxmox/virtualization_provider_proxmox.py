@@ -54,12 +54,11 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     data: VirtualizationProviderDataProxmox
     vim: VimModel
 
-
     def init(self):
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.data: VirtualizationProviderDataProxmox = VirtualizationProviderDataProxmox()
-        self.vim = self.topology.get_vim_from_area_id_model(self.area)
+        self.vim = self.topology.get_vim_by_area(self.area)
         self.ssh.connect(self.vim.vim_url, port=22, username=self.vim.vim_user,
                          password=self.vim.vim_password, timeout=3)
         self.path = self.__get_storage_path(self.vim.vim_proxmox_storage_id)
@@ -93,9 +92,10 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         self.logger.info(f"Creating VM {vm_resource.name}")
         self.__download_cloud_image(f'{vm_resource.image.url}', f'{vm_resource.image.name}')
-        c_init = CloudInit(packages=cloud_init_packages,
-                                    ssh_authorized_keys=self.vim.ssh_keys,
-                                    runcmd=cloud_init_runcmd)
+        c_init = CloudInit(hostname=vm_resource.name,
+                           packages=cloud_init_packages,
+                           ssh_authorized_keys=self.vim.ssh_keys,
+                           runcmd=cloud_init_runcmd)
         c_init.add_user(vm_resource.username, vm_resource.password)
         user_cloud_init = c_init.build_cloud_config()
 
@@ -171,9 +171,12 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         return configurator_facts
 
     def destroy_vm(self, vm_resource: VmResource):
+        self.logger.info(f"Destroying VM {vm_resource.name}")
         vmid = self.data.proxmox_dict[vm_resource.id]
+        self.logger.debug(f"Stopping VM {vmid} | qm stop {vmid}")
         self.__execute_ssh_command(f"qm stop {vmid}")
-        self.__execute_ssh_command(f"qm destroy {vmid} --purge 1 --destroy-unreferenced-disks 1")
+        self.logger.debug(f"Destroying VM {vmid} | qm destroy {vmid} --purge 1")  # --destroy-unreferenced-disks 1")
+        self.__execute_ssh_command(f"qm destroy {vmid} --purge 1")  # --destroy-unreferenced-disks 1")
         self.__execute_ssh_command(f"rm {self.path}/snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml")
         self.__execute_ssh_command(f"rm {self.path}/snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml")
         del self.data.proxmox_dict[vm_resource.id]
@@ -312,7 +315,13 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         if disk_devices is not None:
             disks_memory = list()
             for disk in disk_devices:
-                disks_memory.append(int(disk.split("size=")[1].split("M")[0].strip()))
+                size: str = disk.split("size=")[1]  # 10G or 10M
+                if size.count("G") > 0:
+                    disks_memory.append(int(size.split("G")[0].strip()))
+                elif size.count("M") > 0:
+                    disks_memory.append(int(size.split("M")[0].strip()))
+                else:
+                    raise VirtualizationProviderProxmoxException(f"Disk size unit not supported: {size}")
             return disks_memory
         else:
             raise VirtualizationProviderProxmoxException(f"Non disk devices found for VM-ID: {vmid}")

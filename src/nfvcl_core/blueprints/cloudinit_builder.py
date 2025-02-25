@@ -12,6 +12,7 @@ class CloudInitChpasswd(NFVCLBaseModel):
 
 
 class CloudInit(NFVCLBaseModel):
+    hostname: Optional[str] = Field(default=None)
     manage_etc_hosts: bool = Field(default=True)
     chpasswd: CloudInitChpasswd = Field(default=CloudInitChpasswd())
     disable_root: bool = Field(default=False)

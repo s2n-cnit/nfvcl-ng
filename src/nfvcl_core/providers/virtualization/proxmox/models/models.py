@@ -42,15 +42,36 @@ class ProxmoxInterface(NFVCLBaseModel):
 
 
 class ProxmoxNode(NFVCLBaseModel):
-    node: str = Field()
+    """
+    {
+    "status" : "online",
+    "type" : "node",
+    "disk" : 11806363648,
+    "uptime" : 513931,
+    "cpu" : 0.00346227316141356,
+    "level" : "",
+    "id" : "node/proxmoxnfvcl",
+    "maxcpu" : 16,
+    "maxdisk" : 100861726720,
+    "mem" : 2506846208,
+    "node" : "proxmoxnfvcl",
+    "ssl_fingerprint" : "0A:49:6A:01:AF:52:ED:D7:2D:CC:B7:91:56:89:04:B6:A3:AA:6D:92:01:4B:ED:17:7C:E3:DF:3E:AC:FF:F4:09",
+    "maxmem" : 67426443264
+  } ]
+    """
     status: str = Field()
+    type: str = Field()
+    disk: Optional[int] = Field(default=None)
+    uptime: Optional[int] = Field(default=None)
     cpu: Optional[float] = Field(default=None)
     level: Optional[str] = Field(default=None)
+    id: Optional[str] = Field(default=None)
     maxcpu: Optional[int] = Field(default=None)
-    maxmem: Optional[int] = Field(default=None)
+    maxdisk: Optional[int] = Field(default=None)
     mem: Optional[int] = Field(default=None)
+    node: str = Field()
     ssl_fingerprint: Optional[str] = Field(default=None)
-    uptime: Optional[int] = Field(default=None)
+    maxmem: Optional[int] = Field(default=None)
 
 
 class ProxmoxNodes(NFVCLBaseModel):

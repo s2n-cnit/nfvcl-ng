@@ -84,13 +84,25 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def get_vim_info(self):
         return self.vim
 
+    def get_node_by_ip(self):
+        response = self.__execute_rest_request("nodes", {}, ApiRequestType.GET)
+        nodes: ProxmoxNodes = ProxmoxNodes.model_validate(response.json())
+        for node in nodes.data:
+            node_details = self.__execute_rest_request(f"nodes/{node.node}/network", {}, ApiRequestType.GET)
+            interfaces = node_details.json()["data"]
+            for interface in interfaces:
+                if "address" in interface and interface["address"] == self.vim.vim_url:
+                    return node.node
+        raise VirtualizationProviderProxmoxException(f"Node with ip {self.vim.vim_url} not found")
+
     def create_vm(self, vm_resource: VmResource):
         if len(self.data.proxmox_node_name) == 0:
-            response = self.__execute_rest_request("nodes", {}, ApiRequestType.GET)
-            nodes: ProxmoxNodes = ProxmoxNodes.model_validate(response.json())
-            self.data.proxmox_node_name = nodes.data[0].node
+            if self.vim.vim_proxmox_node:
+                self.data.proxmox_node_name = self.vim.vim_proxmox_node
+            else:
+                self.data.proxmox_node_name = self.get_node_by_ip()
 
-        self.logger.info(f"Creating VM {vm_resource.name}")
+        self.logger.info(f"Creating VM {vm_resource.name} on node {self.data.proxmox_node_name}")
         self.__download_cloud_image(f'{vm_resource.image.url}', f'{vm_resource.image.name}')
         c_init = CloudInit(hostname=vm_resource.name,
                            packages=cloud_init_packages,
@@ -372,6 +384,8 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     raise VirtualizationProviderProxmoxException("Api request type not supported")
 
             self.logger.info(f"Status code: {response.status_code}")
+            if response.status_code != 200:
+                self.logger.error(f"Error in '{url}' response: {response.text}")
             return response
 
     def __get_nfvcl_sdn_zone(self) -> ProxmoxZone:

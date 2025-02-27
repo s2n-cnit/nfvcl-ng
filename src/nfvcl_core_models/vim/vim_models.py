@@ -37,6 +37,7 @@ class VimModel(NFVCLBaseModel):
     vim_password: str = 'admin'
     ssh_keys: Optional[List[str]] = Field(default_factory=list)
     vim_proxmox_realm: Optional[str] = Field(default='pam')
+    vim_proxmox_node: Optional[str] = Field(default=None)
     vim_proxmox_storage_id: Optional[str] = Field(default='local')
     vim_proxmox_storage_volume: Optional[str] = Field(default='local-lvm')
     osm_onboard: Optional[bool] = Field(default=False)

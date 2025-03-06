@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 
 from nfvcl_core.database import BlueprintRepository
 from nfvcl_core.managers import GenericManager, EventManager
+from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
 from nfvcl_core_models.performance import BlueprintPerformanceType
@@ -189,12 +190,19 @@ class BlueprintManager(GenericManager):
         """
         run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint day2 message for {blueprint_id} given to the worker..."))
 
+        b_type = path.split("/")[0]
+        blueprint_module = blueprint_type.get_blueprint_module(b_type)
+
         function = blueprint_type.get_function_to_be_called(path)
         blueprint = self.get_blueprint_instance(blueprint_id)
 
         if blueprint is None:
             run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
             raise NFVCLCoreException(f"Blueprint {blueprint_id} not found")
+
+        if get_class_path_str_from_obj(blueprint) != f"{blueprint_module.module}.{blueprint_module.class_name}":
+            run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} is not of the type {b_type}"))
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} is not of the type {b_type}")
 
         with blueprint.lock:
             self.set_blueprint_status(blueprint.id, BlueprintNGStatus.running_day2())

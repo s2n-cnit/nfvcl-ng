@@ -24,7 +24,8 @@ def set_log_level(level):
 coloredlog_format_string = "%(asctime)s [%(name)-20.20s][%(threadName)-10.10s] [%(levelname)8s] [%(blueprintid)s] %(message)s"
 
 level_styles = {
-    'spam': {'color': 'green', 'faint': True},
+    'trace': {'color': 238, 'faint': True},
+    'spam': {'color': 238, 'faint': True},
     'debug': {'color': 241},
     'verbose': {'color': 'blue'},
     'info': {},

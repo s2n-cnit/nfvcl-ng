@@ -39,7 +39,7 @@ class TaskManager(GenericManager):
         while True:
             task: NFVCLTask = self.queue.get()
             self.task_history[task.task_id] = TaskHistoryElement(task_id=task.task_id, task=task)
-            self.logger.verbose(f'Working on {task}')
+            self.logger.spam(f'Working on {task}')
             excep = None
             try:
                 returnof = task.callable_function(*task.args, **task.kwargs)
@@ -48,7 +48,7 @@ class TaskManager(GenericManager):
                 returnof = None
                 excep = e
 
-            self.logger.verbose(f'Finished {task}')
+            self.logger.spam(f'Finished {task}')
             self.queue.task_done()
 
             task_result = NFVCLTaskResult(task.task_id, returnof, excep is not None, excep)

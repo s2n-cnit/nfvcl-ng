@@ -17,7 +17,7 @@ from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core.utils.file_utils import create_tmp_file, create_tmp_folder
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import get_pods_for_k8s_namespace, get_logs_for_pod, get_deployments, \
-    get_services, k8s_delete_namespace
+    get_services, k8s_delete_namespace, restart_deployment, wait_for_deployment_to_be_ready_by_name, wait_for_deployment_to_be_ready
 from nfvcl_core.utils.k8s.helm_plugin_manager import build_helm_client_from_credential_file_content
 
 
@@ -233,3 +233,11 @@ class K8SProviderNative(K8SProviderInterface):
                 break
         self.logger.debug(f"Released reserved IP: {ip_address}")
         return release_ret
+
+    def restart_deployment(self, helm_chart_resource: HelmChartResource, deployment_name: str):
+        self.logger.debug(f"Restarting deployment '{deployment_name}' in namespace '{helm_chart_resource.namespace.lower()}'")
+        k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
+        updated_dep = restart_deployment(k8s_config, helm_chart_resource.namespace.lower(), deployment_name)
+        wait_res = wait_for_deployment_to_be_ready(k8s_config, updated_dep)
+        self.logger.debug(f"Restarted deployment: {deployment_name} in namespace '{helm_chart_resource.namespace.lower()}', ready wait result: {wait_res}")
+        return wait_res

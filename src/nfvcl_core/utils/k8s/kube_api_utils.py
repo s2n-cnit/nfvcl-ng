@@ -1,5 +1,5 @@
 import time
-from logging import Logger
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
@@ -12,6 +12,8 @@ from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccou
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1Container, V1ResourceQuota, \
     V1ResourceQuotaSpec, V1ClusterRoleBinding, V1Node, V1NodeList, V1DeploymentList, V1Deployment, V1DeploymentSpec, V1StorageClassList, V1PodList, V1DaemonSetList, V1ServiceList, V1ConfigMap, VersionInfo, V1StorageClass
+from verboselogs import VerboseLogger
+
 from nfvcl_core_models.k8s_management_models import Labels
 
 from nfvcl_core_models.topology_k8s_model import K8sQuota, K8sVersion
@@ -19,7 +21,7 @@ from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
 
-logger: Logger = create_logger("K8s API utils")
+logger: VerboseLogger = create_logger("K8s API utils")
 
 TIMEOUT_SECONDS = 10
 
@@ -1219,3 +1221,94 @@ def patch_namespaced_storage_class(kube_client_config: kubernetes.client.Configu
             api_client.close()
 
     return patched_storage_class
+
+def restart_deployment(kube_client_config: kubernetes.client.Configuration, namespace: str, deployment_name: str) -> V1Deployment:
+    """
+    Restart a deployment by updating its annotations.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace: The namespace in which the deployment resides.
+        deployment_name: The name of the deployment to be restarted.
+
+    Returns:
+        The updated deployment.
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_app = kubernetes.client.AppsV1Api(api_client)
+        deployment: V1Deployment = api_instance_app.read_namespaced_deployment(name=deployment_name, namespace=namespace)
+
+        # Update the annotations to trigger a rolling restart
+        if deployment.spec.template.metadata.annotations is None:
+            deployment.spec.template.metadata.annotations = {}
+        deployment.spec.template.metadata.annotations['nfvcl/restartedAt'] = datetime.now(timezone.utc).isoformat()
+
+        try:
+            updated_deployment = api_instance_app.patch_namespaced_deployment(name=deployment_name, namespace=namespace, body=deployment)
+        except ApiException as error:
+            logger.error(f"Exception when calling AppsV1Api>patch_namespaced_deployment: {error}")
+            raise error
+        finally:
+            api_client.close()
+
+        return updated_deployment
+
+def wait_for_deployment_to_be_ready_by_name(kube_client_config: kubernetes.client.Configuration, namespace: str, deployment_name: str, timeout: int = 300):
+    """
+    Wait for a deployment to be ready.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        namespace: The namespace in which the deployment resides.
+        deployment_name: The name of the deployment to wait for.
+        timeout: The maximum time to wait for the deployment to be ready, in seconds.
+
+    Returns:
+        True if the deployment is ready within the timeout, False otherwise.
+    """
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_app = kubernetes.client.AppsV1Api(api_client)
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            logger.spam(f"Waiting for deployment {deployment_name} in namespace {namespace} to be ready...")
+            deployment = api_instance_app.read_namespaced_deployment_status(name=deployment_name, namespace=namespace)
+            if deployment.status.ready_replicas == deployment.spec.replicas:
+                logger.spam(f"Deployment {deployment_name} in namespace {namespace} ready")
+                return True
+            time.sleep(5)
+        logger.spam(f"Deployment {deployment_name} in namespace {namespace} not ready, timeout reached")
+        return False
+
+def wait_for_deployment_to_be_ready(kube_client_config: kubernetes.client.Configuration, deployment: V1Deployment, timeout: int = 300):
+    """
+    Wait for a deployment to be ready.
+
+    Args:
+        kube_client_config: the configuration of K8s on which the client is built.
+        deployment: The deployment to wait for.
+        timeout: The maximum time to wait for the deployment to be ready, in seconds.
+
+    Returns:
+        True if the deployment is ready within the timeout, False otherwise.
+    """
+
+    deployment_name = deployment.metadata.name
+    namespace = deployment.metadata.namespace
+
+    with kubernetes.client.ApiClient(kube_client_config) as api_client:
+        api_instance_app = kubernetes.client.AppsV1Api(api_client)
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            logger.spam(f"Waiting for deployment {deployment_name} in namespace {namespace} to be ready...")
+            deployment_status = api_instance_app.read_namespaced_deployment_status(name=deployment_name, namespace=namespace)
+            if deployment_status.spec.template.metadata.annotations == deployment.spec.template.metadata.annotations:
+                if deployment_status.status.ready_replicas == deployment_status.spec.replicas:
+                    logger.spam(f"Deployment {deployment_name} in namespace {namespace} ready")
+                    return True
+            else:
+                logger.spam(f"Deployment {deployment_name} in namespace {namespace} not ready, annotations mismatch...")
+            time.sleep(5)
+        logger.spam(f"Deployment {deployment_name} in namespace {namespace} not ready, timeout reached")
+        return False

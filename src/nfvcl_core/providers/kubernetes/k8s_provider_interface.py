@@ -45,3 +45,7 @@ class K8SProviderInterface(BlueprintNGProviderInterface):
     @abc.abstractmethod
     def release_k8s_multus_ip(self, area: int, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
         pass
+
+    @abc.abstractmethod
+    def restart_deployment(self, helm_chart_resource: HelmChartResource, deployment_name: str):
+        pass

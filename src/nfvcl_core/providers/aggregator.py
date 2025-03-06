@@ -216,3 +216,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     @register_performance(params_to_info=[(1, "blueprint_id"), (2, "function_name")])
     def call_blueprint_function(self, blue_id: str, function_name: str, *args, **kwargs) -> Any:
         return self.get_blueprint_provider().call_blueprint_function(blue_id, function_name, *args, **kwargs)
+
+    @register_performance()
+    def restart_deployment(self, helm_chart_resource: HelmChartResource, deployment_name: str):
+        return self.get_k8s_provider(helm_chart_resource.area).restart_deployment(helm_chart_resource, deployment_name)

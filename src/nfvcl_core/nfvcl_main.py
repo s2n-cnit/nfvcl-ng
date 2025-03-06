@@ -444,7 +444,7 @@ class NFVCL:
         return self.add_task(self.blueprint_manager.create_blueprint, blue_type, msg, callback=callback)
 
     # @NFVCLPublic(path="", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.PUT)
-    def update_blueprint(self, blue_id: str, day2_path: str, msg: Any, callback=None):
+    def update_blueprint(self, blue_id: str, day2_path: str, msg: Any = None, callback=None):
         return self.add_task(self.blueprint_manager.update_blueprint, blue_id, day2_path, msg, callback=callback)
 
     # @NFVCLPublic(path="/get_from_blueprint", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.GET)

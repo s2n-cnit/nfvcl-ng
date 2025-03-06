@@ -174,14 +174,17 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
             param.annotation.__metadata__ = (Body(media_type=param.annotation.__metadata__[0]),)
 
     # We re-add the original parameters to the new function signature altering the type if needed
-    params_original = [
-        inspect.Parameter(
+    params_original = []
+    for param_name, param in args.items():
+        # A param with override_args_type None is not added to the signature, useful for day2 without parameters
+        if override_args_type and param.name in override_args_type and override_args_type[param_name] is None:
+            continue
+        params_original.append(inspect.Parameter(
             param_name,
             param.kind,
             annotation=override_args_type[param_name] if override_args_type and param.name in override_args_type else param.annotation,
             default=param.default
-        ) for param_name, param in args.items()
-    ]
+        ))
 
     params.extend(params_original)
 
@@ -411,6 +414,9 @@ if __name__ == "__main__":
             type_overrides = {}
             if len(typing.get_type_hints(day2_route.function)) > 0:
                 type_overrides["msg"] = next(iter(typing.get_type_hints(day2_route.function).values()))
+            else:
+                # The day2 has no parameters
+                type_overrides["msg"] = None
             if HttpRequestType.GET in day2_route.methods:
                 module_router.add_api_route(
                     day2_route.final_path,

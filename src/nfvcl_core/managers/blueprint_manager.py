@@ -175,7 +175,7 @@ class BlueprintManager(GenericManager):
                 self.logger.success(f"Blueprint {blue_id} created successfully")
             return blue_id
 
-    def update_blueprint(self, blueprint_id: str, path: str, msg: Any, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> Any:
+    def update_blueprint(self, blueprint_id: str, path: str, msg: Any = None, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> Any:
         """
         Update the blueprint with the given ID
         Args:

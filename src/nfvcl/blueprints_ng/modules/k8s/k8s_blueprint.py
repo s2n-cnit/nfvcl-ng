@@ -1,7 +1,6 @@
 import re
 from typing import Optional, List
 
-from netaddr.ip import IPNetwork
 from pydantic import Field
 
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
@@ -33,8 +32,8 @@ POD_NET_CIDR = SerializableIPv4Network("10.254.0.0/16")
 POD_SERVICE_CIDR = SerializableIPv4Network("10.200.0.0/16")
 K8S_DEFAULT_PASSWORD = "ubuntu"
 DUMMY_NET_CIDR = "10.252.252.0/24"
-DUMMY_NET_POOL_START_IP = str((IPNetwork(DUMMY_NET_CIDR))[20])
-DUMMY_NET_VM_START_IP = str((IPNetwork(DUMMY_NET_CIDR))[1])
+DUMMY_NET_POOL_START_IP = str((SerializableIPv4Network(DUMMY_NET_CIDR))[20])
+DUMMY_NET_VM_START_IP = str((SerializableIPv4Network(DUMMY_NET_CIDR))[1])
 
 
 class K8sBlueprintNGState(BlueprintNGState):

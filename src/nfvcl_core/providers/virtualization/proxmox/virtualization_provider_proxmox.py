@@ -6,12 +6,11 @@ from enum import Enum
 from typing import Dict, List
 
 import httpx
-import paramiko
 from httpx import Response
-from nfvcl_core_models.vim import VimModel
 from pydantic import Field
 
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit, CloudInitNetworkRoot
+from nfvcl_core.managers.vim_clients_manager import ProxmoxVimClient
 from nfvcl_core.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
     NetplanInterface
 from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible
@@ -21,9 +20,10 @@ from nfvcl_core.providers.virtualization.proxmox.models.models import ProxmoxZon
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
+from nfvcl_core.utils.blue_utils import rel_path
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
     VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource
-from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_core_models.vim import VimModel
 
 cloud_init_packages = ['qemu-guest-agent']
 cloud_init_runcmd = ["systemctl enable qemu-guest-agent.service", "systemctl start qemu-guest-agent.service"]
@@ -50,17 +50,14 @@ class VirtualizationProviderProxmoxException(VirtualizationProviderException):
 
 
 class VirtualizationProviderProxmox(VirtualizationProviderInterface):
-    ssh: paramiko.SSHClient
+    proxmox_vim_client: ProxmoxVimClient
     data: VirtualizationProviderDataProxmox
     vim: VimModel
 
     def init(self):
-        self.ssh = paramiko.SSHClient()
-        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.data: VirtualizationProviderDataProxmox = VirtualizationProviderDataProxmox()
         self.vim = self.topology.get_vim_by_area(self.area)
-        self.ssh.connect(self.vim.vim_url, port=22, username=self.vim.vim_user,
-                         password=self.vim.vim_password, timeout=3)
+        self.proxmox_vim_client = self.vim_clients_manager.get_proxmox_client(self, self.vim.name)
         self.path = self.__get_storage_path(self.vim.vim_proxmox_storage_id)
 
         with httpx.Client(verify=False) as client:
@@ -196,6 +193,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def final_cleanup(self):
         for vnet in self.data.proxmox_vnet:
             self.__delete_sdn_vnet(vnet)
+        self.vim_clients_manager.release_client(self, self.vim.name)
 
     def create_net(self, net_resource: NetResource):
         self.__create_sdn_vnet(net_resource)
@@ -262,7 +260,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__execute_ssh_command(f'mkdir -p /root/scripts')
 
     def __load_scripts(self) -> None:
-        ftp_client = self.ssh.open_sftp()
+        ftp_client = self.proxmox_vim_client.ssh_client.open_sftp()
         ftp_client.put(f"{rel_path('scripts/image_script.sh')}", "/root/scripts/image_script.sh")
         self.__execute_ssh_command("chmod +x /root/scripts/image_script.sh")
         ftp_client.close()
@@ -351,12 +349,12 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.logger.info("Waiting qemu guest agent")
         exit_status = 1
         while exit_status != 0:
-            stdin, stdout, stderr = self.ssh.exec_command(f"qm agent {vmid} ping")
+            stdin, stdout, stderr = self.proxmox_vim_client.ssh_client.exec_command(f"qm agent {vmid} ping")
             exit_status = stdout.channel.recv_exit_status()
         return True
 
     def __execute_ssh_command(self, command: str):
-        stdin, stdout, stderr = self.ssh.exec_command(command)
+        stdin, stdout, stderr = self.proxmox_vim_client.ssh_client.exec_command(command)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status != 0:
             raise VirtualizationProviderProxmoxException(f"Error executing command: {command}")

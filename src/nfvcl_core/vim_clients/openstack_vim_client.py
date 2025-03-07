@@ -1,43 +1,15 @@
-from pathlib import Path
 from typing import Optional, List, Dict
 
 from openstack.image.v2.image import Image
 from openstack.network.v2.network import Network
 
+from nfvcl_core.vim_clients.vim_client import VimClient
 from nfvcl_core_models.openstack.images import ImageRepo
 from nfvcl_core_models.vim import VimModel
-from nfvcl_core.utils.log import create_logger
 import openstack
-import os
 from openstack.connection import Connection
-from nfvcl_core.utils.file_utils import render_file_from_template_to_file
 
-# Logger
-logger = create_logger("OpenStack Client")
-# Client list for the singleton pattern. One client for each OS cloud instance
-clients: dict = {}
-
-def _get_client(cloud_name: str) -> Connection:
-    """
-    It creates and connects a client to an OPENSTACK instance.
-    Allows having ONLY ONE instance for each OS cloud.
-    The configuration file path must be set in 'os.environ["OS_CLIENT_CONFIG_FILE"]' before calling this method.
-    Args:
-        cloud_name: The name of the cloud instance, to be used for the singleton pattern.
-
-    Returns:
-        The OS client for interacting with the cloud. (Openstack.connection.Connection)
-    """
-    if cloud_name in clients.keys():
-        return clients[cloud_name]
-    else:
-        client = openstack.connect(cloud=cloud_name)
-        clients[cloud_name] = client
-        return client
-
-
-
-class OpenStackClient:
+class OpenStackVimClient(VimClient):
     """
     Client that interacts with an Openstack instance
     """
@@ -50,11 +22,24 @@ class OpenStackClient:
         Args:
             vim: the vim on witch the client is build.
         """
-        filepath = render_file_from_template_to_file(Path("src/nfvcl/config_templates/openstack/clouds.yaml"), vim.model_dump(), prefix_to_name=vim.name)
-        os.environ["OS_CLIENT_CONFIG_FILE"] = str(filepath.absolute())
-        # Get the client using a singleton pattern
-        self.client = _get_client(vim.name)
+        super().__init__(vim)
+        self.client = openstack.connect(
+            auth_url=vim.vim_url,
+            project_name=vim.vim_tenant_name,
+            username=vim.vim_user,
+            password=vim.vim_password,
+            region_name="RegionOne",
+            user_domain_name="Default",
+            project_domain_name="Default",
+            app_name='NFVCL',
+            app_version='0.4.0', # TODO: get the version from the package
+        )
+
         self.project_id = self.client.identity.find_project(vim.vim_tenant_name).id
+
+    def close(self):
+        super().close()
+        self.client.close()
 
     def get_available_networks(self) -> Dict[str, Network]:
         shared_networks = list(self.client.network.networks(shared=True))
@@ -155,7 +140,3 @@ class OpenStackClient:
         """
         imported = self.client.image.import_image(image, method="web-download", uri=uri)
         return imported
-
-
-
-

@@ -9,7 +9,9 @@ from .blueprint_manager import BlueprintManager
 from .performance_manager import PerformanceManager
 from .kubernetes_manager import KubernetesManager
 from .pdu_manager import PDUManager
+from .vim_clients_manager import VimClientsManager
 from nfvcl_core.containers import NFVCLContainer
+
 
 @inject
 def get_blueprint_manager(_blueprint_manager: BlueprintManager = Provide[NFVCLContainer.blueprint_manager]) -> BlueprintManager:
@@ -30,3 +32,7 @@ def get_event_manager(_event_manager: EventManager = Provide[NFVCLContainer.even
 @inject
 def get_persistence_manager(_persistence_manager: PersistenceManager = Provide[NFVCLContainer.persistence_manager]) -> PersistenceManager:
     return _persistence_manager
+
+@inject
+def get_vim_clients_manager(_vim_clients_manager: VimClientsManager = Provide[NFVCLContainer.vim_clients_manager]) -> VimClientsManager:
+    return _vim_clients_manager

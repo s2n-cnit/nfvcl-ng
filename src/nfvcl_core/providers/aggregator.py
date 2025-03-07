@@ -50,8 +50,8 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def init(self):
         pass
 
-    def __init__(self, blueprint=None, topology_manager: TopologyManager = None, blueprint_manager=None, pdu_manager=None, performance_manager=None):
-        super().__init__(-1, blueprint.id if blueprint else None, topology_manager, blueprint_manager, pdu_manager=pdu_manager)
+    def __init__(self, blueprint=None, topology_manager: TopologyManager = None, blueprint_manager=None, pdu_manager=None, performance_manager=None,vim_clients_manager=None):
+        super().__init__(-1, blueprint.id if blueprint else None, topology_manager, blueprint_manager, pdu_manager=pdu_manager, vim_clients_manager=vim_clients_manager)
         self.blueprint = blueprint
         self.performance_manager = performance_manager
 
@@ -68,9 +68,9 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
         vim = self.topology.get_vim_by_area(area)
         if area not in self.virt_providers_impl:
             if vim.vim_type == VimTypeEnum.OPENSTACK:
-                self.virt_providers_impl[area] = VirtualizationProviderOpenstack(area, self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, persistence_function=self.blueprint.to_db)
+                self.virt_providers_impl[area] = VirtualizationProviderOpenstack(area, self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.blueprint.to_db)
             elif vim.vim_type == VimTypeEnum.PROXMOX:
-                self.virt_providers_impl[area] = VirtualizationProviderProxmox(area, self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, persistence_function=self.blueprint.to_db)
+                self.virt_providers_impl[area] = VirtualizationProviderProxmox(area, self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.blueprint.to_db)
 
             if str(area) not in self.blueprint.base_model.virt_providers:
                 self.blueprint.base_model.virt_providers[str(area)] = BlueprintNGProviderModel(
@@ -83,7 +83,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
 
     def get_k8s_provider(self, area: int):
         if area not in self.k8s_providers_impl:
-            self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, persistence_function=self.blueprint.to_db)
+            self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.blueprint.to_db)
 
             if str(area) not in self.blueprint.base_model.k8s_providers:
                 self.blueprint.base_model.k8s_providers[str(area)] = BlueprintNGProviderModel(
@@ -97,7 +97,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def get_pdu_provider(self):
         # The area is -1 because there is only one PDUProvider
         if not self.pdu_provider_impl:
-            self.pdu_provider_impl = PDUProvider(area=-1, blueprint_id=self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, pdu_manager=self.pdu_manager, persistence_function=self.blueprint.to_db)
+            self.pdu_provider_impl = PDUProvider(area=-1, blueprint_id=self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, pdu_manager=self.pdu_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.blueprint.to_db)
 
             if not self.blueprint.base_model.pdu_provider:
                 self.blueprint.base_model.pdu_provider = BlueprintNGProviderModel(
@@ -110,7 +110,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def get_blueprint_provider(self):
         # The area is -1 because there is only one BlueprintProvider
         if not self.blueprint_provider_impl:
-            self.blueprint_provider_impl = BlueprintProvider(area=-1, blueprint_id=self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, persistence_function=self.blueprint.to_db)
+            self.blueprint_provider_impl = BlueprintProvider(area=-1, blueprint_id=self.blueprint.id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.blueprint.to_db)
 
             if not self.blueprint.base_model.blueprint_provider:
                 self.blueprint.base_model.blueprint_provider = BlueprintNGProviderModel(

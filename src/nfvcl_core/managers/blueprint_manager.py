@@ -12,7 +12,7 @@ from nfvcl_core_models.performance import BlueprintPerformanceType
 from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
 
 if TYPE_CHECKING:
-    from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager
+    from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager, VimClientsManager
 from nfvcl_core.blueprints import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus
@@ -34,13 +34,14 @@ class BlueprintManager(GenericManager):
     """
     blueprint_dict: Dict[str, BlueprintNG] = {}
 
-    def __init__(self, blueprint_repository: BlueprintRepository, topology_manager: TopologyManager, pdu_manager: PDUManager, performance_manager: PerformanceManager, event_manager: EventManager):
+    def __init__(self, blueprint_repository: BlueprintRepository, topology_manager: TopologyManager, pdu_manager: PDUManager, performance_manager: PerformanceManager, event_manager: EventManager, vim_clients_manager: VimClientsManager):
         super().__init__()
         self._blueprint_repository = blueprint_repository
         self._topology_manager = topology_manager
         self._pdu_manager = pdu_manager
         self._performance_manager = performance_manager
         self._event_manager = event_manager
+        self._vim_clients_manager = vim_clients_manager
 
     def load(self):
         """
@@ -119,7 +120,7 @@ class BlueprintManager(GenericManager):
         """
         for item in self._blueprint_repository.get_all_dict():
             self.logger.debug(f"Loading Blueprint instance {item['id']}")
-            blueprint_instance = BlueprintNG.from_db(item, provider=ProvidersAggregator(topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager))
+            blueprint_instance = BlueprintNG.from_db(item, provider=ProvidersAggregator(topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager, vim_clients_manager=self._vim_clients_manager))
             self.blueprint_dict[item['id']] = blueprint_instance
 
     def create_blueprint(self, path: str, msg: Any, parent_id: str | None = None, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> str:
@@ -152,7 +153,7 @@ class BlueprintManager(GenericManager):
             # Instantiate the object (creation of services is done by the worker)
             created_blue: BlueprintNG = BlueClass(blue_id)
             with created_blue.lock:
-                created_blue.provider = ProvidersAggregator(created_blue, topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager)
+                created_blue.provider = ProvidersAggregator(created_blue, topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager, vim_clients_manager=self._vim_clients_manager)
                 created_blue.base_model.parent_blue_id = parent_id
                 # Saving the new blueprint to db
                 created_blue.to_db()

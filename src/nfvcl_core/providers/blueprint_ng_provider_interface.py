@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 from typing import Callable, Optional, TYPE_CHECKING
 
+from nfvcl_core.managers.vim_clients_manager import VimClientsManager
 from nfvcl_core_models.providers.providers import BlueprintNGProviderData
 from nfvcl_core.utils.log import create_logger
 if TYPE_CHECKING:
@@ -13,10 +14,20 @@ class BlueprintNGProviderInterface(abc.ABC):
     area: int
     data: BlueprintNGProviderData
 
-    def __init__(self, area: int, blueprint_id: str, topology_manager: TopologyManager = None, blueprint_manager: BlueprintManager = None, pdu_manager: PDUManager = None, persistence_function: Optional[Callable] = None):
+    def __init__(
+        self,
+        area: int,
+        blueprint_id: str,
+        topology_manager: TopologyManager = None,
+        blueprint_manager: BlueprintManager = None,
+        pdu_manager: PDUManager = None,
+        vim_clients_manager: VimClientsManager = None,
+        persistence_function: Optional[Callable] = None
+    ):
         super().__init__()
         self.topology_manager = topology_manager
         self.blueprint_manager = blueprint_manager
+        self.vim_clients_manager = vim_clients_manager
         self.pdu_manager = pdu_manager
         self.topology = topology_manager.get_topology()
         self.area = area

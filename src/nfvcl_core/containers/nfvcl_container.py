@@ -2,7 +2,7 @@ from dependency_injector import containers, providers
 
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core.database import TopologyRepository, BlueprintRepository, PerformanceRepository, UserRepository
-from nfvcl_core.managers import PersistenceManager, TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
+from nfvcl_core.managers import PersistenceManager, TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager, VimClientsManager
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
 from nfvcl_core.managers.user_manager import UserManager
@@ -58,6 +58,11 @@ class NFVCLContainer(containers.DeclarativeContainer):
         topology_repository=topology_repository
     )
 
+    vim_clients_manager = providers.Singleton(
+        VimClientsManager,
+        topology_manager=topology_manager
+    )
+
     pdu_manager = providers.Singleton(
         PDUManager,
     )
@@ -74,7 +79,8 @@ class NFVCLContainer(containers.DeclarativeContainer):
         topology_manager=topology_manager,
         pdu_manager=pdu_manager,
         performance_manager=performance_manager,
-        event_manager=event_manager
+        event_manager=event_manager,
+        vim_clients_manager=vim_clients_manager
     )
 
     kubernetes_manager = providers.Singleton(

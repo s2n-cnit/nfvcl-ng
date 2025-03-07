@@ -1,10 +1,11 @@
 from typing import List
 from keystoneauth1.exceptions import Unauthorized
+
+from nfvcl_core.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_core_models.topology_models import TopologyModel
 from openstack.network.v2.network import Network
 from nfvcl_core_models.vim import VimModel
 from nfvcl_core.utils.log import create_logger
-from nfvcl_core.utils.openstack.openstack_client import OpenStackClient
 
 # Logger
 logger = create_logger("OpenStack Client")
@@ -44,7 +45,8 @@ def check_networks(topology: TopologyModel, vim: VimModel) -> bool:
     Returns:
         True if the VIM
     """
-    open_stack_client = OpenStackClient(vim)
+    # TODO this should work but we should instead request the client from the VimClientsManager
+    open_stack_client = OpenStackVimClient(vim)
 
     try:
         # Get the net list from openstack for the specific instance

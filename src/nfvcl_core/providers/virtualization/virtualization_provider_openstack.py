@@ -20,10 +20,10 @@ from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansibl
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
+from nfvcl_core.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
 from nfvcl_core_models.vim import VimModel
-from nfvcl_core.utils.openstack.openstack_client import OpenStackClient
 
 
 class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
@@ -35,7 +35,6 @@ class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
 
 class VirtualizationProviderOpenstackException(VirtualizationProviderException):
     pass
-
 
 class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
     """
@@ -54,29 +53,16 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
 
         return ansible_playbook_builder.build()
 
-
-os_clients_dict: Dict[int, OpenStackClient] = {}
-
-
-def get_os_client_from_vim(vim: VimModel, area: int):
-    global os_clients_dict
-
-    if area not in os_clients_dict:
-        os_clients_dict[area] = OpenStackClient(vim)
-
-    return os_clients_dict[area]
-
-
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     vim: VimModel
-    os_client: OpenStackClient
+    os_client: OpenStackVimClient
     conn: Connection
     vim_need_floating_ip: bool
 
     def init(self):
         self.data: VirtualizationProviderDataOpenstack = VirtualizationProviderDataOpenstack()
         self.vim = self.topology.get_vim_by_area(self.area)
-        self.os_client = get_os_client_from_vim(self.vim, self.area)
+        self.os_client = self.vim_clients_manager.get_openstack_client(self, self.vim.name)
         self.conn = self.os_client.client
         self.vim_need_floating_ip = self.vim.config.use_floating_ip
 

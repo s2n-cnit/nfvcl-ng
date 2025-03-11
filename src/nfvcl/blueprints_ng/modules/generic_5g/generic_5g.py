@@ -6,12 +6,6 @@ from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
-    SubDataNets, NetworkEndPointWithType
-from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
-from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
-    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel
-from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, Slice5GWithDNNs
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_core_models.base_model import NFVCLBaseModel
@@ -21,6 +15,12 @@ from nfvcl_core_models.network import PduModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core_models.network.network_models import PduType, MultusInterface
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
+    SubDataNets, NetworkEndPointWithType, NetworkEndPointType
+from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
+from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
+    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, Slice5GWithDNNs
 
 
 class UPFInfo(NFVCLBaseModel):
@@ -164,7 +164,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
     ####                  START EDGE SECTION                    ####
     ################################################################
 
-    def update_edge_areas(self):
+    def update_edge_areas(self, force: bool = False):
         """
         Deploy new edge areas
         Delete edge areas not needed anymore
@@ -184,7 +184,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
                 # Updating UPF configuration (move to a new method in the future?)
                 updated_config = self._create_upf_config(area.id)
-                if edge_info.upf.current_config != updated_config:
+                if force or edge_info.upf.current_config != updated_config:
                     self.logger.info(f"Updating UPF for area {area.id}")
                     self.provider.call_blueprint_function(edge_info.upf.blue_id, "update", updated_config)
                     self.state.edge_areas[str(area.id)].upf = self.get_upfs_info(area.id, edge_info.upf.blue_id, updated_config)

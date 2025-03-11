@@ -56,10 +56,10 @@ class OpenAirInterfaceUE(Generic5GUEBlueprintNG[OAIUEBlueprintNGState, UEBlueCre
         self.state.oai_ue_config_values.config.opc = self.state.current_config.sims[0].op
         self.state.oai_ue_config_values.config.dnn = self.state.current_config.sims[0].sessions[0].dnn
         self.state.oai_ue_config_values.config.sst = str(self.state.current_config.sims[0].sessions[0].slice.sst)
-        self.state.oai_ue_config_values.config.sd = str(self.state.current_config.sims[0].sessions[0].slice.sd)
+        self.state.oai_ue_config_values.config.sd = str(self.state.current_config.sims[0].sessions[0].slice.sd_as_int())
         self.state.oai_ue_config_values.config.usrp = self.state.current_config.usrp
 
-        additional_options = "--sa -r 106 --numerology 1 -C 3619200000 --log_config.global_log_options level,nocolor,time"
+        additional_options = "-r 106 --numerology 1 -C 3619200000 --log_config.global_log_options level,nocolor,time"
 
         if self.state.current_config.usrp == USRPType.RFSIM:
             self.state.oai_ue_config_values.config.use_additional_options = f"{additional_options} --rfsim"

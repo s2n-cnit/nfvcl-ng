@@ -322,6 +322,7 @@ class Global(NFVCLBaseModel):
     waitForUDR: bool
     http2Param: str
     timeout: int
+    coreconfig: Optional[Coreconfig] = Field(None, alias='currentconfig')
 
 
 class Service(NFVCLBaseModel):
@@ -451,7 +452,6 @@ class OaiCoreValuesModel(NFVCLBaseModel):
     oai_ausf: Optional[OaiAusf] = Field(None, alias='oai-ausf')
     oai_amf: Optional[OaiAmf] = Field(None, alias='oai-amf')
     oai_smf: Optional[OaiSmf] = Field(None, alias='oai-smf')
-    coreconfig: Optional[Coreconfig] = Field(None, alias='currentconfig')
 
 
 class OAIMultusInterface(NFVCLBaseModel):

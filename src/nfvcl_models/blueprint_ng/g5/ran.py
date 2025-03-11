@@ -5,6 +5,7 @@ from pydantic import Field
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core_models.custom_types import AreaIDType
 from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPointWithType
 from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 
@@ -26,8 +27,8 @@ class RANBlueCreateModelGeneric(BlueprintNGCreateModel):
     mnc: str = Field(alias='mnc', pattern=r'^[0-9]*$', min_length=2, max_length=3)
     snssai_list: List[Slice5G] = Field(alias='snssaiList')
     tac: int = Field(alias='tac')
-    area_id: int = Field(alias='area_id')
-    gnb_id: Optional[int] = Field(default=1, alias='gnb_id')  # TODO Controllo sul valore non maggiore di 4095
+    area_id: AreaIDType = Field(alias='area_id')
+    gnb_id: Optional[int] = Field(default=1, alias='gnb_id')
 
 
 ################################ CU ###############################################

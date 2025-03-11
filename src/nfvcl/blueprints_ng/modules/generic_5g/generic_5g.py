@@ -115,6 +115,11 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         for pdu_model in self.get_gnb_pdus():
             if self.provider.is_pdu_locked(pdu_model):
                 raise BlueprintNGException(f"GNB PDU {pdu_model.name} is already locked")
+        for area in self.state.current_config.areas:
+            if area.networks.n6.type == NetworkEndPointType.MULTUS:
+                net = self.provider.topology.get_network(area.networks.n6.net_name)
+                if net.gateway_ip is None:
+                    raise BlueprintNGException(f"To use multus on N6, you must provide a gateway ip for {net.name}")
 
     def configuration_feasibility_check(self, config_model: Create5gModel):
         """

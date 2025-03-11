@@ -2,6 +2,7 @@ from .dns import *
 from .example import *
 from .free5gc.free5gc_core import *
 from .free5gc.free5gc_upf import *
+from .free5gc.free5gc_upf_k8s import *
 from .example_pdu import *
 from .k8s import *
 from .oai.oai_core import *

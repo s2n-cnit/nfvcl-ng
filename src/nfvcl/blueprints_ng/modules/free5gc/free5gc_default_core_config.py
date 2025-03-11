@@ -4,11 +4,11 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
     {
         "global": {
             "name": "free5gc",
-            "userPlaneArchitecture": "ulcl",
+            "userPlaneArchitecture": "single",
             "nrf": {
                 "service": {
                     "name": "nrf-nnrf",
-                    "type": "LoadBalancer",
+                    "type": "ClusterIP",
                     "port": "8000",
                     "nodePort": "30800"
                 }
@@ -22,7 +22,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                 },
                 "service": {
                     "ngap": {
-                        "enabled": True,
+                        "enabled": False,
                         "name": "amf-n2",
                         "port": 38412,
                         "nodeport": 31412,
@@ -33,8 +33,58 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
             },
             "smf": {
                 "n4if": {
-                    "ipAddress": "10.180.0.28"
+                    "ipAddress": "0.0.0.0"
                 }
+            },
+            "n2network": {
+                "enabled": False,
+                "name": "n2network",
+                "type": "macvlan",
+                "masterIf": "ens4",
+                "subnetIP": "10.180.0.0",
+                "cidr": 16,
+                "gatewayIP": None,
+                "excludeIP": None
+            },
+            "n3network": {
+                "enabled": False,
+                "name": "n3network",
+                "type": "macvlan",
+                "masterIf": "ens4",
+                "subnetIP": "10.180.0.0",
+                "cidr": 16,
+                "gatewayIP": None,
+                "excludeIP": None
+            },
+            "n4network": {
+                "enabled": False,
+                "name": "n4network",
+                "type": "macvlan",
+                "masterIf": "ens4",
+                "subnetIP": "10.180.0.0",
+                "cidr": 16,
+                "gatewayIP": None,
+                "excludeIP": None
+            },
+            "n6network": {
+                "enabled": False,
+                "name": "n6network",
+                "type": "ipvlan",
+                "masterIf": "ens4",
+                "subnetIP": "10.180.0.0",
+                "cidr": 16,
+                "gatewayIP": None,
+                "excludeIP": None
+            },
+            "n9network": {
+                "enabled": False,
+                "name": "n9network",
+                "type": "ipvlan",
+                "masterIf": "ens4",
+                "subnetIP": "10.180.0.0",
+                "cidr": 16,
+                "gatewayIP": None,
+                "excludeIP": None
             }
         },
         "deployMongoDb": True,
@@ -57,10 +107,6 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
             },
             "nrf": {
                 "configuration": {
-                    "serviceNameList": [
-                        "nnrf-nfm",
-                        "nnrf-disc"
-                    ],
                     "oauthConfiguration": {
                         "oauth": False
                     },
@@ -72,7 +118,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                     },
                     "logger": {
                         "enable": True,
-                        "level": "info",
+                        "level": "debug",
                         "reportCaller": False
                     }
                 }
@@ -99,22 +145,8 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "free5gc-amf": {
             "amf": {
                 "configuration": {
-                    "serviceNameList": [
-                        "namf-comm",
-                        "namf-evts",
-                        "namf-mt",
-                        "namf-loc",
-                        "namf-oam"
-                    ],
                     "configuration": {
                         "amfName": "AMF",
-                        "serviceNameList": [
-                            "namf-comm",
-                            "namf-evts",
-                            "namf-mt",
-                            "namf-loc",
-                            "namf-oam"
-                        ],
                         "servedGuamiList": [
                             {
                                 "plmnId": {
@@ -150,87 +182,11 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                         "supportDnnList": [
                             "internet"
                         ],
-                        "security": {
-                            "integrityOrder": [
-                                "NIA2"
-                            ],
-                            "cipheringOrder": [
-                                "NEA0"
-                            ]
-                        },
-                        "networkName": {
-                            "full": "free5GC",
-                            "short": "free"
-                        },
-                        "ngapIE": {
-                            "mobilityRestrictionList": {
-                                "enable": True
-                            },
-                            "maskedIMEISV": {
-                                "enable": True
-                            },
-                            "redirectionVoiceFallback": {
-                                "enable": False
-                            }
-                        },
-                        "nasIE": {
-                            "networkFeatureSupport5GS": {
-                                "enable": True,
-                                "length": 1,
-                                "imsVoPS": 0,
-                                "emc": 0,
-                                "emf": 0,
-                                "iwkN26": 0,
-                                "mpsi": 0,
-                                "emcN3": 0,
-                                "mcsi": 0
-                            }
-                        },
-                        "t3502Value": 720,
-                        "t3512Value": 3600,
-                        "non3gppDeregTimerValue": 3240,
-                        "t3513": {
-                            "enable": True,
-                            "expireTime": "6s",
-                            "maxRetryTimes": 4
-                        },
-                        "t3522": {
-                            "enable": True,
-                            "expireTime": "6s",
-                            "maxRetryTimes": 4
-                        },
-                        "t3550": {
-                            "enable": True,
-                            "expireTime": "6s",
-                            "maxRetryTimes": 4
-                        },
-                        "t3560": {
-                            "enable": True,
-                            "expireTime": "6s",
-                            "maxRetryTimes": 4
-                        },
-                        "t3565": {
-                            "enable": True,
-                            "expireTime": "6s",
-                            "maxRetryTimes": 4
-                        },
-                        "t3570": {
-                            "enable": True,
-                            "expireTime": "6s",
-                            "maxRetryTimes": 4
-                        },
                         "locality": "area1",
-                        "sctp": {
-                            "numOstreams": 3,
-                            "maxInstreams": 5,
-                            "maxAttempts": 2,
-                            "maxInitTimeout": 2
-                        },
-                        "defaultUECtxReq": False
                     },
                     "logger": {
                         "enable": True,
-                        "level": "info",
+                        "level": "debug",
                         "reportCaller": False
                     }
                 }
@@ -238,12 +194,11 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         },
         "free5gc-smf": {
             "smf": {
+                "service": {
+                    "type": "ClusterIP",
+                    "port": 80
+                },
                 "configuration": {
-                    "serviceNameList": [
-                        "nsmf-pdusession",
-                        "nsmf-event-exposure",
-                        "nsmf-oam"
-                    ],
                     "configuration": {
                         "smfName": "SMF",
                         "snssaiInfos": [
@@ -318,21 +273,11 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                                 }
                             ]
                         },
-                        "locality": "area1",
-                        "t3591": {
-                            "enable": True,
-                            "expireTime": "16s",
-                            "maxRetryTimes": 3
-                        },
-                        "t3592": {
-                            "enable": True,
-                            "expireTime": "16s",
-                            "maxRetryTimes": 3
-                        }
+                        "locality": "area1"
                     },
                     "logger": {
                         "enable": True,
-                        "level": "info",
+                        "level": "debug",
                         "reportCaller": False
                     }
                 }
@@ -341,22 +286,17 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "free5gc-ausf": {
             "ausf": {
                 "configuration": {
-                    "serviceNameList": [
-                        "nausf-auth"
-                    ],
                     "configuration": {
                         "plmnSupportList": [
                             {
                                 "mcc": "001",
                                 "mnc": "01"
                             }
-                        ],
-                        "groupId": "ausfGroup001",
-                        "eapAkaSupiImsiPrefix": False
+                        ]
                     },
                     "logger": {
                         "enable": True,
-                        "level": "info",
+                        "level": "debug",
                         "reportCaller": False
                     }
                 }
@@ -365,10 +305,6 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "free5gc-nssf": {
             "nssf": {
                 "configuration": {
-                    "serviceNameList": [
-                        "nnssf-nsselection",
-                        "nnssf-nssaiavailability"
-                    ],
                     "configuration": {
                         "nssfName": "NSSF",
                         "supportedPlmnList": [
@@ -399,31 +335,8 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                                 },
                                 "nsiInformationList": [
                                     {
-                                        "nrfId": "http://nrf-nrrf:8000/nnrf-nfm/v1/nf-instances",
+                                        "nrfId": "http://nrf-nnrf:8000/nnrf-nfm/v1/nf-instances",
                                         "nsiId": 10
-                                    }
-                                ]
-                            }
-                        ],
-                        "amfSetList": [
-                            {
-                                "amfSetId": 1,
-                                "nrfAmfSet": "http://nrf-nrrf:8000/nnrf-nfm/v1/nf-instances",
-                                "supportedNssaiAvailabilityData": [
-                                    {
-                                        "tai": {
-                                            "plmnId": {
-                                                "mcc": "001",
-                                                "mnc": "01"
-                                            },
-                                            "tac": "000000",
-                                        },
-                                        "supportedSnssaiList": [
-                                            {
-                                                "sst": 1,
-                                                "sd": "000001"
-                                            }
-                                        ]
                                     }
                                 ]
                             }
@@ -449,7 +362,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                     },
                     "logger": {
                         "enable": True,
-                        "level": "info",
+                        "level": "debug",
                         "reportCaller": False
                     }
                 }
@@ -458,28 +371,6 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "free5gc-pcf": {
             "pcf": {
                 "configuration": {
-                    "serviceList": [
-                        {
-                            "serviceName": "npcf-am-policy-control"
-                        },
-                        {
-                            "serviceName": "npcf-smpolicycontrol",
-                            "suppFeat": "3fff"
-                        },
-                        {
-                            "serviceName": "npcf-bdtpolicycontrol"
-                        },
-                        {
-                            "serviceName": "npcf-policyauthorization",
-                            "suppFeat": "3"
-                        },
-                        {
-                            "serviceName": "npcf-eventexposure"
-                        },
-                        {
-                            "serviceName": "npcf-ue-policy-control"
-                        }
-                    ],
                     "configuration": {
                         "pcfName": "PCF",
                         "timeFormat": "2019-01-02 15:04:05",
@@ -488,7 +379,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                     },
                     "logger": {
                         "enable": True,
-                        "level": "info",
+                        "level": "debug",
                         "reportCaller": False
                     }
                 }
@@ -497,13 +388,6 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "free5gc-udm": {
             "udm": {
                 "configuration": {
-                    "serviceNameList": [
-                        "nudm-sdm",
-                        "nudm-uecm",
-                        "nudm-ueau",
-                        "nudm-ee",
-                        "nudm-pp"
-                    ],
                     "configuration": {
                         "SuciProfile": [
                             {
@@ -520,7 +404,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                     },
                     "logger": {
                         "enable": True,
-                        "level": "info",
+                        "level": "debug",
                         "reportCaller": False
                     }
                 }
@@ -531,7 +415,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                 "configuration": {
                     "logger": {
                         "enable": True,
-                        "level": "info",
+                        "level": "debug",
                         "reportCaller": False
                     }
                 }
@@ -540,28 +424,22 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "free5gc-chf": {
             "chf": {
                 "configuration": {
-                    "serviceNameList": [
-                        "nchf-convergedcharging"
-                    ]
+                    "logger": {
+                        "enable": True,
+                        "level": "debug",
+                        "reportCaller": False
+                    }
                 }
             }
         },
         "free5gc-nef": {
             "nef": {
                 "configuration": {
-                    "serviceList": [
-                        {
-                            "serviceName": "nnef-pfdmanagement"
-                        },
-                        {
-                            "serviceName": "nnef-oam"
-                        }
-                    ]
-                },
-                "logger": {
-                    "enable": True,
-                    "level": "info",
-                    "reportCaller": False
+                    "logger": {
+                        "enable": True,
+                        "level": "debug",
+                        "reportCaller": False
+                    }
                 }
             }
         }

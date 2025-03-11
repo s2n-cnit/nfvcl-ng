@@ -4,12 +4,13 @@ import string
 from typing import Optional, Dict, List, Tuple
 
 import httpx
+from anyio import sleep
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_core_config, free5gc_subscriber_config
 from nfvcl.blueprints_ng.modules.free5gc.free5gc_upf.Free5gcUpf_blue import FREE5GC_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNGState, Generic5GK8sBlueprintNG
-from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubArea, SubSliceProfiles, SubSubscribers, SubDataNets
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubArea, SubSliceProfiles, SubSubscribers, SubDataNets, NetworkEndPointType
 from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Free5gcCoreConfig, Snssai, Free5gcLogin, Free5gcSubScriber
 from nfvcl_models.blueprint_ng.g5.core import Core5GDelTacModel, Core5GAddTacModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GDelSubscriberModel, Core5GAddSubscriberModel, NF5GType, Core5GAddDnnModel, Core5GDelDnnModel
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
@@ -54,6 +55,7 @@ class Free5gcBlueprintNGState(Generic5GK8sBlueprintNGState):
 
 @blueprint_type(FREE5GC_CORE_BLUE_TYPE)
 class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreateModel]):
+
     default_upf_implementation = FREE5GC_UPF_BLUE_TYPE
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = Free5gcBlueprintNGState):
@@ -65,7 +67,7 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
 
     def network_functions_dictionary(self) -> Dict[NF5GType, Tuple[str, str]]:
         return {
-            NF5GType.AMF: ("amf", "free5gc-free5gc-amf-amf-n2"),
+            NF5GType.AMF: ("amf", "free5gc-free5gc-amf-amf-n2") if self.state.free5gc_config_values.global_.amf.service.ngap.enabled else ("amf", "free5gc-free5gc-amf-service"),
             NF5GType.AUSF: ("ausf", "free5gc-free5gc-ausf-service"),
             NF5GType.NRF: ("nrf", "nrf-nnrf"),
             NF5GType.SMF: ("smf", "free5gc-free5gc-smf-service"),
@@ -90,7 +92,7 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
             area=core_area.id,
             name="free5gc",
             # repo="https://mysql.github.io/mysql-operator/",
-            chart="helm_charts/charts/free5gc-3.4.4.tgz",
+            chart="helm_charts/charts/free5gc-4.0.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
             namespace=self.id
@@ -108,13 +110,16 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
         )
 
         self.update_k8s_network_functions()
-        self.state.smf_ip = self.state.k8s_network_functions[NF5GType.SMF].service.external_ip[0]
+        if self.state.network_endpoints.n4 is None:
+            self.state.smf_ip = self.state.k8s_network_functions[NF5GType.SMF].service.external_ip[0]
         self.state.webui_ip = self.state.k8s_network_functions[NF5GType.WEBUI].service.external_ip[0]
 
         self.state.base_webui_api = f"http://{self.state.webui_ip}:5000/api"
 
         self.update_core_values()
         self.update_core()
+        # if self.state.network_endpoints.n4:
+        #     self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments['smf'].name)
 
         for subscriber in create_model.config.subscribers.copy():
             self.add_ues(subscriber)
@@ -135,8 +140,23 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
 
         # TODO this should also disable the cert-pvc
         self.state.free5gc_config_values.mongodb.persistence.enabled = self.state.current_config.config.persistence.enabled
+        self.state.free5gc_config_values.global_.nrf.service.type = "LoadBalancer"
         # TODO this value is not present in the current config
         # self.state.free5gc_config_values.mongodb.persistence.storageClass = self.state.current_config.config.persistence.storageClass
+
+        if self.state.network_endpoints.n2 and self.state.network_endpoints.n2.type == NetworkEndPointType.MULTUS:
+            self.state.free5gc_config_values.global_.n2network.set_multus(True, self.state.network_endpoints.n2.multus)
+            self.state.free5gc_config_values.global_.amf.service.ngap.enabled = False
+            self.state.free5gc_config_values.set_amf_ip(self.state.network_endpoints.n2.multus.ip_address.exploded)
+        else:
+            self.state.free5gc_config_values.global_.amf.service.ngap.enabled = True
+
+        if self.state.network_endpoints.n4 and self.state.network_endpoints.n4.type == NetworkEndPointType.MULTUS:
+            self.state.free5gc_config_values.global_.n4network.set_multus(True, self.state.network_endpoints.n4.multus)
+            self.state.free5gc_config_values.set_smf_ip(self.state.network_endpoints.n4.multus.ip_address.exploded)
+        else:
+            self.state.free5gc_config_values.free5gc_smf.smf.service.type = "LoadBalancer"
+            self.state.free5gc_config_values.set_smf_ip("0.0.0.0")
 
         if self.state.smf_ip:
             self.state.free5gc_config_values.set_smf_ip(self.state.smf_ip)
@@ -160,7 +180,7 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
                 self.state.free5gc_config_values.add_supportedsnssailist_item_nssf(self.state.mcc, self.state.mnc, _slice)
                 self.state.free5gc_config_values.add_nsi_list_item_nssf(sub_slice.sliceType, sub_slice.sliceId, self.state.nsi_nssf_id)
                 self.state.nsi_nssf_id = self.state.nsi_nssf_id + 1
-                self.state.free5gc_config_values.add_supported_nssai_nssf(self.state.supported_nssai_availability_nssf_id, self.state.mcc, self.state.mnc, str(sub_area.id).zfill(6), _slice)
+                # self.state.free5gc_config_values.add_supported_nssai_nssf(self.state.supported_nssai_availability_nssf_id, self.state.mcc, self.state.mnc, str(sub_area.id).zfill(6), _slice)
                 self.state.supported_nssai_availability_nssf_id = self.state.supported_nssai_availability_nssf_id + 1
                 self.state.free5gc_config_values.add_tai_supportedsnssailist_nssf_item(self.state.mcc, self.state.mnc, str(sub_area.id).zfill(6), _slice)
 
@@ -169,7 +189,6 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
                     self.state.free5gc_config_values.add_dnn_amf_item(dnn)
                     self.state.free5gc_config_values.add_dnn_info_smf_item(dnn, _dnn.dns, _slice)
                     self.state.free5gc_config_values.add_dnnupfinfolist_smf(f"gNB{sub_area.id}", f"UPF{sub_area.id}", deployed_upf_info.network_info.n4_ip.exploded, deployed_upf_info.network_info.n3_ip.exploded, sub_slice.sliceType, sub_slice.sliceId, dnn, _dnn.pools[0].cidr)
-
 
     def update_core(self):
         """
@@ -180,6 +199,11 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
             self.state.core_helm_chart,
             self.state.free5gc_config_values.model_dump(exclude_none=True, by_alias=True)
         )
+
+    def post_creation(self):
+        nfs = self.network_functions_dictionary()
+        smf_dep = nfs[NF5GType.SMF][0]
+        self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments[smf_dep].name)
 
     def get_gpsi(self):
         """

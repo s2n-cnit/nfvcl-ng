@@ -94,7 +94,7 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
         upf_vm = VmResource(
             area=self.state.current_config.area_id,
             name=f"{self.id}_FREE5GC_UPF_{self.state.current_config.area_id}",
-            image=VmResourceImage(name="Free5GC_UPF_3.4.4", url="https://images.tnt-lab.unige.it/free5gcupf/free5gcupf-v3.4.4-ubuntu2204.qcow2"),
+            image=VmResourceImage(name="Free5GC_UPF_4.0.0", url="https://images.tnt-lab.unige.it/free5gcupf/free5gcupf-v4.0.0-ubuntu2204.qcow2"),
             flavor=VmResourceFlavor(),
             username="ubuntu",
             password="ubuntu",

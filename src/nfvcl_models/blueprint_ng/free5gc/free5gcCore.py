@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import ipaddress
 import re
+import socket
+import struct
 from typing import Optional, List, Dict, Union, Literal, Annotated
 
 from pydantic import Field, RootModel, field_validator
 
+from nfvcl_core_models.network.network_models import MultusInterface
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
 from nfvcl_core_models.base_model import NFVCLBaseModel
 
@@ -12,10 +16,10 @@ ok_regex = re.compile(r'^([a-fA-F0-9]{6})$')
 
 
 class Service(NFVCLBaseModel):
-    name: str
+    name: Optional[str] = Field(default=None)
     type: str
     port: int
-    node_port: str = Field(..., alias='nodePort')
+    node_port: Optional[str] = Field(default=None, alias='nodePort')
 
 
 class Nrf(NFVCLBaseModel):
@@ -26,7 +30,7 @@ class Sbi(NFVCLBaseModel):
     scheme: str
 
 
-class N2if(NFVCLBaseModel):
+class Nif(NFVCLBaseModel):
     ip_address: str = Field(..., alias='ipAddress')
 
 
@@ -44,7 +48,7 @@ class AmfService(NFVCLBaseModel):
 
 
 class Amf(NFVCLBaseModel):
-    n2if: N2if
+    n2if: Nif
     service: AmfService = Field(..., alias='service')
 
 
@@ -53,16 +57,40 @@ class N4if(NFVCLBaseModel):
 
 
 class Smf(NFVCLBaseModel):
-    n4if: N4if
+    n4if: Nif
+
+
+class Nnetwork(NFVCLBaseModel):
+    enabled: bool
+    name: str
+    type: str
+    master_if: str = Field(..., alias='masterIf')
+    subnet_ip: str = Field(..., alias='subnetIP')
+    cidr: int
+    gateway_ip: Optional[str] = Field(default=None, alias='gatewayIP')
+    exclude_ip: Optional[str] = Field(default=None, alias='excludeIP')
+
+    def set_multus(self, create: bool, multus_interface: MultusInterface):
+        self.enabled = create
+        self.type = "macvlan"
+        self.subnet_ip = multus_interface.network_cidr.network_address.exploded
+        self.cidr = multus_interface.prefixlen
+        self.gateway_ip = multus_interface.gateway_ip.exploded if multus_interface.gateway_ip else None
+        self.master_if = multus_interface.host_interface
 
 
 class Global(NFVCLBaseModel):
     name: str
-    user_plane_architecture: str = Field(..., alias='userPlaneArchitecture')
+    user_plane_architecture: str = Field(default="single", alias='userPlaneArchitecture')
     nrf: Nrf
     sbi: Sbi
     amf: Amf
     smf: Smf
+    n2network: Optional[Nnetwork] = Field(default=None, alias='n2network')
+    n3network: Optional[Nnetwork] = Field(default=None, alias='n3network')
+    n4network: Optional[Nnetwork] = Field(default=None, alias='n4network')
+    n6network: Optional[Nnetwork] = Field(default=None, alias='n6network')
+    n9network: Optional[Nnetwork] = Field(default=None, alias='n9network')
 
 
 class Auth(NFVCLBaseModel):
@@ -150,6 +178,14 @@ class Free5gcCoreConfig(NFVCLBaseModel):
     ###############################################################################
     ##################################### AMF #####################################
     ###############################################################################
+
+    def set_amf_ip(self, ip: str):
+        """
+        Args:
+            ip: ip to set
+
+        """
+        self.global_.amf.n2if.ip_address = ip
 
     def add_item_amf_servedGuamiList(self, mcc: str, mnc: str):
         """
@@ -635,7 +671,7 @@ class Free5gcCoreConfig(NFVCLBaseModel):
         # self.free5gc_nssf.nssf.configuration.nssf_configuration.amf_list.clear()
         self.free5gc_nssf.nssf.configuration.nssf_configuration.ta_list.clear()
         # self.free5gc_nssf.nssf.configuration.nssf_configuration.mapping_list_from_plmn.clear()
-        self.free5gc_nssf.nssf.configuration.nssf_configuration.amf_set_list.clear()
+        # self.free5gc_nssf.nssf.configuration.nssf_configuration.amf_set_list.clear()
         self.free5gc_nssf.nssf.configuration.nssf_configuration.nsi_list.clear()
 
 
@@ -745,8 +781,8 @@ class SmfConfig(NFVCLBaseModel):
         ..., alias='userplaneInformation'
     )
     locality: str
-    t3591: T3591
-    t3592: T3592
+    t3591: Optional[T3591] = Field(default=None)
+    t3592: Optional[T3592] = Field(default=None)
 
 
 class TopologyItem(NFVCLBaseModel):
@@ -770,13 +806,14 @@ class UeRoutingInfo(RootModel):
 
 
 class ConfigurationSmf(NFVCLBaseModel):
-    service_name_list: List[str] = Field(..., alias='serviceNameList')
+    service_name_list: Optional[List[str]] = Field(default=None, alias='serviceNameList')
     ue_routing_info: Optional[UeRoutingInfo] = Field(default=None, alias='ueRoutingInfo')
     smf_configuration: SmfConfig = Field(None, alias='configuration')
     logger: Logger = Field(default=None, alias='logger')
 
 
 class Smf1(NFVCLBaseModel):
+    service: Service = Field(..., alias='service')
     configuration: ConfigurationSmf = Field(default=None, alias='configuration')
 
 
@@ -910,31 +947,31 @@ class Sctp(NFVCLBaseModel):
 
 class AmfConfig(NFVCLBaseModel):
     amf_name: str = Field(..., alias='amfName')
-    service_name_list: List[str] = Field(..., alias='serviceNameList')
+    service_name_list: Optional[List[str]] = Field(default=None, alias='serviceNameList')
     served_guami_list: List[ServedGuamiListItem] = Field(..., alias='servedGuamiList')
     support_tai_list: List[SupportTaiListItem] = Field(..., alias='supportTaiList')
     plmn_support_list: List[PlmnSupportListItem] = Field(..., alias='plmnSupportList')
     support_dnn_list: List[str] = Field(..., alias='supportDnnList')
-    security: Security
-    network_name: NetworkName = Field(..., alias='networkName')
-    ngap_ie: NgapIe = Field(..., alias='ngapIE')
-    nas_ie: NasIe = Field(..., alias='nasIE')
-    t3502_value: int = Field(..., alias='t3502Value')
-    t3512_value: int = Field(..., alias='t3512Value')
-    non3gpp_dereg_timer_value: int = Field(..., alias='non3gppDeregTimerValue')
-    t3513: T3513
-    t3522: T3522
-    t3550: T3550
-    t3560: T3560
-    t3565: T3565
-    t3570: T3570
+    security: Optional[Security] = Field(default=None)
+    network_name: Optional[NetworkName] = Field(default=None, alias='networkName')
+    ngap_ie: Optional[NgapIe] = Field(default=None, alias='ngapIE')
+    nas_ie: Optional[NasIe] = Field(default=None, alias='nasIE')
+    t3502_value: Optional[int] = Field(default=None, alias='t3502Value')
+    t3512_value: Optional[int] = Field(default=None, alias='t3512Value')
+    non3gpp_dereg_timer_value: Optional[int] = Field(default=None, alias='non3gppDeregTimerValue')
+    t3513: Optional[T3513] = Field(default=None)
+    t3522: Optional[T3522] = Field(default=None)
+    t3550: Optional[T3550] = Field(default=None)
+    t3560: Optional[T3560] = Field(default=None)
+    t3565: Optional[T3565] = Field(default=None)
+    t3570: Optional[T3570] = Field(default=None)
     locality: str
-    sctp: Sctp
-    default_ue_ctx_req: bool = Field(..., alias='defaultUECtxReq')
+    sctp: Optional[Sctp] = Field(default=None)
+    default_ue_ctx_req: Optional[bool] = Field(default=None, alias='defaultUECtxReq')
 
 
 class ConfigurationAmf(NFVCLBaseModel):
-    service_name_list: List[str] = Field(..., alias='serviceNameList')
+    service_name_list: Optional[List[str]] = Field(default=None, alias='serviceNameList')
     amf_configuration: AmfConfig = Field(None, alias='configuration')
     logger: Logger = Field(default=None, alias='logger')
 
@@ -962,7 +999,7 @@ class NrfConfiguration(NFVCLBaseModel):
 
 
 class ConfigurationNrf(NFVCLBaseModel):
-    service_name_list: List[str] = Field(..., alias='serviceNameList')
+    service_name_list: Optional[List[str]] = Field(default=None, alias='serviceNameList')
     oauthConfiguration: OauthConfiguration = Field(None, alias='oauthConfiguration')
     nrf_configuration: NrfConfiguration = Field(default=None, alias='configuration')
     logger: Logger
@@ -981,12 +1018,12 @@ class Free5gcNrf(NFVCLBaseModel):
 
 class AusfConfig(NFVCLBaseModel):
     plmn_support_list: List[PlmnId] = Field(..., alias='plmnSupportList')
-    group_id: str = Field(..., alias='groupId')
-    eap_aka_supi_imsi_prefix: bool = Field(..., alias='eapAkaSupiImsiPrefix')
+    group_id: Optional[str] = Field(default=None, alias='groupId')
+    eap_aka_supi_imsi_prefix: Optional[bool] = Field(default=None, alias='eapAkaSupiImsiPrefix')
 
 
 class ConfigurationAusf(NFVCLBaseModel):
-    service_name_list: List[str] = Field(..., alias='serviceNameList')
+    service_name_list: Optional[List[str]] = Field(default=None, alias='serviceNameList')
     ausf_configuration: AusfConfig = Field(None, alias='configuration')
     logger: Logger
 
@@ -1171,7 +1208,7 @@ class MappingListFromPlmnItem(NFVCLBaseModel):
 
 
 class NssfConfiguration(NFVCLBaseModel):
-    nssf_name: str = Field(..., alias='nssfName')
+    nssf_name: str = Field(default="NSSF", alias='nssfName')
     supported_plmn_list: List[PlmnId] = Field(
         ..., alias='supportedPlmnList'
     )
@@ -1179,7 +1216,7 @@ class NssfConfiguration(NFVCLBaseModel):
         ..., alias='supportedNssaiInPlmnList'
     )
     nsi_list: List[NsiListItem] = Field(..., alias='nsiList')
-    amf_set_list: List[AmfSetListItem] = Field(..., alias='amfSetList')
+    amf_set_list: Optional[List[AmfSetListItem]] = Field(default=None, alias='amfSetList')
     amf_list: Optional[List[AmfListItem]] = Field(None, alias='amfList')
     ta_list: List[TaListItem] = Field(..., alias='taList')
     mapping_list_from_plmn: Optional[List[MappingListFromPlmnItem]] = Field(
@@ -1188,7 +1225,7 @@ class NssfConfiguration(NFVCLBaseModel):
 
 
 class ConfigurationNssf(NFVCLBaseModel):
-    service_name_list: List[str] = Field(..., alias='serviceNameList')
+    service_name_list: Optional[List[str]] = Field(default=None, alias='serviceNameList')
     nssf_configuration: NssfConfiguration = Field(None, alias='configuration')
     logger: Logger
 
@@ -1216,7 +1253,7 @@ class PcfConfiguration(NFVCLBaseModel):
 
 
 class ConfigurationPcf(NFVCLBaseModel):
-    service_list: List[ServiceListItem] = Field(..., alias='serviceList')
+    service_list: Optional[List[ServiceListItem]] = Field(default=None, alias='serviceList')
     pcf_configuration: PcfConfiguration = Field(None, alias='configuration')
     logger: Logger
 
@@ -1242,7 +1279,7 @@ class UdmConfiguration(NFVCLBaseModel):
 
 
 class ConfigurationUdm(NFVCLBaseModel):
-    service_name_list: List[str] = Field(..., alias='serviceNameList')
+    service_name_list: Optional[List[str]] = Field(default=None, alias='serviceNameList')
     udm_configuration: UdmConfiguration = Field(None, alias='configuration')
     logger: Logger
 
@@ -1264,7 +1301,7 @@ class UdrConfiguration(NFVCLBaseModel):
 
 class ConfigurationUdr(NFVCLBaseModel):
     service_name_list: Optional[List[str]] = Field(default_factory=list, alias='serviceNameList')
-    udr_configuration: Optional[UdrConfiguration] = Field(default=None, alias='serviceNameList')
+    udr_configuration: Optional[UdrConfiguration] = Field(default=None, alias='configuration')
     logger: Logger
 
 
@@ -1278,8 +1315,14 @@ class Free5gcUdr(NFVCLBaseModel):
 
 ################################################ CHF ######################################################
 
+class ChfConfiguration(NFVCLBaseModel):
+    pass
+
+
 class ConfigurationChf(NFVCLBaseModel):
-    service_name_list: List[str] = Field(..., alias='serviceNameList')
+    service_name_list: Optional[List[str]] = Field(default=None, alias='serviceNameList')
+    chf_configuration: Optional[ChfConfiguration] = Field(default=None, alias='configuration')
+    logger: Logger
 
 
 class Chf(NFVCLBaseModel):
@@ -1292,14 +1335,18 @@ class Free5gcChf(NFVCLBaseModel):
 
 ################################################ NEF ######################################################
 
+class NefConfiguration(NFVCLBaseModel):
+    pass
+
 
 class ConfigurationNef(NFVCLBaseModel):
-    service_list: List[ServiceListItem] = Field(..., alias='serviceList')
+    service_list: Optional[List[ServiceListItem]] = Field(default=None, alias='serviceList')
+    nef_configuration: Optional[NefConfiguration] = Field(default=None, alias='configuration')
+    logger: Logger
 
 
 class Nef(NFVCLBaseModel):
     configuration: ConfigurationNef
-    logger: Logger
 
 
 class Free5gcNef(NFVCLBaseModel):

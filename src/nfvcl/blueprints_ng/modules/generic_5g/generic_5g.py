@@ -97,6 +97,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         self.update_edge_areas()
         # Update the attached GNBs
         self.update_gnb_config()
+
+        self.post_creation()
         self.logger.success("5G Blueprint completely deployed")
 
     def get_core_area_id(self) -> int:
@@ -133,6 +135,9 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             ddns.extend(slice.dnnList)
         if len(list(set(ddns))) < len(ddns):
             raise BlueprintNGException("Cannot have multiple slices with the same DNN")
+
+    def post_creation(self) -> str:
+        pass
 
     @abstractmethod
     def prepare_network(self):

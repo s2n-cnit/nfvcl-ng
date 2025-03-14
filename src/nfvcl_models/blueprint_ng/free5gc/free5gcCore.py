@@ -82,6 +82,7 @@ class Nnetwork(NFVCLBaseModel):
 class Global(NFVCLBaseModel):
     name: str
     user_plane_architecture: str = Field(default="single", alias='userPlaneArchitecture')
+    cert: bool = Field(default=False)
     nrf: Nrf
     sbi: Sbi
     amf: Amf

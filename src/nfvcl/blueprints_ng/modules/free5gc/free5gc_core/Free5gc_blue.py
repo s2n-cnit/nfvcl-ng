@@ -140,6 +140,7 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
 
         # TODO this should also disable the cert-pvc
         self.state.free5gc_config_values.mongodb.persistence.enabled = self.state.current_config.config.persistence.enabled
+        self.state.free5gc_config_values.global_.cert = self.state.current_config.config.persistence.enabled
         self.state.free5gc_config_values.global_.nrf.service.type = "LoadBalancer"
         # TODO this value is not present in the current config
         # self.state.free5gc_config_values.mongodb.persistence.storageClass = self.state.current_config.config.persistence.storageClass

@@ -5,6 +5,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
         "global": {
             "name": "free5gc",
             "userPlaneArchitecture": "single",
+            "cert": False,
             "nrf": {
                 "service": {
                     "name": "nrf-nnrf",

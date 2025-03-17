@@ -1,7 +1,9 @@
+import copy
 import re
 from typing import Optional, List
 
 from pydantic import Field
+from starlette.responses import PlainTextResponse
 
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
@@ -433,6 +435,14 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         master_conf.install_istio()
         master_result = self.provider.configure_vm(master_conf)
         # TODO expose prometheus to external using nodeport
+
+    @day2_function("/root_kubeconfig", [HttpRequestType.GET])
+    def get_root_kubeconfig(self) -> PlainTextResponse:
+        """
+        Return the kubeconfig file for the root user.
+        """
+        copy_kubeconfig = copy.deepcopy(self.state.master_credentials)
+        return PlainTextResponse(copy_kubeconfig, media_type="text/plain")
 
     def destroy(self):
         """

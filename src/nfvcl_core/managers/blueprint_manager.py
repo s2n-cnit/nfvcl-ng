@@ -6,6 +6,7 @@ from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 from nfvcl_core.database import BlueprintRepository
 from nfvcl_core.managers import GenericManager, EventManager
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj
+from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
 from nfvcl_core_models.performance import BlueprintPerformanceType
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
     from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager, VimClientsManager
 from nfvcl_core.blueprints import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus, RegisteredBlueprintCall
 from nfvcl_core_models.resources import VmResource
 from nfvcl_core_models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
@@ -165,6 +166,10 @@ class BlueprintManager(GenericManager):
 
                 performance_operation_id = self._performance_manager.start_operation(created_blue.id, BlueprintPerformanceType.DAY0, "create")
                 try:
+                    if isinstance(msg, NFVCLBaseModel):
+                        created_blue.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg=msg.model_dump()))
+                    else:
+                        created_blue.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg={"msg": f"{msg}"}))
                     created_blue.create(msg)
                 except Exception as e:
                     self.logger.error(f"Error during the creation of blueprint {blue_id}. Error: {e}")
@@ -211,6 +216,10 @@ class BlueprintManager(GenericManager):
             performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DAY2, path.split("/")[-1])
             try:
                 if msg:
+                    if isinstance(msg, NFVCLBaseModel):
+                        blueprint.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg=msg.model_dump()))
+                    else:
+                        blueprint.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg={"msg": f"{msg}"}))
                     result = getattr(blueprint, function.__name__)(msg)
                 else:
                     result = getattr(blueprint, function.__name__)()
@@ -262,6 +271,8 @@ class BlueprintManager(GenericManager):
         with blueprint.lock:
             # BlueprintOperationCallbackModel
             performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.CROSS_BLUEPRINT_FUNCTION_CALL, function_name)
+            call_msg = RegisteredBlueprintCall(function_name=function_name, extra={"args": f"{args}", "kwargs": f"{kwargs}"})
+            blueprint.base_model.day_2_call_history.append(call_msg)
             result = getattr(blueprint, function_name)(*args, **kwargs)
             self._performance_manager.end_operation(performance_operation_id)
         return result

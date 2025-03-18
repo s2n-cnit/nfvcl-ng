@@ -453,26 +453,3 @@ if __name__ == "__main__":
         app.include_router(router)
 
     uvicorn.run(app, host=nfvcl_rest_config.nfvcl.ip, port=nfvcl_rest_config.nfvcl.port)
-
-################### OLD CODE ############################
-
-# def handle_exit(*args):
-#     """
-#     Handler for exit. Set all managers to be closed, sending them a SIGTERM signal.
-#     """
-#     # https://stackoverflow.com/a/322317
-#     print("Killing all NFVCL processes")
-#     os.killpg(0, signal.SIGKILL)
-#     # Main process also get killed, no more code can be run
-#
-#
-# if __name__ == '__main__':
-#     # https://stackoverflow.com/a/322317
-#     os.setpgrp()
-#
-# # Setup on close handler for the MAIN process.
-# # It does NOT work with Pycharm stop button! Only with CTRL+C or SIGTERM or SIGINT!!!!
-# # Pycharm terminates the process such that handle_exit is not called.
-# atexit.register(handle_exit)
-# signal.signal(signal.SIGTERM, handle_exit)
-# signal.signal(signal.SIGINT, handle_exit)

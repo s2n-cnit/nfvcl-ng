@@ -1,15 +1,16 @@
 from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
 from typing import TypeVar, Optional, Generic, List, Dict, Any
 
-from pydantic import Field, SerializeAsAny
+from pydantic import Field, SerializeAsAny, field_validator, ValidationError
 
+from nfvcl_core.utils.blue_utils import get_class_from_path
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.prometheus.prometheus_model import PrometheusTargetModel
 from nfvcl_core_models.providers.providers import BlueprintNGProviderData
 from nfvcl_core_models.resources import Resource
-from nfvcl_core.utils.blue_utils import get_class_from_path
 
 StateTypeVar = TypeVar("StateTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
@@ -21,6 +22,14 @@ class CurrentOperation(Enum):
     DEPLOYING = "deploying"
     RUNNING_DAY2_OP = "running-day2-op"
     DESTROYING = "destroying"
+
+class RegisteredBlueprintCall(NFVCLBaseModel):
+    """
+    Store the call that have been made to the blueprint instance
+    """
+    function_name: str = Field(description="Name of the function")
+    extra: Dict[str, str] = Field(description="Extra fields given to the function like args or kwargs", default_factory=dict)
+    msg: dict = Field(description="Message of the call, given by the user", default_factory=dict)
 
 
 class BlueprintNGStatus(NFVCLBaseModel):
@@ -97,7 +106,7 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
 
     node_exporters: List[PrometheusTargetModel] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
 
-    day_2_call_history: List[str] = Field(default=[], description="The history of calls that have been made to the blueprint instance")
+    day_2_call_history: List[RegisteredBlueprintCall] = Field(default=[], description="The history of calls that have been made to the blueprint instance")
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**self.fix_types(["state", "provider_data", "create_config"], **kwargs))
@@ -118,6 +127,18 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
                 if isinstance(field_value, dict):
                     kwargs[field_name] = get_class_from_path(kwargs[f"{field_name}_type"]).model_validate(field_value)
         return kwargs
+
+    @field_validator('day_2_call_history', mode='before')
+    def validate_items(cls, v):
+        if not isinstance(v, list):
+            raise ValueError('items must be a list')
+        valid_items = []
+        for item in v:
+            try:
+                valid_items.append(RegisteredBlueprintCall(**item))
+            except ValidationError:
+                continue
+        return valid_items
 
 
 class BlueprintNGState(NFVCLBaseModel):

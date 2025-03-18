@@ -283,9 +283,10 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return cluster
 
-    def delete_kubernetes(self, k8s_id: str) -> None:
-        self._topology.del_k8s_cluster(k8s_id)
+    def delete_kubernetes(self, k8s_id: str) -> TopologyK8sModel:
+        deleted_cluster = self._topology.del_k8s_cluster(k8s_id)
         self.save_to_db()
+        return deleted_cluster
 
     def get_k8s_cluster_by_area(self, area_id: int) -> TopologyK8sModel:
         """

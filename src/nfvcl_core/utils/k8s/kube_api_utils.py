@@ -8,7 +8,7 @@ import kubernetes.client
 import kubernetes.utils
 import yaml
 from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccount, V1ClusterRoleList, V1ClusterRole, \
-    V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, V1Subject, V1RoleRef, V1Secret, V1SecretList, \
+    V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, RbacV1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1Pod, V1Container, V1ResourceQuota, \
     V1ResourceQuotaSpec, V1ClusterRoleBinding, V1Node, V1NodeList, V1DeploymentList, V1Deployment, V1DeploymentSpec, V1StorageClassList, V1PodList, V1DaemonSetList, V1ServiceList, V1ConfigMap, VersionInfo, V1StorageClass
@@ -299,7 +299,7 @@ def k8s_admin_role_to_sa(kube_client_config: kubernetes.client.Configuration, na
         try:
             metadata: V1ObjectMeta = V1ObjectMeta(name=role_binding_name)
 
-            subjects = [V1Subject(kind='User', name=username)]
+            subjects = [RbacV1Subject(kind='User', name=username)]
             role_ref = V1RoleRef(kind='Role', name='admin', api_group='rbac.authorization.k8s.io')
 
             role_bind = V1RoleBinding(subjects=subjects, role_ref=role_ref, metadata=metadata)
@@ -345,7 +345,7 @@ def k8s_admin_role_over_namespace(kube_client_config: kubernetes.client.Configur
         try:
             metadata: V1ObjectMeta = V1ObjectMeta(name=role_binding_name)
 
-            subjects = [V1Subject(kind='User', name=username)]
+            subjects = [RbacV1Subject(kind='User', name=username)]
             role_ref = V1RoleRef(kind='Role', name='nfvclAdmin', api_group='rbac.authorization.k8s.io')
 
             role_bind = V1RoleBinding(subjects=subjects, role_ref=role_ref, metadata=metadata)
@@ -381,7 +381,7 @@ def k8s_cluster_admin(kube_client_config: kubernetes.client.Configuration, usern
         try:
             metadata: V1ObjectMeta = V1ObjectMeta(name=role_binding_name)
 
-            subjects = [V1Subject(kind='User', name=username)]
+            subjects = [RbacV1Subject(kind='User', name=username)]
             role_ref = V1RoleRef(kind='ClusterRole', name='cluster-admin', api_group='rbac.authorization.k8s.io')
 
             role_bind = V1ClusterRoleBinding(subjects=subjects, role_ref=role_ref, metadata=metadata)

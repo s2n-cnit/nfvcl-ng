@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core.utils.blue_utils import get_yaml_parser
@@ -13,6 +13,7 @@ class CloudInitChpasswd(NFVCLBaseModel):
 
 class CloudInit(NFVCLBaseModel):
     hostname: Optional[str] = Field(default=None)
+    fqdn: Optional[str] = Field(default=None)
     manage_etc_hosts: bool = Field(default=True)
     chpasswd: CloudInitChpasswd = Field(default=CloudInitChpasswd())
     disable_root: bool = Field(default=False)
@@ -31,6 +32,11 @@ class CloudInit(NFVCLBaseModel):
     def build_cloud_config(self) -> str:
         return f"#cloud-config\n{get_yaml_parser().dump(self.model_dump(exclude_none=True))}"
 
+    @field_validator("hostname", "fqdn")
+    def hostname_validator(cls, v: Optional[str]):
+        if v is None:
+            return None
+        return v.lower().replace(" ", "-").replace("_", "-")
 
 class CloudInitDhcpOverride(NFVCLBaseModel):
     # hostname: Optional[str] = Field()

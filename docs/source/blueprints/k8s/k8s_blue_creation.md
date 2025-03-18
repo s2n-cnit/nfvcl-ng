@@ -6,7 +6,7 @@ Here you can see a simple request (with no optional data) that is deploying a K8
 **One and only one** core area must always be present! With this parameter you can choose where the master node should be deployed. 
 Using the `worker_replicas` parameter, you can choose how many workers will be deployed in that area.
 
-A lot of the following parameters can be omitted because they have a default values, you can see what is optional in the swagger (http://{{NFVCL_IP}}:5002/docs)
+A lot of the following parameters can be omitted because they have a default values, you can see what is optional in the swagger (`http://{{NFVCL_IP}}:5002/docs`)
 
 For each area we have a different configuration, the area ID identifies the VIM to be used in the Topology.
 
@@ -37,7 +37,7 @@ And the body should be composed like this (`dmz-internal` net should exist and `
 ```
 
 The creation of a K8S cluster can have different parameters, but in the previous request they are not present, why?
-A lot of them are optional with default values and can be used when required by the user. You can see the following example that is creating the
+A lot of them are `optional` with default values and can be used when required by the user. You can see the following example that is creating the
 same cluster of the previous API call with few differences (the list of IP for the load balancer).
 
 ```json

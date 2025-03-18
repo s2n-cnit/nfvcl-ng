@@ -25,11 +25,10 @@ from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 
 K8S_BLUE_TYPE = "k8s"
 K8S_VERSION = K8sVersion.V1_30
-BASE_IMAGE22 = "u22-k8s-base-v0.1.0"
-BASE_IMAGE22_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.0-ubuntu2204.qcow2"
-BASE_IMAGE24 = "u24-k8s-base-v0.1.0"
-BASE_IMAGE24_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.0-ubuntu2404.qcow2"
-DUMMY_NET_INT_NAME = "eth99"
+BASE_IMAGE22 = "u22-k8s-base-v0.1.1"
+BASE_IMAGE22_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.1-ubuntu2204.qcow2"
+BASE_IMAGE24 = "u24-k8s-base-v0.1.1"
+BASE_IMAGE24_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.1-ubuntu2404.qcow2"
 POD_NET_CIDR = SerializableIPv4Network("10.254.0.0/16")
 POD_SERVICE_CIDR = SerializableIPv4Network("10.200.0.0/16")
 K8S_DEFAULT_PASSWORD = "ubuntu"

@@ -44,6 +44,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     pod_network_cidr: SerializableIPv4Network = Field(default=SerializableIPv4Network("10.254.0.0/16"), description='K8s Pod network IPv4 cidr to init the cluster')
     service_cidr: SerializableIPv4Network = Field(default=SerializableIPv4Network("10.200.0.0/16"), description='Network used to deploy services')
     topology_onboard: bool = Field(default=True, description="If true the K8S cluster, once ready, will be added to the Topology of NFVCL to be used for Blueprint, that requires k8s, creation.")
+    containerd_mirrors: Optional[dict[str, str]] = Field(default=None, description="Dict of containerd mirrors (cache) to be added to the configuration of containerd to avoid limitations from docker.io or other public repositories. Key is the registry, value is the mirror (e.g. {'docker.io': 'https://docker-registry.tnt-lab.unige.it/v2/cache/'})")
     password: str = Field(default="ubuntu", description="The password to be set, in every vm, for user ubuntu", pattern=r'^[a-zA-Z0-9_.-]*$')
     ubuntu_version: UbuntuVersion = Field(default=UbuntuVersion.UBU24, description="Version of Ubuntu")
     install_plugins: bool = Field(default=True, description="Whether to install default plugin list on blueprint deployment (default Flannel, MetalLb, OpenEBS)")

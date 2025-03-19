@@ -311,6 +311,7 @@ class BlueprintManager(GenericManager):
                 self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))
                 raise e
             self._performance_manager.end_operation(performance_operation_id)
+            self.logger.success(f"Blueprint {blueprint_id} deleted successfully")
 
         return blueprint_id
 

@@ -18,7 +18,7 @@ from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAre
 from nfvcl_core_models.http_models import HttpRequestType
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
-from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException
+from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException, TopoK8SNotFoundException
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
@@ -47,6 +47,7 @@ class K8sBlueprintNGState(BlueprintNGState):
     cni: Cni = Field(default=Cni.flannel, description="The network plugin used by the cluster")
     pod_network_cidr: SerializableIPv4Network = Field(default=POD_NET_CIDR, description="The internal network used for PODs by the cluster")
     pod_service_cidr: SerializableIPv4Network = Field(default=POD_SERVICE_CIDR, description="The internal network used for Services by the cluster")
+    containerd_mirrors: Optional[dict[str, str]] = Field(default=None, description="List of containerd mirrors (cache) to be added to the configuration of containerd to avoid limitations from docker.io or other public repositories")
     cadvisor_node_port: int = Field(default=30080, description="The node port on which the cadvisor service is exposed")
 
     password: str = Field(default=K8S_DEFAULT_PASSWORD, description="The password set in master and workers node")
@@ -99,15 +100,6 @@ class K8sBlueprintNGState(BlueprintNGState):
 
         return configurators_list
 
-    def get_reserved_ip_list(self) -> List[str]:
-        """
-        Return a list of IPs reserved for k8s services, from all the pools.
-        """
-        ip_list = []
-        for pool in self.reserved_pools:
-            ip_list.extend(pool.get_ip_address_list())
-        return ip_list
-
     def reserve_worker_number(self):
         """
         Reserve worker number in the state, the first free.
@@ -158,6 +150,9 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.state.password = create_model.password
         self.set_base_image(create_model.ubuntu_version)
         self.state.cadvisor_node_port = create_model.cadvisor_node_port
+        # If mirrors are provided, set them
+        if create_model.containerd_mirrors:
+            self.state.containerd_mirrors = create_model.containerd_mirrors
 
 
         area: K8sAreaDeployment
@@ -297,6 +292,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                                          master_external_ip=self.state.vm_master.access_ip,
                                          pod_network_cidr=self.state.pod_network_cidr,
                                          k8s_service_cidr=self.state.pod_service_cidr)
+            if self.state.containerd_mirrors:
+                master_conf.configure_mirrors(self.state.containerd_mirrors)
             master_result = self.provider.configure_vm(master_conf)
 
             # REGISTERING GENERATED VALUES FROM MASTER CONFIGURATION
@@ -307,6 +304,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         # Configuring ONLY worker nodes that have not yet been configured and then removing from the list
         for configurator in self.state.day_0_workers_configurators_tobe_exec:
             configurator.configure_worker(self.state.master_key_add_worker, self.state.master_credentials)
+            if self.state.containerd_mirrors:
+                configurator.configure_mirrors(self.state.containerd_mirrors)
             self.provider.configure_vm(configurator)
 
         self.state.day_0_workers_configurators_tobe_exec = []
@@ -388,12 +387,12 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             return
 
 
-        dayNconf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster requires actions performed on the master node.
+        day_n_conf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster requires actions performed on the master node.
         for node in model.node_names:
             target_vm = [vm for vm in self.state.vm_workers if vm.name == node]  # Checking that the node to be removed EXISTS
             if len(target_vm) >= 1:
                 if target_vm[0].created: # Checking that the node to be removed has been created and didn't crash
-                    dayNconf.delete_node(target_vm[0].get_name_k8s_format())  # Adding the action to remove it from the cmaster/controller.
+                    day_n_conf.delete_node(target_vm[0].get_name_k8s_format())  # Adding the action to remove it from the cmaster/controller.
                     vm_to_be_destroyed.append(target_vm[0])  # Appending the VM to be deleted.
                 else:
                     self._remove_worker(target_vm[0], destroy_vm=False)
@@ -401,7 +400,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             else:
                 self.logger.error(f"Node >{node}< has not been found, cannot be deleted from cluster {self.id}. Moving to next nodes to be deleted")
 
-        self.provider.configure_vm(dayNconf)  # Removing from the cluster every VM to be deleted before it will be destroyed (Nodes is removed from k8s cluster by master configurator)
+        self.provider.configure_vm(day_n_conf)  # Removing from the cluster every VM to be deleted before it will be destroyed (Nodes is removed from k8s cluster by master configurator)
 
         for vm in vm_to_be_destroyed:  # Destroying every VM to be removed from the cluster
             self._remove_worker(vm)
@@ -432,7 +431,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         master_conf = self.state.day_0_master_configurator
         master_conf.install_istio()
-        master_result = self.provider.configure_vm(master_conf)
+        self.provider.configure_vm(master_conf)
         # TODO expose prometheus to external using nodeport
 
     @day2_function("/root_kubeconfig", [HttpRequestType.GET])
@@ -451,7 +450,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         if self.state.topology_onboarded:
             try:
                 self.provider.topology_manager.delete_kubernetes(self.id)
-            except ValueError:
+            except TopoK8SNotFoundException:
                 self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")
             except TopoK8SHasBlueprintException as e:
                 self.logger.error(f"Blueprint {self.id} will not be destroyed")

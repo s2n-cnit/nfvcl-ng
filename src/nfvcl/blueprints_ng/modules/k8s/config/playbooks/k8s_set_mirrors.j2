@@ -1,0 +1,18 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+{% for key in confvar.k8s_mirrors.keys() %}
+   - name: Set K8S mirrors 1 {{ key }}
+     lineinfile:
+       path: /etc/containerd/config.toml
+       line: '          endpoint = ["{{ confvar.k8s_mirrors[key] }}"]'
+       insertafter: '\[plugins\."io\.containerd\.grpc\.v1\.cri"\.registry\.mirrors\]'
+   - name: Set K8S mirrors 2 {{ key }}
+     lineinfile:
+       path: /etc/containerd/config.toml
+       line: '        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."{{ key }}"]'
+       insertafter: '\[plugins\."io\.containerd\.grpc\.v1\.cri"\.registry\.mirrors\]'
+{% endfor %}
+

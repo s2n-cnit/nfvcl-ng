@@ -71,5 +71,44 @@ same cluster of the previous API call with few differences (the list of IP for t
 }
 ```
 
+## Set K8S mirror (cache) to avoid repository request limit
+You can indicate in the creation request a list of mirrors to be used by the containerd. This is useful to avoid the limit of requests to the docker registry.
+The mirrors are indicated in the `containerd_mirrors` field of the request. The key is the registry to be mirrored and the value is the mirror URL.
+
+```
+{
+  "cni": "flannel",
+  "pod_network_cidr": "10.254.0.0/16",
+  "service_cidr": "10.200.0.0/16",
+  "topology_onboard": true,
+  "password": "abcdefgh",
+  "containerd_mirrors": {
+    "docker.io": "https://docker-registry.tnt-lab.unige.it/v2/cache/"
+  },
+  "ubuntu_version": "UBUNTU24",
+  "require_port_security_disabled": true,
+  "master_flavors": {
+    "memory_mb": "4096",
+    "storage_gb": "32",
+    "vcpu_count": "4"
+  },
+  "areas": [
+    {
+      "area_id": 1,
+      "is_master_area": true,
+      "mgmt_net": "dmz-internal",
+			"additional_networks": ["data_paolo"],
+      "load_balancer_pools_ips": [],
+      "worker_replicas": 1,
+      "worker_flavors": {
+        "memory_mb": "4096",
+        "storage_gb": "32",
+        "vcpu_count": "4"
+      }
+    }
+  ]
+}
+```
+
 ## Additional examples
 You can find additional cluster creation examples [here](/blueprints/k8s/k8s_request_examples.md).

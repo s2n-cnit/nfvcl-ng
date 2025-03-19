@@ -6,6 +6,7 @@ from typing import List, Any, Dict, Optional, Union
 from pydantic import Field
 from ruamel.yaml.scalarstring import LiteralScalarString
 
+from nfvcl_core.utils.file_utils import render_file_from_template_to_file
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core.utils.blue_utils import get_yaml_parser
 
@@ -200,6 +201,7 @@ class AnsiblePlaybookBuilder:
 
     def add_template_task(self, src: Path, dest: str, task_vars: Optional[Dict[str, any]] = None):
         """
+        Copy a file to a remote machine resolving the jinja2 templates.
         Add a task of the 'ansible.builtin.template' type, this will copy the file at the src path on the NFVCL server to the dest on the remote machine
         This task will also resolve every jinja2 template in the file using the playbook vars, internal Ansible vars can also be used
         Args:
@@ -216,6 +218,20 @@ class AnsiblePlaybookBuilder:
             ),
             task_vars=task_vars
         )
+
+    def add_render_and_execute_template_task(self, src: Path, task_vars: Optional[Dict[str, any]] = None, rendered_file_prefix: str = ""):
+        """
+        Render a template ansible file and execute it on the remote machine
+        Args:
+            src: The source file to be rendered
+            task_vars: Variables to be used in the template
+            rendered_file_prefix:
+
+        Returns:
+
+        """
+        rendered_file = render_file_from_template_to_file(path=src, render_dict=task_vars, prefix_to_name=rendered_file_prefix, extension=".yaml")
+        self.add_tasks_from_file(rendered_file)
 
     def add_copy_task(self, src: str | Path, dest: str, remote_src: bool = False, mode: int = 0o777):
         """

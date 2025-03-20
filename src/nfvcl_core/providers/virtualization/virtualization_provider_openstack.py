@@ -188,8 +188,10 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             nat_destination=vm_resource.management_network,
             ip_pool=floating_ip_net,
             network=self.os_client.network_names_to_ids(vm_resource.get_all_connected_network_names()),
-            userdata=cloudin
+            userdata=cloudin,
+            meta={"part_of_blueprint": self.blueprint_id, "deployed_by": "NFVCL"}
         )
+        # NOTE: Trying to add a Tag (self.conn.compute.add_tag_to_server(test_server, "TEST")) will raise an 404 HTTP exception, probably TAGs are not enabled on OS
 
         # Don't put code that may crash here, we first need to register the vm_resource server_obj id correlation in the DB
         # This allows to delete a blueprint that crash during the create_vm execution

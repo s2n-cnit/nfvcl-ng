@@ -66,6 +66,14 @@ class AnsibleReplaceTask(AnsibleTask):
     regexp: str = Field()
     replace: str = Field()
 
+class AnsibleAptInstallTask(AnsibleTask):
+    """
+    https://docs.ansible.com/ansible/latest/collections/ansible/builtin/apt_module.html
+    """
+    name: str = Field()
+    state: str = Field()
+    update_cache: Optional[str] = Field(default=None)
+
 
 class AnsibleShellTask(AnsibleTask):
     cmd: str = Field()
@@ -268,6 +276,40 @@ class AnsiblePlaybookBuilder:
                 path=path,
                 regexp=regexp,
                 replace=replace
+            )
+        )
+
+    def add_apt_install_task(self, package: str, package_version: str = None, update_cache: bool = True):
+        """
+        Add a task to install a package using apt
+        Args:
+            package: Name of the package to install
+            package_version: Version of the package to install (e.g. for package 'foo=1.00' it will be '1.00')
+            update_cache: True if the package cache should be updated before installing the package
+        """
+        package_full_name = f"{package}={package_version}" if package_version else package
+        self.add_task(
+            f"Apt install task for package {package}",
+            "ansible.builtin.apt",
+            AnsibleAptInstallTask(
+                name=package_full_name,
+                state='present',
+                update_cache='yes' if update_cache else 'no'
+            )
+        )
+
+    def add_apt_uninstall_task(self, package: str):
+        """
+        Add a task to uninstall a package using apt
+        Args:
+            package: Name of the package to be uninstalled
+        """
+        self.add_task(
+            f"Apt install task for package {package}",
+            "ansible.builtin.apt",
+            AnsibleAptInstallTask(
+                name=package,
+                state='absent'
             )
         )
 

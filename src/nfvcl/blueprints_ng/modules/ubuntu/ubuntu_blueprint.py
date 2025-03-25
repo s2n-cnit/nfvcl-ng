@@ -2,10 +2,12 @@ from typing import Optional
 
 from pydantic import Field
 
+from nfvcl.blueprints_ng.modules.ubuntu.config.ubuntu_configurator import VmUbuntuConfigurator
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
-from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_core_models.http_models import HttpRequestType
 from nfvcl_core_models.resources import VmResource, VmResourceImage
-from nfvcl_models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuCreateModel
+from nfvcl_models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuCreateModel, UbuntuInstallAptModel
 from nfvcl_models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuVersion
 
 UBUNTU_BLUE_TYPE = "ubuntu"
@@ -21,6 +23,7 @@ class UbuntuBlueprintNGState(BlueprintNGState):
     """
     password: str = Field(default=UBUNTU_DEFAULT_PASSWORD)
     vm: Optional[VmResource] = Field(default=None)
+    configurator: Optional[VmUbuntuConfigurator] = Field(default=None)
 
 
 @blueprint_type(UBUNTU_BLUE_TYPE)
@@ -68,3 +71,13 @@ class UbuntuBlueprint(BlueprintNG[UbuntuBlueprintNGState, UbuntuCreateModel]):
         #Creating VM
         self.provider.create_vm(self.state.vm)
         # No need for configuration, at least for now.
+
+        self.state.configurator = VmUbuntuConfigurator(vm_resource=self.state.vm)
+        self.register_resource(self.state.configurator)
+
+    @day2_function("/apt_install", [HttpRequestType.PUT])
+    def apt_install(self, model: UbuntuInstallAptModel):
+        self.state.configurator.install_apt_packages(model.packages)
+        self.provider.configure_vm(self.state.configurator)
+
+

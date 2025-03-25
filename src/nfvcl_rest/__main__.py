@@ -317,7 +317,7 @@ def setup_main_routes():
     app.add_api_route("/token", token, methods=["POST"])
     app.add_api_route("/logout", logout, methods=["POST"])
     ##### PROTECTED MAIN ROUTES #####
-    app.add_api_route("/close", set_auth_on_api_function(close_nfvcl), methods=["GET"], status_code=status.HTTP_202_ACCEPTED)
+    app.add_api_route("/close", set_auth_on_api_function(close_nfvcl), methods=["POST"], status_code=status.HTTP_202_ACCEPTED)
     app.add_api_route("/logs", set_auth_on_api_function(logs), methods=["GET"], response_class=PlainTextResponse)
     app.add_api_route("/ready", readiness, methods=["GET"])
 
@@ -343,6 +343,7 @@ if __name__ == "__main__":
     )
     app.add_middleware(ExceptionMiddleware)
 
+
     # TODO replace with app.add_exception_handler
     @app.exception_handler(Oauth2CustomException)
     async def oauth2_exception_handler(request: Request, exc: Oauth2CustomException):
@@ -357,6 +358,7 @@ if __name__ == "__main__":
         """
         response = JSONResponse(status_code=exc.status_code, content=OAuth2Response(error=Oauth2Errors.INVALID_GRANT, error_description=exc.description).model_dump(exclude_none=True))
         return response
+
 
     # TODO: check if working / remove
     accessible_folder = global_ref.nfvcl_config.nfvcl.mounted_folder

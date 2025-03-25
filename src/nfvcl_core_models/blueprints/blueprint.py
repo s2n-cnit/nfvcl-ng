@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from datetime import datetime
 from enum import Enum
 from typing import TypeVar, Optional, Generic, List, Dict, Any
@@ -23,12 +24,21 @@ class CurrentOperation(Enum):
     RUNNING_DAY2_OP = "running-day2-op"
     DESTROYING = "destroying"
 
+
+class FunctionType(Enum):
+    UNKOWN = "unkown"
+    DAY0 = "day0"
+    DAY2 = "day2"
+
+
 class RegisteredBlueprintCall(NFVCLBaseModel):
     """
     Store the call that have been made to the blueprint instance
     """
     function_name: str = Field(description="Name of the function")
+    function_type: FunctionType = Field(default=FunctionType.UNKOWN, description="Type of the function")
     extra: Dict[str, str] = Field(description="Extra fields given to the function like args or kwargs", default_factory=dict)
+    msg_type: Optional[str] = Field(default=None, description="The model of the msg field. If none the model will be the default dict")
     msg: dict = Field(description="Message of the call, given by the user", default_factory=dict)
 
 
@@ -36,6 +46,12 @@ class BlueprintNGStatus(NFVCLBaseModel):
     error: bool = Field(default=False)
     current_operation: CurrentOperation = Field(CurrentOperation.IDLE)
     detail: str = Field(default="")
+
+    def is_idle(self) -> bool:
+        return self.current_operation == CurrentOperation.IDLE.value
+
+    def is_deploying(self) -> bool:
+        return self.current_operation == CurrentOperation.DEPLOYING.value
 
     @classmethod
     def deploying(cls, blue_id) -> BlueprintNGStatus:
@@ -60,6 +76,7 @@ class BlueprintNGStatus(NFVCLBaseModel):
 
 class BlueprintNGCreateModel(NFVCLBaseModel):
     pass
+
 
 class RegisteredResource(NFVCLBaseModel):
     type: str = Field()
@@ -140,9 +157,21 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
                 continue
         return valid_items
 
+    def get_snapshot(self, snapshot_name: str) -> BlueprintNGBaseModel:
+        snapshot = copy.deepcopy(self)
+        snapshot.id = snapshot_name
+        # These resources are useless to be saved and will be recreated on the next deployment. Moreover, they may rise errors when trying to deserialize them.
+        snapshot.registered_resources = {}
+        snapshot.k8s_providers = {}
+        snapshot.virt_providers = {}
+        snapshot.pdu_provider = None
+        snapshot.blueprint_provider = None
+        return snapshot
+
 
 class BlueprintNGState(NFVCLBaseModel):
     last_update: Optional[datetime] = Field(default=None)
+
 
 class BlueprintNGException(Exception):
     pass

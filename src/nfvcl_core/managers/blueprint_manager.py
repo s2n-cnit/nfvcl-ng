@@ -4,9 +4,11 @@ import importlib
 from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 
 from nfvcl_core.database import BlueprintRepository
+from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core.managers import GenericManager, EventManager
-from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj
+from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.blueprints import BlueprintNGBaseModel
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
 from nfvcl_core_models.performance import BlueprintPerformanceType
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
     from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager, VimClientsManager
 from nfvcl_core.blueprints import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus, RegisteredBlueprintCall
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus, RegisteredBlueprintCall, FunctionType
 from nfvcl_core_models.resources import VmResource
 from nfvcl_core_models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
@@ -24,6 +26,7 @@ from nfvcl_core.providers.aggregator import ProvidersAggregator
 from nfvcl_core.utils.util import generate_blueprint_id
 
 BLUEPRINTS_MODULE_FOLDER: str = "nfvcl.blueprints_ng.modules"
+
 
 class BlueprintManager(GenericManager):
     """
@@ -35,9 +38,10 @@ class BlueprintManager(GenericManager):
     """
     blueprint_dict: Dict[str, BlueprintNG] = {}
 
-    def __init__(self, blueprint_repository: BlueprintRepository, topology_manager: TopologyManager, pdu_manager: PDUManager, performance_manager: PerformanceManager, event_manager: EventManager, vim_clients_manager: VimClientsManager):
+    def __init__(self, blueprint_repository: BlueprintRepository, snapshot_repository: SnapshotRepository, topology_manager: TopologyManager, pdu_manager: PDUManager, performance_manager: PerformanceManager, event_manager: EventManager, vim_clients_manager: VimClientsManager):
         super().__init__()
         self._blueprint_repository = blueprint_repository
+        self._snapshot_repository = snapshot_repository
         self._topology_manager = topology_manager
         self._pdu_manager = pdu_manager
         self._performance_manager = performance_manager
@@ -156,6 +160,10 @@ class BlueprintManager(GenericManager):
             with created_blue.lock:
                 created_blue.provider = ProvidersAggregator(created_blue, topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager, vim_clients_manager=self._vim_clients_manager)
                 created_blue.base_model.parent_blue_id = parent_id
+                if isinstance(msg, NFVCLBaseModel):
+                    created_blue.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg=msg.model_dump(), msg_type=get_class_path_str_from_obj(msg), function_type=FunctionType.DAY0))
+                else:
+                    created_blue.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg={"msg": f"{msg}"}, function_type=FunctionType.DAY0))
                 # Saving the new blueprint to db
                 created_blue.to_db()
                 self.blueprint_dict[blue_id] = created_blue
@@ -166,10 +174,6 @@ class BlueprintManager(GenericManager):
 
                 performance_operation_id = self._performance_manager.start_operation(created_blue.id, BlueprintPerformanceType.DAY0, "create")
                 try:
-                    if isinstance(msg, NFVCLBaseModel):
-                        created_blue.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg=msg.model_dump()))
-                    else:
-                        created_blue.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg={"msg": f"{msg}"}))
                     created_blue.create(msg)
                 except Exception as e:
                     self.logger.error(f"Error during the creation of blueprint {blue_id}. Error: {e}")
@@ -194,8 +198,6 @@ class BlueprintManager(GenericManager):
         Returns:
             The ID of the updated blueprint.
         """
-        run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint day2 message for {blueprint_id} given to the worker..."))
-
         b_type = path.split("/")[0]
         blueprint_module = blueprint_type.get_blueprint_module(b_type)
 
@@ -210,6 +212,8 @@ class BlueprintManager(GenericManager):
             run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} is not of the type {b_type}"))
             raise NFVCLCoreException(f"Blueprint {blueprint_id} is not of the type {b_type}")
 
+        run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint day2 message for {blueprint_id} given to the worker..."))
+
         with blueprint.lock:
             self.set_blueprint_status(blueprint.id, BlueprintNGStatus.running_day2())
 
@@ -217,9 +221,9 @@ class BlueprintManager(GenericManager):
             try:
                 if msg:
                     if isinstance(msg, NFVCLBaseModel):
-                        blueprint.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg=msg.model_dump()))
+                        blueprint.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg=msg.model_dump(), msg_type=get_class_path_str_from_obj(msg), function_type=FunctionType.DAY2))
                     else:
-                        blueprint.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg={"msg": f"{msg}"}))
+                        blueprint.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg={"msg": f"{msg}"}, function_type=FunctionType.DAY2))
                     result = getattr(blueprint, function.__name__)(msg)
                 else:
                     result = getattr(blueprint, function.__name__)()
@@ -230,6 +234,8 @@ class BlueprintManager(GenericManager):
             self._performance_manager.end_operation(performance_operation_id)
 
             self.set_blueprint_status(blueprint.id, BlueprintNGStatus.idle())
+            # EVENT FIRE
+            self._event_manager.fire_event(NFVCLEventTopics.BLUEPRINT_TOPIC, BlueEventType.BLUE_UPDATED, data=blueprint.base_model)
         return result
 
     def get_from_blueprint(self, blueprint_id: str, path: str) -> Any:
@@ -288,13 +294,13 @@ class BlueprintManager(GenericManager):
         Raises:
             BlueprintNotFoundException if blue does nor exist.
         """
-        run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint deletion message for {blueprint_id} given to the worker..."))
-
         blueprint_instance = self.get_blueprint_instance(blueprint_id)
 
         if blueprint_instance is None:
             run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
             raise NFVCLCoreException(f"Blueprint {blueprint_id} not found")
+
+        run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint deletion message for {blueprint_id} given to the worker..."))
 
         with blueprint_instance.lock:
             performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DELETION, "delete")
@@ -395,6 +401,118 @@ class BlueprintManager(GenericManager):
                     return vm
         return None
 
+    def get_snapshot_list(self) -> List[BlueprintNGBaseModel]:
+        """
+        Get the list of all the snapshots
+        Returns:
+            the list of all the snapshots
+
+        Notes:
+            SYNC
+        """
+        return self._snapshot_repository.get_all()
+
+    def get_snapshot(self, snapshot_name: str) -> BlueprintNGBaseModel:
+        """
+        Get a specific snapshots
+        Returns:
+            the snapshot if found
+
+        Raises:
+            NFVCLCoreException: If the snapshot is not found
+
+        Notes:
+            SYNC
+        """
+        snapshot = self._snapshot_repository.find_one_safe({'id': snapshot_name})
+        if snapshot is None:
+            raise NFVCLCoreException(f"Snapshot {snapshot_name} not found")
+        return snapshot
+
+    def snapshot_blueprint(self, snapshot_name: str, blueprint_id: str, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> BlueprintNGBaseModel:
+        """
+        Snapshot the blueprint with the given ID
+        Args:
+            blueprint_id: The ID of the blueprint to be snapshotted
+            snapshot_name: The name of the snapshot
+
+        Raises:
+            NFVCLCoreException: If the blueprint is not found or if the blueprint is not in idle state
+
+        Notes:
+            SYNC
+        """
+        blueprint = self.get_blueprint_instance(blueprint_id)
+        if blueprint is None:
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} not found")
+        if not blueprint.base_model.status.is_idle():
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} is not in idle state, cannot snapshot")
+        snapshot = blueprint.base_model.get_snapshot(snapshot_name)
+        self._snapshot_repository.save_snapshot(snapshot)
+        return snapshot
+
+    def snapshot_restore(self, snapshot_name: str, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> None:
+        """
+        Restore the blueprint from the snapshot with the given name
+        Args:
+            snapshot_name: The name of the snapshot
+            pre_work_callback: Callback that is called before the creation of the blueprint.
+
+        Raises:
+            NFVCLCoreException: If the snapshot is not found or if the snapshot is corrupted
+
+        Notes:
+            ASYNC
+        """
+        snapshot = self._snapshot_repository.get_snapshot(snapshot_name)
+        if snapshot is None:
+            err_message = f"Snapshot {snapshot_name} not found"
+            run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=err_message))
+            raise NFVCLCoreException(err_message)
+        # Looks for creation request in the blueprint
+        creation_requests = [x for x in snapshot.day_2_call_history if x.function_type == FunctionType.DAY0.value]
+        if len(creation_requests) != 1:
+            err_message = f"Snapshot {snapshot_name} is corrupted, creation request must be 1, found {len(creation_requests)}"
+            run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=err_message))
+            raise NFVCLCoreException(err_message)
+        # Start the creation of the blueprint
+        run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Snapshot {snapshot_name} is being restored..."))
+        created_blueprint_id = self.create_blueprint(creation_requests[0].function_name, snapshot.create_config, parent_id=snapshot.parent_blue_id, pre_work_callback=pre_work_callback)
+        # Reapplying every day2 call, they should be in order
+        for day2_call in snapshot.day_2_call_history:
+            if day2_call.function_type == FunctionType.DAY2.value:
+                blue_class: NFVCLBaseModel = get_class_from_path(day2_call.msg_type)  # It is not strictly a NFVCLBaseModel, but it should be a model
+                message_model = blue_class.model_validate(day2_call.msg)
+                self.update_blueprint(created_blueprint_id, day2_call.function_name, message_model, pre_work_callback=pre_work_callback)
+
+    def snapshot_and_delete(self, snapshot_name: str, blueprint_id: str, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> None:
+        """
+        Snapshot the blueprint with the given ID and then delete the blueprint
+        Args:
+            snapshot_name: The name of the snapshot to be created
+            blueprint_id: The ID of the blueprint to be snapshotted and deleted
+            pre_work_callback: Callback that is called before the creation of the blueprint.
+
+        Notes:
+            ASYNC
+        """
+        # NOTE: Async callback is the one inside the function delete_blueprint
+        self.snapshot_blueprint(snapshot_name, blueprint_id, pre_work_callback=pre_work_callback)
+        self.delete_blueprint(blueprint_id)
+
+    def snapshot_delete(self, snapshot_name: str) -> BlueprintNGBaseModel:
+        """
+        Delete the snapshot with the given name
+        Args:
+            snapshot_name: The name of the snapshot to be deleted
+
+        Returns:
+            The deleted snapshot
+        """
+        snapshot = self.get_snapshot(snapshot_name)
+        self._snapshot_repository.delete_snapshot(snapshot.id)
+        return snapshot
+
     def set_blueprint_status(self, blueprint_id: str, status: BlueprintNGStatus) -> None:
         """
         Set the status of the blueprint with the given ID
@@ -402,7 +520,7 @@ class BlueprintManager(GenericManager):
             blueprint_id: The ID of the blueprint to be updated
             status: The status to be set
         """
-        # TODO fire event
         blueprint = self.get_blueprint_instance(blueprint_id)
         blueprint.base_model.status = status
         blueprint.to_db()
+        self._event_manager.fire_event(NFVCLEventTopics.BLUEPRINT_TOPIC, BlueEventType.BLUE_STATUS_CHANGED, data=blueprint.base_model)

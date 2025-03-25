@@ -13,6 +13,8 @@ class NFVCLEventType(Enum):
 class BlueEventType(NFVCLEventType):
     BLUE_CREATED = "create"
     BLUE_DELETED = "delete"
+    BLUE_UPDATED = "update"
+    BLUE_STATUS_CHANGED = "status_changed"
     BLUE_START_PROCESSING = "start_processing"
     BLUE_END_PROCESSING = "end_processing"
     BLUE_STARTED_DAY0 = "start_day0"

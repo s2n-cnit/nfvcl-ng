@@ -6,35 +6,37 @@ from typing import Callable, Dict, List, Any, Optional, Annotated
 
 import urllib3
 from dependency_injector.wiring import Provide
-
-from nfvcl_core_models.network.network_models import IPv4Pool, IPv4ReservedRange
 from pydantic import Field, PositiveInt
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_implementations
-from nfvcl_core_models.k8s_management_models import Labels
-from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall
-from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
 from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
-from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config
 from nfvcl_core.containers import NFVCLContainer
 from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
 from nfvcl_core.managers.user_manager import UserManager
+from nfvcl_core.public_methods_description import GET_PROM_SRV_SUMMARY, GET_PROM_SRV_DESCRIPTION, \
+    GET_PROM_LIST_SRV_SUMMARY, GET_PROM_LIST_SRV_DESCRIPTION, DEL_PROM_SRV_SUMMARY, DEL_PROM_SRV_DESCRIPTION, \
+    UPD_PROM_SRV_SUMMARY, UPD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_SUMMARY, \
+    UPD_K8SCLUSTER_SUMMARY, UPD_K8SCLUSTER_DESCRIPTION, ADD_EXTERNAL_K8SCLUSTER_SUMMARY, ADD_EXTERNAL_K8SCLUSTER
+from nfvcl_core.utils.log import create_logger
 from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGBaseModel
+from nfvcl_core_models.config import NFVCLConfigModel
+from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.network import PduModel, NetworkModel, RouterModel
+from nfvcl_core_models.network.network_models import IPv4Pool, IPv4ReservedRange
 from nfvcl_core_models.performance import BlueprintPerformance
+from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall
 from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl_core_models.response_model import OssCompliantResponse
 from nfvcl_core_models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
+from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.user import UserNoConfidence, UserCreateREST
 from nfvcl_core_models.vim import VimModel
-from nfvcl_core.public_methods_description import GET_PROM_SRV_SUMMARY, GET_PROM_SRV_DESCRIPTION, GET_PROM_LIST_SRV_SUMMARY, GET_PROM_LIST_SRV_DESCRIPTION, DEL_PROM_SRV_SUMMARY, DEL_PROM_SRV_DESCRIPTION, UPD_PROM_SRV_SUMMARY, UPD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_SUMMARY, UPD_K8SCLUSTER_SUMMARY, UPD_K8SCLUSTER_DESCRIPTION, ADD_EXTERNAL_K8SCLUSTER_SUMMARY, ADD_EXTERNAL_K8SCLUSTER
-from nfvcl_core.utils.log import create_logger
 
 
 def callback_function(event: threading.Event, namespace: Dict, msg: NFVCLTaskResult):
@@ -94,6 +96,7 @@ class NFVCLPublic:
 class NFVCL:
     TOPOLOGY_SECTION = NFVCLPublicSectionModel(name="Topology", description="Operations related to the topology", path="/v1/topology")
     BLUEPRINTS_SECTION = NFVCLPublicSectionModel(name="Blueprints", description="Operations related to the blueprints", path="/nfvcl/v2/api/blue")
+    SNAPSHOT_SECTION = NFVCLPublicSectionModel(name="Snapshots", description="Operations related to the snapshot of blueprints", path="/nfvcl/v2/api/snapshot")
     PERFORMANCE_SECTION = NFVCLPublicSectionModel(name="Performances", description="Operations related to the performance metrics", path="/performance/blue")
     K8S_SECTION = NFVCLPublicSectionModel(name="Kubernetes cluster management", description="Operations related to kubernetes clusters", path="/k8s")
     UTILS_SECTION = NFVCLPublicSectionModel(name="Utils", description="Utils", path="/v2/utils")
@@ -131,7 +134,6 @@ class NFVCL:
         self.performance_manager.load()
         self.user_manager.load()
 
-
         # TODO rework plugin loading
         from nfvcl_core.plugins.plugin import NFVCLPlugin
         from nfvcl_horse.horse import NFVCLHorsePlugin
@@ -140,8 +142,6 @@ class NFVCL:
 
         for plugin in self.plugins:
             plugin.load()
-
-
 
     # def vim_checks(self):
     #     # TODO maybe this should be moved somewere else?
@@ -366,7 +366,7 @@ class NFVCL:
         kubernetes_model.provided_by = ProvidedBy.EXTERNAL
         return self.add_task(self.topology_manager.add_kubernetes, kubernetes_model, callback=callback)
 
-    @NFVCLPublic(path="/kubernetes/update",section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_K8SCLUSTER_SUMMARY, description=UPD_K8SCLUSTER_DESCRIPTION, sync=True)
+    @NFVCLPublic(path="/kubernetes/update", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_K8SCLUSTER_SUMMARY, description=UPD_K8SCLUSTER_DESCRIPTION, sync=True)
     def update_kubernetes(self, cluster: TopologyK8sModel, callback=None) -> TopologyK8sModel:
         return self.add_task(self.topology_manager.update_kubernetes, cluster, callback=callback)
 
@@ -463,6 +463,30 @@ class NFVCL:
     def protect_blueprint(self, blueprint_id: str, protect: bool, callback=None) -> dict:
         return self.add_task(self.blueprint_manager.protect_blueprint, blueprint_id, protect, callback=callback)
 
+    @NFVCLPublic(path="/{snapshot_name}", section=SNAPSHOT_SECTION, method=NFVCLPublicMethod.GET, sync=True)
+    def get_snapshot(self, snapshot_name: str, callback=None) -> BlueprintNGBaseModel:
+        return self.add_task(self.blueprint_manager.get_snapshot, snapshot_name, callback=callback)
+
+    @NFVCLPublic(path="/", section=SNAPSHOT_SECTION, method=NFVCLPublicMethod.GET, sync=True)
+    def get_snapshot_list(self, callback=None) -> List[BlueprintNGBaseModel]:
+        return self.add_task(self.blueprint_manager.get_snapshot_list, callback=callback)
+
+    @NFVCLPublic(path="/{blueprint_id}", section=SNAPSHOT_SECTION, method=NFVCLPublicMethod.POST, sync=True)
+    def snapshot_blueprint(self, blueprint_id: str, snapshot_name: str, callback=None) -> BlueprintNGBaseModel:
+        return self.add_task(self.blueprint_manager.snapshot_blueprint, snapshot_name, blueprint_id, callback=callback)
+
+    @NFVCLPublic(path="/restore/{snapshot_name}", section=SNAPSHOT_SECTION, method=NFVCLPublicMethod.POST)
+    def snapshot_restore(self, snapshot_name: str, callback=None):
+        return self.add_task(self.blueprint_manager.snapshot_restore, snapshot_name, callback=callback)
+
+    @NFVCLPublic(path="/snapshot_and_delete/{blueprint_id}", section=SNAPSHOT_SECTION, method=NFVCLPublicMethod.POST)
+    def snapshot_and_delete_blueprint(self, blueprint_id: str, snapshot_name: str, callback=None):
+        return self.add_task(self.blueprint_manager.snapshot_and_delete, snapshot_name, blueprint_id, callback=callback)
+
+    @NFVCLPublic(path="/{snapshot_name}", section=SNAPSHOT_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
+    def delete_snapshot(self, snapshot_name: str, callback=None) -> BlueprintNGBaseModel:
+        return self.add_task(self.blueprint_manager.snapshot_delete, snapshot_name, callback=callback)
+
     ############# Performance #############
 
     @NFVCLPublic(path="/", section=PERFORMANCE_SECTION, method=NFVCLPublicMethod.GET, sync=True)
@@ -482,7 +506,6 @@ class NFVCL:
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_installed_plugins)
     def k8s_get_installed_plugins(self, cluster_id: str, callback=None) -> List[str]:
         return self.add_task(self.kubernetes_manager.get_k8s_installed_plugins, cluster_id, callback=callback)
-
 
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.install_plugins)
     def k8s_install_plugin(self, cluster_id: str, plugin_name: K8sPluginsToInstall, callback=None) -> OssCompliantResponse:

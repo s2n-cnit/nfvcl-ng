@@ -18,6 +18,12 @@ class DatabaseRepository(Generic[T]):
     def find_one(self, query: dict) -> T:
         return self.data_type.model_validate(self.collection.find_one(query, projection={'_id': False}))
 
+    def find_one_safe(self, query: dict) -> T | None:
+        result = self.collection.find_one(query, projection={'_id': False})
+        if result is None:
+            return None
+        return self.data_type.model_validate(self.collection.find_one(query, projection={'_id': False}))
+
     # def update_one(self, query: dict, data: dict):
     #     return self.collection.update_one(query, {'$set': data})
 

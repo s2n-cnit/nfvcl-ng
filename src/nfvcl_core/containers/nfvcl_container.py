@@ -1,5 +1,6 @@
 from dependency_injector import containers, providers
 
+from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core.database import TopologyRepository, BlueprintRepository, PerformanceRepository, UserRepository
 from nfvcl_core.managers import PersistenceManager, TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager, VimClientsManager
@@ -43,6 +44,11 @@ class NFVCLContainer(containers.DeclarativeContainer):
         persistence_manager=persistence_manager
     )
 
+    snapshot_repository = providers.Singleton(
+        SnapshotRepository,
+        persistence_manager=persistence_manager
+    )
+
     performance_repository = providers.Singleton(
         PerformanceRepository,
         persistence_manager=persistence_manager
@@ -75,6 +81,7 @@ class NFVCLContainer(containers.DeclarativeContainer):
 
     blueprint_manager = providers.Singleton(
         BlueprintManager,
+        snapshot_repository=snapshot_repository,
         blueprint_repository=blueprint_repository,
         topology_manager=topology_manager,
         pdu_manager=pdu_manager,

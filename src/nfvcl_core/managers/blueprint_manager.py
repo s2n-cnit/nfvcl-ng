@@ -178,6 +178,7 @@ class BlueprintManager(GenericManager):
                 except Exception as e:
                     self.logger.error(f"Error during the creation of blueprint {blue_id}. Error: {e}")
                     self.set_blueprint_status(blue_id, BlueprintNGStatus.error_state(str(e)))
+                    self._performance_manager.set_error(blue_id, True)
                     raise e
                 self.set_blueprint_status(blue_id, BlueprintNGStatus.idle())
                 self._performance_manager.end_operation(performance_operation_id)
@@ -230,6 +231,7 @@ class BlueprintManager(GenericManager):
             except Exception as e:
                 self.logger.error(f"Error during the update of blueprint {blueprint_id}. Error: {e}")
                 self.set_blueprint_status(blueprint.id, BlueprintNGStatus.error_state(str(e)))
+                self._performance_manager.set_error(blueprint.id, True)
                 raise e
             self._performance_manager.end_operation(performance_operation_id)
 
@@ -315,6 +317,7 @@ class BlueprintManager(GenericManager):
             except Exception as e:
                 self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
                 self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))
+                self._performance_manager.set_error(blueprint_id, True)
                 raise e
             self._performance_manager.end_operation(performance_operation_id)
             self.logger.success(f"Blueprint {blueprint_id} deleted successfully")

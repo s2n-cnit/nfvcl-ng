@@ -115,6 +115,18 @@ class PerformanceManager(GenericManager):
         self.pending_operations[blueprint_id] = op_id
         return op_id
 
+    def set_error(self, blueprint_id: str, error_state: bool):
+        """
+        Set the error flag for the blueprint performance
+        Args:
+            blueprint_id: The blueprint id
+            error_state: The error state
+        """
+        if blueprint_id in self.performance_dict:
+            self.performance_dict[blueprint_id].error = error_state
+        else:
+            self.logger.warning("Skipping operation performance for unknown blueprint")
+
     def _find_operation(self, operation_id: str) -> (BlueprintPerformanceOperation, str):
         for blueprint_performance in self.performance_dict.values():
             for blueprint_operation in blueprint_performance.operations:

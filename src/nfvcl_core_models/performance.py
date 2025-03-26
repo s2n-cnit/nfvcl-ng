@@ -33,4 +33,5 @@ class BlueprintPerformance(NFVCLBaseModel):
     blueprint_id: str = Field()
     blueprint_type: str = Field()
     start: datetime = Field()
+    error: Optional[bool] = Field(default=False, description="If an error occurred during the blueprint execution of any kind of call. This means performance is not reliable")
     operations: List[BlueprintPerformanceOperation] = Field(default_factory=list)

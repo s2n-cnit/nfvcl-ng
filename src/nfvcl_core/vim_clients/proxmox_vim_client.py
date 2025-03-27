@@ -1,7 +1,7 @@
 import paramiko
 
 from nfvcl_core.vim_clients.vim_client import VimClient
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 
 
 class ProxmoxVimClient(VimClient):

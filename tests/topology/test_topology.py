@@ -3,11 +3,11 @@ import copy
 import pytest
 
 from nfvcl_core.nfvcl_main import NFVCL
-from nfvcl_core_models.network import PduModel
+from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core_models.topology_models import TopologyModel
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 from parent_test import NFVCLTestSuite
 from topology.models import TOPOLOGY_OK, VIM_TO_ADD1, VIM_TO_ADD2, PDU_TO_ADD, K8S_TO_ADD, PROMETHEUS_TO_ADD
 

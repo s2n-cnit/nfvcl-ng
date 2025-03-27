@@ -1,7 +1,7 @@
 from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core_models.network import NetworkModel, RouterModel, PduModel
+from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
 from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from pydantic import HttpUrl, Field
 from typing import List, Optional
@@ -240,7 +240,6 @@ class TopologyModel(NFVCLBaseModel):
 
         Returns: A VIM that have the required area.
         """
-        item: VimModel
         vim = next((item for item in self.vims if area_id in item.areas), None)
         if vim is None:
             msg_err = "The VIM of area ->{}<- was not found in the topology.".format(area_id)
@@ -256,7 +255,6 @@ class TopologyModel(NFVCLBaseModel):
 
         Returns: A VIM list that have the required area.
         """
-        item: VimModel
         vim_list = [item for item in self.vims if area_id in item.areas]
         if 0 >= len(vim_list):
             msg_err = "The VIM of area ->{}<- was not found in the topology.".format(area_id)

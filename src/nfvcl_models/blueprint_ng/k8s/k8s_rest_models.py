@@ -56,7 +56,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     @field_validator('areas')
     def check_areas(cls, areas: List[K8sAreaDeployment]) -> List[K8sAreaDeployment]:
         if isinstance(areas, list):
-            master_areas = [area for area in areas if area.is_master_area == True]
+            master_areas = [area for area in areas if area.is_master_area]
             if len(master_areas) < 1:
                 raise ValueError("There must be a master area to be deployed. Please set is_master_area to true at least in one area.")
             if len(master_areas) > 1:
@@ -68,7 +68,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
         """
         Returns the master area of the request
         """
-        master_areas = [area for area in self.areas if area.is_master_area == True]
+        master_areas = [area for area in self.areas if area.is_master_area]
         if len(master_areas) > 0:
             return master_areas[0]
         else:
@@ -84,7 +84,7 @@ class K8sAddNodeModel(BlueprintNGCreateModel):
         Checks if there is NOT a master area in day2 call
         """
         if isinstance(areas, list):
-            if len([area for area in areas if area.is_master_area == True]) >= 1:
+            if len([area for area in areas if area.is_master_area]) >= 1:
                 raise ValueError("It is not possible to add CORE areas in day2 request. Only upon cluster creation.")
 
         return areas

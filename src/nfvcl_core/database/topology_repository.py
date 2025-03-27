@@ -1,5 +1,5 @@
-from nfvcl_core.database import DatabaseRepository
-from nfvcl_core.managers import PersistenceManager
+from nfvcl_core.database.database_repository import DatabaseRepository
+from nfvcl_core.managers.persistence_manager import PersistenceManager
 from nfvcl_core_models.topology_models import TopologyModel
 
 

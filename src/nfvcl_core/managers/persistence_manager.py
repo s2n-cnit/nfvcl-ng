@@ -9,7 +9,7 @@ from pymongo import MongoClient
 from pymongo.synchronous.collection import Collection
 from pymongo.synchronous.database import Database
 
-from nfvcl_core.migrations import Migration
+from nfvcl_core.migrations.base_class_migration import Migration
 from nfvcl_core.managers.generic_manager import GenericManager
 
 

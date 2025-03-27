@@ -6,11 +6,11 @@ from pydantic import Field
 
 from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPointType
 from nfvcl_models.blueprint_ng.g5.ran import RANBlueCreateModel, Split, GNBBlueCreateModel, GNBBlueCreateModelNetwork, CUBlueCreateModel, CUUPBlueCreateModel, CUCPBlueCreateModel, DUBlueCreateModel, RanInterfacesIps, RANBlueCreateModelGeneric, CUBlueCreateModelNetwork, CUCPBlueCreateModelNetwork, CUUPBlueCreateModelNetwork, DUBlueCreateModelNetwork
-from nfvcl_core.blueprints import BlueprintNG
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
-from nfvcl_core_models.blueprints import BlueprintNGState
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGState
 from nfvcl_core_models.http_models import HttpRequestType
-from nfvcl_core_models.network import PduModel
+from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_core_models.network.network_models import PduType
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
 

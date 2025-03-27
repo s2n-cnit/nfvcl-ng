@@ -1,1 +1,1 @@
-from .oai_upf_k8s_blue import OpenAirInterfaceUpfK8s
+from .oai_upf_k8s_blue import OpenAirInterfaceUpfK8s as OpenAirInterfaceUpfK8s

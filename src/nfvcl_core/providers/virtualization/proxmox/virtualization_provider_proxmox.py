@@ -23,7 +23,7 @@ from nfvcl_core.providers.virtualization.virtualization_provider_interface impor
 from nfvcl_core.utils.blue_utils import rel_path
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
     VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 
 cloud_init_packages = ['qemu-guest-agent']
 cloud_init_runcmd = ["systemctl enable qemu-guest-agent.service", "systemctl start qemu-guest-agent.service"]

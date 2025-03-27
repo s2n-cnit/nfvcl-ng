@@ -170,34 +170,6 @@ class VimModel(NFVCLBaseModel):
             return router_name
 
 
-class UpdateVimModel(NFVCLBaseModel):
-    name: str
-    networks_to_add: List[str] = Field(
-        [],
-        description="List of network names declared in the topology to be added to the VIM"
-    )
-    networks_to_del: List[str] = Field(
-        [],
-        description="List of network names declared in the topology to be deleted to the VIM"
-    )
-    routers_to_add: List[str] = Field(
-        [],
-        description="List of router names declared in the topology to be added to the VIM"
-    )
-    routers_to_del: List[str] = Field(
-        [],
-        description="List of router names declared in the topology to be added to the VIM"
-    )
-    areas_to_add: List[int] = Field(
-        [],
-        description="List of served area identifiers declared in the topology to be added to the VIM"
-    )
-    areas_to_del: List[int] = Field(
-        [],
-        description="List of served area identifiers declared in the topology to be added to the VIM"
-    )
-
-
 class VimNetMap(NFVCLBaseModel):
     vld: str
     name: str
@@ -230,7 +202,6 @@ class VMFlavors(NFVCLBaseModel):
 
     @field_validator('memory_mb', 'storage_gb', 'vcpu_count', mode='before')
     def validate_field(cls, input_val) -> str:
-        to_ret: str
         if isinstance(input_val, str):
             return input_val
         elif isinstance(input_val, int):

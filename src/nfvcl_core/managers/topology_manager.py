@@ -7,13 +7,13 @@ from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_cal
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
 
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
-from nfvcl_core.database import TopologyRepository
+from nfvcl_core.database.topology_repository import TopologyRepository
 from nfvcl_core.managers import GenericManager
-from nfvcl_core_models.network import NetworkModel, RouterModel, PduModel
+from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
 from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface
 from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl_core_models.topology_models import TopologyModel
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 
 
 class TopologyManager(GenericManager):
@@ -57,7 +57,7 @@ class TopologyManager(GenericManager):
 
             # Check overlapping areas
             if len(set(vim_already_present.areas) & set(vim.areas)) > 0:
-                raise NFVCLCoreException(f"Some of the areas are already assigned to a VIM")
+                raise NFVCLCoreException("Some of the areas are already assigned to a VIM")
 
         self._topology.add_vim(vim)
         self.save_to_db()

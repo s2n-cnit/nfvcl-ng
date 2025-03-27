@@ -23,7 +23,7 @@ class NFVCLParameters(NFVCLBaseModel):
     def validate_ip(cls, ip: str):
         try:
             SerializableIPv4Address(ip)
-        except AddressValueError as e:
+        except AddressValueError:
             raise ValueError(f">{ip}< is not a valid IPv4 address.")
         return ip
 

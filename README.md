@@ -184,7 +184,7 @@ Once configuration is done you can run the NFVCL in the background using **scree
 > :warning: It may be necessary to use the absolute path '/home/ubuntu/.local/bin/poetry' for running the NFVCL.
 ``` 
 screen -S nfvcl
-poetry run python -m nfvcl
+poetry run python src/nfvcl_rest/__main__.py
 ```
 > :warning: To detach from screen press **CTRL+a** then **d**.
 > To resume the screen run `screen -r nfvcl`.

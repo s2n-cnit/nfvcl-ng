@@ -1,6 +1,6 @@
 from enum import Enum
 from ipaddress import AddressValueError, IPv4Address
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -8,7 +8,7 @@ from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core.utils.util import generate_id
 
-
+# TODO remove but do a transaction in the DB for NetworkModel (see below)
 class NetworkTypeEnum(str, Enum):
     vlan: str = 'vlan'
     vxlan: str = 'vxlan'
@@ -37,7 +37,6 @@ class IPv4Pool(NFVCLBaseModel):
         """
         Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')
         """
-        to_ret: SerializableIPv4Address
         if isinstance(val, str):
             return SerializableIPv4Address(val)
         elif isinstance(val, IPv4Address):
@@ -50,7 +49,6 @@ class IPv4Pool(NFVCLBaseModel):
         """
         Allow to initialize IPv4 Objects also by passing a string ('10.0.10.0')
         """
-        to_ret: SerializableIPv4Address
         if isinstance(val, str):
             return SerializableIPv4Address(val)
         elif isinstance(val, IPv4Address):
@@ -364,49 +362,6 @@ class RouterModel(BaseModel):
         if isinstance(other, RouterModel):
             return self.name == other.name
         return False
-
-
-# TODO remove as soon as OSM is removed
-class PduInterface(BaseModel):
-    vld: str
-    name: str
-    mgt: bool = Field(alias='mgmt')
-    intf_type: Optional[str] = Field(default=None)
-    ip_address: Union[str, SerializableIPv4Address] = Field(alias='ip-address')  # TODO pass to only str???
-    network_name: str = Field(alias='vim-network-name')
-    port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
-
-    @classmethod
-    def build_pdu(cls, vld: str, name: str, mgt: bool, ip_address: str, network_name: str):
-        return PduInterface(vld=vld, name=name, mgt=mgt, ip_address=ip_address, network_name=network_name)
-
-    def get_ip(self) -> List[SerializableIPv4Address]:
-        """
-        Return a list of IP of the VLD (Every interface can have multiple IPs
-        Returns:
-            A list of IP, usually composed only by a single IP, but, when the interface has floating IPs (for example)
-            more than one IP is returned.
-        """
-        return_list = []
-        ip_list_str = self.ip_address.split(";")
-        for ip in ip_list_str:
-            return_list.append(SerializableIPv4Address(ip))
-
-        return return_list
-
-    def get_ip_str(self) -> List[str]:
-        """
-        Return a list of IP of the VLD (Every interface can have multiple IPs
-        Returns:
-            A list of IP, usually composed only by a single IP, but, when the interface has floating IPs (for example)
-            more than one IP is returned.
-        """
-        ip_list_str = self.ip_address.split(";")
-
-        return ip_list_str
-
-    class Config:
-        populate_by_name = True
 
 
 class NetworkInterfaceModel(NFVCLBaseModel):

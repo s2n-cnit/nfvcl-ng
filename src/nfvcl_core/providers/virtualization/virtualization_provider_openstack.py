@@ -23,7 +23,7 @@ from nfvcl_core.providers.virtualization.virtualization_provider_interface impor
 from nfvcl_core.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 
 
 class VirtualizationProviderDataOpenstack(VirtualizationProviderData):

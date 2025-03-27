@@ -103,7 +103,7 @@ class HelmPluginManager:
         ))
 
         self.logger.info(f"Installing chart {chart} in {namespace}")
-        chart_install_result = asyncio.run(helm_client.install_or_upgrade_release(
+        asyncio.run(helm_client.install_or_upgrade_release(
             helm_chart_res.name.lower(),
             chart,
             values if values else {},

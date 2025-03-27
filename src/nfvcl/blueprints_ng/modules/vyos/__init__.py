@@ -1,1 +1,1 @@
-from .vyos_blueprint import VyOSBlueprint
+from .vyos_blueprint import VyOSBlueprint as VyOSBlueprint

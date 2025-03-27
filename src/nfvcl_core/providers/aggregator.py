@@ -6,12 +6,12 @@ from nfvcl_core_models.blueprints.blueprint import BlueprintNGProviderModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import PduType, PduModel, MultusInterface
 from nfvcl_core_models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource
-from nfvcl_core_models.vim import VimTypeEnum
+from nfvcl_core_models.vim.vim_models import VimTypeEnum
 from nfvcl_core.providers.blueprint.blueprint_provider import BlueprintProvider
-from nfvcl_core.providers.kubernetes import K8SProviderNative
+from nfvcl_core.providers.kubernetes.k8s_provider_native import K8SProviderNative
 from nfvcl_core.providers.kubernetes.k8s_provider_interface import K8SProviderInterface
 from nfvcl_core.providers.pdu.pdu_provider import PDUProvider
-from nfvcl_core.providers.virtualization import VirtualizationProviderOpenstack
+from nfvcl_core.providers.virtualization.virtualization_provider_openstack import VirtualizationProviderOpenstack
 from nfvcl_core.providers.virtualization.proxmox.virtualization_provider_proxmox import VirtualizationProviderProxmox
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import VirtualizationProviderInterface
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj

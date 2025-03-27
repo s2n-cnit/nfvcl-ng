@@ -339,7 +339,7 @@ def k8s_admin_role_over_namespace(kube_client_config: kubernetes.client.Configur
         # Checking if admin role exist, otherwise create it
         try:
             k8s_check_role_exist(kube_client_config, namespace, rolename='nfvclAdmin')
-        except ValueError as e:
+        except ValueError:
             # Does not exist or multiple account found
             k8s_create_admin_role(kube_client_config, namespace)
         try:
@@ -523,7 +523,7 @@ def k8s_cert_sign_req(kube_client_config: kubernetes.client.Configuration, usern
             conditions = [condition]
             status = V1CertificateSigningRequestStatus(conditions=conditions)
             csr_result.status = status
-            csr_approbation: V1CertificateSigningRequest = api_instance_core.patch_certificate_signing_request_approval(
+            api_instance_core.patch_certificate_signing_request_approval(
                 name=username, body=csr_result)
             # Need to sleep otherwise the cert is still not ready
             time.sleep(0.10)

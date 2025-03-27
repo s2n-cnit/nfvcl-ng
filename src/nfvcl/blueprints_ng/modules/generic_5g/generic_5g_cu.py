@@ -4,8 +4,8 @@ from typing import Optional, TypeVar, Generic, final
 
 from pydantic import Field
 
-from nfvcl_core.blueprints import BlueprintNG
-from nfvcl_core_models.blueprints import BlueprintNGState
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGState
 from nfvcl_models.blueprint_ng.g5.ran import CUBlueCreateModel
 
 

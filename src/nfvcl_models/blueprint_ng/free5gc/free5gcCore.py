@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import ipaddress
 import re
-import socket
-import struct
 from typing import Optional, List, Dict, Union, Literal, Annotated
 
 from pydantic import Field, RootModel, field_validator
 
+from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.network_models import MultusInterface
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
-from nfvcl_core_models.base_model import NFVCLBaseModel
 
 ok_regex = re.compile(r'^([a-fA-F0-9]{6})$')
 

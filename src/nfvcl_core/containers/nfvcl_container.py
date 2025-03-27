@@ -2,7 +2,10 @@ from dependency_injector import containers, providers
 
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core_models.config import NFVCLConfigModel
-from nfvcl_core.database import TopologyRepository, BlueprintRepository, PerformanceRepository, UserRepository
+from nfvcl_core.database.topology_repository import TopologyRepository
+from nfvcl_core.database.blueprint_repository import BlueprintRepository
+from nfvcl_core.database.performance_repository import PerformanceRepository
+from nfvcl_core.database.user_repository import  UserRepository
 from nfvcl_core.managers import PersistenceManager, TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager, VimClientsManager
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager

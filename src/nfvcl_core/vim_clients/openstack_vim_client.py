@@ -5,7 +5,7 @@ from openstack.network.v2.network import Network
 
 from nfvcl_core.vim_clients.vim_client import VimClient
 from nfvcl_core_models.openstack.images import ImageRepo
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 import openstack
 from openstack.connection import Connection
 

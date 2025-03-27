@@ -11,7 +11,7 @@ from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.http_models import HttpRequestType
 from nfvcl_core_models.linux.ip import Route
-from nfvcl_core_models.network import PduModel
+from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core_models.network.network_models import PduType, MultusInterface
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
@@ -107,7 +107,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         Returns: Area id of the core
         """
-        return int(list(filter(lambda x: x.core == True, self.state.current_config.areas))[0].id)
+        return int(list(filter(lambda x: x.core, self.state.current_config.areas))[0].id)
 
     def pre_creation_checks(self):
         """
@@ -543,7 +543,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             raise BlueprintNGException(f"Slice {new_slice.sliceId} already exist")
 
         if oss and not add_slice_model.area_ids:
-            raise BlueprintNGException(f"In OSS mode 'area_ids' need to be specified")
+            raise BlueprintNGException("In OSS mode 'area_ids' need to be specified")
 
         if add_slice_model.area_ids:
             if len(add_slice_model.area_ids) == 1 and add_slice_model.area_ids == "*":

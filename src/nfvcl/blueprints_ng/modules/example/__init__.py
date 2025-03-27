@@ -1,1 +1,1 @@
-from .example_blue import ExampleBlueprintNG
+from .example_blue import ExampleBlueprintNG as ExampleBlueprintNG

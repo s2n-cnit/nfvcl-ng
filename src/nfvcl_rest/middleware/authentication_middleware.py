@@ -61,7 +61,7 @@ def token(form_data: OAuth2PasswordAndRefreshRequestForm = Depends()):
                 access_token, refresh_token = user_manager.refresh_token(form_data.refresh_token)
             case _:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid grant type", headers={"WWW-Authenticate": "Bearer"}, )
-    except Exception as e:
+    except Exception:
         logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

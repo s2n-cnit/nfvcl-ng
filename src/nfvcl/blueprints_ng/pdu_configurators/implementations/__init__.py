@@ -1,4 +1,4 @@
-from nfvcl_core.managers import PDUManager
+from nfvcl_core.managers.pdu_manager import PDUManager
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations.gnb.amari_pdu_configurator import AmariPDUConfigurator
 

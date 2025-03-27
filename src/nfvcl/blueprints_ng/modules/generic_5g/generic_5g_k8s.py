@@ -107,7 +107,7 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
         """
         self.logger.info(f"Scaling {nf_scaling.nf} to {nf_scaling.replica_count} replicas")
 
-        k8s_config = get_k8s_config_from_file_content(self.provider.get_k8s_provider(list(filter(lambda x: x.core == True, self.state.current_config.areas))[0].id).k8s_cluster.credentials)
+        k8s_config = get_k8s_config_from_file_content(self.provider.get_k8s_provider(list(filter(lambda x: x.core, self.state.current_config.areas))[0].id).k8s_cluster.credentials)
         k8s_scale_k8s_deployment(
             k8s_config,
             namespace=self.state.core_helm_chart.namespace.lower(),
@@ -122,7 +122,7 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
         """
         Get A list of prometheus metrics queries for all 5g network functions
         """
-        self.logger.debug(f"day2_get_metrics_queries")
+        self.logger.debug("day2_get_metrics_queries")
 
         metrics_dict: Dict[str, List[str]] = {}
 

@@ -1,16 +1,15 @@
 from dependency_injector.wiring import Provide, inject
 
-from .generic_manager import GenericManager
+from .generic_manager import GenericManager as GenericManager
 from .persistence_manager import PersistenceManager
 from .task_manager import TaskManager
 from .event_manager import EventManager
-from .topology_manager import TopologyManager
+from .topology_manager import TopologyManager as TopologyManager
 from .blueprint_manager import BlueprintManager
 from .performance_manager import PerformanceManager
-from .kubernetes_manager import KubernetesManager
-from .pdu_manager import PDUManager
+from .pdu_manager import PDUManager as PDUManager
 from .vim_clients_manager import VimClientsManager
-from nfvcl_core.containers import NFVCLContainer
+from nfvcl_core.containers.nfvcl_container import NFVCLContainer
 
 
 @inject

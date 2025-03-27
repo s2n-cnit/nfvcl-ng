@@ -1,2 +1,2 @@
-from .dns_blueprint import DNSBlueprint
+from .dns_blueprint import DNSBlueprint as DNSBlueprint
 

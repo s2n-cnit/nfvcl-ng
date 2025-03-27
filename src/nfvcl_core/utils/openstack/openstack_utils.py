@@ -3,8 +3,7 @@ from keystoneauth1.exceptions import Unauthorized
 
 from nfvcl_core.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_core_models.topology_models import TopologyModel
-from openstack.network.v2.network import Network
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 from nfvcl_core.utils.log import create_logger
 
 # Logger
@@ -51,7 +50,6 @@ def check_networks(topology: TopologyModel, vim: VimModel) -> bool:
     try:
         # Get the net list from openstack for the specific instance
         openstack_network_list = open_stack_client.client.list_networks()
-        network: Network
         for network_name in vim.networks:
             # All net details are found in the topology
             network_to_check = topology.get_network(network_name) # get info from topology

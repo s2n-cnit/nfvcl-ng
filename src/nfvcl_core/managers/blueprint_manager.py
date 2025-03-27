@@ -3,12 +3,12 @@ from __future__ import annotations
 import importlib
 from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 
-from nfvcl_core.database import BlueprintRepository
+from nfvcl_core.database.blueprint_repository import BlueprintRepository
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core.managers import GenericManager, EventManager
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core_models.blueprints import BlueprintNGBaseModel
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGBaseModel
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
 from nfvcl_core_models.performance import BlueprintPerformanceType
@@ -16,7 +16,7 @@ from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_cal
 
 if TYPE_CHECKING:
     from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager, VimClientsManager
-from nfvcl_core.blueprints import BlueprintNG
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus, RegisteredBlueprintCall, FunctionType
 from nfvcl_core_models.resources import VmResource
@@ -328,7 +328,7 @@ class BlueprintManager(GenericManager):
         """
         Deletes all blueprints in the NFVCL.
         """
-        run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprints are being deleted..."))
+        run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail="Blueprints are being deleted..."))
 
         blueprints = list(self.blueprint_dict.keys())
         for blue_id in blueprints:

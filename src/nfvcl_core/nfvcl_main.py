@@ -11,7 +11,7 @@ from pydantic import Field, PositiveInt
 from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_implementations
 from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
-from nfvcl_core.containers import NFVCLContainer
+from nfvcl_core.containers.nfvcl_container import NFVCLContainer
 from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
@@ -26,8 +26,7 @@ from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGBaseModel
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core_models.k8s_management_models import Labels
-from nfvcl_core_models.network import PduModel, NetworkModel, RouterModel
-from nfvcl_core_models.network.network_models import IPv4Pool, IPv4ReservedRange
+from nfvcl_core_models.network.network_models import PduModel, NetworkModel, RouterModel, IPv4Pool, IPv4ReservedRange
 from nfvcl_core_models.performance import BlueprintPerformance
 from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall
 from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
@@ -36,7 +35,7 @@ from nfvcl_core_models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, 
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.user import UserNoConfidence, UserCreateREST
-from nfvcl_core_models.vim import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel
 
 
 def callback_function(event: threading.Event, namespace: Dict, msg: NFVCLTaskResult):

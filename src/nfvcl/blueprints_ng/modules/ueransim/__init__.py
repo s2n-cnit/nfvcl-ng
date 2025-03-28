@@ -1,1 +1,1 @@
-from .ueransim_blue import UeransimBlueprintNG
+from .ueransim_blue import UeransimBlueprintNG as UeransimBlueprintNG

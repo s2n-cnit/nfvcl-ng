@@ -1,15 +1,18 @@
 #!/bin/bash
 echo "Adding MongoDB GPG keys..."
-curl -fsSL https://www.mongodb.org/static/pgp/server-6.0.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/mongodb-6.gpg
-echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
 
-echo "Adding Python 3.11 and ansible repo"
+
+echo "Adding Python 3.12 and ansible repo"
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt-add-repository --yes --update ppa:ansible/ansible
 sudo apt update
 
-echo "Installing python3.11"
-sudo apt install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils
+echo "Installing python3.12"
+sudo apt install -y python3.12 python3.12-dev python3.12-venv python3.12-distutils pipx
+
+pipx ensurepath
 
 echo "Installing Ansible"
 sudo apt install -y ansible
@@ -30,7 +33,7 @@ sudo apt-get update
 sudo apt-get install helm
 
 echo "Installing Poetry"
-curl -sSL https://install.python-poetry.org | python3 -
+pipx install poetry
 
 echo "install uvicorn..."
 sudo apt install -y uvicorn

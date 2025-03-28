@@ -4,21 +4,22 @@ from typing import List, Optional, Dict
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
+from nfvcl_models.blueprint_ng.g5.ue import UESim
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_core_models.linux.ip import Route
+from nfvcl_core_models.network.network_models import PduType
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
-from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
-    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim, Route
-from nfvcl.models.http_models import HttpRequestType
-from nfvcl.models.network import PduModel
-from nfvcl.models.network.network_models import PduType
-from nfvcl.models.pdu.gnb import GNBPDUConfigure
-from nfvcl.models.ueransim.blueprint_ueransim_model import UeransimSim, UeransimUe
-from nfvcl.topology.topology import build_topology
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
+    UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.network.network_models import PduModel
+from nfvcl_models.blueprint_ng.blueprint_ueransim_model import UeransimUe
+from nfvcl_core.utils.blue_utils import rel_path
 
 UERANSIM_BLUE_TYPE = "ueransim"
 
@@ -74,11 +75,11 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
 
 
 class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
-    sims: List[UeransimSim] = Field()
+    sims: List[UESim] = Field()
     gnbSearchList: List[str] = Field()
-    sims_to_delete: List[UeransimSim] = Field(default_factory=list)
+    sims_to_delete: List[UESim] = Field(default_factory=list)
 
-    def update_sims(self, new_sims: List[UeransimSim]):
+    def update_sims(self, new_sims: List[UESim]):
         self.sims_to_delete = list(set(self.sims) - set(new_sims))
         self.sims = new_sims
 
@@ -97,9 +98,14 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
         self.sims_to_delete.clear()
 
         for sim in self.sims:
+            fixed_sim = sim.model_dump(exclude_none=True, by_alias=True)
+            for session in fixed_sim["sessions"]:
+                session["apn"] = session["dnn"]
+                del session["dnn"]
+
             ue_sim_config_path = f"/opt/UERANSIM/ue-sim-{sim.imsi}.conf"
             ansible_builder.add_template_task(rel_path("config/ue_conf_file.jinja2"), ue_sim_config_path,
-                                              {"sim": sim, "gnbSearchList": self.gnbSearchList})
+                                              {"sim": fixed_sim, "gnbSearchList": self.gnbSearchList})
 
             # Create a new service to start the UE with this SIM
             ue_sim_service_path = f"/etc/systemd/system/ueransim-ue-sim-{sim.imsi}.service"
@@ -143,7 +149,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         super().destroy()
 
     def add_gnb_to_topology(self, area_id: int):
-        build_topology().add_pdu(PduModel(
+        self.provider.add_pdu(PduModel(
             name=f"UERANSIM_GNB_{self.id}_{area_id}",
             area=area_id,
             type=PduType.GNB,
@@ -153,14 +159,14 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
     def del_gnb_from_topology(self, area_id: int):
         try:
-            build_topology().del_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
+            self.provider.delete_pdu(f"UERANSIM_GNB_{self.id}_{area_id}")
         except Exception as e:
             self.logger.warning(f"Error deleting PDU: {str(e)}")
 
     def _create_gnb(self, area_id: str):
         if area_id not in self.state.areas:
             radio_network_name = f"radio_{self.id}_{area_id}"
-            network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{area_id}.0/24")
+            network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{int(area_id)%256}.0/24")
             self.register_resource(network)
             self.provider.create_net(network)
 
@@ -250,7 +256,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         else:
             raise BlueprintNGException(f"No Gnb found in area {area_id}")
 
-    def _add_sim(self, area_id: str, ue_id: int, new_sim: UeransimSim):
+    def _add_sim(self, area_id: str, ue_id: int, new_sim: UESim):
         self.logger.info(f"Trying to add Sim with imsi {new_sim.imsi}, in area {area_id}, ue {ue_id}")
         for ue in self.state.areas[area_id].ues:
             if ue.ue_id == str(ue_id):
@@ -315,7 +321,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     def del_sim(self, model: UeransimBlueprintRequestDelSim):
         self._del_sim(model.area_id, model.ue_id, model.imsi)
 
-    def to_dict(self, detailed: bool) -> dict:
+    def to_dict(self, detailed: bool, include_childrens: bool = False) -> dict:
         """
         OVERRIDE
         Return a dictionary representation of the UERANSIM blueprint instance.
@@ -323,14 +329,15 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
         Args:
             detailed: Return the same content saved in the database containing all the details of the blueprint.
+            include_childrens: Recursively include the children blueprints dict.
 
         Returns:
 
         """
         if detailed:
-            return super().to_dict(detailed)
+            return super().to_dict(detailed, include_childrens)
         else:
-            base_dict = super().to_dict(detailed)
+            base_dict = super().to_dict(detailed, include_childrens)
             base_dict['gnbs'] = {}
             for area in self.state.areas.items():
                 base_dict['gnbs'][area[0]] = {}

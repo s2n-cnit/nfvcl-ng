@@ -1,15 +1,28 @@
 from __future__ import annotations
 
-from nfvcl.models.base_model import NFVCLBaseModel
+from typing import List, Optional
+
+from pydantic import Field
+
+from nfvcl_core_models.base_model import NFVCLBaseModel
+
+
+class Network(NFVCLBaseModel):
+    name: str
+    cidr: str
+    gateway: Optional[str] = Field(default=None)
 
 
 class Networks(NFVCLBaseModel):
-    mgmt: str
-    data: str
-    k8s_controller: str
-
+    mgmt: Network
+    data: Network
+    gnb: Network
+    n3: Network
+    n6: Network
+    k8s_lb_ips: List[str]
 
 class Vim(NFVCLBaseModel):
+    tenant: str
     user: str
     password: str
     url: str

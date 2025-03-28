@@ -1,1 +1,1 @@
-from .sdcore_upf_blueprint import SdCoreUPFBlueprintNG
+from .sdcore_upf_blueprint import SdCoreUPFBlueprintNG as SdCoreUPFBlueprintNG

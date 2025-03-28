@@ -4,7 +4,7 @@
 ---
 log_level: "20"      # 10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0
 nfvcl: 
-  version: "0.3.0"
+  version: "0.4.0"
   port: "5002"
   ip: ""    # Empty takes the default network interface
 mongodb: 
@@ -21,6 +21,8 @@ redis:
 # Configuration using ENV variables
 Using ENV variables every value loaded from the configuration file will be overwritten, this means that you can override
 alse a single value.
+
+TODO: this section is no longer correct and needs to be updated
 
 ```
 MONGO_IP=127.0.0.1

@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Rome
@@ -12,7 +12,7 @@ RUN apt-get update && \
 RUN apt-add-repository --yes ppa:ansible/ansible && \
     add-apt-repository --yes ppa:deadsnakes/ppa && \
     apt-get update && apt install -y ansible && \
-    apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils uvicorn build-essential && \
+    apt-get install -y python3.12 python3.12-dev python3.12-venv uvicorn build-essential && \
     echo "[defaults]\nhost_key_checking = False" >> /etc/ansible/ansible.cfg && \
     curl -sSL https://install.python-poetry.org | python3 -
 # Installing Helm
@@ -37,4 +37,4 @@ RUN /root/.local/bin/poetry install && \
     rm -rf /root/.cache/pypoetry/artifacts && \
     rm -rf /root/.cache/pip
 
-CMD ["/root/.local/bin/poetry", "run", "python", "-m", "nfvcl"]
+CMD ["/root/.local/bin/poetry", "run", "python", "-m", "nfvcl_rest"]

@@ -3,18 +3,18 @@ from typing import Generic, TypeVar, Optional, Dict, Tuple, final, List
 
 from pydantic import Field, RootModel
 
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import day2_function
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState
-from nfvcl.blueprints_ng.resources import HelmChartResource
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
-from nfvcl.models.blueprint_ng.g5.core import NF5GType, NetworkFunctionScaling
-from nfvcl.models.http_models import HttpRequestType
-from nfvcl.models.k8s.cadvisor import cadvisor_exposed_metrics
-from nfvcl.models.k8s.k8s_objects import K8sService, K8sDeployment
-from nfvcl.utils.k8s import get_k8s_config_from_file_content
-from nfvcl.utils.k8s.kube_api_utils import k8s_scale_k8s_deployment
-from nfvcl.utils.metrics.prometheus_utils import create_prometheus_query
+from nfvcl_core.blueprints.blueprint_type_manager import day2_function
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState, NFNetworkEndpoint
+from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, NetworkEndPointType
+from nfvcl_models.blueprint_ng.g5.core import NF5GType, NetworkFunctionScaling
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_models.k8s.cadvisor import cadvisor_exposed_metrics
+from nfvcl_models.k8s.k8s_objects import K8sService, K8sDeployment
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.kube_api_utils import k8s_scale_k8s_deployment
+from nfvcl_core.utils.metrics.prometheus_utils import create_prometheus_query
 
 
 class Metrics5GContainers(RootModel):
@@ -62,12 +62,43 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
         self.state.core_deployed = True
 
     @final
+    def prepare_network(self):
+        if self.state.current_config.config.network_endpoints.n2.type == NetworkEndPointType.MULTUS:
+            multus_interface = self.provider.reserve_k8s_multus_ip(self.get_core_area_id(), self.state.current_config.config.network_endpoints.n2.net_name)
+            self.state.network_endpoints.n2 = NFNetworkEndpoint(
+                net_name=self.state.current_config.config.network_endpoints.n2.net_name,
+                type=self.state.current_config.config.network_endpoints.n2.type,
+                multus=multus_interface,
+                ip_address=multus_interface.ip_address,
+                network_cidr=multus_interface.network_cidr
+            )
+        if self.state.current_config.config.network_endpoints.n4.type == NetworkEndPointType.MULTUS:
+            multus_interface = self.provider.reserve_k8s_multus_ip(self.get_core_area_id(), self.state.current_config.config.network_endpoints.n4.net_name)
+            self.state.network_endpoints.n4 = NFNetworkEndpoint(
+                net_name=self.state.current_config.config.network_endpoints.n4.net_name,
+                type=self.state.current_config.config.network_endpoints.n4.type,
+                multus=multus_interface,
+                ip_address=multus_interface.ip_address,
+                network_cidr=multus_interface.network_cidr
+            )
+
+    @final
     def get_amf_ip(self) -> str:
-        return self.state.k8s_network_functions[NF5GType.AMF].service.external_ip[0]
+        if self.state.current_config.config.network_endpoints.n2.type == NetworkEndPointType.MULTUS:
+            return self.state.network_endpoints.n2.ip_address.exploded
+        else:
+            return self.state.k8s_network_functions[NF5GType.AMF].service.external_ip[0]
 
     @final
     def get_nrf_ip(self) -> str:
         return self.state.k8s_network_functions[NF5GType.NRF].service.external_ip[0]
+
+    @final
+    def get_smf_ip(self) -> str:
+        if self.state.current_config.config.network_endpoints.n4.type == NetworkEndPointType.MULTUS:
+            return self.state.network_endpoints.n4.ip_address.exploded
+        else:
+            return self.state.k8s_network_functions[NF5GType.SMF].service.external_ip[0]
 
     @day2_function("/scale_nf", [HttpRequestType.PUT])
     def day2_scale_nf(self, nf_scaling: NetworkFunctionScaling):
@@ -76,7 +107,7 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
         """
         self.logger.info(f"Scaling {nf_scaling.nf} to {nf_scaling.replica_count} replicas")
 
-        k8s_config = get_k8s_config_from_file_content(self.provider.get_k8s_provider(list(filter(lambda x: x.core == True, self.state.current_config.areas))[0].id).k8s_cluster.credentials)
+        k8s_config = get_k8s_config_from_file_content(self.provider.get_k8s_provider(list(filter(lambda x: x.core, self.state.current_config.areas))[0].id).k8s_cluster.credentials)
         k8s_scale_k8s_deployment(
             k8s_config,
             namespace=self.state.core_helm_chart.namespace.lower(),
@@ -91,7 +122,7 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
         """
         Get A list of prometheus metrics queries for all 5g network functions
         """
-        self.logger.debug(f"day2_get_metrics_queries")
+        self.logger.debug("day2_get_metrics_queries")
 
         metrics_dict: Dict[str, List[str]] = {}
 
@@ -106,4 +137,4 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
                 metric_list.append(metric_query)
             metrics_dict[nf_name] = metric_list
 
-        return Metrics5GContainers(metrics_dict)
+        return Metrics5GContainers.model_validate(metrics_dict)

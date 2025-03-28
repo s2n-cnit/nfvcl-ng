@@ -1,1 +1,1 @@
-from .sdcore_blueprint import SdCoreBlueprintNG
+from .sdcore_blueprint import SdCoreBlueprintNG as SdCoreBlueprintNG

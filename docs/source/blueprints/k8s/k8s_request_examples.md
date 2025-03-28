@@ -1,135 +1,42 @@
 # K8S Blueprint request examples
 
-## Network cases
-### Using mgt net to expose services
+## Multi AREA deployment and custom flavors
 ```
 {
+  "cni": "flannel",
+  "pod_network_cidr": "10.254.0.0/16",
+  "service_cidr": "10.200.0.0/16",
+  "topology_onboard": true,
   "password": "ubuntu",
+  "install_plugins": true,
   "require_port_security_disabled": true,
-  "areas": [
-    {
-      "area_id": 1,
-      "is_master_area": true,
-      "use_vxlan": false,
-      "mgmt_net": "dmz-internal",
-      "service_net_required_ip_number": 20,
-      "worker_replicas": 1
-    }
-  ]
-}
-```
-
-### Using secondary net to expose services
-```
-{
-  "password": "ubuntu",
-  "require_port_security_disabled": true,
-  "areas": [
-    {
-      "area_id": 1,
-      "is_master_area": true,
-      "service_net": "data_paolo",
-      "mgmt_net": "dmz-internal",
-      "service_net_required_ip_number": 20,
-      "worker_replicas": 1
-    }
-  ]
-}
-```
-
-### Using VXLAN to expose services
-```
-{
-  "password": "ubuntu",
-  "require_port_security_disabled": true,
-  "areas": [
-    {
-      "area_id": 1,
-      "is_master_area": true,
-      "mgmt_net": "dmz-internal",
-      "service_net_required_ip_number": 20,
-      "worker_replicas": 1
-    }
-  ]
-}
-```
-
-## Flavors
-### Use default flavors
-```
-{
-  "password": "ubuntu",
-  "require_port_security_disabled": true,
-  "areas": [
-    {
-      "area_id": 1,
-      "is_master_area": true,
-      "mgmt_net": "dmz-internal",
-      "service_net_required_ip_number": 20,
-      "worker_replicas": 1
-    }
-  ]
-}
-```
-
-### Use a custom flavor
-```
-{
-	"password": "ubuntu",
-	"require_port_security_disabled": true,
   "master_flavors": {
-    "vcpu_count": "4",
     "memory_mb": "4096",
-    "storage_gb": "16",
-    "vcpu_type": "host",
-    "require_port_security_disabled": false
+    "storage_gb": "32",
+    "vcpu_count": "6"
   },
   "areas": [
     {
       "area_id": 1,
-      "is_master_area": true,
-			"service_net": "data_paolo",
-      "mgmt_net": "dmz-internal",
-      "service_net_required_ip_number": 20,
+      "is_master_area": false,
+      "mgmt_net": "6GREEN-control",
+      "load_balancer_pools_ips": ["192.168.131.241","192.168.131.242","192.168.131.243","192.168.131.244","192.168.131.246","192.168.131.248","192.168.131.249"],
       "worker_replicas": 1,
-			"worker_flavors": {
-        "vcpu_count": "4",
-        "memory_mb": "4096",
+      "worker_flavors": {
+        "memory_mb": "6128",
         "storage_gb": "32",
-        "vcpu_type": "host",
-        "require_port_security_disabled": false
+        "vcpu_count": "6"
       }
-    }
-  ]
-}
-```
-
-### Use an existing flavor (use case: no permission to create it)
-```
-{
-	"password": "ubuntu",
-	"require_port_security_disabled": true,
-  "master_flavors": {
-    "vcpu_count": "4",
-    "memory_mb": "4096",
-    "storage_gb": "16",
-    "vcpu_type": "host",
-    "require_port_security_disabled": false
-  },
-  "areas": [
-    {
-      "area_id": 1,
-      "is_master_area": true,
-			"service_net": "data_paolo",
-      "mgmt_net": "dmz-internal",
-      "service_net_required_ip_number": 20,
+    },
+		{
+      "area_id": 2,
+      "is_master_area": false,
+      "mgmt_net": "CTE-control",
       "worker_replicas": 1,
-			"worker_flavors": {
-        "vcpu_count": "4",
-        "memory_mb": "4096",
+      "worker_flavors": {
+        "memory_mb": "6128",
         "storage_gb": "32",
-        "vcpu_type": "host",
-        "require_port_security_disabled": false
+        "vcpu_count": "4"
       }
     }
   ]

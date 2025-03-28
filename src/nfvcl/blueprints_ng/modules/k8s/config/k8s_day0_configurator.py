@@ -1,12 +1,12 @@
 import textwrap
 
-from pydantic import IPvAnyNetwork
 from ruamel.yaml.scalarstring import LiteralScalarString
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
-from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
-from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.models.network.ipam_models import SerializableIPv4Network
-from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import KarmadaInstallModel
+
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
+from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import KarmadaInstallModel
+from nfvcl_core.utils.blue_utils import rel_path
 
 
 class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):
@@ -22,7 +22,10 @@ class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):
         """
         return self._ansible_builder.build()
 
-    def configure_master(self, master_ip: str, master_external_ip: str, pod_network_cidr: SerializableIPv4Network, k8s_service_cidr: SerializableIPv4Network):
+    def set_blueprint_id(self, blueprint_id: str) -> None:
+        self.blueprint_id = blueprint_id
+
+    def configure_master(self, master_ip: str, master_external_ip: str, pod_network_cidr: SerializableIPv4Network, k8s_service_cidr: SerializableIPv4Network) -> None:
         """
         This function is creating ansible tasks for configuring the master node of a K8S cluster, in order:
         Configures dummy network (see __configure_common).
@@ -37,7 +40,7 @@ class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):
         """
         self._ansible_builder = AnsiblePlaybookBuilder("K8s Master Day0Configurator") # Reset the playbook
         # Using the playbook to configure the master
-        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/kubernetes_master_day0_1.yaml"))
+        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/k8s_master_day0.yaml"))
         # Set the playbook variables for the master node
         self._ansible_builder.set_var("pod_network_cidr", str(pod_network_cidr))
         self._ansible_builder.set_var("k8s_master_ip", master_ip)
@@ -57,13 +60,21 @@ class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):
             join_command: The join command retrieved from the master node
             credentials_file: The config file (admin.conf) retrieved from the master node that is used to configure kubectl on worker node
         """
-        self._ansible_builder = AnsiblePlaybookBuilder("K8s Worker Day0Configurator")  # Reset the playbook
+        self._ansible_builder = AnsiblePlaybookBuilder("K8s Worker Day0Configurator") # Reset the playbook
 
-        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/kubernetes_worker_day0.yaml"))
+        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/k8s_worker_day0.yaml"))
         # Set the playbook variables
         self._ansible_builder.set_var("join_command", join_command) # The command to join the cluster
         self._ansible_builder.set_var("credentials_file", LiteralScalarString(textwrap.dedent(credentials_file)))  # Credential file to be used for k8s management in workers
         self._ansible_builder.add_gather_var_task("joined_or_not")
+
+
+    def configure_mirrors(self, mirrors: dict[str, str]):
+        """
+        """
+        self._ansible_builder.set_var("k8s_mirrors", mirrors)
+        self._ansible_builder.add_render_and_execute_template_task(rel_path("playbooks/k8s_set_mirrors.j2"), {"k8s_mirrors": mirrors}, rendered_file_prefix=self.vm_resource.name)
+        self._ansible_builder.add_service_task("containerd", ServiceState.RESTARTED, True)
 
     def install_karmada(self, request: KarmadaInstallModel):
         """
@@ -73,7 +84,7 @@ class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):
         """
         self._ansible_builder = AnsiblePlaybookBuilder("K8s Master Day0 Karmada")
         # Using the playbook to configure karmada and submariner
-        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/kubernetes_master_inst_karmada.yaml"))
+        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/k8s_master_karmada.yaml"))
         # Set the playbook variables for karmada, submariner
         self._ansible_builder.set_var("cluster_id", request.cluster_id)
         self._ansible_builder.set_var("kube_config_location", request.kube_config_location)
@@ -88,4 +99,4 @@ class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):
         """
         self._ansible_builder = AnsiblePlaybookBuilder("K8s Master Day0 Istio")
         # Using the playbook to configure karmada and submariner
-        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/kubernetes_master_istio.yaml"))
+        self._ansible_builder.add_tasks_from_file(rel_path("playbooks/k8s_master_istio.yaml"))

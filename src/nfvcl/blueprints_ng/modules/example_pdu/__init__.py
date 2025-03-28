@@ -1,1 +1,1 @@
-from .example_pdu_blue import ExamplePDUBlueprintNG
+from .example_pdu_blue import ExamplePDUBlueprintNG as ExamplePDUBlueprintNG

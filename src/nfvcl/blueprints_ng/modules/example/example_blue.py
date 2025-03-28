@@ -4,14 +4,15 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNG, BlueprintNGCreateModel, BlueprintNGState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGState
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     HelmChartResource
-from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.http_models import HttpRequestType
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core.utils.blue_utils import rel_path
 
 
 class ExampleCreateModel(BlueprintNGCreateModel):
@@ -214,9 +215,10 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
         self.provider.create_vm(new_vm)
         self.provider.configure_vm(new_vm_configurator)
 
-        self.state.vm_ubuntu2_configurator.file_content = "Edited by add_vm function"
-        self.provider.configure_vm(self.state.vm_ubuntu2_configurator)
-
-        self.provider.update_values_helm_chart(self.state.mqtt_helm_chart, {
-            "test": "updated"
-        })
+    @day2_function("/get_vm", [HttpRequestType.GET])
+    def get_vm(self) -> ExampleAddVMModel:
+        """
+        This docstring for the get_vm day2 function will be shown on Swagger
+        """
+        self.logger.info("get_vm function")
+        return ExampleAddVMModel(mgmt_net="test", data_net="test", num=1)

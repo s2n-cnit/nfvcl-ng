@@ -1,39 +1,40 @@
+import copy
 import re
 from typing import Optional, List
 
-from netaddr.ip import IPNetwork
 from pydantic import Field
+from starlette.responses import PlainTextResponse
 
-from nfvcl.blueprints_ng.blueprint_ng import BlueprintNGState, BlueprintNG
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day2_configurator import VmK8sDay2Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
-from nfvcl.blueprints_ng.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl.models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
+from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
     KarmadaInstallModel, K8sDelNodeModel
-from nfvcl.models.http_models import HttpRequestType
-from nfvcl.models.k8s.common_k8s_model import Cni
-from nfvcl.models.k8s.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
-from nfvcl.models.k8s.topology_k8s_model import TopologyK8sModel, K8sVersion
-from nfvcl.models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
-from nfvcl.models.topology.topology_models import TopoK8SHasBlueprintException
-from nfvcl.topology.topology import Topology, build_topology
-from nfvcl.utils.k8s import get_k8s_config_from_file_content, get_config_map, patch_config_map, get_k8s_cidr_info
-from nfvcl.utils.k8s.helm_plugin_manager import HelmPluginManager
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
+from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
+from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException, TopoK8SNotFoundException
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info
+from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 
 K8S_BLUE_TYPE = "k8s"
 K8S_VERSION = K8sVersion.V1_30
-BASE_IMAGE_MASTER = "u24-k8s-base-v0.0.4-rev"
-BASE_IMAGE_WORKER = "u24-k8s-base-v0.0.4-rev"
-BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.0.4-ubuntu2404.qcow2"
-DUMMY_NET_INT_NAME = "eth99"
+BASE_IMAGE22 = "u22-k8s-base-v0.1.1"
+BASE_IMAGE22_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.1-ubuntu2204.qcow2"
+BASE_IMAGE24 = "u24-k8s-base-v0.1.1"
+BASE_IMAGE24_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.1-ubuntu2404.qcow2"
 POD_NET_CIDR = SerializableIPv4Network("10.254.0.0/16")
 POD_SERVICE_CIDR = SerializableIPv4Network("10.200.0.0/16")
 K8S_DEFAULT_PASSWORD = "ubuntu"
 DUMMY_NET_CIDR = "10.252.252.0/24"
-DUMMY_NET_POOL_START_IP = str((IPNetwork(DUMMY_NET_CIDR))[20])
-DUMMY_NET_VM_START_IP = str((IPNetwork(DUMMY_NET_CIDR))[1])
+DUMMY_NET_POOL_START_IP = str((SerializableIPv4Network(DUMMY_NET_CIDR))[20])
+DUMMY_NET_VM_START_IP = str((SerializableIPv4Network(DUMMY_NET_CIDR))[1])
 
 
 class K8sBlueprintNGState(BlueprintNGState):
@@ -46,9 +47,12 @@ class K8sBlueprintNGState(BlueprintNGState):
     cni: Cni = Field(default=Cni.flannel, description="The network plugin used by the cluster")
     pod_network_cidr: SerializableIPv4Network = Field(default=POD_NET_CIDR, description="The internal network used for PODs by the cluster")
     pod_service_cidr: SerializableIPv4Network = Field(default=POD_SERVICE_CIDR, description="The internal network used for Services by the cluster")
+    containerd_mirrors: Optional[dict[str, str]] = Field(default=None, description="List of containerd mirrors (cache) to be added to the configuration of containerd to avoid limitations from docker.io or other public repositories")
     cadvisor_node_port: int = Field(default=30080, description="The node port on which the cadvisor service is exposed")
 
     password: str = Field(default=K8S_DEFAULT_PASSWORD, description="The password set in master and workers node")
+    base_image_name: str = Field(default=BASE_IMAGE24)
+    base_image_url: str = Field(default=BASE_IMAGE24_URL)
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Indicates if the blueprint will require port security disabled (on openstack)")
     topology_onboarded: bool = Field(default=False, description="If the blueprint cluster has to be added to the topology")
 
@@ -58,14 +62,14 @@ class K8sBlueprintNGState(BlueprintNGState):
     load_balancer_ips_area: dict[str, List[SerializableIPv4Address]] = Field(default={}, description="The IPs used by the load balancer indexed by the area")
     load_balancer_pools: List[K8sLoadBalancerPoolArea] = Field(default=[], description="The K8sTemplateArea filled when calculating the load balancer pools")
 
-    worker_numbers: List[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # We can have at maximum 18 workers. This is used to reserve the number of workers.
+    worker_numbers: List[int] = Field(default=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  # We can have at maximum 18 workers. This is used to reserve the number of workers.
     attached_networks: List[str] = Field(default=[], description="A list of networks attached to all the nodes from every area. Every are can have different networks")
     # VM Master/Controller
     vm_master: Optional[VmResource] = Field(default=None, description="The virtual machine describing the master of the cluster")
     day_0_master_configurator: Optional[VmK8sDay0Configurator] = Field(default=None, description="The DAY0 configurator of the master")
     day_2_master_configurator: Optional[VmK8sDay2Configurator] = Field(default=None, description="The DAY2 configurator of the master")
     # VMs Worker
-    vm_workers: List[VmResource] = []
+    vm_workers: List[VmResource] = Field(default_factory=list)
     day_0_workers_configurators: List[VmK8sDay0Configurator] = Field(default=[], description="The DAY0 configurators of the workers")
     day_0_workers_configurators_tobe_exec: List[VmK8sDay0Configurator] = Field(default=[], description="The DAY0 configurators of the workers that have ansible tasks to be executed")
     # Data retrieved and saved from cluster creation
@@ -95,15 +99,6 @@ class K8sBlueprintNGState(BlueprintNGState):
                                                       configur.vm_resource.name != worker_to_be_rem.name]
 
         return configurators_list
-
-    def get_reserved_ip_list(self) -> List[str]:
-        """
-        Return a list of IPs reserved for k8s services, from all the pools.
-        """
-        ip_list = []
-        for pool in self.reserved_pools:
-            ip_list.extend(pool.get_ip_address_list())
-        return ip_list
 
     def reserve_worker_number(self):
         """
@@ -153,7 +148,12 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.state.pod_service_cidr = create_model.service_cidr
         self.state.cni = create_model.cni
         self.state.password = create_model.password
+        self.set_base_image(create_model.ubuntu_version)
         self.state.cadvisor_node_port = create_model.cadvisor_node_port
+        # If mirrors are provided, set them
+        if create_model.containerd_mirrors:
+            self.state.containerd_mirrors = create_model.containerd_mirrors
+
 
         area: K8sAreaDeployment
         for area in create_model.areas:  # In each area we deploy workers and in the core area also the master (there is always a core area containing the master)
@@ -176,25 +176,35 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         # If required, onboarding the cluster in the topology
         if create_model.topology_onboard:
-            topo: Topology = build_topology()
+            # TODO this is a hack, blueprints should not have direct access to the topology manager
+            topology_manager = self.provider.topology_manager
             area_list = [item.area_id for item in self.state.area_list]
 
-            k8s_cluster = TopologyK8sModel(name=self.id, provided_by="NFVCL", blueprint_ref=self.id,
+            k8s_cluster = TopologyK8sModel(name=self.id, provided_by=ProvidedBy.NFVCL, blueprint_ref=self.id,
                                            credentials=self.state.master_credentials,
-                                           vim_name=topo.get_vim_name_from_area_id(self.state.master_area.area_id),
+                                           vim_name=topology_manager.get_vim_name_from_area_id(self.state.master_area.area_id),
                                            # For the constraint on the model, there is always a master area.
-                                           k8s_version=K8sVersion.V1_29, networks=self.state.attached_networks, areas=area_list,
+                                           k8s_version=K8S_VERSION, networks=[K8sNetworkInfo(name=network) for network in self.state.attached_networks], areas=area_list,
                                            cni="", nfvo_onboard=False, cadvisor_node_port=self.state.cadvisor_node_port,
                                            anti_spoofing_enabled=not self.state.require_port_security_disabled)
-            topo.add_k8scluster(k8s_cluster)
+            topology_manager.add_kubernetes(k8s_cluster)
             self.state.topology_onboarded = create_model.topology_onboard
+
+    def set_base_image(self, version: UbuntuVersion):
+        match version:
+            case UbuntuVersion.UBU24.value:
+                self.state.base_image_url = BASE_IMAGE24_URL
+                self.state.base_image_name = BASE_IMAGE24
+            case UbuntuVersion.UBU22.value:
+                self.state.base_image_url = BASE_IMAGE22_URL
+                self.state.base_image_name = BASE_IMAGE22
 
     def deploy_master_node(self, area: K8sAreaDeployment, master_flavors: VmResourceFlavor):
         # Defining Master node. Should be executed only once.
         self.state.vm_master = VmResource(
             area=area.area_id,
             name=f"{self.id.lower()}-vm-k8s-c",
-            image=VmResourceImage(name=BASE_IMAGE_MASTER, url=BASE_IMAGE_URL),
+            image=VmResourceImage(name=self.state.base_image_name, url=self.state.base_image_url),
             flavor=master_flavors,
             username="ubuntu",
             password=self.state.password,
@@ -219,7 +229,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             vm = VmResource(
                 area=area.area_id,
                 name=f"{self.id.lower()}-vm-w-{worker_number}",
-                image=VmResourceImage(name=BASE_IMAGE_WORKER, url=BASE_IMAGE_URL),
+                image=VmResourceImage(name=self.state.base_image_name, url=self.state.base_image_url),
                 flavor=area.worker_flavors,
                 username="ubuntu",
                 password=self.state.password,
@@ -282,6 +292,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                                          master_external_ip=self.state.vm_master.access_ip,
                                          pod_network_cidr=self.state.pod_network_cidr,
                                          k8s_service_cidr=self.state.pod_service_cidr)
+            if self.state.containerd_mirrors:
+                master_conf.configure_mirrors(self.state.containerd_mirrors)
             master_result = self.provider.configure_vm(master_conf)
 
             # REGISTERING GENERATED VALUES FROM MASTER CONFIGURATION
@@ -292,6 +304,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         # Configuring ONLY worker nodes that have not yet been configured and then removing from the list
         for configurator in self.state.day_0_workers_configurators_tobe_exec:
             configurator.configure_worker(self.state.master_key_add_worker, self.state.master_credentials)
+            if self.state.containerd_mirrors:
+                configurator.configure_mirrors(self.state.containerd_mirrors)
             self.provider.configure_vm(configurator)
 
         self.state.day_0_workers_configurators_tobe_exec = []
@@ -372,24 +386,33 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 f"The number of workers cannot be lower than 1. Pods are scheduled only on workers node, there will be no schedule.")
             return
 
-        dayNconf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster requires actions performed on the master node.
+
+        day_n_conf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster requires actions performed on the master node.
         for node in model.node_names:
             target_vm = [vm for vm in self.state.vm_workers if vm.name == node]  # Checking that the node to be removed EXISTS
             if len(target_vm) >= 1:
-                dayNconf.delete_node(target_vm[0].get_name_k8s_format())  # Adding the action to remove it from the cmaster/controller.
-                vm_to_be_destroyed.append(target_vm[0])  # Appending the VM to be deleted.
+                if target_vm[0].created: # Checking that the node to be removed has been created and didn't crash
+                    day_n_conf.delete_node(target_vm[0].get_name_k8s_format())  # Adding the action to remove it from the cmaster/controller.
+                    vm_to_be_destroyed.append(target_vm[0])  # Appending the VM to be deleted.
+                else:
+                    self._remove_worker(target_vm[0], destroy_vm=False)
+                    self.logger.error(f"Node >{node}< has not been created, it will be destroyed from the blueprint assuming there was a problem during the creation")
             else:
                 self.logger.error(f"Node >{node}< has not been found, cannot be deleted from cluster {self.id}. Moving to next nodes to be deleted")
 
-        self.provider.configure_vm(dayNconf)  # Removing from the cluster every VM to be deleted before it will be destroyed (Nodes is removed from k8s cluster by master configurator)
+        self.provider.configure_vm(day_n_conf)  # Removing from the cluster every VM to be deleted before it will be destroyed (Nodes is removed from k8s cluster by master configurator)
 
         for vm in vm_to_be_destroyed:  # Destroying every VM to be removed from the cluster
+            self._remove_worker(vm)
+
+    def _remove_worker(self, vm: VmResource, destroy_vm: bool = True):
+        if destroy_vm:
             self.provider.destroy_vm(vm)  # Delete the VM from the provider
-            self.deregister_resource(vm)  # Delete from registered resources
-            # Destroying configurator and releasing the worker number, deregister worker resources from the state
-            conf_to_be_deregistered = self.state.remove_worker(vm)
-            for configurator in conf_to_be_deregistered:
-                self.deregister_resource(configurator)
+        self.deregister_resource(vm)  # Delete from registered resources
+        # Destroying configurator and releasing the worker number, deregister worker resources from the state
+        conf_to_be_deregistered = self.state.remove_worker(vm)
+        for configurator in conf_to_be_deregistered:
+            self.deregister_resource(configurator)
 
     @day2_function("/install_karmada", [HttpRequestType.POST])
     def configure_karmada(self, model: KarmadaInstallModel):
@@ -408,8 +431,16 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         master_conf = self.state.day_0_master_configurator
         master_conf.install_istio()
-        master_result = self.provider.configure_vm(master_conf)
+        self.provider.configure_vm(master_conf)
         # TODO expose prometheus to external using nodeport
+
+    @day2_function("/root_kubeconfig", [HttpRequestType.GET])
+    def get_root_kubeconfig(self) -> PlainTextResponse:
+        """
+        Return the kubeconfig file for the root user.
+        """
+        copy_kubeconfig = copy.deepcopy(self.state.master_credentials)
+        return PlainTextResponse(copy_kubeconfig, media_type="text/plain")
 
     def destroy(self):
         """
@@ -418,18 +449,15 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         if self.state.topology_onboarded:
             try:
-                build_topology().del_k8scluster(self.id)
-            except ValueError:
+                self.provider.topology_manager.delete_kubernetes(self.id)
+            except TopoK8SNotFoundException:
                 self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")
             except TopoK8SHasBlueprintException as e:
                 self.logger.error(f"Blueprint {self.id} will not be destroyed")
                 raise e
         super().destroy()
-        # Remove reserved IP range
-        build_topology().release_ranges(self.id)  # Remove all reserved ranges in the networks
-        # If it was onboarded on the topology (as a usable k8s cluster), remove it.
 
-    def to_dict(self, detailed: bool) -> dict:
+    def to_dict(self, detailed: bool, include_childrens: bool = False) -> dict:
         """
         OVERRIDE
         Return a dictionary representation of the K8S blueprint instance.
@@ -437,14 +465,15 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         Args:
             detailed: Return the same content saved in the database containing all the details of the blueprint.
+            include_childrens: Recursively include the children blueprints dict.
 
         Returns:
 
         """
         if detailed:
-            return super().to_dict(detailed)
+            return super().to_dict(detailed, include_childrens)
         else:
-            base_dict = super().to_dict(detailed)
+            base_dict = super().to_dict(detailed, include_childrens)
             if self.base_model.state.vm_master:
                 ip_list = [f"Controller {self.base_model.state.vm_master.name}: {self.base_model.state.vm_master.access_ip}"]
                 ip_list.extend([f"Worker {vm.name}: {vm.access_ip}" for vm in self.base_model.state.vm_workers])

@@ -1,12 +1,16 @@
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
-from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
+from typing import Any
+
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 
 
 class VmK8sDay2Configurator(VmResourceAnsibleConfiguration):
     """
     This is the configurator for day0 of kubernetes nodes (master and workers)
     """
-    _ansible_builder: AnsiblePlaybookBuilder  # _ in front of the name, so it is not serialized
+    _ansible_builder: AnsiblePlaybookBuilder = AnsiblePlaybookBuilder("K8s Master Day2Configurator")
+
+    # _ in front of the name, so it is not serialized
 
     def dump_playbook(self) -> str:
         """

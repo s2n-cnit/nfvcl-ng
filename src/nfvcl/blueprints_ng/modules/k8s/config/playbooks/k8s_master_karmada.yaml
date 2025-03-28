@@ -1,0 +1,36 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+   - name: Download Submariner executable
+     ansible.builtin.get_url:
+       url: https://get.submariner.io
+       dest: /tmp/submariner.sh
+       mode: '0750'
+   - name: Download Karmada executable
+     ansible.builtin.get_url:
+       url: https://raw.githubusercontent.com/karmada-io/karmada/master/hack/install-cli.sh
+       dest: /tmp/karmada.sh
+       mode: '0750'
+   - name: Remove Karmada executable if already present
+     ansible.builtin.file:
+       path: /usr/local/bin/karmadactl
+       state: absent
+   - name: Installing Submariner
+     ansible.builtin.shell: |
+       /tmp/submariner.sh
+     environment:
+       DESTDIR: "/usr/local/bin"
+   - name: Installing Karmada
+     ansible.builtin.shell: |
+       /tmp/karmada.sh
+   - name: Create submariner broker info file
+     ansible.builtin.copy:
+       content: "{{ submariner_broker }}"
+       dest: "/tmp/sub_broker.subm"
+   - name: Configuring Submariner
+     ansible.builtin.shell: "echo | /usr/local/bin/subctl join --kubeconfig '{{ kube_config_location }}' '/tmp/sub_broker.subm' --clusterid '{{ cluster_id }}'"
+   - name: Configuring Karmada
+     command: sudo karmadactl register '{{ karmada_control_plane }}' --token '{{ karmada_token }}' --discovery-token-ca-cert-hash '{{ discovery_token_hash }}' --cluster-name '{{ cluster_id }}' --kubeconfig '{{ kube_config_location }}'
+

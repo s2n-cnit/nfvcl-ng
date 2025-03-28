@@ -1,19 +1,43 @@
-from nfvcl.models.blueprint_ng.core5g.OAI_Models import OaiUpfValuesModel
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import OaiUpfValuesModel
 
-# Class rappresenting default config, it will be overwritten with the input one
+# Class representing default config, it will be overwritten with the input one
 default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
+    "multus": {
+        "defaultGateway": "",
+        "n3Interface": {
+            "create": False,
+            "ipAdd": "172.21.12.95",
+            "netmask": "22",
+            "name": "n3",
+            "routes": [],
+            "hostInterface": "bond0"
+        },
+        "n4Interface": {
+            "create": False,
+            "ipAdd": "192.168.24.2",
+            "netmask": "24",
+            "name": "n4",
+            "routes": [],
+            "hostInterface": "bond0"
+        },
+        "n6Interface": {
+            "create": False,
+            "ipAdd": "192.168.22.2",
+            "netmask": "24",
+            "name": "n6",
+            "routes": [],
+            "hostInterface": "bond0"
+        }
+    },
     "currentconfig": {
         "log_level": {
             "general": "info"
         },
         "register_nf": {
-            "general": "yes"
+            "general": "no"
         },
         "http_version": 2,
         "snssais": [
-            {
-                "sst": 1
-            },
             {
                 "sst": 1,
                 "sd": "FFFFFF"
@@ -112,14 +136,21 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
         "upf": {
             "support_features": {
                 "enable_bpf_datapath": "no",
-                "enable_snat": "yes"
+                "enable_snat": "yes",
+                "enable_qos": "no"
             },
-            "remote_n6_gw": "127.0.0.1",
+            "remote_n6_gw": "localhost",
+            "smfs": [
+                {
+                    "host": ""
+                }
+            ],
             "upf_info": {
                 "sNssaiUpfInfoList": [
                     {
                         "sNssai": {
-                            "sst": 1
+                            "sst": 1,
+                            "sd": "FFFFFF"
                         },
                         "dnnUpfInfoList": [
                             {
@@ -145,12 +176,12 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
             {
                 "dnn": "oai",
                 "pdu_session_type": "IPV4",
-                "ipv4_subnet": "12.1.1.0/24"
+                "ipv4_subnet": "10.1.0.0/24"
             },
             {
                 "dnn": "ims",
                 "pdu_session_type": "IPV4V6",
-                "ipv4_subnet": "14.1.1.0/24"
+                "ipv4_subnet": "10.2.0.0/24"
             }
         ]
     }

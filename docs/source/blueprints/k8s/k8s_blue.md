@@ -1,11 +1,23 @@
 # K8S Blueprint
+## What is this Blueprint for?
 The Kubernetes Blueprint is dedicated to the lifecycle management of a K8S cluster.
 It acts on the required VIMs to create a variable number of Virtual Machines on witch K8S software is configured.
 One of these VMs acts as the cluster controller while the others act as workers. Based on the request some nodes of the 
 cluster can be deployed in an area or in another (multi vim deployment)
 
 The supported features are:
-- Creation of a K8S cluster (done while creating the blueprint instance)
+- Creation of a K8S cluster with the desired number of nodes (min 2, 1 controller and 1 worker). On creation you can:
+    - Change the CNI between Flannel and Calico
+    - Change the pod network CIDR and the service CIDR
+    - Define if the cluster should be onboarded in the Topology
+    - Choose the password for the VMs
+    - Choose if the plugins should be installed
+    - Choose if the port security should be disabled
+    - Define the flavors for the master and the worker nodes
+    - Define the management network and additional networks for the nodes
+    - Define the load balancer pools IPs
+    - Define the number of worker replicas
+    - Define the containerd mirrors (or cache) to be used
 - Destruction of the K8S cluster (done when destroying the blueprint instance)
 - Add a node to the cluster of an existing K8S blueprint instance
 - Delete a node from the cluster of an existing K8S blueprint instance (a controller and a worker must always be present)

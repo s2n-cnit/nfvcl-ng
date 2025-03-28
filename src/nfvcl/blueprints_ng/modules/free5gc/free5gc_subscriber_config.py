@@ -1,4 +1,4 @@
-from nfvcl.models.blueprint_ng.free5gc.free5gcCore import Free5gcSubScriber
+from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Free5gcSubScriber
 
 subscriber_config: Free5gcSubScriber = Free5gcSubScriber.model_validate({
    "userNumber":1,

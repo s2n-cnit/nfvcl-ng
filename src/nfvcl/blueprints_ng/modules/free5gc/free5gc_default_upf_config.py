@@ -1,4 +1,4 @@
-from nfvcl.models.blueprint_ng.free5gc.free5gcUpf import Free5gcUpfConfig
+from nfvcl_models.blueprint_ng.free5gc.free5gcUpf import Free5gcUpfConfig
 
 default_upf_config: Free5gcUpfConfig = Free5gcUpfConfig.model_validate({
     "version": "1.0.3",

@@ -6,13 +6,14 @@ from typing import Optional, Dict, Tuple
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState, \
     NF5GType
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_default_config import default_config
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_values_model import SDCoreValuesModel, SimAppYamlConfiguration
-from nfvcl.blueprints_ng.resources import HelmChartResource
-from nfvcl.models.blueprint_ng.core5g.common import Create5gModel
+from nfvcl.blueprints_ng.modules.sdcore_upf.sdcore_upf_blueprint import SDCORE_UPF_BLUE_TYPE
+from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
 
 
 class BlueSDCoreCreateModel(Create5gModel):
@@ -25,6 +26,8 @@ class SdCoreBlueprintNGState(Generic5GK8sBlueprintNGState):
 
 @blueprint_type("sdcore")
 class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateModel]):
+    default_upf_implementation = SDCORE_UPF_BLUE_TYPE
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = SdCoreBlueprintNGState):
         super().__init__(blueprint_id, state_type)
 
@@ -52,8 +55,8 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCo
         self.update_sdcore_values()
 
         self.state.core_helm_chart = HelmChartResource(
-            area=list(filter(lambda x: x.core == True, self.state.current_config.areas))[0].id,
-            name=f"sdcore",
+            area=list(filter(lambda x: x.core, self.state.current_config.areas))[0].id,
+            name="sdcore", # TODO should this include the blueprint id? Can we deploy multiple cores on the same blueprint?
             chart="helm_charts/charts/sdcore-1.0.0.tgz",
             chart_as_path=True,
             namespace=self.id
@@ -85,6 +88,13 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCo
         This will also set the UPFs IPs on the slices
         """
         self.config_ref.from_generic_5g_model(self.state.current_config)
+
+        # TODO fix this
+        if self.state.current_config.config.persistence.enabled:
+            self.logger.warning("Persistence is enabled but it is not supported by the current blueprint version")
+        #self.state.sdcore_config_values.field_5g_control_plane.mongodb.persistence.enabled = self.state.current_config.config.persistence.enabled
+        # TODO this value does not exist in the current config
+        # self.state.sdcore_config_values.field_5g_control_plane.mongodb.persistence.storage_class = self.state.current_config.config.persistence.storage_class
 
         for area in self.state.current_config.areas:
             for slice in area.slices:

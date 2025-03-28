@@ -1,7 +1,21 @@
-import paramiko
 import socket
-import re
-import time
+from typing import Optional
+
+import paramiko
+
+from models.config_unitest import ConfigUniteTest
+from nfvcl_core.utils.blue_utils import get_yaml_parser
+
+unittest_config: Optional[ConfigUniteTest] = None
+
+def get_unittest_config() -> ConfigUniteTest:
+    global unittest_config
+    if unittest_config is None:
+        parser = get_yaml_parser()
+        with open("config_unitest_dev.yaml", 'r') as stream:
+            data_loaded = parser.load(stream)
+            unittest_config = ConfigUniteTest.model_validate(data_loaded)
+    return unittest_config
 
 
 class SSH:
@@ -20,32 +34,13 @@ class SSH:
         return stdout
 
     def execute_ssh_command(self, command: str, sudo=False):
-        command = f"$ echo {self.pwd} | sudo -S {command}" if sudo else command
+        command = f"echo {self.pwd} | sudo -S {command}" if sudo else command
         stdin, stdout, stderr = self.ssh.exec_command(command)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status != 0:
             raise Exception(f"Error executing command: {command}")
         else:
             return stdout
-
-    def check_gnb_connection(self):
-        timeout = time.time() + 60 * 1
-        while True:
-            stdout = self.execute_ssh_command(f"journalctl -u ueransim-gnb.service -b", sudo=True)
-            output = ' '.join(stdout.readlines())
-            output = re.search("successful", output).group()
-            if output == "successful" or time.time() > timeout:
-                return output
-
-    def get_ue_TUN_name(self, imsi):
-        self.execute_ssh_command(f"systemctl restart ueransim-ue-sim-{imsi}.service", sudo=True)
-        timeout = time.time() + 60 * 1
-        while True:
-            stdout = self.execute_ssh_command(f"journalctl -u ueransim-ue-sim-{imsi}.service -b | grep TUN", sudo=True)
-            output = stdout.readline()
-            output = re.search("uesimtun[0-9]", output).group()
-            if "uesimtun" in output or time.time() > timeout:
-                return output
 
     def close_connection(self):
         self.ssh.close()

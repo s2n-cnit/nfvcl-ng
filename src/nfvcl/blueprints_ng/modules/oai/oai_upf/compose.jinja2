@@ -2,7 +2,7 @@ version: '3.8'
 services:
     oai-upf{{ upf_id }}:
         container_name: "oai-upf{{ upf_id }}"
-        image: oaisoftwarealliance/oai-upf:v2.0.0
+        image: oaisoftwarealliance/oai-upf:v2.1.0
         restart: on-failure
         expose:
             - 2152/udp

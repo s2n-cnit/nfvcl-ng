@@ -1,1 +1,1 @@
-from .OpenAirInterfaceUpf_blue import OpenAirInterfaceUpf
+from .OpenAirInterfaceUpf_blue import OpenAirInterfaceUpf as  OpenAirInterfaceUpf

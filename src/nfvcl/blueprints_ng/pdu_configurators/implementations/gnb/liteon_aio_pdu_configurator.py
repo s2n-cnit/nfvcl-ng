@@ -1,12 +1,12 @@
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl.blueprints_ng.providers.configurators.ansible_utils import run_ansible_playbook
-from nfvcl.blueprints_ng.resources import PDUResourceAnsibleConfiguration
-from nfvcl.blueprints_ng.utils import rel_path
-from nfvcl.models.base_model import NFVCLBaseModel
-from nfvcl.models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.resources import PDUResourceAnsibleConfiguration
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core.providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl_core.utils.blue_utils import rel_path
 
 
 class LiteonConfigVars(NFVCLBaseModel):
@@ -46,7 +46,7 @@ class LiteonAIOPDUConfigurator(GNBPDUConfigurator):
             nci=str(config.tac),
             pci=str(config.tac),
             sst=str(config.nssai[0].sst),
-            sd=str(config.nssai[0].sd),
+            sd=config.nssai[0].sd,
             amf_ip=config.amf_ip,
             upf_ip=config.upf_ip,
             frequency=self.pdu_model.config["frequency"]

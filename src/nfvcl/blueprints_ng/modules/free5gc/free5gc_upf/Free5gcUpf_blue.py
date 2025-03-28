@@ -4,16 +4,16 @@ from typing import Optional
 
 from pydantic import Field
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, ServiceState
-from nfvcl.blueprints_ng.lcm.blueprint_type_manager import blueprint_type
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUPFVMBlueprintNGState, Generic5GUPFVMBlueprintNG
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_upf_config
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBlueprintNG, Generic5GUPFBlueprintNGState, \
-    DeployedUPFInfo
-from nfvcl.blueprints_ng.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
-from nfvcl.blueprints_ng.utils import rel_path, yaml
-from nfvcl.models.blueprint_ng.free5gc.free5gcUpf import Free5gcUpfConfig, DnnListItem, IfListItem
-from nfvcl.models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
-from nfvcl.models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core_models.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
+from nfvcl_models.blueprint_ng.free5gc.free5gcUpf import Free5gcUpfConfig, DnnListItem, IfListItem
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
+from nfvcl_core.utils.blue_utils import rel_path, yaml
 
 FREE5GC_UPF_BLUE_TYPE = "free5gc_upf"
 
@@ -65,7 +65,7 @@ class Free5gcUpfConfigurator(VmResourceAnsibleConfiguration):
         return ansible_builder.build()
 
 
-class Free5GCUpfBlueprintNGState(Generic5GUPFBlueprintNGState):
+class Free5GCUpfBlueprintNGState(Generic5GUPFVMBlueprintNGState):
     """
     This class represent the current state of the blueprint, the data contained in this class will be saved to the DB
 
@@ -80,8 +80,8 @@ class Free5GCUpfBlueprintNGState(Generic5GUPFBlueprintNGState):
 
 
 @blueprint_type(FREE5GC_UPF_BLUE_TYPE)
-class Free5GCUpf(Generic5GUPFBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCreateModel]):
-    def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFBlueprintNGState] = Free5GCUpfBlueprintNGState):
+class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCreateModel]):
+    def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFVMBlueprintNGState] = Free5GCUpfBlueprintNGState):
         """
         Don't write code in the init method, this will be called every time the blueprint is loaded from the DB
         """
@@ -94,12 +94,12 @@ class Free5GCUpf(Generic5GUPFBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCrea
         upf_vm = VmResource(
             area=self.state.current_config.area_id,
             name=f"{self.id}_FREE5GC_UPF_{self.state.current_config.area_id}",
-            image=VmResourceImage(name="Free5GC_UPF_3.4.3", url="https://images.tnt-lab.unige.it/free5gcupf/free5gcupf-v3.4.3-ubuntu2204.qcow2"),
+            image=VmResourceImage(name="Free5GC_UPF_4.0.0", url="https://images.tnt-lab.unige.it/free5gcupf/free5gcupf-v4.0.0-ubuntu2204.qcow2"),
             flavor=VmResourceFlavor(),
             username="ubuntu",
             password="ubuntu",
-            management_network=self.state.current_config.networks.mgt,
-            additional_networks=[self.state.current_config.networks.n4, self.state.current_config.networks.n3, self.state.current_config.networks.n6]
+            management_network=self.state.current_config.networks.mgt.net_name,
+            additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name]
         )
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)
@@ -124,11 +124,11 @@ class Free5GCUpf(Generic5GUPFBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCrea
 
         vm_upf = next(iter(self.state.vm_resources.values()))
 
-        self.state.upf_conf.pfcp.addr = vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.ip
-        self.state.upf_conf.pfcp.node_id = vm_upf.network_interfaces[self.create_config.networks.n4][0].fixed.ip
+        self.state.upf_conf.pfcp.addr = vm_upf.network_interfaces[self.create_config.networks.n4.net_name][0].fixed.ip
+        self.state.upf_conf.pfcp.node_id = vm_upf.network_interfaces[self.create_config.networks.n4.net_name][0].fixed.ip
 
         if_list_item = IfListItem(
-            addr=vm_upf.network_interfaces[self.create_config.networks.n3][0].fixed.ip,
+            addr=vm_upf.network_interfaces[self.create_config.networks.n3.net_name][0].fixed.ip,
             type="N3"
         )
         self.state.upf_conf.gtpu.if_list.append(if_list_item)
@@ -136,7 +136,7 @@ class Free5GCUpf(Generic5GUPFBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCrea
         for new_slice in self.state.current_config.slices:
             for dnn in new_slice.dnn_list:
                 dnn_item = DnnListItem(
-                    dnn=dnn.name,
+                    dnn=dnn.dnn,
                     cidr=dnn.cidr
                 )
                 if dnn_item not in self.state.upf_conf.dnn_list:
@@ -146,7 +146,7 @@ class Free5GCUpf(Generic5GUPFBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCrea
 
         self.state.upf_vm_configurator.upf_id = self.state.current_config.area_id
         self.state.upf_vm_configurator.upf_conf = upf_conf_yaml
-        self.state.upf_vm_configurator.n6 = vm_upf.network_interfaces[self.state.current_config.networks.n6][0].fixed.interface_name
+        self.state.upf_vm_configurator.n6 = vm_upf.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name
         self.state.upf_vm_configurator.gnb_cidr = self.state.current_config.gnb_cidr.exploded
         self.state.upf_vm_configurator.n3_gateway = self.state.current_config.n3_gateway_ip.exploded
         self.state.upf_vm_configurator.n6_gateway = self.state.current_config.n6_gateway_ip.exploded
@@ -162,12 +162,12 @@ class Free5GCUpf(Generic5GUPFBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCrea
             vm_resource_id=vm_upf.id,
             vm_configurator_id=self.state.upf_vm_configurator.id,
             network_info=UPFNetworkInfo(
-                n4_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n4][0].fixed.cidr),
-                n3_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n3][0].fixed.cidr),
-                n6_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n6][0].fixed.cidr),
-                n4_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n4][0].fixed.ip),
-                n3_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n3][0].fixed.ip),
-                n6_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n6][0].fixed.ip)
+                n4_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.cidr),
+                n3_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.cidr),
+                n6_cidr=SerializableIPv4Network(vm_upf.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.cidr),
+                n4_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.ip),
+                n3_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.ip),
+                n6_ip=SerializableIPv4Address(vm_upf.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.ip)
             )
         )
         self.state.upf_list.clear()

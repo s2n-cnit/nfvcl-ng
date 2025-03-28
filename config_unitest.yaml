@@ -1,10 +1,24 @@
 config:
   networks:
-    mgmt: "dmz-internal"
-    data: ""
-    k8s_controller: ""
+    mgmt:
+      name: ""
+      cidr: ""
+      gateway: ""
+    data:
+      name: ""
+      cidr: ""
+    n3:
+      name: ""
+      cidr: ""
+    n6:
+      name: ""
+      cidr: ""
+    gnb:
+      name: ""
+      cidr: ""
+    k8s_lb_ips: []
   vim:
     tenant: ""
     user: ""
     password: ""
-    url: "http://os-lab.maas:5000/v3"
+    url: "http://os.maas:5000/v3"

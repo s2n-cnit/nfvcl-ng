@@ -1,0 +1,51 @@
+services:
+
+  nfvcl:
+    image: registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
+    depends_on:
+      - mongo
+      - redis
+    restart: always
+    environment:
+      NFVCL_CONFIG_PATH: "/app/nfvcl-ng/config/config.yaml"
+    ports:
+      - 5002:5002
+    volumes:
+      - ../config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
+      - ../logs/:/app/nfvcl-ng/logs/
+      - ../tmp/:/tmp/nfvcl/
+    networks:
+      - shared-network
+
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    networks:
+      - shared-network
+
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - shared-network
+
+volumes:
+  mongo_data:
+  redis_data:
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: "10.224.52.0/24"
+  shared-network:
+    external: true

@@ -1,20 +1,22 @@
 from typing import List
 
-from nfvcl.blueprints_ng.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription, AnsibleShellTask
-from nfvcl.blueprints_ng.resources import VmResourceAnsibleConfiguration
+from pydantic import Field
+
+from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription, AnsibleShellTask
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 
 
 class VmK8sDayNConfigurator(VmResourceAnsibleConfiguration):
     """
     This is the configurator for day0 of kubernetes nodes (master and workers)
     """
-    task_list: List[AnsibleTaskDescription] = []
+    task_list: List[AnsibleTaskDescription] = Field(default_factory=list)
 
     def dump_playbook(self) -> str:
         """
         This method need to be implemented, it should return the Ansible playbook as a string.
         """
-        ansible_builder = AnsiblePlaybookBuilder("Playbook VyOS NAT configuration")
+        ansible_builder = AnsiblePlaybookBuilder("Playbook K8S DayN Configurator")
 
         for task_description in self.task_list:
             ansible_builder.add_task_embedded(task_descr=task_description)

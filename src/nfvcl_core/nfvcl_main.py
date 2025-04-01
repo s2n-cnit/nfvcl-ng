@@ -12,6 +12,7 @@ from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_i
 from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
 from nfvcl_core.containers.nfvcl_container import NFVCLContainer
+from nfvcl_core.database.extra_repository import ExtraRepository
 from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
@@ -100,6 +101,7 @@ class NFVCL:
     K8S_SECTION = NFVCLPublicSectionModel(name="Kubernetes cluster management", description="Operations related to kubernetes clusters", path="/k8s")
     UTILS_SECTION = NFVCLPublicSectionModel(name="Utils", description="Utils", path="/v2/utils")
     USER_SECTION = NFVCLPublicSectionModel(name="Users", description="User management", path="/v2/users")
+    HORSE_SECTION = NFVCLPublicSectionModel(name="Horse", description="Horse", path="/v2/horse")
 
     def __init__(
         self,
@@ -112,6 +114,7 @@ class NFVCL:
         pdu_manager: PDUManager = Provide[NFVCLContainer.pdu_manager],
         kubernetes_manager: KubernetesManager = Provide[NFVCLContainer.kubernetes_manager],
         user_manager: UserManager = Provide[NFVCLContainer.user_manager],
+        extra_repository: ExtraRepository = Provide[NFVCLContainer.extra_repository],
     ):
         self.logger = create_logger(self.__class__.__name__)
 
@@ -124,6 +127,7 @@ class NFVCL:
         self.task_manager = task_manager
         self.event_manager = event_manager
         self.user_manager = user_manager
+        self.extra_repository = extra_repository
 
         urllib3.disable_warnings()
 

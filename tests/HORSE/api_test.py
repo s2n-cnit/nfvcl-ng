@@ -1,16 +1,17 @@
 import os
-import logging
 import time
 import unittest
+import uuid
 from http.server import HTTPServer
 from multiprocessing import Process, Pipe
 from multiprocessing.connection import Connection
+
+from nfvcl_horse.models.horse_models import RTRActionType
 
 # Need to be before
 os.environ['HORSE_DEBUG'] = "True"
 os.environ.get('HORSE_DEBUG')
 # Need to be after, requires env var
-from nfvcl.rest_endpoints.HORSE.horse import *
 from tests.HORSE.dummy_server import HTTPDummyServer, set_pipe
 
 HTTP_DUMMY_SRV_PORT = 9995

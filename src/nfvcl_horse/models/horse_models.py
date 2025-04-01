@@ -1,9 +1,22 @@
 import re
 import datetime
 from enum import Enum
+
+
+from nfvcl_core.utils.util import PATH_PATTERN
+
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
+
+from nfvcl_core_models.base_model import NFVCLBaseModel
 from pydantic import BaseModel, field_validator, Field
 
-from nfvcl.models.base_model import NFVCLBaseModel
+class DocModuleInfo(NFVCLBaseModel):
+    ipaddress: SerializableIPv4Address
+    port: int = Field(None, ge=0, le=65535)
+    path: str = Field(description="Path to the module expresses like /path1/path2", pattern=PATH_PATTERN)
+
+    def url(self):
+        return f"{self.ipaddress}:{self.port}{self.path}"
 
 
 class RTRRestAnswer(BaseModel):

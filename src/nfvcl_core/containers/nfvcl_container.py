@@ -1,5 +1,6 @@
 from dependency_injector import containers, providers
 
+from nfvcl_core.database.extra_repository import ExtraRepository
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core.database.topology_repository import TopologyRepository
@@ -59,6 +60,11 @@ class NFVCLContainer(containers.DeclarativeContainer):
 
     user_repository = providers.Singleton(
         UserRepository,
+        persistence_manager=persistence_manager
+    )
+
+    extra_repository = providers.Singleton(
+        ExtraRepository,
         persistence_manager=persistence_manager
     )
 

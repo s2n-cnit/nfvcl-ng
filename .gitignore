@@ -10,8 +10,9 @@ mounted_folder/*
 /.idea/
 config/config_dev.yaml
 main_debug.py
-helm_charts/charts/*
+#helm_charts/charts/*
 helm_charts/index.yaml
 /docs/build/*
 *.drawio*.bkp
 config_unitest_dev.yaml
+/config_dev.yaml

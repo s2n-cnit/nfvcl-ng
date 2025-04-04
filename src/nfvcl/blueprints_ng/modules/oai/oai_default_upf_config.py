@@ -34,7 +34,7 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
             "general": "info"
         },
         "register_nf": {
-            "general": "no"
+            "general": "yes"
         },
         "http_version": 2,
         "snssais": [

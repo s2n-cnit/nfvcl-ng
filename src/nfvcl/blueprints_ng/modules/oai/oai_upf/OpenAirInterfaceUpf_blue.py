@@ -122,8 +122,8 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
                 oai_utils.add_dnn_dnns(self.state.upf_conf, dnn.dnn, dnn.cidr)
                 oai_utils.add_dnn_snssai_upf_info_list_item(self.state.upf_conf, new_snssai, dnn_item)
 
-        if self.state.current_config.smf_ip:
-            self.state.upf_conf.upf.smfs = [AvailableSmf(host=self.state.current_config.smf_ip.exploded)]
+        # if self.state.current_config.smf_ip:
+        #     self.state.upf_conf.upf.smfs = [AvailableSmf(host=self.state.current_config.smf_ip.exploded)]
 
         upf_conf_yaml = yaml.dump(json.loads(self.state.upf_conf.model_dump_json(by_alias=True)))
 

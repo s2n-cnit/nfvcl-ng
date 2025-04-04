@@ -436,9 +436,13 @@ class OaiAmf(OaiNF):
 class StartSmf(Start):
     smf: bool
 
+class SMFHostAliases(NFVCLBaseModel):
+    ip: str = Field()
+    hostnames: str = Field()
 
 class OaiSmf(OaiNF):
     start: StartSmf
+    hostAliases: List[SMFHostAliases]
     multus: Optional[OAIMultusSMF] = Field(default=None)
 
 

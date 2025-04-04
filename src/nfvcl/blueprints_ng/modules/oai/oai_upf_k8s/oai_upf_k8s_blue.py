@@ -79,8 +79,8 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
 
         self.state.upf_values.upfconfig.nfs.nrf.host = f"oai-nrf-svc-lb.{self.base_model.parent_blue_id}" #svc.cluster.local"
 
-        if self.state.current_config.smf_ip:
-            self.state.upf_values.upfconfig.upf.smfs = [AvailableSmf(host=self.state.current_config.smf_ip.exploded)]
+        # if self.state.current_config.smf_ip:
+        #     self.state.upf_values.upfconfig.upf.smfs = [AvailableSmf(host=self.state.current_config.smf_ip.exploded)]
 
         self.state.upf_values.upfconfig.upf.remote_n6_gw = self.state.multus_network_info.n6.gateway_ip.exploded if self.state.multus_network_info.n6 and self.state.multus_network_info.n6.gateway_ip else "127.0.0.1"
 

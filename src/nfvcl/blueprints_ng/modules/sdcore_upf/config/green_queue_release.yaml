@@ -1,0 +1,8 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+   - name: Release IP GreenQueueBypass
+     shell: |
+       docker exec -t bess bessctl "command module green_queue_nfvcl release GreenQueueBypassCommandReleaseIpAddressArg {'ip_address': b'{{ ip }}'}"

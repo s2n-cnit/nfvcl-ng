@@ -1,0 +1,9 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+   - name: Remove GreenQueueBypass and restore connections
+     shell: |
+       docker exec -t bess bessctl "delete module green_queue_nfvcl"
+       docker exec -t bess bessctl "add connection {{ n6_nic_name }}SrcEther {{ n6_nic_name }}_measure"

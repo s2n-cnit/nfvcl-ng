@@ -36,7 +36,7 @@ class Free5gcUpfConfigurator(VmResourceAnsibleConfiguration):
         This method need to be implemented, it should return the Ansible playbook as a string
         """
 
-        ansible_builder = AnsiblePlaybookBuilder("Playbook OpenAirInterfaceUpfConfigurator")
+        ansible_builder = AnsiblePlaybookBuilder("Playbook Free5gcUpfConfigurator")
 
         ansible_builder.add_template_task(rel_path("start.sh.jinja2"), "/root/Free5GC_UPF/start.sh")
         ansible_builder.add_template_task(rel_path("stop.sh.jinja2"), "/root/Free5GC_UPF/stop.sh")
@@ -107,6 +107,7 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
 
         self.state.upf_vm_configurator = Free5gcUpfConfigurator(vm_resource=upf_vm)
         self.register_resource(self.state.upf_vm_configurator)
+        self.update_upf()
 
         self.update_upf_info()
 

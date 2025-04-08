@@ -49,6 +49,7 @@ decohints = "^1.0.9"
 python-jose = "^3.4.0"
 python-multipart = "^0.0.20"
 blinker = "^1.9.0"
+proxmoxer = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"

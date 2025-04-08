@@ -75,7 +75,7 @@ class CloudInitNetwork(NFVCLBaseModel):
 
 
 class CloudInitNetworkRoot(NFVCLBaseModel):
-    network: CloudInitNetwork = Field(default=CloudInitNetwork())
+    network: CloudInitNetwork = Field(default_factory=CloudInitNetwork)
 
     def add_device(self, iface: str, macaddress: str, override=False):
         tmp = InterfaceCloudInit(

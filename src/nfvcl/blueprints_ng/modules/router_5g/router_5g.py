@@ -68,8 +68,8 @@ class RouterConfigurator(VmResourceAnsibleConfiguration):
 
 @blueprint_type("router_5g")
 class Router5GBlueprintNG(BlueprintNG[Router5GBlueprintNGState, Router5GCreateModel]):
-    router_image = VmResourceImage(name="ubuntu2204")
-    router_flavor = VmResourceFlavor(vcpu_count='1', memory_mb='1024', storage_gb='5')
+    router_image = VmResourceImage(name="ubuntu-lab-v0.1.4-ubuntu2204", url="https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.4-ubuntu2204.qcow2")
+    router_flavor = VmResourceFlavor(vcpu_count='1', memory_mb='1024', storage_gb='15')
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = Router5GBlueprintNGState):
         super().__init__(blueprint_id, state_type)

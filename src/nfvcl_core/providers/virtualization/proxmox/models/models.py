@@ -101,6 +101,17 @@ class DhcpRangeItem(NFVCLBaseModel):
     start_address: str = Field(default=None, alias='start-address')
 
 
+class Vnet(NFVCLBaseModel):
+    alias: Optional[str] = Field(default=None)
+    digest: Optional[str] = Field(default=None)
+    isolate_ports: Optional[int] = Field(default=0, alias='isolate-ports')
+    type: Optional[str] = Field(default=None)
+    vlanaware: Optional[int] = Field(default=0)
+    vnet: Optional[str] = Field(default=None)
+    zone: Optional[str] = Field(default=None)
+
+
+
 class Subnet(NFVCLBaseModel):
     dhcp_range: Optional[List[DhcpRangeItem]] = Field(default_factory=list, alias='dhcp-range')
     vnet: Optional[str] = Field(default=None)

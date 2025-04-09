@@ -58,6 +58,7 @@ class VmResourceFlavor(NFVCLBaseModel):
     storage_gb: str = Field(default="32")
     vcpu_type: Optional[str] = Field(default="host")
     require_port_security_disabled: Optional[bool] = Field(default=False)
+    vm_volume: Optional[str] = Field(default=None, description="Used only by Proxmox for now")
 
 
 class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):
@@ -257,7 +258,6 @@ class HelmChartResource(ResourceDeployable):
     services: Optional[Dict[str, K8sService]] = Field(default=None)
     deployments: Optional[Dict[str, K8sDeployment]] = Field(default=None)
     statefulsets: Optional[Dict[str, K8sStatefulSet]] = Field(default=None)
-
 
     def set_services_from_k8s_api(self, k8s_services: V1ServiceList):
         self.services = {}

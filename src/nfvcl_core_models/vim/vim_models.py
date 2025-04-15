@@ -35,6 +35,7 @@ class VimModel(NFVCLBaseModel):
     vim_tenant_name: str = 'admin'
     vim_user: str = 'admin'
     vim_password: str = 'admin'
+    vim_timeout: Optional[int] = Field(default=None)
     ssh_keys: Optional[List[str]] = Field(default_factory=list)
     vim_proxmox_realm: Optional[str] = Field(default='pam')
     vim_proxmox_node: Optional[str] = Field(default=None)

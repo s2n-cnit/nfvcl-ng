@@ -25,6 +25,7 @@ from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResour
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
 from nfvcl_core_models.vim.vim_models import VimModel
 
+DEFAULT_OPENSTACK_TIMEOUT = 180 # See openstack/cloud/_compute.py
 
 class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
     os_dict: Dict[str, str] = Field(default_factory=dict)
@@ -179,6 +180,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                 raise VirtualizationProviderOpenstackException("Multiple floating ip networks found")
 
         # Create the VM and wait for completion
+        request_timeout = DEFAULT_OPENSTACK_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
         server_obj: Server = self.conn.create_server(
             vm_resource.name,
             image=image,
@@ -189,7 +191,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             ip_pool=floating_ip_net,
             network=self.os_client.network_names_to_ids(vm_resource.get_all_connected_network_names()),
             userdata=cloudin,
-            meta={"part_of_blueprint": self.blueprint_id, "deployed_by": "NFVCL"}
+            meta={"part_of_blueprint": self.blueprint_id, "deployed_by": "NFVCL"},
+            timeout=request_timeout
         )
         # NOTE: Trying to add a Tag (self.conn.compute.add_tag_to_server(test_server, "TEST")) will raise an 404 HTTP exception, probably TAGs are not enabled on OS
 
@@ -292,7 +295,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             network.id,
             cidr=net_resource.cidr,
             enable_dhcp=True,
-            disable_gateway_ip=True
+            disable_gateway_ip=True,
         )
 
         self.data.subnets.append(subnet.id)
@@ -390,7 +393,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def destroy_vm(self, vm_resource: VmResource):
         self.logger.info(f"Destroying VM {vm_resource.name}")
         if vm_resource.id in self.data.os_dict:
-            self.conn.delete_server(self.data.os_dict[vm_resource.id], wait=True)
+            request_timeout = DEFAULT_OPENSTACK_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
+            self.conn.delete_server(self.data.os_dict[vm_resource.id], wait=True, timeout=request_timeout)
         else:
             self.logger.warning(f"Unable to find VM id for resource '{vm_resource.id}' with name '{vm_resource.name}', manually check on VIM")
         self.logger.success(f"Destroying VM {vm_resource.name} finished")

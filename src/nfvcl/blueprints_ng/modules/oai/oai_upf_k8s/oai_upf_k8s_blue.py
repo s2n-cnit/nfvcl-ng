@@ -113,8 +113,8 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
                 n4_cidr=self.state.multus_network_info.n4.network_cidr if self.state.multus_network_info.n4 else SerializableIPv4Network("1.1.1.1/32"),
                 n3_cidr=self.state.multus_network_info.n3.network_cidr if self.state.multus_network_info.n3 else SerializableIPv4Network("1.1.1.1/32"),
                 n6_cidr=self.state.multus_network_info.n6.network_cidr if self.state.multus_network_info.n6 else SerializableIPv4Network("1.1.1.1/32"),
-                n4_ip=self.state.multus_network_info.n4.ip_address if self.state.multus_network_info.n6 else SerializableIPv4Address("1.1.1.1"),
-                n3_ip=self.state.multus_network_info.n3.ip_address if self.state.multus_network_info.n6 else SerializableIPv4Address("1.1.1.1"),
+                n4_ip=self.state.multus_network_info.n4.ip_address if self.state.multus_network_info.n4 else SerializableIPv4Address("1.1.1.1"),
+                n3_ip=self.state.multus_network_info.n3.ip_address if self.state.multus_network_info.n3 else SerializableIPv4Address("1.1.1.1"),
                 n6_ip=self.state.multus_network_info.n6.ip_address if self.state.multus_network_info.n6 else SerializableIPv4Address("1.1.1.1")
             )
         )

@@ -1,7 +1,7 @@
 from enum import Enum
 from logging import Logger
 from typing import List, Optional
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, computed_field
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core.utils.log import create_logger
@@ -13,42 +13,60 @@ class VimTypeEnum(str, Enum):
     OPENSTACK: str = 'openstack'
     PROXMOX: str = 'proxmox'
 
+class OpenstackParameters(NFVCLBaseModel):
+    region_name: Optional[str] = Field(default="RegionOne")
+    project_name: Optional[str] = Field(default="admin")
+    user_domain_name: Optional[str] = Field(default="Default")
+    project_domain_name: Optional[str] = Field(default="Default")
+
+class ProxmoxParameters(NFVCLBaseModel):
+    proxmox_realm: Optional[str] = Field(default="pam")
+    proxmox_node: Optional[str] = Field(default=None)
+    proxmox_images_volume: Optional[str] = Field(default='local')
+    proxmox_vm_volume: Optional[str] = Field(default='local-lvm')
+    proxmox_token_name: Optional[str] = Field(default='')
+    proxmox_token_value: Optional[str] = Field(default='')
+    proxmox_otp_code: Optional[str] = Field(default='')
+
 
 class VimModel(NFVCLBaseModel):
     """
-    Represents the model to be sent at OSM for VIM management
-
-    References:
-        https://osm.etsi.org/docs/user-guide/latest/04-vim-setup.html?highlight=floating#openstack
     """
-
     class VimConfigModel(NFVCLBaseModel):
-        # https://osm.etsi.org/docs/user-guide/latest/04-vim-setup.html?highlight=floating#configuration-options-reference
         insecure: bool = True
         APIversion: str = 'v3.3'
         use_floating_ip: bool = False
 
     name: str
     vim_type: VimTypeEnum = VimTypeEnum.OPENSTACK
-    schema_version: str = '1.3'
     vim_url: str
     vim_tenant_name: str = 'admin'
     vim_user: str = 'admin'
     vim_password: str = 'admin'
     vim_timeout: Optional[int] = Field(default=None)
     ssh_keys: Optional[List[str]] = Field(default_factory=list)
-    vim_proxmox_realm: Optional[str] = Field(default='pam')
-    vim_proxmox_node: Optional[str] = Field(default=None)
-    vim_proxmox_images_volume: Optional[str] = Field(default='local')
-    vim_proxmox_vm_volume: Optional[str] = Field(default='local-lvm')
-    vim_proxmox_token_name: Optional[str] = Field(default='')
-    vim_proxmox_token_value: Optional[str] = Field(default='')
-    vim_proxmox_otp_code: Optional[str] = Field(default='')
-    osm_onboard: Optional[bool] = Field(default=False)
+
+    vim_openstack_parameters: Optional[OpenstackParameters] = Field(default=None)
+    vim_proxmox_parameters: Optional[ProxmoxParameters] = Field(default=None)
+
     config: VimConfigModel = Field(default=VimConfigModel())
     networks: List[str] = Field(default_factory=list)
     routers: List[str] = Field(default_factory=list)
     areas: List[int] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def proxmox_parameters(self) -> ProxmoxParameters:
+        if self.vim_proxmox_parameters is None:
+            self.vim_proxmox_parameters = ProxmoxParameters()
+        return self.vim_proxmox_parameters
+
+    @computed_field
+    @property
+    def openstack_parameters(self) -> OpenstackParameters:
+        if self.vim_openstack_parameters is None:
+            self.vim_openstack_parameters = OpenstackParameters()
+        return self.vim_openstack_parameters
 
     def __eq__(self, other):
         """

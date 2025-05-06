@@ -25,17 +25,17 @@ class OpenStackVimClient(VimClient):
         super().__init__(vim)
         self.client = openstack.connect(
             auth_url=vim.vim_url,
-            project_name=vim.vim_tenant_name,
+            project_name=vim.openstack_parameters.project_name,
             username=vim.vim_user,
             password=vim.vim_password,
-            region_name="RegionOne",
-            user_domain_name="Default",
-            project_domain_name="Default",
+            region_name=vim.openstack_parameters.region_name,
+            user_domain_name=vim.openstack_parameters.user_domain_name,
+            project_domain_name=vim.openstack_parameters.project_domain_name,
             app_name='NFVCL',
             app_version='0.4.0', # TODO: get the version from the package
         )
 
-        self.project_id = self.client.identity.find_project(vim.vim_tenant_name).id
+        self.project_id = self.client.identity.find_project(vim.openstack_parameters.project_name).id
 
     def close(self):
         super().close()

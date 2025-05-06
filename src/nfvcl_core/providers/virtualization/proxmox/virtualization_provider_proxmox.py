@@ -59,7 +59,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__create_ci_qcow_folders()
         self.__load_scripts()
         if len(self.data.proxmox_node_name) == 0:
-            if self.vim.vim_proxmox_node:
+            if self.vim.proxmox_parameters.proxmox_node:
                 self.data.proxmox_node_name = self.vim.proxmox_parameters.proxmox_node
             else:
                 self.data.proxmox_node_name = self.get_node_by_ip()

@@ -35,7 +35,7 @@ class OpenStackVimClient(VimClient):
             app_version='0.4.0', # TODO: get the version from the package
         )
 
-        self.project_id = self.client.identity.find_project(vim.openstack_parameters.project_name).id
+        self.project_id = self.client.identity.find_project(vim.openstack_parameters.project_name, vim.openstack_parameters.project_domain_name).id
 
     def close(self):
         super().close()

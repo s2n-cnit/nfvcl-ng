@@ -40,7 +40,6 @@ class VimModel(NFVCLBaseModel):
     name: str
     vim_type: VimTypeEnum = VimTypeEnum.OPENSTACK
     vim_url: str
-    vim_tenant_name: str = 'admin'
     vim_user: str = 'admin'
     vim_password: str = 'admin'
     vim_timeout: Optional[int] = Field(default=None)

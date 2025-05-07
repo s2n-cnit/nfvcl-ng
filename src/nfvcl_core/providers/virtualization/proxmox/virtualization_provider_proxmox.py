@@ -1,6 +1,7 @@
 import ipaddress
 import math
 import re
+import time
 from enum import Enum
 from time import sleep
 from typing import Dict, List
@@ -25,6 +26,7 @@ from nfvcl_core_models.vim.vim_models import VimModel
 cloud_init_packages = ['qemu-guest-agent']
 cloud_init_runcmd = ["systemctl enable qemu-guest-agent.service", "systemctl start qemu-guest-agent.service"]
 
+DEFAULT_PROXMOX_TIMEOUT = 180
 
 class ApiRequestType(Enum):
     POST = "POST"
@@ -424,19 +426,20 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                 else:
                     self.logger.warning(f"Disk of VM: {vmid}, is already larger than the desired size")
 
-    def qemu_guest_agent_ready(self, vmid: int) -> bool:
+    def qemu_guest_agent_ready(self, vmid: int):
         self.logger.info("Waiting qemu guest agent")
         exit_status = 1
-        response = None
-        while exit_status != 0:
+        timeout = time.time() + DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
+        while exit_status != 0 and time.time() < timeout:
             try:
                 response = self.proxmox_vim_client.proxmoxer.nodes(self.data.proxmox_node_name).qemu(vmid).agent.ping.post()
                 if response is not None:
                     exit_status = 0
+                    return
             except Exception as e:
                 self.logger.debug("Waiting...")
                 sleep(3)
-        return True
+        raise VirtualizationProviderProxmoxException(f"Timeout waiting for qemu guest agent")
 
     def __execute_ssh_command(self, command: str):
         stdin, stdout, stderr = self.proxmox_vim_client.ssh_client.exec_command(command)

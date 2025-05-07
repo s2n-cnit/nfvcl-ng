@@ -4,6 +4,7 @@ from proxmoxer import ProxmoxAPI
 from nfvcl_core.vim_clients.vim_client import VimClient
 from nfvcl_core_models.vim.vim_models import VimModel
 
+DEFAULT_PROXMOX_TIMEOUT = 180
 
 class ProxmoxVimClient(VimClient):
     def __init__(self, vim: VimModel):
@@ -15,7 +16,7 @@ class ProxmoxVimClient(VimClient):
             port=22,
             username=self.vim.vim_user,
             password=self.vim.vim_password,
-            timeout=3
+            timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
         )
         self.logger.spam("Connected to Proxmox")
 
@@ -26,7 +27,7 @@ class ProxmoxVimClient(VimClient):
                 token_name=self.vim.proxmox_parameters().proxmox_token_name,
                 token_value=self.vim.proxmox_parameters().proxmox_token_value,
                 verify_ssl=False,
-                timeout=3
+                timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
             )
         else:
             self.proxmoxer = ProxmoxAPI(
@@ -35,7 +36,7 @@ class ProxmoxVimClient(VimClient):
                 password=self.vim.vim_password,
                 otp=self.vim.proxmox_parameters().proxmox_otp_code if self.vim.proxmox_parameters().proxmox_otp_code else None,
                 verify_ssl=False,
-                timeout=3
+                timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
             )
 
     def close(self):

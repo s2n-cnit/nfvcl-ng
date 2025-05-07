@@ -344,8 +344,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                     requested_flavor.storage_gb,
                     is_public=False
                 )
-                project = self.conn.get_project(self.vim.openstack_parameters().project_name)
-                self.conn.add_flavor_access(flavor.id, project['id'])
+                self.conn.add_flavor_access(flavor.id, self.os_client.project_id)
                 self.data.flavors.append(flavor_name)
             return flavor
 

@@ -55,11 +55,11 @@ class BlueprintNGStatus(NFVCLBaseModel):
 
     @classmethod
     def deploying(cls, blue_id) -> BlueprintNGStatus:
-        return BlueprintNGStatus(current_operation=CurrentOperation.DEPLOYING, detail="The blueprint {blue_id} is being deployed...")
+        return BlueprintNGStatus(current_operation=CurrentOperation.DEPLOYING, detail=f"The blueprint {blue_id} is being deployed...")
 
     @classmethod
     def destroying(cls, blue_id) -> BlueprintNGStatus:
-        return BlueprintNGStatus(current_operation=CurrentOperation.DESTROYING, detail="The blueprint {blue_id} is being destroyed...")
+        return BlueprintNGStatus(current_operation=CurrentOperation.DESTROYING, detail=f"The blueprint {blue_id} is being destroyed...")
 
     @classmethod
     def running_day2(cls) -> BlueprintNGStatus:

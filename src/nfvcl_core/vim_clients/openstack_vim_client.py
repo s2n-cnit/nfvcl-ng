@@ -15,6 +15,7 @@ class OpenStackVimClient(VimClient):
     """
     client: Connection
     project_id: str
+    user_id: str
 
     def __init__(self, vim: VimModel):
         """
@@ -34,8 +35,18 @@ class OpenStackVimClient(VimClient):
             app_name='NFVCL',
             app_version='0.4.0', # TODO: get the version from the package
         )
+        self.user_id = self.client.session.get_user_id()
+        user_projects = self.client.identity.user_projects(self.user_id)
+        # We don't use anymore self.client.identity.find_project(vim.openstack_parameters.project_name, vim.openstack_parameters.project_domain_name).id
+        # because it is using http://10.10.0.206/openstack-keystone/v3/projects?domain_id=users witch requires to be administrator of the cluster.
+        # Instead, http://10.10.0.206/openstack-keystone/v3/users/13de4bfd017746daabe4131377614a55/projects (used by .user_projects) requires to be an admin of the project.
 
-        self.project_id = self.client.identity.find_project(vim.openstack_parameters.project_name, vim.openstack_parameters.project_domain_name).id
+        matching_projects = [project for project in user_projects if project.name == vim.openstack_parameters.project_name]
+        if not matching_projects:
+            raise ValueError(f"Project {vim.openstack_parameters.project_name} not found for user {self.user_id}. Check if user has been added to the project or if the project name is correct.")
+        if len(matching_projects) > 1:
+            print(f"Warning: Multiple projects found with name {vim.openstack_parameters.project_name}. Using the first one.")
+        self.project_id = matching_projects[0].id
 
     def close(self):
         super().close()

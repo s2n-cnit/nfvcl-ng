@@ -53,15 +53,11 @@ class VimModel(NFVCLBaseModel):
     routers: List[str] = Field(default_factory=list)
     areas: List[int] = Field(default_factory=list)
 
-    @computed_field
-    @property
     def proxmox_parameters(self) -> ProxmoxParameters:
         if self.vim_proxmox_parameters is None:
             self.vim_proxmox_parameters = ProxmoxParameters()
         return self.vim_proxmox_parameters
 
-    @computed_field
-    @property
     def openstack_parameters(self) -> OpenstackParameters:
         if self.vim_openstack_parameters is None:
             self.vim_openstack_parameters = OpenstackParameters()

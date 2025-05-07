@@ -26,12 +26,12 @@ class OpenStackVimClient(VimClient):
         super().__init__(vim)
         self.client = openstack.connect(
             auth_url=vim.vim_url,
-            project_name=vim.openstack_parameters.project_name,
+            project_name=vim.openstack_parameters().project_name,
             username=vim.vim_user,
             password=vim.vim_password,
-            region_name=vim.openstack_parameters.region_name,
-            user_domain_name=vim.openstack_parameters.user_domain_name,
-            project_domain_name=vim.openstack_parameters.project_domain_name,
+            region_name=vim.openstack_parameters().region_name,
+            user_domain_name=vim.openstack_parameters().user_domain_name,
+            project_domain_name=vim.openstack_parameters().project_domain_name,
             app_name='NFVCL',
             app_version='0.4.0', # TODO: get the version from the package
         )
@@ -41,11 +41,11 @@ class OpenStackVimClient(VimClient):
         # because it is using http://10.10.0.206/openstack-keystone/v3/projects?domain_id=users witch requires to be administrator of the cluster.
         # Instead, http://10.10.0.206/openstack-keystone/v3/users/13de4bfd017746daabe4131377614a55/projects (used by .user_projects) requires to be an admin of the project.
 
-        matching_projects = [project for project in user_projects if project.name == vim.openstack_parameters.project_name]
+        matching_projects = [project for project in user_projects if project.name == vim.openstack_parameters().project_name]
         if not matching_projects:
-            raise ValueError(f"Project {vim.openstack_parameters.project_name} not found for user {self.user_id}. Check if user has been added to the project or if the project name is correct.")
+            raise ValueError(f"Project {vim.openstack_parameters().project_name} not found for user {self.user_id}. Check if user has been added to the project or if the project name is correct.")
         if len(matching_projects) > 1:
-            print(f"Warning: Multiple projects found with name {vim.openstack_parameters.project_name}. Using the first one.")
+            self.logger.warning(f"Multiple projects found with name {vim.openstack_parameters().project_name}. Using the first one.")
         self.project_id = matching_projects[0].id
 
     def close(self):

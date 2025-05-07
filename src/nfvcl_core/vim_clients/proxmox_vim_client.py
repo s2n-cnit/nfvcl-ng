@@ -19,21 +19,21 @@ class ProxmoxVimClient(VimClient):
         )
         self.logger.spam("Connected to Proxmox")
 
-        if self.vim.proxmox_parameters.proxmox_token_value:
+        if self.vim.proxmox_parameters().proxmox_token_value:
             self.proxmoxer = ProxmoxAPI(
                 self.vim.vim_url,
-                user=f'{self.vim.vim_user}@{self.vim.proxmox_parameters.proxmox_realm}',
-                token_name=self.vim.proxmox_parameters.proxmox_token_name,
-                token_value=self.vim.proxmox_parameters.proxmox_token_value,
+                user=f'{self.vim.vim_user}@{self.vim.proxmox_parameters().proxmox_realm}',
+                token_name=self.vim.proxmox_parameters().proxmox_token_name,
+                token_value=self.vim.proxmox_parameters().proxmox_token_value,
                 verify_ssl=False,
                 timeout=3
             )
         else:
             self.proxmoxer = ProxmoxAPI(
                 self.vim.vim_url,
-                user=f'{self.vim.vim_user}@{self.vim.proxmox_parameters.proxmox_realm}',
+                user=f'{self.vim.vim_user}@{self.vim.proxmox_parameters().proxmox_realm}',
                 password=self.vim.vim_password,
-                otp=self.vim.proxmox_parameters.proxmox_otp_code if self.vim.proxmox_parameters.proxmox_otp_code else None,
+                otp=self.vim.proxmox_parameters().proxmox_otp_code if self.vim.proxmox_parameters().proxmox_otp_code else None,
                 verify_ssl=False,
                 timeout=3
             )

@@ -55,12 +55,12 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.data: VirtualizationProviderDataProxmox = VirtualizationProviderDataProxmox()
         self.vim = self.topology.get_vim_by_area(self.area)
         self.proxmox_vim_client = self.vim_clients_manager.get_proxmox_client(self, self.vim.name)
-        self.path = self.__get_storage_path(self.vim.proxmox_parameters.proxmox_images_volume)
+        self.path = self.__get_storage_path(self.vim.proxmox_parameters().proxmox_images_volume)
         self.__create_ci_qcow_folders()
         self.__load_scripts()
         if len(self.data.proxmox_node_name) == 0:
-            if self.vim.proxmox_parameters.proxmox_node:
-                self.data.proxmox_node_name = self.vim.proxmox_parameters.proxmox_node
+            if self.vim.proxmox_parameters().proxmox_node:
+                self.data.proxmox_node_name = self.vim.proxmox_parameters().proxmox_node
             else:
                 self.data.proxmox_node_name = self.get_node_by_ip()
 
@@ -136,8 +136,8 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             "scsihw": "virtio-scsi-pci",
             "tags": "nfvcl", # If you want add more tags, you have to separate them with ";"
             "agent": 1,
-            "scsi0": f"file={vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters.proxmox_vm_volume}:0,import-from=local:0/{vm_resource.image.name}.qcow2,iothread=on",
-            "ide2": f"{vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters.proxmox_vm_volume}:cloudinit",
+            "scsi0": f"file={vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters().proxmox_vm_volume}:0,import-from=local:0/{vm_resource.image.name}.qcow2,iothread=on",
+            "ide2": f"{vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters().proxmox_vm_volume}:cloudinit",
             "boot": "order=scsi0",
             "cicustom": f"user=local:snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml,network=local:snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml"
         }

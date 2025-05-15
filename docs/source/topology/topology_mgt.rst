@@ -16,52 +16,84 @@ The structure of the data to be used in requests can be found in the bottom of N
 Create new resource
 *******************
 You can create a new resource (which are listed above) using the correspondent `POST` request that you can find in the Swagger ( http://NFVCL-IP:5002/docs ).
-We will use as example the POST to create a new VIM in the topology ``/v1/topology/vim``
+We will see two example, Openstack first and then Proxmox, of POST to create VIM in the topology ``/v1/topology/vim``
 
 .. code-block:: json
 
-    {
-        "name": "os_lab",
-        "vim_type": "openstack",
-        "schema_version": "1.0",
-        "vim_url": "http://os-lab.maas:5000/v3",
-        "vim_tenant_name": "paolo",
-        "vim_user": "paolo",
-        "vim_password": "password",
-        "config": {
-            "insecure": true,
-            "APIversion": "v3.3",
-            "use_floating_ip": true
-        },
-        "networks": [
-            "dmz-internal",
-            "data_paolo"
-        ],
-        "routers": [],
-        "areas": [
-            3,
-            4,
-            5
-        ]
-    }
+ {
+      "name": "string",
+      "vim_type": "openstack",
+      "vim_url": "string",
+      "vim_user": "admin",
+      "vim_password": "admin",
+      "vim_timeout": TIMEOUT_IN_SECOND,
+      "ssh_keys": [
+        "string"
+      ],
+      "vim_openstack_parameters": {
+        "region_name": "RegionOne",
+        "project_name": "admin",
+        "user_domain_name": "Default",
+        "project_domain_name": "Default"
+      },
+      "config": {
+        "insecure": true,
+        "APIversion": "v3.3",
+        "use_floating_ip": false
+      },
+      "networks": [
+        "string"
+      ],
+      "routers": [
+        "string"
+      ],
+      "areas": [
+        0
+      ]
+ }
 
-
-Update resource
-***************
-You can update a new resource (which are listed above) using the correspondent `PUT` request that you can find in the SWAGGER (see home page).
-We will use as example the POST to update a VIM in the topology ``/v1/topology/vim``
 
 .. code-block:: json
 
-    {
-      "name": "os_ntua",
-      "networks_to_add": ["nephele-vpn-network"],
-      "networks_to_del": ["public1"],
-      "routers_to_add": [],
-      "routers_to_del": [],
-      "areas_to_add": [],
-      "areas_to_del": []
-    }
+  {
+      "name": "string",
+      "vim_type": "proxmox",
+      "vim_url": "string",
+      "vim_user": "admin",
+      "vim_password": "admin",
+      "vim_timeout": TIMEOUT_IN_SECOND,
+      "ssh_keys": [
+        "string"
+      ],
+      "vim_proxmox_parameters": {
+        "proxmox_realm": "pam",
+        "proxmox_node": "null",
+        "proxmox_images_volume": "local",
+        "proxmox_vm_volume": "local-lvm",
+        "proxmox_token_name": "YOUR_TOKEN_NAME",
+        "proxmox_token_value": "YOUR_TOKEN_VALUE",
+        "proxmox_otp_code": ""
+      },
+      "config": {
+        "insecure": true,
+        "APIversion": "v3.3",
+        "use_floating_ip": false
+      },
+      "networks": [
+        "string"
+      ],
+      "routers": [
+        "string"
+      ],
+      "areas": [
+        0
+      ]
+  }
+
+.. warning::
+    For Proxmox the field *proxmox_token_name* is the name of the token that you can find in your proxmox server
+    Datacenter > Permission > Api Tokens and in the table **Token Name**.
+    Token and Otp code are optional paramaters, instead *vim_user* and *vim_password* must be provided.
 
 Delete resource
 ***************

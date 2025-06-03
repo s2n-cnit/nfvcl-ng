@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Literal
 
 from pydantic import Field
 
@@ -47,6 +47,7 @@ class SDCoreUPFConfiguration(NFVCLBaseModel):
 
 
 class SDCoreUPFGreenQueueConfiguration(NFVCLBaseModel):
+    module_class: Literal['GreenQueueBypass', 'GreenBypass'] = Field(default="GreenQueueBypass")
     dnn: str = Field()
     src_mac: str = Field()
     dst_mac: str = Field()
@@ -137,8 +138,8 @@ class SDCoreUPFGreenQueueRemoveConfigurator(VmResourceAnsibleConfiguration):
 
         return ansible_builder.build()
 
-UPF_IMAGE_NAME = "sd-core-upf-v2.0.2-s2n-3"
-UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.0.2-s2n-3-ubuntu2404.qcow2"
+UPF_IMAGE_NAME = "sd-core-upf-v2.0.2-s2n-6"
+UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.0.2-s2n-6-ubuntu2404.qcow2"
 
 
 @blueprint_type(SDCORE_UPF_BLUE_TYPE)

@@ -5,7 +5,7 @@
   tasks:
    - name: Configure GreenQueueBypass
      shell: |
-       docker exec -t bess bessctl "add module GreenQueueBypass green_queue_nfvcl false {'src_mac': b'{{ src_mac }}', 'dst_mac': b'{{ dst_mac }}', 'src_ip': b'{{ src_ip }}', 'dst_ip': b'{{ dst_ip }}', 'ip_ttl': {{ ip_ttl }}, 'src_port': {{ src_port }}, 'dst_port': {{ dst_port }}, 'traffic_gate': 0, 'notification_gate': 0, 'sleep_ms': {{ sleep_ms }}, 'enable_bypass': {{ enable_bypass }}, 'release_single_packet' : {{ release_single_packet }}}"
+       docker exec -t bess bessctl "add module {{ module_class }} green_queue_nfvcl false {'src_mac': b'{{ src_mac }}', 'dst_mac': b'{{ dst_mac }}', 'src_ip': b'{{ src_ip }}', 'dst_ip': b'{{ dst_ip }}', 'ip_ttl': {{ ip_ttl }}, 'src_port': {{ src_port }}, 'dst_port': {{ dst_port }}, 'traffic_gate': 0, 'notification_gate': 0, 'sleep_ms': {{ sleep_ms }}, 'enable_bypass': {{ enable_bypass }}, 'release_single_packet' : {{ release_single_packet }}}"
        docker exec -t bess bessctl "delete connection {{ n6_nic_name }}SrcEther ogate 0"
        docker exec -t bess bessctl "add connection {{ n6_nic_name }}SrcEther green_queue_nfvcl"
        docker exec -t bess bessctl "add connection green_queue_nfvcl {{ n6_nic_name }}_measure"

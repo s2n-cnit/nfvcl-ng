@@ -1,8 +1,10 @@
-.. contents::
-
 ====================
 Blueprint
 ====================
+
+.. contents::
+   :local:
+
 The NFVCL is deploying ecosystems instances using Blueprints. A network ecosystem is meant to be a complete functional
 network environment, such as a 5G system, an overlay system for network cybersecurity or a simple application service
 mesh.
@@ -84,7 +86,10 @@ Here you find a list of all developed Blueprints, their type and the requirement
 Blueprint LCM Management
 ++++++++++++++++++++++++
 This section describes how the NFVCL user can use the Blueprint system to deploy, manage and destroy Blueprints.
-The specific guide for APIs is found in the Blueprint dedicated page and in the NFVCL API swagger.
+
+.. important::
+   The specific guide for APIs is found in the Blueprint dedicated page and in the NFVCL **API SWAGGER**.
+   The Swagger is accessible on NFVCL port once **it has been started!!!**
 
 Blueprint deployment/instantiation
 **********************************
@@ -94,8 +99,57 @@ needed in the Topology.
 The K8S cluster can be deployed on VMs using the dedicated Blueprint (K8S) or can be added as external (already existing)
 cluster to the topology.
 
-To instantiate a blueprint it is sufficient to call a POST API, each blueprint has the dedicated call for its creation.
-**For further details** please see the specific Blueprint dedicated page.
+.. note::
+   To instantiate a blueprint it is sufficient to call a POST API, each blueprint has the dedicated call for its creation.
+   **For further details** please see the specific Blueprint dedicated page.
+
+Flavor permission error
+-----------------------
+.. important::
+   If during the creation of a blueprint you receive an error indicating that you don't have permission to create a
+   flavor, you can use an existing one. Just indicate in the request flavor tha name of the existing one
+   (vpcu, ram, disk are ignored)
+
+.. code-block:: json
+   :emphasize-lines: 6
+
+   {
+     "area": 666,
+     "mgmt_net": "your-network",
+     "version": "UBUNTU24",
+	   "flavor": {
+		"name": "m1.medium"
+     }
+   }
+
+.. code-block:: json
+   :emphasize-lines: 10,21
+
+   {
+     "cni": "flannel",
+     "pod_network_cidr": "10.254.0.0/16",
+     "service_cidr": "10.200.0.0/16",
+     "topology_onboard": true,
+     "password": "3bU85qRRDnu6Yz",
+   	 "ubuntu_version": "UBUNTU24",
+     "require_port_security_disabled": true,
+     "master_flavors": {
+   		"name": "m1.medium"
+     },
+     "areas": [
+       {
+         "area_id": 1,
+         "is_master_area": true,
+         "mgmt_net": "ttilab-network",
+         "additional_networks": [],
+         "load_balancer_pools_ips": [],
+         "worker_replicas": 1,
+         "worker_flavors": {
+           "name": "m1.medium"
+         }
+       }
+     ]
+   }
 
 Blueprint day 2 operation
 *************************
@@ -106,7 +160,8 @@ Blueprint Destroy/Deletion
 **************************
 To remove a Blueprint it should be only needed to call the DELETE call with the target ID.
 
-http://NFVCL_URL:5002/nfvcl/v2/api/blue/BLUE_ID
+.. note::
+   API (DELETE): `http://NFVCL_URL:5002/nfvcl/v2/api/blue/BLUE_ID`
 
 If an error occurs during the deletion of a blueprint, you can force the operation using the ``force_deletion`` set to
 true as parameter in the request.
@@ -119,17 +174,22 @@ Blueprint Protection
 ********************
 The protection of a blueprint can be used to prevent the deletion of a blueprint. It it a PATCH request:
 
-http://NFVCL_URL:5002/nfvcl/v2/api/blue/protect/BLUE_ID
+.. note::
+   API (PATCH): `http://NFVCL_URL:5002/nfvcl/v2/api/blue/protect/BLUE_ID`
+
 
 Blueprint instances
 *******************
 To retrieve a list of instantiated blueprints you can make a GET request to:
 
-http://NFVCL_URL:5002/nfvcl/v2/api/blue/
+.. note::
+   API (GET): `http://NFVCL_URL:5002/nfvcl/v2/api/blue/`
+
 
 To get a list that includes all the details of a Blueprint instance you can add the following query param:
 
-http://NFVCL_URL:5002/nfvcl/v2/api/blue/?detailed=true
+.. note::
+   API (GET): `http://NFVCL_URL:5002/nfvcl/v2/api/blue/?detailed=true`
 
 Blueprint Snapshots
 +++++++++++++++++++
@@ -141,11 +201,15 @@ Snapshot Creation
 *************************
 To create a snapshot of a Blueprint instance it is sufficient to call a POST API
 
-http://192.168.12.42:5002/nfvcl/v2/api/snapshot/BLUE_ID?snapshot_name=TEST-ABC2
+.. note::
+   API (POST): `http://192.168.12.42:5002/nfvcl/v2/api/snapshot/BLUE_ID?snapshot_name=TEST-ABC2`
+
 
 Snapshot Destroy/Deletion
 *************************
 To remove a snapshot it should be only needed to call the DELETE call with the target ID.
 
-http://NFVCL_URL:5002/nfvcl/v2/api/snapshot/TEST-ABC2
+.. note::
+   API (DELETE): `http://NFVCL_URL:5002/nfvcl/v2/api/snapshot/TEST-ABC2`
+
 

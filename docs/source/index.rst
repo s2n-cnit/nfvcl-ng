@@ -12,7 +12,6 @@ Once a Blueprint instance has been deployed, the NFVCL is capable of managing Da
 
 .. contents::
 
-
 The installation procedure is described in the main `README <https://github.com/s2n-cnit/nfvcl-ng>`_.
 
 The NFVCL is working through REST API calls, you can see every available API in the swagger offered by the NFVCL.

@@ -255,14 +255,14 @@ class NFVCL:
         """
         return self.add_task(self.topology_manager.get_topology, callback=callback)
 
-    @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST)
+    @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def create_topology(self, topology: TopologyModel, callback=None):
         """
         Create the topology
         """
         return self.add_task(self.topology_manager.create_topology, topology, callback=callback)
 
-    @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)
+    @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_topology(self, callback=None):
         return self.add_task(self.topology_manager.delete_topology, callback=callback)
 
@@ -270,15 +270,15 @@ class NFVCL:
     def get_vim(self, vim_id: str, callback=None) -> VimModel:
         return self.add_task(self.topology_manager.get_vim, vim_id, callback=callback)
 
-    @NFVCLPublic(path="/vim", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST)
+    @NFVCLPublic(path="/vim", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def create_vim(self, vim: VimModel, callback=None):
         return self.add_task(self.topology_manager.create_vim, vim, callback=callback)
 
-    @NFVCLPublic(path="/vim/update", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT)
+    @NFVCLPublic(path="/vim/update", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, sync=True)
     def update_vim(self, vim: VimModel, callback=None):
         return self.add_task(self.topology_manager.update_vim, vim, callback=callback)
 
-    @NFVCLPublic(path="/vim/{vim_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)
+    @NFVCLPublic(path="/vim/{vim_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_vim(self, vim_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_vim, vim_id, callback=callback)
 
@@ -318,7 +318,7 @@ class NFVCL:
     def get_router(self, network_id: str, callback=None) -> RouterModel:
         return self.add_task(self.topology_manager.get_router, network_id, callback=callback)
 
-    @NFVCLPublic(path="/router", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST)
+    @NFVCLPublic(path="/router", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def create_router(self, router: RouterModel, callback=None) -> RouterModel:
         return self.add_task(self.topology_manager.create_router, router, callback=callback)
 
@@ -361,7 +361,7 @@ class NFVCL:
         summary=ADD_EXTERNAL_K8SCLUSTER_SUMMARY,
         description=ADD_EXTERNAL_K8SCLUSTER, sync=True
     )
-    def create_kubernetes_external(self, kubernetes_model: TopologyK8sModel, callback=None):
+    def create_kubernetes_external(self, kubernetes_model: TopologyK8sModel, callback=None, sync=True):
         kubernetes_model.provided_by = ProvidedBy.EXTERNAL
         return self.add_task(self.topology_manager.add_kubernetes, kubernetes_model, callback=callback)
 

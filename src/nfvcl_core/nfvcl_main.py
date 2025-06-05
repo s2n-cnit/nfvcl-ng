@@ -451,8 +451,8 @@ class NFVCL:
         return self.add_task(self.blueprint_manager.get_from_blueprint, blue_id, day2_path, callback=callback)
 
     @NFVCLPublic(path="/{blueprint_id}", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.DELETE)
-    def delete_blueprint(self, blueprint_id: str, callback=None):
-        return self.add_task(self.blueprint_manager.delete_blueprint, blueprint_id, callback=callback)
+    def delete_blueprint(self, blueprint_id: str, force_deletion: bool, callback=None):
+        return self.add_task(self.blueprint_manager.delete_blueprint, blueprint_id, callback=callback, force_deletion=force_deletion)
 
     @NFVCLPublic(path="/all/blue", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.DELETE)
     def delete_all_blueprints(self, callback=None):

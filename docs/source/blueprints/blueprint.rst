@@ -108,6 +108,13 @@ To remove a Blueprint it should be only needed to call the DELETE call with the 
 
 http://NFVCL_URL:5002/nfvcl/v2/api/blue/BLUE_ID
 
+If an error occurs during the deletion of a blueprint, you can force the operation using the ``force_deletion`` set to
+true as parameter in the request.
+
+.. warning::
+   Forcing the deletion will not ensure that remote resources like (PODs, VMs, etc...) are deleted from VIMs or K8s
+   clusters.
+
 Blueprint Protection
 ********************
 The protection of a blueprint can be used to prevent the deletion of a blueprint. It it a PATCH request:

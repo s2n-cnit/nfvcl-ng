@@ -1,5 +1,7 @@
 from typing import Optional, List, Dict
 
+from keystoneauth1.exceptions import Unauthorized
+from openstack.exceptions import SDKException
 from openstack.image.v2.image import Image
 from openstack.network.v2.network import Network
 
@@ -35,6 +37,10 @@ class OpenStackVimClient(VimClient):
             app_name='NFVCL',
             app_version='0.4.0', # TODO: get the version from the package
         )
+        try:
+            self.client.authorize()
+        except (Unauthorized, SDKException) as e:
+            raise Unauthorized(f"Error while connecting to Openstack (Credentials may be invalid): {e}")
         self.user_id = self.client.session.get_user_id()
         user_projects = self.client.identity.user_projects(self.user_id)
         # We don't use anymore self.client.identity.find_project(vim.openstack_parameters.project_name, vim.openstack_parameters.project_domain_name).id

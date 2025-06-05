@@ -33,9 +33,9 @@ class NFVCLParameters(NFVCLBaseModel):
             try:
                 port = int(port)
             except ValueError:
-                raise ValueError(f"Config decode error for Mongo PORT: >{port}< cannot be converted to int.")
+                raise ValueError(f"Config decode error for NFVCL PORT: >{port}< cannot be converted to int.")
         elif not isinstance(port, int):
-            raise ValueError(f"Config decode error for Mongo PORT: >{port}< must be str or int.")
+            raise ValueError(f"Config decode error for NFVCL PORT: >{port}< must be str or int.")
         return port
 
 
@@ -61,7 +61,7 @@ class MongoParameters(NFVCLBaseModel):
         return port
 
     @field_validator('host', mode='before')
-    def validate_mongo_host(cls, host: int):
+    def validate_mongo_host(cls, host: str):
         if isinstance(host, str):
             return host
         raise ValueError(f"Config decode error for Mongo DB host: >{host}< is not a valid string.")
@@ -104,8 +104,8 @@ class NFVCLConfigModel(BaseSettings):
 
     log_level: int = Field(default=20, description="10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0")
     nfvcl: NFVCLParameters = Field(default_factory=NFVCLParameters)
-    mongodb: MongoParameters = Field(default_factory=NFVCLParameters)
-    redis: RedisParameters = Field(default_factory=NFVCLParameters)
+    mongodb: MongoParameters = Field(default_factory=MongoParameters)
+    redis: RedisParameters = Field(default_factory=RedisParameters)
 
     @classmethod
     def settings_customise_sources(

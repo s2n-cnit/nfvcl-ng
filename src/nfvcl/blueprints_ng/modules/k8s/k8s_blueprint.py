@@ -5,6 +5,7 @@ from typing import Optional, List
 from pydantic import Field
 from starlette.responses import PlainTextResponse
 
+from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
@@ -20,7 +21,7 @@ from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoo
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
 from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException, TopoK8SNotFoundException
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
-from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info
+from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info, k8s_add_label_to_k8s_node
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 
 K8S_BLUE_TYPE = "k8s"
@@ -170,6 +171,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.day0conf(configure_master=True)
         # Fix DNS Problem
         self.fix_dns_problem()
+        # Label nodes to indicate the area they belong to. Used to constrain deployments to run on specific areas.i
+        self.label_nodes()
         # Install K8s Plugins if required (default=yes)
         if create_model.install_plugins:
             self.install_default_plugins()
@@ -259,22 +262,33 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
     def setup_load_balancer_pool(self):
         """
-        Creates the load balancer pool to be used by MetalLB.
-        By default, TODO
+        Sets up load balancer pools for the Kubernetes cluster by reserving a range of IPs
+        in the service network and assigning them to specific areas based on their associated
+        workers and master nodes. Each area is configured with its own load balancer pool.
 
+        Attributes:
+            state.load_balancer_ips_area (Dict[int, List[str]]): A dictionary where keys are
+                area IDs and values are lists of IP addresses allocated for each area.
+            state.vm_workers (List[WorkerNode]): List of worker nodes in the cluster, each of
+                which contains information about its area and name.
+            state.vm_master (MasterNode): The master node of the cluster containing its area
+                and name information.
+            state.load_balancer_pools (List[K8sLoadBalancerPoolArea]): List of load balancer
+                pool areas generated after setting up.
         """
         # Reserve a range of IP in the service net
         lb_area_list: List[K8sLoadBalancerPoolArea] = []
 
-        for key, value in self.state.load_balancer_ips_area.items():
+        for area_id, value in self.state.load_balancer_ips_area.items():
             # All workers in the area will be hosts that announce the LB pool
-            hostnames = [vm.name.lower() for vm in self.state.vm_workers if vm.area == int(key)]
-            # If the controller is in the area add it
-            if self.state.vm_master.area == int(key):
+            hostnames = [vm.name.lower() for vm in self.state.vm_workers if vm.area == int(area_id)]
+            # If the controller is in the area, add it
+            if self.state.vm_master.area == int(area_id):
                 hostnames.append(self.state.vm_master.name.lower())
             if len(hostnames) == 0:
                 hostnames = None
-            lb_area = K8sLoadBalancerPoolArea(pool_name=f"{self.id.lower()}-area1", ip_list=value, host_names=hostnames)
+            # We build the lbpool such that only workers(+master if in that area) in the area will be hosts that announce the LB pool
+            lb_area = K8sLoadBalancerPoolArea(pool_name=f"{self.id.lower()}-area-{area_id}", ip_list=value, host_names=hostnames)
             lb_area_list.append(lb_area)
 
         self.state.load_balancer_pools = lb_area_list
@@ -325,6 +339,18 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         # Patch the config map
         result = patch_config_map(client_config, "coredns", "kube-system", config_map)
         return result
+
+    def label_nodes(self):
+        """
+        Label each node with the area it belongs to. Used to constrain deployments to run on specific areas(or workers)
+        """
+        k8s_config = get_k8s_config_from_file_content(self.state.master_credentials)
+        for vm in self.state.vm_workers:
+            area = vm.area
+            labels = Labels(labels={"area": str(area)})
+            hostname = vm.name.lower() # always lower case for hostnames
+            k8s_add_label_to_k8s_node(k8s_config, hostname, labels=labels)
+        k8s_add_label_to_k8s_node(k8s_config, self.state.vm_master.name.lower(), Labels(labels={"area": str(self.state.vm_master.area)}))
 
     def install_default_plugins(self):
         """

@@ -250,6 +250,8 @@ class BlueprintManager(GenericManager):
             path: The blueprint-specific path, the last part of the URL for the creation request (e.g., /nfvcl/v2/api/blue/vyos ----> path='vyos')
         """
         blueprint = self.get_blueprint_instance(blueprint_id)
+        if blueprint is None:
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} does not exist", http_equivalent_code=404)
         function = blueprint_type.get_function_to_be_called(path)
 
         if blueprint.lock.locked():

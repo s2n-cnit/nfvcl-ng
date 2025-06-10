@@ -289,7 +289,7 @@ class BlueprintManager(GenericManager):
             self._performance_manager.end_operation(performance_operation_id)
         return result
 
-    def delete_blueprint(self, blueprint_id: str, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None, force_deletion: bool = False) -> str:
+    def delete_blueprint(self, blueprint_id: str, force_deletion: Optional[bool] = False, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> str:
         """
         Deletes the blueprint from the NFVCL if the blueprint is not protected.
 

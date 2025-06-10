@@ -17,7 +17,7 @@ class K8sAreaDeployment(NFVCLBaseModel):
     mgmt_net: str = Field(description="The management network NAME in the topology used by NFVCL to configure nodes")
     additional_networks: List[str] = Field(default=[], description="Additional networks connected to the VMs in this area")
 
-    load_balancer_pools_ips: List[SerializableIPv4Address] = Field(default=[], description="The list of IPs to be announced from the load balancer IN THIS AREA.")
+    load_balancer_pools_ips: List[SerializableIPv4Address] = Field(default=[], description="The list of IPs to be announced at L2 from the load balancer IN THIS AREA.")
 
     worker_replicas: PositiveInt = Field(default=1, description="Number of workers in this area")
     worker_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="8192", storage_gb='32', vcpu_count='6')

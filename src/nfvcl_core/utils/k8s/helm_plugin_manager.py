@@ -10,8 +10,8 @@ from kubernetes.utils import FailToCreateError
 from verboselogs import VerboseLogger
 
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core.utils.log import create_logger
-from nfvcl_core.utils.k8s.kube_api_utils import get_daemon_sets, apply_def_to_cluster, read_namespaced_storage_class, patch_namespaced_storage_class
 from nfvcl_core.utils.file_utils import render_file_from_template_to_file, create_tmp_file
 from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData
@@ -70,6 +70,7 @@ class HelmPluginManager:
     def __init__(self, k8s_credential_file, context_name: str = "") -> None:
         self.k8s_credential_file = k8s_credential_file
         self.k8s_config = get_k8s_config_from_file_content(k8s_credential_file)
+        self.kube_utils = KubeApiUtils(self.k8s_config)
         self.helm_client = build_helm_client_from_credential_file_content(k8s_credential_file, create_tmp_file("k8s", "k8s_helm_client_credentials", True))
         self.context_name = context_name
         self.logger: VerboseLogger = create_logger(self.__class__.__name__, blueprintid=context_name)
@@ -166,10 +167,10 @@ class HelmPluginManager:
             values=values_disable_replication
         )
         # Get the storage class to make it default
-        storage_class = read_namespaced_storage_class(self.k8s_config, "openebs-hostpath")
+        storage_class = self.kube_utils.read_namespaced_storage_class("openebs-hostpath")
         # Set it the default sc
         storage_class.metadata.annotations["storageclass.kubernetes.io/is-default-class"] = 'true'
-        patch_namespaced_storage_class(self.k8s_config, storage_class)
+        self.kube_utils.patch_namespaced_storage_class(storage_class)
 
     def _install_flannel(self, plugin_data: K8sPluginAdditionalData):
         """
@@ -226,7 +227,7 @@ class HelmPluginManager:
         Returns:
             List[K8sPluginName]: A list containing the names of the installed plugins.
         """
-        daemon_sets = get_daemon_sets(self.k8s_config)
+        daemon_sets = self.kube_utils.get_daemon_sets()
         # deployments = get_deployments(self.k8s_config)
         plugin_list = []
 
@@ -269,9 +270,9 @@ class HelmPluginManager:
         # Element in position 1 because apply_def_to_cluster is working on yaml file, please look at the source
         # code of apply_def_to_cluster
         try:
-            apply_def_to_cluster(self.k8s_config, yaml_file_to_be_applied=yaml_file_path)[1]
+            self.kube_utils.apply_def_to_cluster(yaml_file_to_be_applied=yaml_file_path)[1]
         except FailToCreateError as fail:
             self.logger.warning(traceback.format_tb(fail.__traceback__))
             self.logger.warning("Definition <{}> for plugin <{}> has gone wrong. Retrying in 30 seconds...".format(str(yaml_file_path), plugin_name.name))
             time.sleep(30)
-            apply_def_to_cluster(self.k8s_config, yaml_file_to_be_applied=yaml_file_path)[1]
+            self.kube_utils.apply_def_to_cluster(yaml_file_to_be_applied=yaml_file_path)[1]

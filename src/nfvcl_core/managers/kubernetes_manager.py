@@ -1,15 +1,16 @@
+from pathlib import Path
 from typing import List
 
 from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1ClusterRoleBinding, V1ServiceAccount, V1Secret, V1SecretList, V1ResourceQuota, V1NodeList, V1Node, V1DeploymentList, V1Deployment
 from kubernetes.utils import FailToCreateError
 
+from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core_models.k8s_management_models import Labels
-from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
+from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall, K8sLoadBalancerPoolArea, K8sPluginAdditionalData, K8sPlugin
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
-from nfvcl_core.utils.k8s.kube_api_utils import get_service_accounts, k8s_delete_namespace, k8s_get_roles, get_k8s_namespaces, k8s_admin_role_to_sa, k8s_admin_role_over_namespace, k8s_cluster_admin, k8s_create_service_account, k8s_create_secret_for_user, k8s_get_secrets, k8s_cert_sign_req, k8s_add_quota_to_namespace, k8s_get_nodes, k8s_add_label_to_k8s_node, k8s_get_deployments, k8s_add_label_to_k8s_deployment, k8s_scale_k8s_deployment, k8s_get_ipaddress_pool, k8s_get_storage_classes, get_pods_for_k8s_namespace, apply_def_to_cluster, k8s_create_namespace, get_k8s_cidr_info
 from nfvcl_core.managers import TopologyManager, BlueprintManager, EventManager
 from nfvcl_core.managers.generic_manager import GenericManager
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
@@ -22,6 +23,24 @@ class KubernetesManager(GenericManager):
         self._topology_manager = topology_manager
         self._blueprint_manager = blueprint_manager
         self._event_manager = event_manager
+        self._k8s_api_utils_cache = {}
+
+    def get_k8s_api_utils(self, cluster_id: str) -> KubeApiUtils:
+        """
+        Get a KubeApiUtils instance for the specified cluster.
+
+        Args:
+            cluster_id: The ID of the Kubernetes cluster.
+
+        Returns:
+            An instance of KubeApiUtils for the specified cluster.
+        """
+        if cluster_id not in self._k8s_api_utils_cache:
+            cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
+            k8s_config = get_k8s_config_from_file_content(cluster.credentials)
+            self._k8s_api_utils_cache[cluster_id] = KubeApiUtils(kube_client_config=k8s_config)
+
+        return self._k8s_api_utils_cache[cluster_id]
 
 
     def get_k8s_installed_plugins(self, cluster_id: str) -> List[K8sPluginName]:
@@ -58,11 +77,11 @@ class KubernetesManager(GenericManager):
         cluster = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
 
         lb_pool: K8sLoadBalancerPoolArea = plug_to_install_list.load_balancer_pool
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-        pod_network_cidr = get_k8s_cidr_info(k8s_config)
+        k8s_api = self.get_k8s_api_utils(cluster_id)
+        pod_network_cidr = k8s_api.get_cidr_info()
 
         # Create additional data for plugins (lbpool and cidr)
-        template_fill_data = K8sPluginAdditionalData(areas=[lb_pool], pod_network_cidr=pod_network_cidr)
+        template_fill_data = K8sPluginAdditionalData(areas=[lb_pool] if lb_pool else None, pod_network_cidr=pod_network_cidr)
 
         helm_plugin_manager = HelmPluginManager(cluster.credentials, cluster_id)
         helm_plugin_manager.install_plugins(plug_to_install_list.plugin_list, template_fill_data)
@@ -77,16 +96,19 @@ class KubernetesManager(GenericManager):
             cluster_id: The target cluster
             body: The yaml content to be applied at the cluster.
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         # Loading a yaml in this way result in a dictionary
         dict_request = yaml.load_all(body)
 
         try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            list_to_ret: List[dict] = []
+
             # The dictionary can be composed of multiple documents (divided by --- in the yaml)
             for document in dict_request:
-                result = apply_def_to_cluster(kube_client_config=k8s_config, dict_to_be_applied=document)
+                result = k8s_api.apply_def_to_cluster(dict_to_be_applied=document)
+                for element in result:
+                    list_to_ret.append(element.to_dict())
+
         except FailToCreateError as err:
             self.logger.error(err)
             if err.args[0][0].status == 409:
@@ -94,11 +116,6 @@ class KubernetesManager(GenericManager):
             else:
                 msg_err = err
             raise ValueError(msg_err)
-        # Element in position zero because apply_def_to_cluster is working on dictionary, please look at the source
-        # code of apply_def_to_cluster
-        list_to_ret: List[dict] = []
-        for element in result[0]:
-            list_to_ret.append(element.to_dict())
 
         self.logger.success("Successfully applied to cluster. Created resources are: \n {}".format(list_to_ret))
 
@@ -114,13 +131,9 @@ class KubernetesManager(GenericManager):
 
             a dict {"cidr": "x.y.z.k/z"} containing the cidr of the pod network.
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            cidr_info = get_k8s_cidr_info(k8s_config)
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            cidr_info = k8s_api.get_cidr_info()
         except ApiException as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -141,14 +154,9 @@ class KubernetesManager(GenericManager):
 
             a V1PodList list with pod belonging to the specified namespace
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            pod_list: V1PodList = get_pods_for_k8s_namespace(kube_client_config=k8s_config, namespace=namespace)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            pod_list: V1PodList = k8s_api.get_pods_for_namespace(namespace=namespace)
         except ApiException as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -179,15 +187,9 @@ class KubernetesManager(GenericManager):
         Returns:
             the created namespace
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            # Try to install plugins to cluster
-            created_namespace: V1Namespace = k8s_create_namespace(k8s_config, namespace_name=name, labels=labels)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            created_namespace: V1Namespace = k8s_api.create_namespace(namespace_name=name, labels=labels)
         except ApiException as val_err:
             self.logger.error(val_err, exc_info=val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -207,20 +209,14 @@ class KubernetesManager(GenericManager):
         Returns:
             the created namespace
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            # Try to install plugins to cluster
-            created_namespace: V1Namespace = k8s_delete_namespace(k8s_config, namespace_name=name)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            deleted_namespace: V1Namespace = k8s_api.delete_namespace(namespace_name=name)
         except ApiException as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
-        resp = OssCompliantResponse(status=OssStatus.ready, detail="Namespace deleted", result=created_namespace.to_dict())
+        resp = OssCompliantResponse(status=OssStatus.ready, detail="Namespace deleted", result=deleted_namespace.to_dict())
         return resp
 
     def get_k8s_service_account(self, cluster_id: str, username: str = "", namespace: str = "") -> dict:
@@ -243,10 +239,8 @@ class KubernetesManager(GenericManager):
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
         try:
-            # Retrieving service account list filtered by username and namespace
-            user_accounts: V1ServiceAccountList = get_service_accounts(kube_client_config=k8s_config, username=username,
-                                                                       namespace=namespace)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            user_accounts: V1ServiceAccountList = k8s_api.get_service_accounts(namespace=namespace, username=username)
         except ApiException as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -273,9 +267,8 @@ class KubernetesManager(GenericManager):
         k8s_config = get_k8s_config_from_file_content(cluster.credentials)
 
         try:
-            # Retrieving service account list filtered by username and namespace
-            role_list: V1ClusterRoleList = k8s_get_roles(kube_client_config=k8s_config, rolename=rolename, namespace=namespace)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            role_list: V1ClusterRoleList = k8s_api.get_roles(rolename=rolename, namespace=namespace)
         except ApiException | ValueError as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -295,13 +288,9 @@ class KubernetesManager(GenericManager):
             A namespace list (V1NamespaceList)
         """
 
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            namespace_list: V1NamespaceList = get_k8s_namespaces(kube_client_config=k8s_config, namespace=namespace)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            namespace_list: V1NamespaceList = k8s_api.get_namespaces(namespace=namespace)
         except ApiException as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -325,16 +314,10 @@ class KubernetesManager(GenericManager):
         Returns:
             The created role binding (V1RoleBinding)
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            # Retrieving service account list filtered by username and namespace
-            role_bind_res: V1RoleBinding = k8s_admin_role_to_sa(kube_client_config=k8s_config, namespace=namespace,
-                                                                username=s_account, role_binding_name=role_binding_name)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            role_bind_res: V1RoleBinding = k8s_api.admin_role_to_sa(namespace=namespace, username=s_account,
+                                                                    role_binding_name=role_binding_name)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -360,16 +343,10 @@ class KubernetesManager(GenericManager):
         Returns:
             The created role binding (V1RoleBinding)
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            # Retrieving service account list filtered by username and namespace
-            role_bind_res: V1RoleBinding = k8s_admin_role_over_namespace(kube_client_config=k8s_config, namespace=namespace,
-                                                                         username=user, role_binding_name=role_binding_name)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            role_bind_res: V1RoleBinding = k8s_api.admin_role_over_namespace(namespace=namespace, username=user,
+                                                                            role_binding_name=role_binding_name)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -391,14 +368,10 @@ class KubernetesManager(GenericManager):
         Returns:
             The created role binding (V1RoleBinding)
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            role_bind_res: V1ClusterRoleBinding = k8s_cluster_admin(kube_client_config=k8s_config, username=user, role_binding_name=cluster_role_binding_name)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            role_bind_res: V1ClusterRoleBinding = k8s_api.cluster_admin(username=user,
+                                                                       role_binding_name=cluster_role_binding_name)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -419,16 +392,10 @@ class KubernetesManager(GenericManager):
         Returns:
             The created user (V1ServiceAccount)
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            # Creating service account
-            user_creation_res: V1ServiceAccount = k8s_create_service_account(kube_client_config=k8s_config, namespace=namespace,
-                                                                             username=user)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            user_creation_res: V1ServiceAccount = k8s_api.create_service_account(namespace=namespace,
+                                                                              username=user)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -451,17 +418,11 @@ class KubernetesManager(GenericManager):
         Returns:
             The created secret (V1Secret)
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            # Retrieving service account list filtered by username and namespace
-            created_secret: V1Secret = k8s_create_secret_for_user(kube_client_config=k8s_config,
-                                                                  namespace=namespace, username=user,
-                                                                  secret_name=secret_name)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            created_secret: V1Secret = k8s_api.create_secret_for_user(namespace=namespace,
+                                                                     username=user,
+                                                                     secret_name=secret_name)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -484,15 +445,10 @@ class KubernetesManager(GenericManager):
         Returns:
             The filtered list of secrets
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            auth_response: V1SecretList = k8s_get_secrets(kube_client_config=k8s_config,
-                                                          namespace=namespace, secret_name=secret_name, owner=owner)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            auth_response: V1SecretList = k8s_api.get_secrets(
+                namespace=namespace, secret_name=secret_name, owner=owner)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -521,26 +477,30 @@ class KubernetesManager(GenericManager):
             "secret": detailed_secret.to_dict()}
 
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+
             # Creating SA
-            sa = k8s_create_service_account(kube_client_config=k8s_config, namespace=namespace, username=username)
+            sa = k8s_api.create_service_account(namespace=namespace, username=username)
+
             # Creating role binding to be admin
             binding_name = "rolebinding_admin_" + username
-            role = k8s_admin_role_to_sa(kube_client_config=k8s_config, namespace=namespace, username=username, role_binding_name=binding_name)
+            role = k8s_api.admin_role_to_sa(namespace=namespace, username=username,
+                                          role_binding_name=binding_name)
+
             # Create secret
             secret_name = username + "-secret"
-            secret = k8s_create_secret_for_user(kube_client_config=k8s_config, namespace=namespace, username=username, secret_name=secret_name)
-            # Returning secret WITH token included
-            detailed_secret = k8s_get_secrets(kube_client_config=k8s_config, namespace=namespace, secret_name=secret.metadata.name)
+            secret = k8s_api.create_secret_for_user(namespace=namespace, username=username,
+                                                  secret_name=secret_name)
 
-            result = {"service_account": sa.to_dict(),
-                      "binding_role": role.to_dict(),
-                      "secret": detailed_secret.to_dict()}
+            # Returning secret WITH token included
+            detailed_secret = k8s_api.get_secrets(namespace=namespace, secret_name=secret.metadata.name)
+
+            result = {
+                "service_account": sa.to_dict(),
+                "binding_role": role.to_dict(),
+                "secret": detailed_secret.to_dict()
+            }
 
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
@@ -564,15 +524,9 @@ class KubernetesManager(GenericManager):
             a dictionary containing: server certificate, user private key and user certificate in BASE 64 format to be used in kubectl after being
             converted from base64.
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            auth_response: dict = k8s_cert_sign_req(kube_client_config=k8s_config, username=username,
-                                                    expiration_sec=expire_seconds)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            auth_response: dict = k8s_api.cert_sign_req(username=username, expiration_sec=expire_seconds)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -594,18 +548,13 @@ class KubernetesManager(GenericManager):
         Returns:
             The created quota.
         """
-
-        # Get k8s cluster and k8s config for client
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
-
         try:
-            quota_resp: V1ResourceQuota = k8s_add_quota_to_namespace(kube_client_config=k8s_config, namespace_name=namespace,
-                                                                     quota_name=quota_name, quota=quota)
-
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            quota_resp: V1ResourceQuota = k8s_api.add_quota_to_namespace(
+                namespace_name=namespace, quota_name=quota_name, quota=quota)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            resp = OssCompliantResponse(status=OssStatus.failed, detail=val_err.body, result={})
+            resp = OssCompliantResponse(status=OssStatus.failed, detail=str(val_err), result={})
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         resp = OssCompliantResponse(status=OssStatus.ready, detail="Quota created", result=quota_resp.to_dict())
@@ -624,14 +573,13 @@ class KubernetesManager(GenericManager):
         Returns:
             If detailed a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
             if detailed:
-                node_list: V1NodeList = k8s_get_nodes(k8s_config, detailed=detailed)
+                node_list: V1NodeList = k8s_api.get_nodes(detailed=detailed)
                 to_return = node_list.to_dict()
             else:
-                name_list = k8s_get_nodes(k8s_config, detailed=detailed)
+                name_list = k8s_api.get_nodes(detailed=detailed)
                 to_return = {"nodes": name_list}
             return to_return
         except ApiException as val_err:
@@ -653,10 +601,9 @@ class KubernetesManager(GenericManager):
         Returns:
             The updated node V1Node in dict form
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         try:
-            node: V1Node = k8s_add_label_to_k8s_node(k8s_config, node_name=node_name, labels=labels)
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            node: V1Node = k8s_api.add_label_to_k8s_node(node_name=node_name, labels=labels)
             return node.to_dict()
         except ApiException as api_exp:
             self.logger.error(api_exp)
@@ -677,14 +624,13 @@ class KubernetesManager(GenericManager):
         Returns:
             If detailed a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
             if detailed:
-                deployment_list: V1DeploymentList = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
+                deployment_list: V1DeploymentList = k8s_api.get_deployments(namespace=namespace, detailed=detailed)
                 to_return = deployment_list.to_dict()
             else:
-                name_list = k8s_get_deployments(k8s_config, namespace=namespace, detailed=detailed)
+                name_list = k8s_api.get_deployments(namespace=namespace, detailed=detailed)
                 to_return = {"deployments": name_list}
             return to_return
         except ApiException as val_err:
@@ -704,14 +650,14 @@ class KubernetesManager(GenericManager):
         Returns:
             The updated node V1Deployment in dict form
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         try:
-            deployment: V1Deployment = k8s_add_label_to_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, labels=labels)
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            deployment: V1Deployment = k8s_api.add_label_to_k8s_deployment(
+                namespace=namespace, deployment_name=deployment_name, labels=labels)
+            return deployment.to_dict()
         except ApiException as api_exp:
             self.logger.error(api_exp)
             raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
-        return deployment.to_dict()
 
     def scale_k8s_deployment(self, cluster_id: str, namespace: str, deployment_name: str, replica_number: int):
         """
@@ -726,14 +672,14 @@ class KubernetesManager(GenericManager):
         Returns:
             The updated node V1Deployment in dict form
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         try:
-            deployment: V1Deployment = k8s_scale_k8s_deployment(k8s_config, namespace=namespace, deployment_name=deployment_name, replica_num=replica_number)
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            deployment: V1Deployment = k8s_api.scale_k8s_deployment(
+                namespace=namespace, deployment_name=deployment_name, replica_num=replica_number)
+            return deployment.to_dict()
         except ApiException as api_exp:
             self.logger.error(api_exp)
             raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
-        return deployment.to_dict()
 
     def get_k8s_ipaddress_pools(self, cluster_id: str) -> List[str]:
         """
@@ -743,14 +689,13 @@ class KubernetesManager(GenericManager):
 
             A list of IP address pools. If there is no pool, an empty list is returned. This means that the LB has not been configured
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         try:
-            ip_pool_list = k8s_get_ipaddress_pool(k8s_config)
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            ip_pool_list = k8s_api.get_ipaddress_pool()
+            return ip_pool_list
         except ApiException as api_exp:
             self.logger.error(api_exp)
             raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
-        return ip_pool_list
 
     def get_k8s_storage_classes(self, cluster_id: str) -> List[str]:
         """
@@ -763,18 +708,17 @@ class KubernetesManager(GenericManager):
 
             A list of storage classes
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         try:
-            storage_classes = k8s_get_storage_classes(k8s_config)
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            storage_classes = k8s_api.get_storage_classes()
+
+            sc_name_list = []
+            for sc in storage_classes.items:
+                sc_name_list.append(sc.metadata.name)
+            return sc_name_list
         except ApiException as api_exp:
             self.logger.error(api_exp)
             raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
-
-        sc_name_list = []
-        for sc in storage_classes.items:
-            sc_name_list.append(sc.metadata.name)
-        return sc_name_list
 
     def get_k8s_default_storage_class(self, cluster_id: str) -> str | None:
         """
@@ -787,10 +731,14 @@ class KubernetesManager(GenericManager):
 
             The default storage class, empty if none
         """
-        cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-        k8s_config = get_k8s_config_from_file_content(cluster.credentials)
         try:
-            storage_classes = k8s_get_storage_classes(k8s_config)
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            storage_classes = k8s_api.get_storage_classes()
+
+            for sc in storage_classes.items:
+                if sc.metadata.annotations and sc.metadata.annotations.get("storageclass.kubernetes.io/is-default-class") == "true":
+                    return sc.metadata.name
+            return None
         except ApiException as api_exp:
             self.logger.error(api_exp)
             raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)

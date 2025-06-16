@@ -5,6 +5,7 @@ from typing import Optional, List
 from pydantic import Field
 from starlette.responses import PlainTextResponse
 
+from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
@@ -21,7 +22,6 @@ from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoo
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
 from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException, TopoK8SNotFoundException
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
-from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info, k8s_add_label_to_k8s_node
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 
 K8S_BLUE_TYPE = "k8s"
@@ -329,15 +329,16 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         Internal .maas domain is SOMETIMES not resolved by the internal K8S DNS. This function fixes the problem.
         """
         client_config = get_k8s_config_from_file_content(self.state.master_credentials)
+        kube_utils = KubeApiUtils(client_config)
         # Get the Core DNS configmap
-        config_map = get_config_map(client_config, "kube-system", "coredns")
+        config_map = kube_utils.get_config_map("kube-system", "coredns")
         # Extract data
         dns_config_file_content: str = config_map.data['Corefile']
         # Add internal DNS to solve maas domain
         dns_config_file_content += "maas:53 {\n    forward . 192.168.17.25\n}\n"
         config_map.data['Corefile'] = dns_config_file_content
         # Patch the config map
-        result = patch_config_map(client_config, "coredns", "kube-system", config_map)
+        result = kube_utils.patch_config_map("coredns", "kube-system", config_map)
         return result
 
     def label_nodes(self):
@@ -345,12 +346,13 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         Label each node with the area it belongs to. Used to constrain deployments to run on specific areas(or workers)
         """
         k8s_config = get_k8s_config_from_file_content(self.state.master_credentials)
+        kube_utils = KubeApiUtils(k8s_config)
         for vm in self.state.vm_workers:
             area = vm.area
             labels = Labels(labels={"area": str(area)})
             hostname = vm.name.lower() # always lower case for hostnames
-            k8s_add_label_to_k8s_node(k8s_config, hostname, labels=labels)
-        k8s_add_label_to_k8s_node(k8s_config, self.state.vm_master.name.lower(), Labels(labels={"area": str(self.state.vm_master.area)}))
+            kube_utils.add_label_to_k8s_node(hostname, labels=labels)
+        kube_utils.add_label_to_k8s_node(self.state.vm_master.name.lower(), Labels(labels={"area": str(self.state.vm_master.area)}))
 
     def install_default_plugins(self):
         """
@@ -359,6 +361,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         self.logger.info(f"Starting default plugin installation on {self.id} K8S cluster")
         client_config = get_k8s_config_from_file_content(self.state.master_credentials)
+        kube_utils = KubeApiUtils(client_config)
         # It builds plugin list
         plug_list: List[K8sPluginName] = []
 
@@ -370,7 +373,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         plug_list.append(K8sPluginName.OPEN_EBS)
 
         # Get the k8s pod network cidr
-        pod_network_cidr = get_k8s_cidr_info(client_config)
+        pod_network_cidr = kube_utils.get_cidr_info()
         plugin_data = K8sPluginAdditionalData(areas=self.state.load_balancer_pools, pod_network_cidr=pod_network_cidr, cadvisor_node_port=self.state.cadvisor_node_port) # TODO cadvisor is not anymore present
 
         helm_plugin_manager = HelmPluginManager(k8s_credential_file=self.state.master_credentials, context_name=self.id)

@@ -11,7 +11,7 @@
        dest: /etc/fstab
        regexp: swap
        state: absent
-   - name: Intilizing Kubernetes Cluster
+   - name: Initializing Kubernetes Cluster
      command: kubeadm init --pod-network-cidr '{{ pod_network_cidr }}' --apiserver-advertise-address '{{ k8s_master_ip }}' --apiserver-cert-extra-sans '{{ k8s_master_external_ip }}' --service-cidr '{{ k8s_service_cidr }}' --control-plane-endpoint '{{ k8s_master_external_ip }}'
    - pause: seconds=5
    - name: Create directory for kube config.

@@ -280,9 +280,9 @@ class KubeApiUtils:
 
         return role_bind_res
 
-    def cluster_admin(self, username: str, role_binding_name: str) -> V1ClusterRoleBinding:
+    def cluster_admin_to_sa(self, username: str, namespace: str, role_binding_name: str) -> V1ClusterRoleBinding:
         """
-        This function is specific to give CLUSTER admin rights on a user.
+        This function is specific to give CLUSTER admin rights to a Service Account.
 
         Args:
             username: the name of the user that will become cluster administrator
@@ -294,7 +294,7 @@ class KubeApiUtils:
         try:
             metadata: V1ObjectMeta = V1ObjectMeta(name=role_binding_name)
 
-            subjects = [RbacV1Subject(kind='User', name=username)]
+            subjects = [RbacV1Subject(kind='ServiceAccount', name=username, namespace=namespace)]
             role_ref = V1RoleRef(kind='ClusterRole', name='cluster-admin', api_group='rbac.authorization.k8s.io')
 
             role_bind = V1ClusterRoleBinding(subjects=subjects, role_ref=role_ref, metadata=metadata)

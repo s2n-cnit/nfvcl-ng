@@ -544,9 +544,9 @@ class NFVCL:
     def k8s_give_admin_rights_to_sa(self, cluster_id: str, namespace: str, s_account: str, role_binding_name: str, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.give_admin_rights_to_sa, cluster_id, namespace, s_account, role_binding_name, callback=callback)
 
-    @NFVCLPublic(path="/{cluster_id}/roles/cluster-admin/{s_account}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_cluster_admin_rights)
-    def k8s_give_cluster_admin_rights(self, cluster_id: str, s_account: str, cluster_role_binding_name: str, callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.give_cluster_admin_rights, cluster_id, s_account, cluster_role_binding_name, callback=callback)
+    @NFVCLPublic(path="/{cluster_id}/roles/cluster-admin/{namespace}/{s_account}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_cluster_admin_rights)
+    def k8s_give_cluster_admin_rights(self, cluster_id: str, s_account: str, namespace: str, cluster_role_binding_name: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.give_cluster_admin_rights, cluster_id, s_account, namespace, cluster_role_binding_name, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/secrets", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_secrets)
     def k8s_get_secrets(self, cluster_id: str, namespace: str = "", secret_name: str = "", owner: str = "", callback=None) -> dict:

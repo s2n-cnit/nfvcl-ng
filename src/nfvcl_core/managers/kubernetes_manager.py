@@ -325,7 +325,7 @@ class KubernetesManager(GenericManager):
 
         return role_bind_res.to_dict()
 
-    def give_cluster_admin_rights(self, cluster_id: str, s_account: str, cluster_role_binding_name: str):
+    def give_cluster_admin_rights(self, cluster_id: str, s_account: str, namespace: str, cluster_role_binding_name: str):
         """
         Give cluster admin rights to a service account.
 
@@ -334,6 +334,8 @@ class KubernetesManager(GenericManager):
 
             s_account: The user that will become administrator for the cluster
 
+            namespace: The namespace to which the user belongs.
+
             cluster_role_binding_name: The name that will be given to the ClusterRoleBinding
 
         Returns:
@@ -341,7 +343,7 @@ class KubernetesManager(GenericManager):
         """
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)
-            role_bind_res: V1ClusterRoleBinding = k8s_api.cluster_admin(username=s_account, role_binding_name=cluster_role_binding_name)
+            role_bind_res: V1ClusterRoleBinding = k8s_api.cluster_admin_to_sa(username=s_account, namespace=namespace, role_binding_name=cluster_role_binding_name)
         except ApiException as error:
             raise NFVCLCoreException(message=str(error), http_equivalent_code=error.status)
         return role_bind_res.to_dict()

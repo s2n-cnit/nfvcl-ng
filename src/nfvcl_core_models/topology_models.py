@@ -1,4 +1,5 @@
 from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
 from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
 from nfvcl_core_models.vim.vim_models import VimModel
@@ -84,7 +85,7 @@ class TopologyModel(NFVCLBaseModel):
         """
         found_cluster = next((cluster for cluster in self.kubernetes if cluster.name == cluster_id), None)
         if found_cluster is None:
-            raise ValueError(f"K8s cluster with name {cluster_id} not found in the topology")
+            raise NFVCLCoreException(f"K8s cluster with name {cluster_id} not found in the topology", http_equivalent_code=404)
         return found_cluster
 
     def add_k8s_cluster(self, k8s_cluster: TopologyK8sModel):

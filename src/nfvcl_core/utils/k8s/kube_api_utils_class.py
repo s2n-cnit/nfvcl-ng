@@ -1,23 +1,24 @@
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import kubernetes
 import kubernetes.client
 import kubernetes.utils
-from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccount, V1ClusterRoleList, V1ClusterRole, \
-    V1Namespace, V1NamespaceList, V1ObjectMeta, V1RoleBinding, RbacV1Subject, V1RoleRef, V1Secret, V1SecretList, \
+import yaml
+from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccount, V1Namespace, V1NamespaceList, \
+    V1ObjectMeta, V1RoleBinding, RbacV1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1ClusterRoleBinding, V1ResourceQuota, \
     V1ResourceQuotaSpec, V1Deployment, V1DeploymentSpec, V1NodeList, V1Node, V1Container, V1DaemonSetList, \
     V1StorageClassList, V1PodList, V1ServiceList, V1DeploymentList, V1ConfigMap, VersionInfo, V1StorageClass, \
-    V1CustomResourceDefinitionList
+    V1CustomResourceDefinitionList, V1RoleList
 
-import yaml
 from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
+from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.topology_k8s_model import K8sQuota, K8sVersion
 
@@ -70,45 +71,39 @@ class KubeApiUtils:
                 field_selector = 'metadata.name=' + username
             if namespace:
                 if not self.check_namespace_exist(namespace):
-                    raise ValueError(f"Namespace ->{namespace}<- does not exist.")
+                    raise NFVCLCoreException(f"Namespace ->{namespace}<- does not exist.", http_equivalent_code=404)
                 service_accounts: V1ServiceAccountList = self.core_v1_api.list_namespaced_service_account(
                     namespace=namespace, field_selector=field_selector, timeout_seconds=self.TIMEOUT_SECONDS)
             else:
                 service_accounts: V1ServiceAccountList = self.core_v1_api.list_service_account_for_all_namespaces(
                     field_selector=field_selector, timeout_seconds=self.TIMEOUT_SECONDS)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api in get_service_accounts: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api in get_service_accounts: {error}", http_equivalent_code=error.status)
 
         return service_accounts
 
-    def check_sa_exist(self, username: str, namespace: str = None) -> V1ServiceAccount:
+    def check_sa_exist(self, username: str, namespace: str = None) -> Optional[V1ServiceAccount]:
         """
-        Check that a SA exist. Raise ValueError if not found or if found multiple instance.
+        Check that a SA exist. Return None if not.
         Args:
             username: the mandatory username to filter users.
             namespace: the optional namespace. If None users are retrieved from all namespaces.
         Returns:
             The target user if found.
-
-        Raises:
-            ValueError if no user is found or if multiple users are found
         """
         account_list: V1ServiceAccountList = self.get_service_accounts(namespace, username)
         if len(account_list.items) <= 0:
             if namespace:
-                raise ValueError(f"User ->{username}<- not found in namespace {namespace}")
+                self.logger.debug(f"User ->{username}<- not found in namespace {namespace}")
             else:
-                raise ValueError(f"User ->{username}<- not found")
+                self.logger.debug(f"User ->{username}<- not found")
+            return None
         elif len(account_list.items) == 1:
             return account_list.items[0]
         else:
-            if namespace:
-                raise ValueError(f"Not unique match for user ->{username}<- in namespace {namespace}")
-            else:
-                raise ValueError(f"Not unique match for user ->{username}<-")
+            raise NFVCLCoreException(f"Not unique match for user ->{username}<- in namespace {namespace}", http_equivalent_code=409)
 
-    def get_roles(self, namespace: str = None, rolename: str = None) -> V1ClusterRoleList:
+    def get_roles(self, namespace: str = None, rolename: str = None) -> V1RoleList:
         """
         Retrieve all roles of a namespace. If a namespace is not specified, it will work on
         all namespaces.
@@ -123,25 +118,24 @@ class KubeApiUtils:
         """
         field_selector = ''
         try:
-            if rolename != "":
+            if rolename and rolename != "":
                 field_selector = 'metadata.name=' + rolename
-            if namespace:
+            if namespace and namespace != "":
                 if not self.check_namespace_exist(namespace):
-                    raise ValueError(f"Namespace ->{namespace}<- does not exist.")
-                role_list: V1ClusterRoleList = self.rbac_auth_v1_api.list_namespaced_role(
+                    raise NFVCLCoreException(f"Namespace ->{namespace}<- does not exist.", http_equivalent_code=404)
+                role_list: V1RoleList = self.rbac_auth_v1_api.list_namespaced_role(
                     namespace=namespace, field_selector=field_selector, timeout_seconds=self.TIMEOUT_SECONDS)
             else:
-                role_list: V1ClusterRoleList = self.rbac_auth_v1_api.list_role_for_all_namespaces(
+                role_list: V1RoleList = self.rbac_auth_v1_api.list_role_for_all_namespaces(
                     field_selector=field_selector, timeout_seconds=self.TIMEOUT_SECONDS)
         except ApiException as error:
-            self.logger.error(f"Exception when calling RbacAuthorizationV1Api in get_k8s_role: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling RbacAuthorizationV1Api in get_roles: {error}", http_equivalent_code=error.status)
 
         return role_list
 
-    def check_role_exist(self, rolename: str, namespace: str = None) -> V1ClusterRole:
+    def check_role_exist(self, rolename: str, namespace: str = None) -> Optional[V1Role]:
         """
-        Check that a role exist. Raise ValueError if not found or if found multiple instance.
+        Check that a role exists. Raise ValueError if not found or if found multiple instances.
         Args:
             rolename: the mandatory name for the role to filter roles.
             namespace: the optional namespace. If None roles are retrieved from all namespaces.
@@ -151,19 +145,17 @@ class KubeApiUtils:
         Raises:
             ValueError if no role is found or if multiple roles are found
         """
-        role_list: V1ClusterRoleList = self.get_roles(namespace, rolename)
+        role_list: V1RoleList = self.get_roles(namespace, rolename)
         if len(role_list.items) <= 0:
             if namespace:
-                raise ValueError(f"Role ->{rolename}<- not found in namespace {namespace}")
+                self.logger.debug(f"Role ->{rolename}<- not found in namespace {namespace}")
             else:
-                raise ValueError(f"Role ->{rolename}<- not found")
+                self.logger.debug(f"Role ->{rolename}<- not found")
+            return None
         elif len(role_list.items) == 1:
             return role_list.items[0]
         else:
-            if namespace:
-                raise ValueError(f"Not unique match for role ->{rolename}<- in namespace {namespace}")
-            else:
-                raise ValueError(f"Not unique match for role ->{rolename}<-")
+            raise NFVCLCoreException(f"Not unique match for role ->{rolename}<- in namespace {namespace}", http_equivalent_code=409)
 
     def get_namespaces(self, namespace: str = None) -> V1NamespaceList:
         """
@@ -186,12 +178,11 @@ class KubeApiUtils:
                 label_selector=field_selector,
                 timeout_seconds=self.TIMEOUT_SECONDS)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api in get_namespaces: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api in get_namespaces: {error}", http_equivalent_code=error.status)
 
         return namespace_list
 
-    def check_namespace_exist(self, namespace: str) -> V1Namespace:
+    def check_namespace_exist(self, namespace: str) -> Optional[V1Namespace]:
         """
         Check that a namespace exist. Raise ValueError if not found or if found multiple instance.
         Args:
@@ -204,11 +195,12 @@ class KubeApiUtils:
         """
         namespace_list: V1NamespaceList = self.get_namespaces(namespace)
         if len(namespace_list.items) <= 0:
-            raise ValueError(f"Namespace ->{namespace}<- not found")
+            self.logger.debug(f"Namespace ->{namespace}<- not found")
+            return None
         elif len(namespace_list.items) == 1:
             return namespace_list.items[0]
         else:
-            raise ValueError(f"Not unique match for namespace ->{namespace}<-")
+            raise NFVCLCoreException(f"Not unique match for namespace ->{namespace}<-", http_equivalent_code=409)
 
     def create_service_account(self, namespace: str, username: str) -> V1ServiceAccount:
         """
@@ -226,47 +218,41 @@ class KubeApiUtils:
             sa: V1ServiceAccount = V1ServiceAccount(metadata=metadata)
             created_sa: V1ServiceAccount = self.core_v1_api.create_namespaced_service_account(namespace, body=sa)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api in create_service_account: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api in create_service_account: {error}", http_equivalent_code=error.status)
 
         return created_sa
 
     def create_admin_role(self, namespace: str) -> V1Role:
         """
-        Create an admin role in a namespace
-
-        Warnings:
-            CAN be called once per namespace!!
-
+        Create an admin role called 'admin' in a namespace. If it exists, it will get the admin role from the namespace.
         Args:
             namespace: The namespace where to create the admin role
-
         Returns:
             The created role
-
         Raises:
             ValueError if the namespace doesn't exist
         """
         if not self.check_namespace_exist(namespace):
-            raise ValueError(f"Namespace ->{namespace}<- does not exist.")
+            raise NFVCLCoreException(f"Namespace ->{namespace}<- does not exist.", http_equivalent_code=404)
         try:
-            metadata: V1ObjectMeta = V1ObjectMeta(name="nfvclAdmin")
+            metadata: V1ObjectMeta = V1ObjectMeta(name="admin")
             # Admin role
             rules = [V1PolicyRule(api_groups=['*'], resources=['*'], verbs=['*'])]
-
             role = V1Role(rules=rules, metadata=metadata)
             role_res: V1Role = self.rbac_auth_v1_api.create_namespaced_role(namespace=namespace, body=role)
         except ApiException as error:
-            self.logger.error(f"Exception when calling RbacAuthorizationV1Api in create_admin_role: {error}")
-            raise error
-
+            if error.status == 409:
+                self.logger.warning(f"Role ->admin<- already exist in namespace ->{namespace}<-")
+                return self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='metadata.name=admin').items[0]
+            else:
+                raise NFVCLCoreException(f"Exception when calling CoreV1Api in create_admin_role: {error}", http_equivalent_code=error.status)
         return role_res
 
     def admin_role_to_sa(self, namespace: str, username: str, role_binding_name: str) -> V1RoleBinding:
         """
         Give to an EXISTING service account the admin role on a namespace.
         Args:
-            namespace: the target namespace where the user reside
+            namespace: the target namespace where the user resides
             username: the name of the service account that will become administrator of the namespace
             role_binding_name: the name that will be given to the rule.
 
@@ -274,11 +260,11 @@ class KubeApiUtils:
             The created role binding to administrator.
         """
         if not self.check_namespace_exist(namespace):
-            raise ValueError(f"Namespace ->{namespace}<- does not exist.")
+            raise NFVCLCoreException(f"Namespace ->{namespace}<- does not exist.", http_equivalent_code=404)
         if not self.check_sa_exist(username, namespace):
-            # Not critical, can exist a role binding to a user(service account) that is not inside namespace
-            self.logger.warning(f"User ->{username}<- in {namespace} namespace.")
-
+            raise NFVCLCoreException(f"User ->{username}<- not found in {namespace} namespace.", http_equivalent_code=404)
+        if not self.check_role_exist("admin", namespace):
+            self.create_admin_role(namespace)
         try:
             metadata: V1ObjectMeta = V1ObjectMeta(name=role_binding_name)
 
@@ -289,47 +275,7 @@ class KubeApiUtils:
             role_bind_res: V1RoleBinding = self.rbac_auth_v1_api.create_namespaced_role_binding(
                 namespace=namespace, body=role_bind)
         except ApiException as error:
-            self.logger.error(f"Exception when calling RbacAuthorizationV1Api in admin_role_to_sa: {error}")
-            raise error
-
-        return role_bind_res
-
-    def admin_role_over_namespace(self, namespace: str, username: str, role_binding_name: str) -> V1RoleBinding:
-        """
-        This function is specific to give admin rights on a user that is not present explicitly inside a k8s cluster.
-        For example, when new certificates are created for k8s API, the user does not exist in namespaces, it is not a
-        service account.
-        Give to a user (could not exist in namespaces, for example through certificates) the admin role on a namespace.
-        Args:
-            namespace: the target namespace where the user reside
-            username: the name of the user that will become administrator of the namespace. The uses
-            role_binding_name: the name that will be given to the rule.
-
-        Returns:
-            The created role binding to administrator.
-        """
-        if not self.check_namespace_exist(namespace):
-            raise ValueError(f"Namespace ->{namespace}<- does not exist.")
-
-        # Checking if admin role exist, otherwise create it
-        try:
-            self.check_role_exist('nfvclAdmin', namespace)
-        except ValueError:
-            # Does not exist or multiple account found
-            self.create_admin_role(namespace)
-
-        try:
-            metadata: V1ObjectMeta = V1ObjectMeta(name=role_binding_name)
-
-            subjects = [RbacV1Subject(kind='User', name=username)]
-            role_ref = V1RoleRef(kind='Role', name='nfvclAdmin', api_group='rbac.authorization.k8s.io')
-
-            role_bind = V1RoleBinding(subjects=subjects, role_ref=role_ref, metadata=metadata)
-            role_bind_res: V1RoleBinding = self.rbac_auth_v1_api.create_namespaced_role_binding(
-                namespace=namespace, body=role_bind)
-        except ApiException as error:
-            self.logger.error(f"Exception when calling RbacAuthorizationV1Api in admin_role_over_namespace: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling RbacAuthorizationV1Api in admin_role_to_sa: {error}", http_equivalent_code=error.status)
 
         return role_bind_res
 
@@ -353,8 +299,7 @@ class KubeApiUtils:
             role_bind = V1ClusterRoleBinding(subjects=subjects, role_ref=role_ref, metadata=metadata)
             role_bind_res: V1ClusterRoleBinding = self.rbac_auth_v1_api.create_cluster_role_binding(body=role_bind)
         except ApiException as error:
-            self.logger.error(f"Exception when calling RbacAuthorizationV1Api in cluster_admin: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api in cluster_admin: {error}", http_equivalent_code=error.status)
 
         return role_bind_res
 
@@ -370,10 +315,10 @@ class KubeApiUtils:
             The created secret
         """
         if not self.check_namespace_exist(namespace):
-            raise ValueError(f"Namespace ->{namespace}<- does not exist.")
+            raise NFVCLCoreException(f"Namespace ->{namespace}<- does not exist.", http_equivalent_code=404)
         service_account: V1ServiceAccount = self.check_sa_exist(username, namespace)
         if not service_account:
-            raise ValueError(f"User ->{username}<- in {namespace} namespace.")
+            raise NFVCLCoreException(f"User ->{username}<- not found in {namespace} namespace.", http_equivalent_code=404)
 
         try:
             annotations = {'kubernetes.io/service-account.name': username}
@@ -382,8 +327,7 @@ class KubeApiUtils:
             auth_req = V1Secret(metadata=metadata, type="kubernetes.io/service-account-token")
             auth_resp: V1Secret = self.core_v1_api.create_namespaced_secret(namespace=namespace, body=auth_req)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api in create_secret_for_user: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api in create_secret_for_user: {error}", http_equivalent_code=error.status)
 
         return auth_resp
 
@@ -406,7 +350,7 @@ class KubeApiUtils:
 
             if namespace != "":
                 if not self.check_namespace_exist(namespace):
-                    raise ValueError(f"Namespace ->{namespace}<- does not exist.")
+                    raise NFVCLCoreException(f"Namespace ->{namespace}<- does not exist.", http_equivalent_code=404)
                 secret_list: V1SecretList = self.core_v1_api.list_namespaced_secret(
                     namespace=namespace, field_selector=field_selector)
             else:
@@ -425,8 +369,7 @@ class KubeApiUtils:
                 secret_list.items = to_return_list
 
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api in get_secrets: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api in get_secrets: {error}", http_equivalent_code=error.status)
 
         return secret_list
 
@@ -510,8 +453,7 @@ class KubeApiUtils:
             namespace_body = V1Namespace(metadata=metadata)
             namespace = self.core_v1_api.create_namespace(body=namespace_body)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api>create_namespace: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>create_namespace: {error}", http_equivalent_code=error.status)
 
         return namespace
 
@@ -528,8 +470,7 @@ class KubeApiUtils:
         try:
             namespace = self.core_v1_api.delete_namespace(name=namespace_name)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api>delete_namespace: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>delete_namespace: {error}", http_equivalent_code=error.status)
 
         return namespace
 
@@ -546,15 +487,14 @@ class KubeApiUtils:
             The created quota.
         """
         try:
-            spec = quota.model_dump(by_alias=True)
+            spec = quota.model_dump(by_alias=True, exclude_none=True)
             res_spec = V1ResourceQuotaSpec(hard=spec)
             metadata = V1ObjectMeta(name=quota_name)
             res_quota = V1ResourceQuota(metadata=metadata, spec=res_spec)
 
             created_quota = self.core_v1_api.create_namespaced_resource_quota(namespace=namespace_name, body=res_quota)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api>create_namespaced_resource_quota: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>add_quota_to_namespace: {error}", http_equivalent_code=error.status)
 
         return created_quota
 
@@ -586,15 +526,14 @@ class KubeApiUtils:
             patched_deployment = apps_v1_api.patch_namespaced_deployment(
                 name=deployment_name, namespace=namespace_name, body=deployment_to_be_patched)
         except ApiException as error:
-            self.logger.error(f"Exception when calling AppsV1Api>patch_namespaced_deployment: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling AppsV1Api>add_container_to_namespaced_deployment: {error}", http_equivalent_code=error.status)
 
         return patched_deployment
 
     def get_nodes(self, detailed: bool = False) -> V1NodeList | List[str]:
         """
         Return a list of nodes
-
+self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='metadata.name=admin')
         Args:
             detailed: if true, return all nodes details
 
@@ -615,8 +554,7 @@ class KubeApiUtils:
                     name_list.append(item.metadata.name)
                 return name_list
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api>list_node: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>get_nodes: {error}", http_equivalent_code=error.status)
 
     def add_label_to_k8s_node(self, node_name: str, labels: Labels) -> V1Node:
         """
@@ -638,8 +576,7 @@ class KubeApiUtils:
 
             patched_node = self.core_v1_api.patch_node(node_name, node)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api>patch_node: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>add_label_to_k8s_node: {error}", http_equivalent_code=error.status)
 
         return patched_node
 
@@ -659,8 +596,7 @@ class KubeApiUtils:
         try:
             deployment_list: V1DeploymentList = apps_v1_api.list_namespaced_deployment(namespace=namespace)
         except ApiException as error:
-            self.logger.error("Exception when calling AppsV1Api>list_namespaced_deployment: {}\n".format(error))
-            raise error
+            raise NFVCLCoreException(f"Exception when calling AppsV1Api>get_deployments: {error}", http_equivalent_code=error.status)
         if detailed:
             return deployment_list
         else:
@@ -694,9 +630,7 @@ class KubeApiUtils:
             patched_deployment = apps_v1_api.patch_namespaced_deployment(
                 namespace=namespace, name=deployment_name, body=deployment)
         except ApiException as error:
-            self.logger.error(f"Exception when calling AppsV1Api>patch_namespaced_deployment: {error}")
-            raise error
-
+            raise NFVCLCoreException(f"Exception when calling AppsV1Api>add_label_to_k8s_deployment: {error}", http_equivalent_code=error.status)
         return patched_deployment
 
     def scale_k8s_deployment(self, namespace: str, deployment_name: str, replica_num: int) -> V1Deployment:
@@ -723,8 +657,7 @@ class KubeApiUtils:
             patched_deployment = apps_v1_api.patch_namespaced_deployment(
                 namespace=namespace, name=deployment_name, body=deployment)
         except ApiException as error:
-            self.logger.error(f"Exception when calling AppsV1Api>patch_namespaced_deployment: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling AppsV1Api>scale_k8s_deployment: {error}", http_equivalent_code=error.status)
 
         return patched_deployment
 
@@ -752,8 +685,7 @@ class KubeApiUtils:
                     label_selector=label_selector,
                     timeout_seconds=self.TIMEOUT_SECONDS)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api->list_service: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>get_services: {error}", http_equivalent_code=error.status)
 
         return service_list
 
@@ -774,8 +706,7 @@ class KubeApiUtils:
                 label_selector=label_selector,
                 timeout_seconds=self.TIMEOUT_SECONDS)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api>list_namespaced_pod: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>get_pods_for_namespace: {error}", http_equivalent_code=error.status)
 
         return pod_list
 
@@ -797,9 +728,7 @@ class KubeApiUtils:
                 namespace=namespace,
                 tail_lines=tail_lines)
         except ApiException as error:
-            self.logger.error(f"Exception when calling CoreV1Api>read_namespaced_pod_log: {error}")
-            raise error
-
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>get_logs_for_pod: {error}", http_equivalent_code=error.status)
         return pod_log
 
     def get_daemon_sets(self, namespace: str = None, label_selector: str = None) -> V1DaemonSetList:
@@ -827,8 +756,7 @@ class KubeApiUtils:
                 daemon_set_list = apps_v1_api.list_daemon_set_for_all_namespaces(
                     timeout_seconds=self.TIMEOUT_SECONDS)
         except ApiException as error:
-            self.logger.error(f"Exception when calling AppsV1Api->list_daemon_set: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling AppsV1Api>get_daemon_sets: {error}", http_equivalent_code=error.status)
 
         return daemon_set_list
 
@@ -852,8 +780,7 @@ class KubeApiUtils:
                 pool_spec = ip_pool['spec']
                 ipaddress_pool = pool_spec['addresses']
         except ApiException as error:
-            self.logger.error(f"Exception when calling metallb.io/v1beta1>get_ipaddress_pool: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CustomObjectsApi>get_ipaddress_pool: {error}", http_equivalent_code=error.status)
 
         return ipaddress_pool
 
@@ -869,8 +796,7 @@ class KubeApiUtils:
         try:
             return storage_v1_api.list_storage_class()
         except ApiException as error:
-            self.logger.error(f"Exception when calling StorageV1Api>get_storage_classes: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling StorageV1Api>get_storage_classes: {error}", http_equivalent_code=error.status)
 
     def restart_deployment(self, namespace: str, deployment_name: str) -> V1Deployment:
         """
@@ -895,8 +821,7 @@ class KubeApiUtils:
         try:
             updated_deployment = apps_v1_api.patch_namespaced_deployment(name=deployment_name, namespace=namespace, body=deployment)
         except ApiException as error:
-            self.logger.error(f"Exception when calling AppsV1Api>patch_namespaced_deployment: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling AppsV1Api>restart_deployment: {error}", http_equivalent_code=error.status)
 
         return updated_deployment
 
@@ -977,8 +902,7 @@ class KubeApiUtils:
             if yaml_file_to_be_applied:
                 result_yaml = create_from_yaml_custom(self.api_client, str(yaml_file_to_be_applied))
         except ApiException as error:
-            self.logger.error("Exception when calling create_from_yaml: {}\n".format(error))
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>apply_def_to_cluster: {error}", http_equivalent_code=error.status)
         return result_dict, result_yaml
 
     def get_cidr_info(self) -> str:
@@ -1013,8 +937,7 @@ class KubeApiUtils:
         try:
             config_map: V1ConfigMap = self.core_v1_api.read_namespaced_config_map(name=config_name, namespace=namespace)
         except ApiException as error:
-            self.logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>read_namespaced_config_map: {error}", http_equivalent_code=error.status)
 
         return config_map
 
@@ -1033,8 +956,7 @@ class KubeApiUtils:
         try:
             api_version: VersionInfo = version_api.get_code(_request_timeout=10)
         except ApiException as error:
-            self.logger.error("Exception when calling ApisApi->get_api_versions: {}\n".format(error))
-            raise error
+            raise NFVCLCoreException(f"Exception when calling VersionApi>get_code: {error}", http_equivalent_code=error.status)
 
         # Converting v.1.x.y -> v.1.x
         main_ver = api_version.git_version[:api_version.git_version.rfind('.')]
@@ -1059,8 +981,7 @@ class KubeApiUtils:
         try:
             storage_class = api_instance.read_storage_class(name=storage_class_name)
         except ApiException as error:
-            self.logger.error(f"Exception when calling StorageV1Api->read_storage_class: {error}\n")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling StorageV1Api>read_namespaced_storage_class: {error}", http_equivalent_code=error.status)
 
         return storage_class
 
@@ -1078,8 +999,7 @@ class KubeApiUtils:
         try:
             patched_storage_class = api_instance.patch_storage_class(name=storage_class.metadata.name, body=storage_class)
         except ApiException as error:
-            self.logger.error(f"Exception when calling StorageV1Api->patch_storage_class: {error}\n")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling StorageV1Api>patch_namespaced_storage_class: {error}", http_equivalent_code=error.status)
 
         return patched_storage_class
 
@@ -1096,8 +1016,7 @@ class KubeApiUtils:
         try:
             config_map = self.core_v1_api.read_namespaced_config_map(config_map_name, namespace=namespace)
         except ApiException as error:
-            self.logger.error("Exception when calling CoreV1->read_namespaced_config_map: {}\n".format(error))
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>get_config_map: {error}", http_equivalent_code=error.status)
 
         return config_map
 
@@ -1115,8 +1034,7 @@ class KubeApiUtils:
         try:
             config_map = self.core_v1_api.patch_namespaced_config_map(name, namespace, config_map)
         except ApiException as error:
-            self.logger.error("Exception when calling CoreV1->patch_namespaced_config_map: {}\n".format(error))
-            raise error
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>patch_config_map: {error}", http_equivalent_code=error.status)
 
         return config_map
 
@@ -1149,5 +1067,4 @@ class KubeApiUtils:
                     name_list.append(item.metadata.name)
                 return name_list
         except ApiException as error:
-            self.logger.error(f"Exception when calling ApiextensionsV1Api->list_custom_resource_definition: {error}")
-            raise error
+            raise NFVCLCoreException(f"Exception when calling ApiextensionsV1Api>get_custom_resource_definitions: {error}", http_equivalent_code=error.status)

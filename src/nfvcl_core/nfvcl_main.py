@@ -1,7 +1,6 @@
 import inspect
 import threading
 from enum import Enum
-from fcntl import FASYNC
 from functools import partial
 from typing import Callable, Dict, List, Any, Optional, Annotated
 
@@ -374,62 +373,33 @@ class NFVCL:
     def delete_kubernetes(self, cluster_id: str, callback=None) -> TopologyK8sModel:
         return self.add_task(self.topology_manager.delete_kubernetes, cluster_id, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.GET,
-        sync=True,
-        summary=GET_PROM_LIST_SRV_SUMMARY,
-        description=GET_PROM_LIST_SRV_DESCRIPTION
-    )
+    ######################
+    # Prometheus Section #
+    ######################
+
+    @NFVCLPublic(path="/prometheus",section=TOPOLOGY_SECTION,method=NFVCLPublicMethod.GET,sync=True,summary=GET_PROM_LIST_SRV_SUMMARY,description=GET_PROM_LIST_SRV_DESCRIPTION)
     def get_prometheus_list(self, callback=None) -> List[PrometheusServerModel]:
         return self.add_task(self.topology_manager.get_prometheus_list, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus/{prometheus_id}",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.GET,
-        sync=True,
-        summary=GET_PROM_SRV_SUMMARY,
-        description=GET_PROM_SRV_DESCRIPTION
-    )
+    @NFVCLPublic(path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.GET, sync=True, summary=GET_PROM_SRV_SUMMARY, description=GET_PROM_SRV_DESCRIPTION)
     def get_prometheus(self, prometheus_id: str, callback=None) -> PrometheusServerModel:
         return self.add_task(self.topology_manager.get_prometheus, prometheus_id, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.POST,
-        summary=ADD_PROM_SRV_SUMMARY,
-        description=ADD_PROM_SRV_DESCRIPTION,
-        sync=True
-    )
+    @NFVCLPublic(path="/prometheus", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, summary=ADD_PROM_SRV_SUMMARY, description=ADD_PROM_SRV_DESCRIPTION, sync=True)
     def create_prometheus(self, prometheus_model: PrometheusServerModel, callback=None):
         return self.add_task(self.topology_manager.add_prometheus, prometheus_model, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus/{prometheus_id}",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.PUT,
-        summary=UPD_PROM_SRV_SUMMARY,
-        description=UPD_PROM_SRV_DESCRIPTION,
-        sync=True
-    )
+    @NFVCLPublic( path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_PROM_SRV_SUMMARY, description=UPD_PROM_SRV_DESCRIPTION, sync=True)
     def update_prometheus(self, prometheus_model: PrometheusServerModel, callback=None):
         return self.add_task(self.topology_manager.update_prometheus, prometheus_model, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus/{prometheus_id}",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.DELETE,
-        summary=DEL_PROM_SRV_SUMMARY,
-        description=DEL_PROM_SRV_DESCRIPTION,
-        sync=True
-    )
+    @NFVCLPublic( path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, summary=DEL_PROM_SRV_SUMMARY, description=DEL_PROM_SRV_DESCRIPTION, sync=True)
     def delete_prometheus(self, prometheus_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_prometheus, prometheus_id, callback=callback)
 
-    ############# Blueprints #############
+    #####################
+    # Blueprint Section #
+    #####################
 
     @NFVCLPublic(path="", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.GET, sync=True)
     def get_blueprints(self, blue_type: str = None, detailed: bool = False, tree: bool = False, callback=None) -> List[dict]:
@@ -501,7 +471,9 @@ class NFVCL:
     # def delete_performance(self, blueprint_id: str, callback=None):
     #     return self._add_task(self._performance_manager.delete_performance, blueprint_id, callback=callback)
 
-    ############# Kubernetes cluster management #############
+    #################################
+    # Kubernetes cluster management #
+    #################################
 
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_installed_plugins)
     def k8s_get_installed_plugins(self, cluster_id: str, callback=None) -> List[str]:
@@ -539,7 +511,7 @@ class NFVCL:
     def k8s_get_namespace_list(self, cluster_id: str, namespace: Optional[str] = None, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.get_k8s_namespace_list, cluster_id, namespace, callback=callback)
 
-    @NFVCLPublic(path="/{cluster_id}/namespace/{name}", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=True, doc_by=KubernetesManager.create_k8s_namespace)
+    @NFVCLPublic(path="/{cluster_id}/namespace/{name}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_k8s_namespace)
     def k8s_create_namespace(self, cluster_id: str, name: str, labels: dict, callback=None) -> OssCompliantResponse:
         return self.add_task(self.kubernetes_manager.create_k8s_namespace, cluster_id, name, labels, callback=callback)
 
@@ -547,41 +519,38 @@ class NFVCL:
     def k8s_delete_namespace(self, cluster_id: str, name: str, callback=None) -> OssCompliantResponse:
         return self.add_task(self.kubernetes_manager.delete_k8s_namespace, cluster_id, name, callback=callback)
 
+    @NFVCLPublic(path="/{cluster_id}/sa/{namespace}/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_service_account)
+    def k8s_create_service_account(self, cluster_id: str, namespace: str, user: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.create_service_account, cluster_id, namespace, user, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/sa/admin/{namespace}/{username}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_admin_sa_for_namespace)
+    def k8s_create_admin_sa_for_namespace(self, cluster_id: str, namespace: str, username: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.create_admin_sa_for_namespace, cluster_id, namespace, username, callback=callback)
+
     @NFVCLPublic(path="/{cluster_id}/sa", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_service_account)
     def k8s_get_service_account(self, cluster_id: str, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.get_k8s_service_account, cluster_id, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/roles", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_roles)
-    def k8s_get_roles(self, cluster_id: str, rolename: Optional[str] = None, namespace: Optional[str] = None, callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.get_k8s_roles, cluster_id, rolename, namespace, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/roles/admin/sa/{namespace}/{s_account}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_admin_rights_to_sa)
-    def k8s_give_admin_rights_to_sa(self, cluster_id: str, namespace: str, s_account: str, role_binding_name: Annotated[str, "text/plain"], callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.give_admin_rights_to_sa, cluster_id, namespace, s_account, role_binding_name, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/roles/admin/{namespace}/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_admin_rights_to_user_namespaced)
-    def k8s_give_admin_rights_to_user_namespaced(self, cluster_id: str, namespace: str, user: str, role_binding_name: Annotated[str, "text/plain"], callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.give_admin_rights_to_user_namespaced, cluster_id, namespace, user, role_binding_name, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/roles/cluster-admin/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_cluster_admin_rights)
-    def k8s_give_cluster_admin_rights(self, cluster_id: str, user: str, cluster_role_binding_name: Annotated[str, "text/plain"], callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.give_cluster_admin_rights, cluster_id, user, cluster_role_binding_name, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/sa/{namespace}/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=True, doc_by=KubernetesManager.create_service_account)
-    def k8s_create_service_account(self, cluster_id: str, namespace: str, user: str, callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.create_service_account, cluster_id, namespace, user, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/secret/{namespace}/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_secret_for_sa)
     def k8s_create_secret_for_sa(self, cluster_id: str, namespace: str, user: str, secret_name: Annotated[str, "text/plain"], callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.create_secret_for_sa, cluster_id, namespace, user, secret_name, callback=callback)
 
+    @NFVCLPublic(path="/{cluster_id}/roles", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_roles)
+    def k8s_get_roles(self, cluster_id: str, rolename: Optional[str] = None, namespace: Optional[str] = None, callback=None) -> dict:
+        role_list = self.add_task(self.kubernetes_manager.get_k8s_roles, cluster_id, rolename, namespace, callback=callback)
+        return role_list.to_dict()
+
+    @NFVCLPublic(path="/{cluster_id}/roles/admin/sa/{namespace}/{s_account}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_admin_rights_to_sa)
+    def k8s_give_admin_rights_to_sa(self, cluster_id: str, namespace: str, s_account: str, role_binding_name: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.give_admin_rights_to_sa, cluster_id, namespace, s_account, role_binding_name, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/roles/cluster-admin/{s_account}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_cluster_admin_rights)
+    def k8s_give_cluster_admin_rights(self, cluster_id: str, s_account: str, cluster_role_binding_name: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.give_cluster_admin_rights, cluster_id, s_account, cluster_role_binding_name, callback=callback)
+
     @NFVCLPublic(path="/{cluster_id}/secrets", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_secrets)
     def k8s_get_secrets(self, cluster_id: str, namespace: str = "", secret_name: str = "", owner: str = "", callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.get_secrets, cluster_id, namespace, secret_name, owner, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/sa/{namespace}/{username}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_admin_sa_for_namespace)
-    def k8s_create_admin_sa_for_namespace(self, cluster_id: str, namespace: str, username: str, callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.create_admin_sa_for_namespace, cluster_id, namespace, username, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/user/{username}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_k8s_kubectl_user, summary="Create (the user) and retrieve info for a new kubectl user")
     def k8s_create_kubectl_user(self, cluster_id: str, username: str, expire_seconds: int = 31536000, callback=None) -> dict:

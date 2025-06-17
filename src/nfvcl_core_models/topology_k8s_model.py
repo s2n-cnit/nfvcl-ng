@@ -140,3 +140,5 @@ class K8sQuota(NFVCLBaseModel):
     request_memory: str = Field(default="1Gi", alias="requests.memory")
     limit_cpu: str = Field(default="2", alias="limits.cpu")
     limit_memory: str = Field(default="2Gi", alias="limits.memory")
+    requests_storage: str = Field(default="20Gi", alias="requests.storage")
+    limit_ephimeral_storage: Optional[str] = Field(default=None, alias="limits.ephemeral-storage")

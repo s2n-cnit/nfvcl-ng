@@ -1,20 +1,22 @@
-from pathlib import Path
 from typing import List
 
-from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1ClusterRoleList, V1NamespaceList, V1RoleBinding, V1ClusterRoleBinding, V1ServiceAccount, V1Secret, V1SecretList, V1ResourceQuota, V1NodeList, V1Node, V1DeploymentList, V1Deployment
+from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1NamespaceList, \
+    V1RoleBinding, V1ClusterRoleBinding, V1ServiceAccount, V1Secret, V1SecretList, V1ResourceQuota, V1NodeList, V1Node, \
+    V1DeploymentList, V1Deployment, V1RoleList
 from kubernetes.utils import FailToCreateError
 
-from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
-from nfvcl_core_models.k8s_management_models import Labels
-from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall, K8sLoadBalancerPoolArea, K8sPluginAdditionalData, K8sPlugin
-from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota
-from nfvcl_core_models.custom_types import NFVCLCoreException
-from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
-from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.managers import TopologyManager, BlueprintManager, EventManager
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
 from nfvcl_core.utils.blue_utils import yaml
+from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
+from nfvcl_core_models.custom_types import NFVCLCoreException
+from nfvcl_core_models.k8s_management_models import Labels
+from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall, K8sLoadBalancerPoolArea, \
+    K8sPluginAdditionalData
+from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota
 
 
 class KubernetesManager(GenericManager):
@@ -41,7 +43,6 @@ class KubernetesManager(GenericManager):
             self._k8s_api_utils_cache[cluster_id] = KubeApiUtils(kube_client_config=k8s_config)
 
         return self._k8s_api_utils_cache[cluster_id]
-
 
     def get_k8s_installed_plugins(self, cluster_id: str) -> List[K8sPluginName]:
         """
@@ -247,7 +248,7 @@ class KubernetesManager(GenericManager):
 
         return user_accounts.to_dict()
 
-    def get_k8s_roles(self, cluster_id: str, rolename: str = "", namespace: str = "") -> dict:
+    def get_k8s_roles(self, cluster_id: str, rolename: str = "", namespace: str = "") -> V1RoleList:
         """
         Returns a list of roles
 
@@ -268,12 +269,14 @@ class KubernetesManager(GenericManager):
 
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)
-            role_list: V1ClusterRoleList = k8s_api.get_roles(rolename=rolename, namespace=namespace)
-        except ApiException | ValueError as val_err:
+            role_list: V1RoleList = k8s_api.get_roles(rolename=rolename, namespace=namespace)
+            if len(role_list.items) == 0:
+                raise NFVCLCoreException("No role found", http_equivalent_code=404)
+        except (ApiException, ValueError) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
-        return role_list.to_dict()
+        return role_list
 
     def get_k8s_namespace_list(self, cluster_id: str, namespace: str = "") -> dict:
         """
@@ -282,7 +285,7 @@ class KubernetesManager(GenericManager):
         Args:
             cluster_id: The cluster in which the function looks for namespaces
 
-            namespace: the name to use as filter
+            namespace: the name to use as a filter
 
         Returns:
             A namespace list (V1NamespaceList)
@@ -297,7 +300,6 @@ class KubernetesManager(GenericManager):
 
         return namespace_list.to_dict()
 
-
     def give_admin_rights_to_sa(self, cluster_id: str, namespace: str, s_account: str, role_binding_name: str):
         """
         Give admin rights to an EXISTING service account (SA) in a namespace.
@@ -305,7 +307,7 @@ class KubernetesManager(GenericManager):
         Args:
             cluster_id: The target k8s cluster id
 
-            namespace: The namespace on witch the admin rights are given to the target user.
+            namespace: The namespace on which the admin rights are given to the target user.
 
             s_account: The existing service account that will become administrator
 
@@ -316,66 +318,32 @@ class KubernetesManager(GenericManager):
         """
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)
-            role_bind_res: V1RoleBinding = k8s_api.admin_role_to_sa(namespace=namespace, username=s_account,
-                                                                    role_binding_name=role_binding_name)
+            role_bind_res: V1RoleBinding = k8s_api.admin_role_to_sa(namespace=namespace, username=s_account, role_binding_name=role_binding_name)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return role_bind_res.to_dict()
 
-
-    def give_admin_rights_to_user_namespaced(self, cluster_id: str, namespace: str, user: str, role_binding_name: str):
+    def give_cluster_admin_rights(self, cluster_id: str, s_account: str, cluster_role_binding_name: str):
         """
-        Give admin rights to a user (not necessarily existing) in a namespace. This call should be used, after a certificate
-        signing request (CSR) has been issued and approved, for a user, to make him administrator (Note that this
-        user won't exist in any namespace).
+        Give cluster admin rights to a service account.
 
         Args:
             cluster_id: The target k8s cluster id
 
-            namespace: The namespace on witch the admin rights are given to the target user.
-
-            user: The user that will become administrator for the target namespace
-
-            role_binding_name: The name that will be given to the RoleBinding
-
-        Returns:
-            The created role binding (V1RoleBinding)
-        """
-        try:
-            k8s_api = self.get_k8s_api_utils(cluster_id)
-            role_bind_res: V1RoleBinding = k8s_api.admin_role_over_namespace(namespace=namespace, username=user,
-                                                                            role_binding_name=role_binding_name)
-        except (ValueError, ApiException) as val_err:
-            self.logger.error(val_err)
-            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
-
-        return role_bind_res.to_dict()
-
-    def give_cluster_admin_rights(self, cluster_id: str, user: str, cluster_role_binding_name: str):
-        """
-        Give cluster admin rights to a user. This call should be used, after a certificate
-        signing request (CSR) has been issued and approved, for a user, to make him administrator of the cluster
-
-        Args:
-            cluster_id: The target k8s cluster id
-
-            user: The user that will become administrator for the cluster
+            s_account: The user that will become administrator for the cluster
 
             cluster_role_binding_name: The name that will be given to the ClusterRoleBinding
 
         Returns:
-            The created role binding (V1RoleBinding)
+            The created role binding (V1ClusterRoleBinding)
         """
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)
-            role_bind_res: V1ClusterRoleBinding = k8s_api.cluster_admin(username=user,
-                                                                       role_binding_name=cluster_role_binding_name)
-        except (ValueError, ApiException) as val_err:
-            self.logger.error(val_err)
-            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
-
+            role_bind_res: V1ClusterRoleBinding = k8s_api.cluster_admin(username=s_account, role_binding_name=cluster_role_binding_name)
+        except ApiException as error:
+            raise NFVCLCoreException(message=str(error), http_equivalent_code=error.status)
         return role_bind_res.to_dict()
 
     def create_service_account(self, cluster_id: str, namespace: str, user: str) -> dict:
@@ -394,13 +362,62 @@ class KubernetesManager(GenericManager):
         """
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)
-            user_creation_res: V1ServiceAccount = k8s_api.create_service_account(namespace=namespace,
-                                                                              username=user)
+            user_creation_res: V1ServiceAccount = k8s_api.create_service_account(namespace=namespace, username=user)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return user_creation_res.to_dict()
+
+    def create_admin_sa_for_namespace(self, cluster_id: str, namespace: str, username: str):
+        """
+        Create a Service Account with admin rights in the target namespace.
+
+        1 - Create the user
+
+        2 - Create the Admin Role for that namespace
+
+        3 - Role binds the admin role to the user on the target namespace
+
+        3 - Create a secret for the user
+
+        4 - Return created resources
+
+        Args:
+            cluster_id: The target k8s cluster.
+
+            namespace: The namespace in which the user is created
+
+            username: The name of the user
+
+        Returns:
+            a dictionary containing the created resources:
+            {"service_account": sa.to_dict(),
+            "secret": detailed_secret.to_dict()}
+
+        """
+        try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            # Creating SA
+            sa = k8s_api.create_service_account(namespace=namespace, username=username)
+            # Creating Role
+            admin_role = k8s_api.create_admin_role(namespace)
+            # Creating role binding to be admin
+            binding_name = "rolebinding_admin_" + username
+            role_binding = k8s_api.admin_role_to_sa(namespace=namespace, username=username, role_binding_name=binding_name)
+            # Create secret
+            secret_name = username + "-secret"
+            secret = k8s_api.create_secret_for_user(namespace=namespace, username=username, secret_name=secret_name)
+            # Returning secret WITH token included
+            detailed_secret = k8s_api.get_secrets(namespace=namespace, secret_name=secret.metadata.name)
+            result = {
+                "service_account": sa.to_dict(),
+                "secret": detailed_secret.to_dict()
+            }
+        except (ValueError, ApiException) as val_err:
+            self.logger.error(val_err)
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
+        return result
 
     def create_secret_for_sa(self, cluster_id: str, namespace: str, user: str, secret_name: str) -> dict:
         """
@@ -421,8 +438,8 @@ class KubernetesManager(GenericManager):
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)
             created_secret: V1Secret = k8s_api.create_secret_for_user(namespace=namespace,
-                                                                     username=user,
-                                                                     secret_name=secret_name)
+                                                                      username=user,
+                                                                      secret_name=secret_name)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
@@ -454,59 +471,6 @@ class KubernetesManager(GenericManager):
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         return auth_response.to_dict()
-
-    def create_admin_sa_for_namespace(self, cluster_id: str, namespace: str, username: str):
-        """
-        Create a Service Account in the target namespace, with admin rights.
-        1 - Create the user
-        2 - Role bind the admin role to the user on the target namespace
-        3 - Create a secret for the user
-        4 - Return created resources
-
-        Args:
-            cluster_id: The target k8s cluster.
-
-            namespace: The namespace in which the user is created
-
-            username: The name of the user
-
-        Returns:
-            a dictionary containing the created resources:
-            {"service_account": sa.to_dict(),
-            "binding_role": role.to_dict(),
-            "secret": detailed_secret.to_dict()}
-
-        """
-        try:
-            k8s_api = self.get_k8s_api_utils(cluster_id)
-
-            # Creating SA
-            sa = k8s_api.create_service_account(namespace=namespace, username=username)
-
-            # Creating role binding to be admin
-            binding_name = "rolebinding_admin_" + username
-            role = k8s_api.admin_role_to_sa(namespace=namespace, username=username,
-                                          role_binding_name=binding_name)
-
-            # Create secret
-            secret_name = username + "-secret"
-            secret = k8s_api.create_secret_for_user(namespace=namespace, username=username,
-                                                  secret_name=secret_name)
-
-            # Returning secret WITH token included
-            detailed_secret = k8s_api.get_secrets(namespace=namespace, secret_name=secret.metadata.name)
-
-            result = {
-                "service_account": sa.to_dict(),
-                "binding_role": role.to_dict(),
-                "secret": detailed_secret.to_dict()
-            }
-
-        except (ValueError, ApiException) as val_err:
-            self.logger.error(val_err)
-            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
-
-        return result
 
     def create_k8s_kubectl_user(self, cluster_id: str, username: str, expire_seconds: int = 31536000):
         """

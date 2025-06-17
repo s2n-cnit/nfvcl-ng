@@ -587,6 +587,14 @@ class NFVCL:
     def k8s_create_kubectl_user(self, cluster_id: str, username: str, expire_seconds: int = 31536000, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.create_k8s_kubectl_user, cluster_id, username, expire_seconds, callback=callback)
 
+    @NFVCLPublic(path="/{cluster_id}/admission-webhook/nfvcl", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=False, doc_by=KubernetesManager.install_nfvcl_admission_webhook, summary="Install NFVCL admission webhook")
+    def k8s_install_admission_webhook(self, cluster_id: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.install_nfvcl_admission_webhook, cluster_id, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/admission-webhook/nfvcl", section=K8S_SECTION, method=NFVCLPublicMethod.DELETE, sync=False, doc_by=KubernetesManager.uninstall_nfvcl_admission_webhook, summary="Uninstall NFVCL admission webhook")
+    def k8s_uninstall_admission_webhook(self, cluster_id: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.uninstall_nfvcl_admission_webhook, cluster_id, callback=callback)
+
     @NFVCLPublic(path="/{cluster_id}/quota/{namespace}/{quota_name}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.apply_resource_quota_namespace)
     def k8s_apply_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota, callback=None) -> OssCompliantResponse:
         return self.add_task(self.kubernetes_manager.apply_resource_quota_namespace, cluster_id, namespace, quota_name, quota, callback=callback)

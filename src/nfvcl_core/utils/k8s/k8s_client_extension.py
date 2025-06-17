@@ -9,7 +9,7 @@ from nfvcl_core.utils.log import create_logger
 
 logger: logging.Logger = create_logger("K8S CLIENT EXTENSION")
 
-handled_custom_api = ["metallb.io/v1beta1", "operator.tigera.io/v1"]
+handled_custom_api = ["metallb.io/v1beta1", "operator.tigera.io/v1", "cert-manager.io/v1"]
 
 """
 This extension to k8s is necessary when using Custom Resources Definitions (CRDs).

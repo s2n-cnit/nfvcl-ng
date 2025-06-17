@@ -19,6 +19,8 @@ class K8sPluginName(str, Enum):
     MULTUS = 'multus'
     ISTIO = 'istio'
     CADVISOR = 'cadvisor'
+    CERT_MANAGER = 'cert-manager'
+    NFVCL_WEBHOOK = 'nfvcl-webhook'
 
 
 class K8sPluginType(str, Enum):
@@ -83,7 +85,7 @@ class K8sPluginsToInstall(NFVCLBaseModel):
     Model used to represent a list of plugins to be installed with specific parameters needed by the plugins.
     """
     plugin_list: List[K8sPluginName] = Field(description="The list of plugins to be installed")
-    load_balancer_pool: Optional[K8sLoadBalancerPoolArea] = Field(description="The pool to be used by the Load Balancer to expose LB services.")
+    load_balancer_pool: Optional[K8sLoadBalancerPoolArea] = Field(default=None, description="The pool to be used by the Load Balancer to expose LB services.")
     skip_plug_checks: bool = Field(default=False, description="If True do not check for plugin compatibility")
 
 

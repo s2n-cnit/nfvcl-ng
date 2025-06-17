@@ -377,7 +377,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         plugin_data = K8sPluginAdditionalData(areas=self.state.load_balancer_pools, pod_network_cidr=pod_network_cidr, cadvisor_node_port=self.state.cadvisor_node_port) # TODO cadvisor is not anymore present
 
         helm_plugin_manager = HelmPluginManager(k8s_credential_file=self.state.master_credentials, context_name=self.id)
-        helm_plugin_manager.install_plugins([K8sPluginName.FLANNEL, K8sPluginName.METALLB, K8sPluginName.OPEN_EBS], plugin_data)
+        helm_plugin_manager.install_plugins(plug_list, plugin_data)
 
 
 

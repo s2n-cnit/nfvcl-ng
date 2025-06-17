@@ -142,6 +142,8 @@ class HelmPluginManager:
         for plugin_name in plugin_names_copy:
             if plugin_name == K8sPluginName.OPEN_EBS:
                 self._install_openebs()
+            elif plugin_name == K8sPluginName.MULTUS:
+                self._install_multus(plugin_data)
             elif plugin_name == K8sPluginName.METALLB:
                 self._install_metallb(plugin_data)
             elif plugin_name == K8sPluginName.CERT_MANAGER:
@@ -189,6 +191,16 @@ class HelmPluginManager:
             version="0.26.0",
             namespace="flannel",
             values=values
+        )
+
+    def _install_multus(self, plugin_data: K8sPluginAdditionalData):
+        multus_chart_path = PLUGIN_PATH / 'multus-cni-2.2.17.tgz'
+        self.install_plugin(
+            name=K8sPluginName.MULTUS,
+            chart_name=str(multus_chart_path),
+            version="2.2.17",
+            namespace="multus",
+            values={}
         )
 
     def _install_metallb(self, plugin_data: K8sPluginAdditionalData):
@@ -262,14 +274,15 @@ class HelmPluginManager:
         Args:
             plugin_data: K8sPluginAdditionalData instance containing additional data relevant to the plugin installation process.
         """
-        calico_chart_path = PLUGIN_PATH / 'tigera-operator-v3.29.0.tgz'
-        calico_values = yaml.safe_load(PLUGIN_VALUE_PATH / 'calico.yaml')
+        calico_chart_path = PLUGIN_PATH / 'tigera-operator-v3.30.1.tgz'
+        with open(PLUGIN_VALUE_PATH / 'calico.yaml', 'r') as calico_values_file:
+            calico_values = yaml.safe_load(calico_values_file)
         calico_values["installation"]["calicoNetwork"]["ipPools"][0]['cidr'] = plugin_data.pod_network_cidr if plugin_data.pod_network_cidr else "10.254.0.0/16"
         self.install_plugin(
             name=K8sPluginName.CALICO,
             chart_name=str(calico_chart_path),
-            version="3.29.0",
-            namespace="calico",
+            version="3.30.1",
+            namespace="tigera-operator",
             values=calico_values
         )
 
@@ -286,6 +299,8 @@ class HelmPluginManager:
 
         daemon_set: V1DaemonSet
         for daemon_set in daemon_sets.items:
+            if daemon_set.metadata.labels is None:
+                continue
             if 'app' in daemon_set.metadata.labels:
                 app = daemon_set.metadata.labels['app']
                 match app:

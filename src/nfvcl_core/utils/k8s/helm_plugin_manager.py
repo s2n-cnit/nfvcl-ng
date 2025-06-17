@@ -144,6 +144,10 @@ class HelmPluginManager:
                 self._install_openebs()
             elif plugin_name == K8sPluginName.METALLB:
                 self._install_metallb(plugin_data)
+            elif plugin_name == K8sPluginName.CERT_MANAGER:
+                self._install_cert_manager(plugin_data)
+            elif plugin_name == K8sPluginName.NFVCL_WEBHOOK:
+                self._install_nfvcl_webhook(plugin_data)
 
     def _install_openebs(self):
         """
@@ -203,6 +207,55 @@ class HelmPluginManager:
         template_file_metallb = Path('src/nfvcl/config_templates/k8s/metallb/metallb-config.j2')
         rendered_file = render_file_from_template_to_file(template_file_metallb, plugin_data.model_dump(), self.context_name, ".yaml")
         self.__apply_yaml_file_to_cluster(K8sPluginName.METALLB, rendered_file)
+
+    def _install_cert_manager(self, plugin_data: K8sPluginAdditionalData):
+        """
+        Args:
+            plugin_data: K8sPluginAdditionalData used to fill values inside helm charts (i.e. the cidr of pods in flannel and calico)
+        """
+        cert_manager_chart_path = PLUGIN_PATH / 'cert-manager-v1.18.0.tgz'
+        self.install_plugin(
+            name=K8sPluginName.CERT_MANAGER,
+            chart_name=str(cert_manager_chart_path),
+            version="v1.18.0",
+            namespace="cert-manager",
+            values={"crds": {"enabled": True}}
+        )
+
+    def _install_nfvcl_webhook(self, plugin_data: K8sPluginAdditionalData):
+        base_path = Path("src/nfvcl/config_templates/k8s/nfvcl_webhook")
+
+        template_file_certificates = Path(base_path, "certificate.yaml")
+        template_file_deployment = Path(base_path, "deployment.yaml")
+        template_file_webhook = Path(base_path, "mutatingwebhookconfiguration.yaml.j2")
+
+        rendered_file_certificates = render_file_from_template_to_file(template_file_certificates, plugin_data.model_dump(), self.context_name, ".yaml")
+        rendered_file_deployment = render_file_from_template_to_file(template_file_deployment, plugin_data.model_dump(), self.context_name, ".yaml")
+        self.__apply_yaml_file_to_cluster(K8sPluginName.NFVCL_WEBHOOK, rendered_file_certificates)
+        self.__apply_yaml_file_to_cluster(K8sPluginName.NFVCL_WEBHOOK, rendered_file_deployment)
+
+        # Poll until the secret is available
+        max_retries = 30
+        retry_interval = 1  # seconds
+        ca_b64 = None
+        for attempt in range(max_retries):
+            try:
+                secret = self.kube_utils.get_secrets("nfvcl-webhook", "webhook-tls")
+                if secret and secret.items and len(secret.items) > 0 and "ca.crt" in secret.items[0].data:
+                    ca_b64 = secret.items[0].data["ca.crt"]
+                    break
+                self.logger.debug(f"Secret not ready yet, waiting (attempt {attempt + 1}/{max_retries})...")
+            except Exception as e:
+                self.logger.debug(f"Error retrieving secret: {e}")
+
+            time.sleep(retry_interval)
+        else:
+            self.logger.error("Timed out waiting for webhook-tls secret")
+            raise TimeoutError("Timed out waiting for webhook-tls secret to become available")
+
+        if ca_b64:
+            rendered_file_webhook = render_file_from_template_to_file(template_file_webhook, {"cabundle": ca_b64}, self.context_name, ".yaml")
+            self.__apply_yaml_file_to_cluster(K8sPluginName.NFVCL_WEBHOOK, rendered_file_webhook)
 
     def _install_calico(self, plugin_data: K8sPluginAdditionalData):
         """

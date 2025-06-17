@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nfvcl-webhook
+  labels:
+    name: nfvcl-webhook
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: nfvcl-webhook-selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: webhook-cert
+  namespace: nfvcl-webhook
+spec:
+  secretName: webhook-tls
+  duration: 175200h
+  renewBefore: 360h
+  commonName: "nfvcl-webhook.nfvcl-webhook.svc"
+  dnsNames:
+    - "nfvcl-webhook.nfvcl-webhook.svc"
+  issuerRef:
+    name: nfvcl-webhook-selfsigned-issuer
+    kind: ClusterIssuer

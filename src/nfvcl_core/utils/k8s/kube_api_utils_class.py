@@ -44,6 +44,7 @@ class KubeApiUtils:
         self.rbac_auth_v1_api = kubernetes.client.RbacAuthorizationV1Api(self.api_client)
         self.certificates_v1_api = kubernetes.client.CertificatesV1Api(self.api_client)
         self.apiextensions_v1_api = kubernetes.client.ApiextensionsV1Api(self.api_client)
+        self.admission_registration_v1_api = kubernetes.client.AdmissionregistrationV1Api(self.api_client)
 
     def __del__(self):
         """
@@ -473,6 +474,24 @@ class KubeApiUtils:
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>delete_namespace: {error}", http_equivalent_code=error.status)
 
         return namespace
+
+    def delete_mutating_webhook_configuration(self, mutating_webook_configuration_name: str) -> V1Namespace:
+        """
+        Delete a MutatingWebhookConfiguration in a k8s cluster.
+
+        Args:
+            mutating_webook_configuration_name: The name of the MutatingWebhookConfiguration to be deleted
+
+        Returns:
+            The deleted namespace
+        """
+        try:
+            mwc = self.admission_registration_v1_api.delete_mutating_webhook_configuration(mutating_webook_configuration_name)
+        except ApiException as error:
+            self.logger.error(f"Exception when calling AdmissionregistrationV1Api>delete_mutating_webhook_configuration: {error}")
+            raise error
+
+        return mwc
 
     def add_quota_to_namespace(self, namespace_name: str, quota_name: str, quota: K8sQuota) -> V1ResourceQuota:
         """

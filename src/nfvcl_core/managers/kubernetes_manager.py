@@ -707,7 +707,33 @@ class KubernetesManager(GenericManager):
             self.logger.error(api_exp)
             raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
 
-        for sc in storage_classes.items:
-            if sc.metadata.annotations.get("storageclass.kubernetes.io/is-default-class") == "true":
-                return sc.metadata.name
-        return None
+    def install_nfvcl_admission_webhook(self, cluster_id: str):
+        k8s_api = self.get_k8s_api_utils(cluster_id)
+
+        if "certificates.cert-manager.io" not in k8s_api.get_custom_resource_definitions():
+            self.logger.info("Cert Manager is not installed. Installing it now...")
+
+            self.install_plugins(cluster_id, K8sPluginsToInstall(plugin_list=[
+                K8sPluginName.CERT_MANAGER
+            ]))
+        else:
+            self.logger.info("Cert Manager is already installed. Continuing with NFVCL Admission Webhook installation...")
+
+        self.logger.info("Installing NFVCL Admission Webhook...")
+        self.install_plugins(cluster_id, K8sPluginsToInstall(plugin_list=[
+            K8sPluginName.NFVCL_WEBHOOK
+        ]))
+        self.logger.info("NFVCL Admission Webhook installed successfully.")
+        return "NFVCL Admission Webhook installed successfully."
+
+    def uninstall_nfvcl_admission_webhook(self, cluster_id: str):
+        k8s_api = self.get_k8s_api_utils(cluster_id)
+        self.logger.info("Uninstalling NFVCL Admission Webhook...")
+        try:
+            k8s_api.delete_mutating_webhook_configuration("nfvcl-webhook")
+            k8s_api.delete_namespace("nfvcl-webhook")
+            self.logger.info("NFVCL Admission Webhook uninstalled successfully.")
+            return "NFVCL Admission Webhook uninstalled successfully."
+        except Exception as e:
+            self.logger.error(f"Error uninstalling NFVCL Admission Webhook: {e}")
+            raise NFVCLCoreException(message=str(e), http_equivalent_code=500)

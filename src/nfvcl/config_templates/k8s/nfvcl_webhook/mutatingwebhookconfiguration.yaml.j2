@@ -1,0 +1,25 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: nfvcl-webhook
+webhooks:
+  - name: inject.nfvcl.node.selector.k8s.io
+    clientConfig:
+      service:
+        name: nfvcl-webhook
+        namespace: nfvcl-webhook
+        path: /mutate
+        port: 443
+      caBundle: "{{ confvar.cabundle }}"
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5
+    failurePolicy: Ignore
+    namespaceSelector:
+      matchLabels:
+        nfvcl-webhook-enabled: "true"

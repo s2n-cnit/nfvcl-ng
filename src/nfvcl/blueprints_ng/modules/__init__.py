@@ -17,3 +17,4 @@ from .ubuntu import *
 from .ueransim import *
 from .vyos import *
 from .athonet import *
+from .monitoring import *

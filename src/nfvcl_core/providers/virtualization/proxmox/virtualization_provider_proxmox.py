@@ -429,7 +429,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def qemu_guest_agent_ready(self, vmid: int):
         self.logger.info("Waiting qemu guest agent")
         exit_status = 1
-        timeout = time.time() + DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
+        timeout = time.time() + (DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout)
         while exit_status != 0 and time.time() < timeout:
             try:
                 response = self.proxmox_vim_client.proxmoxer.nodes(self.data.proxmox_node_name).qemu(vmid).agent.ping.post()

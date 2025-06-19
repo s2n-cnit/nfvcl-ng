@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
 
@@ -102,6 +102,14 @@ class DhcpRangeItem(NFVCLBaseModel):
 
 
 class Vnet(NFVCLBaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
+        extra="allow",
+        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
+        validate_default=True,
+        validate_assignment=True
+    )
+
     alias: Optional[str] = Field(default=None)
     digest: Optional[str] = Field(default=None)
     isolate_ports: Optional[int] = Field(default=0, alias='isolate-ports')
@@ -113,6 +121,14 @@ class Vnet(NFVCLBaseModel):
 
 
 class Subnet(NFVCLBaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
+        extra="allow",
+        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
+        validate_default=True,
+        validate_assignment=True
+    )
+
     dhcp_range: Optional[List[DhcpRangeItem]] = Field(default_factory=list, alias='dhcp-range')
     vnet: Optional[str] = Field(default=None)
     subnet: Optional[str] = Field(default=None)

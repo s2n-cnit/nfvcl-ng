@@ -21,7 +21,7 @@ from nfvcl_core.providers.virtualization.virtualization_provider_interface impor
 from nfvcl_core.utils.blue_utils import rel_path
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
     VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource
-from nfvcl_core_models.vim.vim_models import VimModel
+from nfvcl_core_models.vim.vim_models import VimModel, ProxmoxPrivilegeEscalationTypeEnum
 
 cloud_init_packages = ['qemu-guest-agent']
 cloud_init_runcmd = ["systemctl enable qemu-guest-agent.service", "systemctl start qemu-guest-agent.service"]
@@ -309,13 +309,13 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__execute_ssh_command(f'mkdir -p /root/scripts')
 
     def __load_scripts(self) -> None:
-        ftp_client = self.proxmox_vim_client.ssh_client.open_sftp()
-        ftp_client.put(f"{rel_path('scripts/image_script.sh')}", "/root/scripts/image_script.sh")
+        with open(rel_path('scripts/image_script.sh'), 'r') as script_file:
+            script_content = script_file.read()
+            self.__execute_ssh_command(f"echo '{script_content}' > /root/scripts/image_script.sh")
         self.__execute_ssh_command("chmod +x /root/scripts/image_script.sh")
-        ftp_client.close()
 
     def __load_cloud_init(self, cloud_init: str, cloud_init_path: str) -> None:
-        self.__execute_ssh_command(f"echo -e '{cloud_init}' > {cloud_init_path}")
+        self.__execute_ssh_command(f"echo '{cloud_init}' > {cloud_init_path}")
 
     def __download_cloud_image(self, image_url, image_name):
         # TODO when supported
@@ -442,6 +442,10 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         raise VirtualizationProviderProxmoxException(f"Timeout waiting for qemu guest agent")
 
     def __execute_ssh_command(self, command: str):
+        if self.vim.proxmox_parameters().proxmox_privilege_escalation == ProxmoxPrivilegeEscalationTypeEnum.SUDO_WITHOUT_PASSWORD:
+            # Needed to escape single quote: https://stackoverflow.com/a/1250279
+            command = command.replace("'", """'"'"'""")
+            command = f"sudo sh -c '{command}'"
         stdin, stdout, stderr = self.proxmox_vim_client.ssh_client.exec_command(command)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status != 0:

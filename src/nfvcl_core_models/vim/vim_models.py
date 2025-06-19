@@ -13,6 +13,11 @@ class VimTypeEnum(str, Enum):
     OPENSTACK: str = 'openstack'
     PROXMOX: str = 'proxmox'
 
+class ProxmoxPrivilegeEscalationTypeEnum(str, Enum):
+    NONE = 'none'
+    SUDO_WITHOUT_PASSWORD = 'sudo_without_password'
+    #SUDO_WITH_PASSWORD = 'sudo_with_password' TODO not implemented yet
+
 class OpenstackParameters(NFVCLBaseModel):
     region_name: Optional[str] = Field(default="RegionOne")
     project_name: Optional[str] = Field(default="admin")
@@ -27,6 +32,7 @@ class ProxmoxParameters(NFVCLBaseModel):
     proxmox_token_name: Optional[str] = Field(default='')
     proxmox_token_value: Optional[str] = Field(default='')
     proxmox_otp_code: Optional[str] = Field(default='')
+    proxmox_privilege_escalation: Optional[ProxmoxPrivilegeEscalationTypeEnum] = Field(default=ProxmoxPrivilegeEscalationTypeEnum.NONE)
 
 
 class VimModel(NFVCLBaseModel):

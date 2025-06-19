@@ -5,19 +5,29 @@ from pydantic import Field, ConfigDict
 from nfvcl_core_models.base_model import NFVCLBaseModel
 
 
-class ProxmoxTicket(NFVCLBaseModel):
+class ProxmoxBaseModel(NFVCLBaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
+        extra="allow",  # Allow extra fields in the model to account for Proxmox API changes and fields not yet defined in the model
+        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
+        validate_default=True,
+        validate_assignment=True
+    )
+
+
+class ProxmoxTicket(ProxmoxBaseModel):
     ticket: Optional[str] = Field(default=None)
     csrfpreventiontoken: Optional[str] = Field(default=None)
 
 
-class ProxmoxMac(NFVCLBaseModel):
+class ProxmoxMac(ProxmoxBaseModel):
     mac: str = Field()
     net_name: str = Field()
     hw_interface_name: str = Field()
     interface_name: str = Field()
 
 
-class ProxmoxZone(NFVCLBaseModel):
+class ProxmoxZone(ProxmoxBaseModel):
     digest: str = Field()
     dhcp: Optional[str] = Field(default=None)
     dns: Optional[str] = Field(default=None)
@@ -32,16 +42,16 @@ class ProxmoxZone(NFVCLBaseModel):
     zone: str = Field()
 
 
-class ProxmoxZones(NFVCLBaseModel):
+class ProxmoxZones(ProxmoxBaseModel):
     data: List[ProxmoxZone] = Field(default_factory=list)
 
 
-class ProxmoxInterface(NFVCLBaseModel):
+class ProxmoxInterface(ProxmoxBaseModel):
     name: str = Field()
     mac_address: str = Field()
 
 
-class ProxmoxNode(NFVCLBaseModel):
+class ProxmoxNode(ProxmoxBaseModel):
     """
     {
     "status" : "online",
@@ -74,11 +84,11 @@ class ProxmoxNode(NFVCLBaseModel):
     maxmem: Optional[int] = Field(default=None)
 
 
-class ProxmoxNodes(NFVCLBaseModel):
+class ProxmoxNodes(ProxmoxBaseModel):
     data: List[ProxmoxNode] = Field(default_factory=list)
 
 
-class ProxmoxNetsDevice(NFVCLBaseModel):
+class ProxmoxNetsDevice(ProxmoxBaseModel):
     nets: Dict[str, List[str]] = Field(default_factory=dict)
 
     def add_net_device(self, vmid: str):
@@ -96,20 +106,12 @@ class ProxmoxNetsDevice(NFVCLBaseModel):
             return "net0"
 
 
-class DhcpRangeItem(NFVCLBaseModel):
+class DhcpRangeItem(ProxmoxBaseModel):
     end_address: str = Field(default=None, alias='end-address')
     start_address: str = Field(default=None, alias='start-address')
 
 
-class Vnet(NFVCLBaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        extra="allow",
-        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
-        validate_default=True,
-        validate_assignment=True
-    )
-
+class Vnet(ProxmoxBaseModel):
     alias: Optional[str] = Field(default=None)
     digest: Optional[str] = Field(default=None)
     isolate_ports: Optional[int] = Field(default=0, alias='isolate-ports')
@@ -119,16 +121,7 @@ class Vnet(NFVCLBaseModel):
     zone: Optional[str] = Field(default=None)
 
 
-
-class Subnet(NFVCLBaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,  # Allow creating model object using the field name instead of the alias
-        extra="allow",
-        use_enum_values=True,  # Needed to be able to save the state to the mongo DB
-        validate_default=True,
-        validate_assignment=True
-    )
-
+class Subnet(ProxmoxBaseModel):
     dhcp_range: Optional[List[DhcpRangeItem]] = Field(default_factory=list, alias='dhcp-range')
     vnet: Optional[str] = Field(default=None)
     subnet: Optional[str] = Field(default=None)
@@ -142,5 +135,5 @@ class Subnet(NFVCLBaseModel):
     digest: Optional[str] = Field(default=None)
 
 
-class Subnets(NFVCLBaseModel):
+class Subnets(ProxmoxBaseModel):
     data: List[Subnet] = Field(default_factory=list)

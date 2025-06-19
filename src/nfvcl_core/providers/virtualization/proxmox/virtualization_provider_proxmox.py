@@ -437,7 +437,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     exit_status = 0
                     return
             except Exception as e:
-                self.logger.debug("Waiting...")
+                self.logger.debug("Waiting qemu guest agent...")
                 sleep(3)
         raise VirtualizationProviderProxmoxException(f"Timeout waiting for qemu guest agent")
 

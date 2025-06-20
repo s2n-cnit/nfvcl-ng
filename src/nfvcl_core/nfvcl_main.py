@@ -386,16 +386,20 @@ class NFVCL:
         return self.add_task(self.topology_manager.get_prometheus, prometheus_id, callback=callback)
 
     @NFVCLPublic(path="/prometheus", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, summary=ADD_PROM_SRV_SUMMARY, description=ADD_PROM_SRV_DESCRIPTION, sync=True)
-    def create_prometheus(self, prometheus_model: PrometheusServerModel, callback=None):
+    def create_prometheus(self, prometheus_model: PrometheusServerModel, callback=None) -> PrometheusServerModel:
         return self.add_task(self.topology_manager.add_prometheus, prometheus_model, callback=callback)
 
-    @NFVCLPublic( path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_PROM_SRV_SUMMARY, description=UPD_PROM_SRV_DESCRIPTION, sync=True)
-    def update_prometheus(self, prometheus_model: PrometheusServerModel, callback=None):
+    @NFVCLPublic(path="/prometheus", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_PROM_SRV_SUMMARY, description=UPD_PROM_SRV_DESCRIPTION, sync=True)
+    def update_prometheus(self, prometheus_model: PrometheusServerModel, callback=None) -> PrometheusServerModel:
         return self.add_task(self.topology_manager.update_prometheus, prometheus_model, callback=callback)
 
     @NFVCLPublic( path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, summary=DEL_PROM_SRV_SUMMARY, description=DEL_PROM_SRV_DESCRIPTION, sync=True)
     def delete_prometheus(self, prometheus_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_prometheus, prometheus_id, callback=callback)
+
+    @NFVCLPublic( path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, summary="Refresh file on remote Prometheus", sync=True)
+    def trigger_file_upload(self, prometheus_id: str, callback=None) -> PrometheusServerModel:
+        return self.add_task(self.topology_manager.trigger_file_upload, prometheus_id, callback=callback)
 
     #####################
     # Blueprint Section #

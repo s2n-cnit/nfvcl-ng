@@ -269,7 +269,7 @@ class KubeApiUtils:
         try:
             metadata: V1ObjectMeta = V1ObjectMeta(name=role_binding_name)
 
-            subjects = [RbacV1Subject(kind='User', name=username)]
+            subjects = [RbacV1Subject(kind='ServiceAccount', name=username)]
             role_ref = V1RoleRef(kind='Role', name='admin', api_group='rbac.authorization.k8s.io')
 
             role_bind = V1RoleBinding(subjects=subjects, role_ref=role_ref, metadata=metadata)

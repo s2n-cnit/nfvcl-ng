@@ -407,7 +407,7 @@ class TopologyModel(NFVCLBaseModel):
             prom_svr_index = self.prometheus_srv.index(prom_svr_to_search)
         except ValueError:
             msg_err = "The prometheus server ->{}<- has not been found".format(prom_srv_id)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=404)
 
         return prom_svr_index
 

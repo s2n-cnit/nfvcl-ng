@@ -6,14 +6,16 @@ from pydantic import Field
 from starlette.responses import PlainTextResponse
 
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
+from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.k8s_management_models import Labels
+from nfvcl_core_models.prometheus.prometheus_model import PrometheusTargetModel, PrometheusServerModel
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day2_configurator import VmK8sDay2Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
-from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address, EndPointV4
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
     KarmadaInstallModel, K8sDelNodeModel
@@ -56,6 +58,7 @@ class K8sBlueprintNGState(BlueprintNGState):
     base_image_url: str = Field(default=BASE_IMAGE24_URL)
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Indicates if the blueprint will require port security disabled (on openstack)")
     topology_onboarded: bool = Field(default=False, description="If the blueprint cluster has to be added to the topology")
+    prometheus_server_reference: Optional[PrometheusServerModel]= Field(default=None, description="A copy of the prometheus server, containing only targets from this blueprint")
 
     master_area: Optional[K8sAreaDeployment] = Field(default=None, description="A copy of the master area")
     area_list: List[K8sAreaDeployment] = Field(default=[], description="The list of deployed areas")
@@ -471,6 +474,55 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         copy_kubeconfig = copy.deepcopy(self.state.master_credentials)
         return PlainTextResponse(copy_kubeconfig, media_type="text/plain")
 
+    @day2_function("/enable_prom", [HttpRequestType.PUT])
+    def enable_prom(self, prometheus_id: str) -> None:
+        """
+        Return the kubeconfig file for the root user.
+
+        Attributes:
+
+            prometheus_id: The ID of the prometheus server, in the topology, that will collect data from this blueprint.
+        """
+        self.logger.debug("Enabling prometheus on blueprint")
+        if self.state.prometheus_server_reference is not None:
+            raise NFVCLCoreException(f"Prometheus server {self.state.prometheus_server_reference.id} already configured for this blueprint. Cannot enable prometheus on this blueprint")
+
+        topology_manager = self.provider.topology_manager
+        prometheus_server = topology_manager.get_prometheus(prometheus_id)
+        # Creating a copy just for reference (Used in destroy())
+        self.state.prometheus_server_reference = copy.deepcopy(prometheus_server)
+        self.state.prometheus_server_reference.targets = []
+
+        targets: List[EndPointV4] = []
+        targets.append(EndPointV4(ip=self.state.vm_master.access_ip, port=9100))  # Node exporter on port 9100
+        for vm in self.state.vm_workers:
+            targets.append(EndPointV4(ip=vm.access_ip, port=9100)) # Node exporter on port 9100
+
+        prometheus_target = PrometheusTargetModel(endpoints=targets, labels={"k8s_cluster": self.id, "deployed_by": "nfvcl", "blueprint": self.id})
+        # Saving as a reference only the targets from this blueprint such that it is possible to remove them on destruction
+        self.state.prometheus_server_reference.targets = [prometheus_target]
+        self.to_db()
+        # Updating the TOPOLOGY server and refreshing the remote file
+        prometheus_server.add_target(prometheus_target)
+        prometheus_server.update_remote_sd_file()
+
+    @day2_function("/disable_prom", [HttpRequestType.PUT])
+    def disable_prom(self) -> None:
+        self.logger.debug("Disabling prometheus on blueprint")
+        # Removing from prometheus scraping using the reference.
+        if self.state.prometheus_server_reference is not None:
+            topology_manager = self.provider.topology_manager
+            prometheus_server = topology_manager.get_prometheus(self.state.prometheus_server_reference.id)
+            try:
+                self.logger.debug(f"Removing targets from prometheus server {prometheus_server.ip}")
+                prometheus_server.del_targets(self.state.prometheus_server_reference.targets)
+            except ValueError as e:
+                self.logger.error(f"Could not remove targets from prometheus server {prometheus_server.id}: {e}")
+            self.state.prometheus_server_reference = None
+            prometheus_server.update_remote_sd_file()
+            self.to_db()
+
+
     def destroy(self):
         """
         Destroy the blueprints. Calls super destroy that destroy VMs and configurators.
@@ -484,6 +536,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             except TopoK8SHasBlueprintException as e:
                 self.logger.error(f"Blueprint {self.id} will not be destroyed")
                 raise e
+        # Removing from prometheus scraping using the reference.
+        self.disable_prom()
         super().destroy()
 
     def to_dict(self, detailed: bool, include_childrens: bool = False) -> dict:

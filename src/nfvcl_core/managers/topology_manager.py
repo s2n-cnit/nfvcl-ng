@@ -369,17 +369,28 @@ class TopologyManager(GenericManager):
     def get_prometheus(self, prometheus_id: str) -> PrometheusServerModel:
         return self._topology.find_prom_srv(prometheus_id)
 
-    def add_prometheus(self, prometheus: PrometheusServerModel):
+    def add_prometheus(self, prometheus: PrometheusServerModel) -> PrometheusServerModel:
         self._topology.add_prometheus_srv(prometheus)
         self.save_to_db()
+        return prometheus
 
-    def update_prometheus(self, prometheus: PrometheusServerModel):
+    def update_prometheus(self, prometheus: PrometheusServerModel) -> PrometheusServerModel:
         self._topology.upd_prometheus_srv(prometheus)
         self.save_to_db()
+        return prometheus
 
     def delete_prometheus(self, prometheus_id: str):
         self._topology.del_prometheus_srv(prometheus_id, False)
         self.save_to_db()
+
+    def trigger_file_upload(self, prometheus_id: str) -> PrometheusServerModel:
+        prom_server = self._topology.find_prom_srv(prometheus_id)
+        prom_server.update_remote_sd_file()
+        return prom_server
+
+    ###############
+    #    PDUs     #
+    ###############
 
     def update_pdu(self, pdu: PduModel):
         """

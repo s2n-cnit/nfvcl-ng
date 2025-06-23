@@ -1,7 +1,5 @@
 from typing import List, Optional
 
-import ruamel.yaml
-from numpy.random.tests.test_generator_mt19937 import endpoint
 from pydantic import BaseModel, Field
 
 from nfvcl_core.utils.blue_utils import yaml

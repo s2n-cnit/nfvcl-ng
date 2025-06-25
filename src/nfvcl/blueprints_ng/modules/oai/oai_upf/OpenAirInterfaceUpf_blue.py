@@ -76,7 +76,7 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
         upf_vm = VmResource(
             area=self.state.current_config.area_id,
             name=f"{self.id}_OAI_UPF_{self.state.current_config.area_id}",
-            image=VmResourceImage(name="OpenAirInterfaceUPFv2.1.0", url="https://images.tnt-lab.unige.it/openairinterfaceupf/openairinterfaceupf-v2.1.0-ubuntu2204.qcow2"),
+            image=VmResourceImage(name="OpenAirInterfaceUPFv2.1.0-1", url="https://images.tnt-lab.unige.it/openairinterfaceupf/openairinterfaceupf-v2.1.0-1-ubuntu2204.qcow2"),
             flavor=VmResourceFlavor(),
             username="ubuntu",
             password="ubuntu",

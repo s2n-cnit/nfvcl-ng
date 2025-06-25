@@ -374,7 +374,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             configurator_instance.configure(gnb_configuration_request)
             if str(pdu.area) not in self.state.ran_areas:
                 self.state.ran_areas[str(pdu.area)] = RANAreaInfo(area=pdu.area)
-            self.state.ran_areas[str(pdu.area)].pdu_names.append(pdu.name)
+            if pdu.name not in self.state.ran_areas[str(pdu.area)].pdu_names:
+                self.state.ran_areas[str(pdu.area)].pdu_names.append(pdu.name)
 
         # Unlock PDUs for removed areas
         currently_existing_areas: Set[str] = set(map(lambda x: str(x.id), self.state.current_config.areas))

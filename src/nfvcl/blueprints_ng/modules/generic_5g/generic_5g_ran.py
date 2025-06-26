@@ -171,6 +171,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
         model.tac = self.state.current_config.tac
         model.area_id = self.state.current_config.area_id
         model.gnb_id = self.state.current_config.gnb_id
+        model.additional_routes = self.state.current_config.additional_routes
 
     @final
     def update(self, create_model: RANBlueCreateModel):
@@ -183,21 +184,25 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
                         self.update_common_values(self.state.cu_model)
                         self.state.cu_model.amf = self.state.current_config.amf_host
                         self.provider.call_blueprint_function(self.state.cu_blue_id, "update", self.state.cu_model)
+                        self.provider.call_blueprint_function(self.state.cu_blue_id, "restart_cu")
 
                     case _: #CUCP-CUUP
                         self.logger.info("Updating CUCP")
                         self.update_common_values(self.state.cucp_model)
                         self.state.cucp_model.amf = self.state.current_config.amf_host
                         self.provider.call_blueprint_function(self.state.cu_cp_blue_id, "update", self.state.cucp_model)
+                        self.provider.call_blueprint_function(self.state.cu_cp_blue_id, "restart_cucp")
 
                         self.logger.info("Updating CUUP")
                         self.update_common_values(self.state.cuup_model)
                         self.provider.call_blueprint_function(self.state.cu_up_blue_id, "update", self.state.cuup_model)
+                        self.provider.call_blueprint_function(self.state.cu_up_blue_id, "restart_cuup")
 
                 self.logger.info("Updating DU")
                 self.update_common_values(self.state.du_model)
                 self.state.du_model.usrp = self.state.current_config.usrp
                 self.provider.call_blueprint_function(self.state.du_blue_id, "update", self.state.du_model)
+                self.provider.call_blueprint_function(self.state.du_blue_id, "restart_du")
 
             case _: #GNB
                 self.logger.info("Updating GNB")
@@ -205,6 +210,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
                 self.state.gnb_model.usrp = self.state.current_config.usrp
                 self.state.gnb_model.amf = self.state.current_config.amf_host
                 self.provider.call_blueprint_function(self.state.gnb_blue_id, "update", self.state.gnb_model)
+                self.provider.call_blueprint_function(self.state.gnb_blue_id, "restart_gnb", self.state.gnb_model)
 
         self.update_ran()
 
@@ -219,6 +225,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
         self.state.current_config.snssai_list = model.nssai
         self.state.current_config.tac = model.tac
         self.state.current_config.gnb_id = model.gnb_id
+        self.state.current_config.additional_routes = model.additional_routes
 
         match self.state.current_config.split:
             case Split.CU_DU | Split.CP_UP_DU:
@@ -227,22 +234,27 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
                         self.update_common_values(self.state.cu_model)
                         self.state.cu_model.amf = model.amf_ip
                         self.provider.call_blueprint_function(self.state.cu_blue_id, "update", self.state.cu_model)
+                        self.provider.call_blueprint_function(self.state.cu_blue_id, "restart_cu")
 
                     case _: #CUCP-CUUP
                         self.update_common_values(self.state.cucp_model)
                         self.state.cucp_model.amf = model.amf_ip
                         self.provider.call_blueprint_function(self.state.cu_cp_blue_id, "update", self.state.cucp_model)
+                        self.provider.call_blueprint_function(self.state.cu_cp_blue_id, "restart_cucp")
 
                         self.update_common_values(self.state.cuup_model)
                         self.provider.call_blueprint_function(self.state.cu_up_blue_id, "update", self.state.cuup_model)
+                        self.provider.call_blueprint_function(self.state.cu_up_blue_id, "restart_cuup")
 
                 self.update_common_values(self.state.du_model)
                 self.provider.call_blueprint_function(self.state.du_blue_id, "update", self.state.du_model)
+                self.provider.call_blueprint_function(self.state.du_blue_id, "restart_du")
 
             case _: #GNB
                 self.update_common_values(self.state.gnb_model)
                 self.state.gnb_model.amf = model.amf_ip
                 self.provider.call_blueprint_function(self.state.gnb_blue_id, "update", self.state.gnb_model)
+                self.provider.call_blueprint_function(self.state.gnb_blue_id, "restart_gnb")
 
     def del_gnb_from_topology(self):
         try:

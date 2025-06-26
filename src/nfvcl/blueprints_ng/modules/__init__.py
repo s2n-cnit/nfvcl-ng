@@ -11,8 +11,10 @@ from .oai.oai_upf_k8s import *
 from .oai.oai_ran import *
 from .oai.oai_ue import *
 from .router_5g import *
+from .router5g_k8s import *
 from .sdcore import *
 from .sdcore_upf import *
+from .sdcore_upf_k8s import *
 from .ubuntu import *
 from .ueransim import *
 from .ueransim_k8s import *

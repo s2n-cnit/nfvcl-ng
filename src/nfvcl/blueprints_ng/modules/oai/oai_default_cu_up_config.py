@@ -54,6 +54,7 @@ default_cuup_config: CUUP = CUUP.model_validate({
         "f1IfName": "eth0",
         "e1IfName": "eth0",
         "f1cuPort": "2153",
-        "f1duPort": "2153"
+        "f1duPort": "2153",
+        "additional_routes": []
     }
 })

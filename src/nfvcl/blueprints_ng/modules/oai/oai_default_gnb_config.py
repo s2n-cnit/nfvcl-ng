@@ -61,6 +61,7 @@ default_gnb_config: GNB = GNB.model_validate({
         "n2IfName": "eth0",
         "n3IfName": "eth0",
         "amfIpAddress": "127.0.0.1",
-        "gnbId": "0xe00"
+        "gnbId": "0xe00",
+        "additional_routes": []
     }
 })

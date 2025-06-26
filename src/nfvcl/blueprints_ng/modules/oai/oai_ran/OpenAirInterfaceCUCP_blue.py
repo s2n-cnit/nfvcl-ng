@@ -85,3 +85,7 @@ class OpenAirInterfaceCucp(Generic5GCUCPK8sBlueprintNG[OAICucpBlueprintNGState, 
             self.state.cucp_helm_chart,
             self.state.oai_cucp_config_values.model_dump(exclude_none=True, by_alias=True)
         )
+
+    def restart_cucp(self):
+        self.logger.info("Restarting CUCP")
+        self.provider.restart_all_deployments(self.state.cucp_helm_chart, self.id)

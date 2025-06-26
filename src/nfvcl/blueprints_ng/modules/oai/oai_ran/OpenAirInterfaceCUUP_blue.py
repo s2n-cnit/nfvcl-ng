@@ -81,9 +81,20 @@ class OpenAirInterfaceCuup(Generic5GCUUPK8sBlueprintNG[OAICuupBlueprintNGState, 
         self.state.oai_cuup_config_values.config.cu_cp_host = self.state.current_config.cucp_host
         self.state.oai_cuup_config_values.config.gnb_id = f'0x{self.state.current_config.gnb_id:0>4x}'
 
+        routes_list = []
+        for route in self.state.current_config.additional_routes:
+            tmp = route.as_linux_replace_command()
+            if tmp not in routes_list:
+                routes_list.append(tmp)
+        self.state.oai_cuup_config_values.config.additional_routes = routes_list
+
     def update_cuup(self):
         self.update_cuup_values()
         self.provider.update_values_helm_chart(
             self.state.cuup_helm_chart,
             self.state.oai_cuup_config_values.model_dump(exclude_none=True, by_alias=True)
         )
+
+    def restart_cuup(self):
+        self.logger.info("Restarting CUUP")
+        self.provider.restart_all_deployments(self.state.cuup_helm_chart, self.id)

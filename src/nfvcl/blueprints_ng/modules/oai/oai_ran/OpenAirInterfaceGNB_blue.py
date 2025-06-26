@@ -88,9 +88,23 @@ class OpenAirInterfaceGnb(Generic5GGNBK8sBlueprintNG[OAIGnbBlueprintNGState, GNB
         else:
             self.state.oai_gnb_config_values.config.use_additional_options = additional_options
 
+        routes_list = []
+        for route in self.state.current_config.additional_routes:
+            tmp = route.as_linux_replace_command()
+            if tmp not in routes_list:
+                routes_list.append(tmp)
+        self.state.oai_gnb_config_values.config.additional_routes = routes_list
+
     def update_gnb(self):
         self.update_gnb_values()
         self.provider.update_values_helm_chart(
             self.state.gnb_helm_chart,
             self.state.oai_gnb_config_values.model_dump(exclude_none=True, by_alias=True)
         )
+        self.logger.info("Restarting GNB")
+        self.provider.restart_all_deployments(self.state.gnb_helm_chart, self.id)
+
+    def restart_gnb(self):
+        self.logger.info("Restarting GNB")
+        self.provider.restart_all_deployments(self.state.gnb_helm_chart, self.id)
+

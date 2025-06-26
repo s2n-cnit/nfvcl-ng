@@ -696,7 +696,7 @@ class Dns(NFVCLBaseModel):
 
 class DnnInfo(NFVCLBaseModel):
     dnn: str
-    dnaiList: List[str] = Field(default=["mec"], alias='dnaiList')
+    # dnaiList: List[str] = Field(default=["mec"], alias='dnaiList')
     dns: Dns
 
 

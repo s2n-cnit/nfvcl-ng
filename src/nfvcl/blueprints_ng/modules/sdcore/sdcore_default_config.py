@@ -26,6 +26,28 @@ default_config: SDCoreValuesModel = SDCoreValuesModel.model_validate({
         "resources": {
             "enabled": False
         },
+        "global": {
+          "n2network": {
+            "enabled": False,
+            "name": "n2network",
+            "type": "macvlan",
+            "masterIf": "ens4",
+            "subnetIP": "10.180.0.0",
+            "cidr": 16,
+            "gatewayIP": None,
+            "excludeIP": None
+          },
+          "n4network": {
+            "enabled": False,
+            "name": "n4network",
+            "type": "macvlan",
+            "masterIf": "ens4",
+            "subnetIP": "10.180.0.0",
+            "cidr": 16,
+            "gatewayIP": None,
+            "excludeIP": None
+          }
+        },
         "config": {
             "mongodb": {
                 "name": "free5gc",
@@ -48,6 +70,11 @@ default_config: SDCoreValuesModel = SDCoreValuesModel.model_validate({
                 "serviceType": "LoadBalancer"
             },
             "amf": {
+                "ngapp":{
+                    "enabled": True,
+                    "port": 38412,
+                    "n2if": "10.180.255.37"
+                },
                 "serviceType": "LoadBalancer",
                 "cfgFiles": {
                     "amfcfg.conf": {
@@ -58,11 +85,19 @@ default_config: SDCoreValuesModel = SDCoreValuesModel.model_validate({
                 }
             },
             "smf": {
+                "n4": {
+                   "isPfcpNeeded": True,
+                   "port": 8805,
+                   "n4if": "10.180.255.36"
+                },
                 "serviceType": "LoadBalancer",
                 "cfgFiles": {
                     "smfcfg.conf": {
                         "configuration": {
-                            "enableDBStore": False
+                            "enableDBStore": False,
+                            "pfcp": {
+                                "addr": "POD_IP"
+                            }
                         }
                     }
                 }

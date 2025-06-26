@@ -45,5 +45,9 @@ class Generic5GCUUPBlueprintNG(BlueprintNG[Generic5GCUUPBlueprintNGState, CUUPBl
         pass
 
     @abstractmethod
+    def restart_cuup(self):
+        pass
+
+    @abstractmethod
     def get_cuup_interfaces_ip(self):
         pass

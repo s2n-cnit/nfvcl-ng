@@ -45,5 +45,9 @@ class Generic5GDUBlueprintNG(BlueprintNG[Generic5GDUBlueprintNGState, DUBlueCrea
         pass
 
     @abstractmethod
+    def restart_du(self):
+        pass
+
+    @abstractmethod
     def get_du_interfaces_ip(self):
         pass

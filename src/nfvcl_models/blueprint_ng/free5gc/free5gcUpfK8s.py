@@ -98,6 +98,7 @@ class Upf(BaseUpf):
     n3if: Nif
     n4if: Nif
     n6if: Nif
+    gnb_cidr: str
 
 
 class UpfUlcl(BaseUpf):

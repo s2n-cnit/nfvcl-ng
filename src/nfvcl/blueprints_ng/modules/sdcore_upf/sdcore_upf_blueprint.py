@@ -176,26 +176,6 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             self.state.upf_list.remove(deployed_info)
             del self.state.currently_deployed_dnns[dnn]
 
-    def get_dnn_ip_pool(self, dnn: str) -> str:
-        found_ip_pool: Optional[str] = None
-        for slice in self.state.current_config.slices:
-            for dnnslice in slice.dnn_list:
-                if dnnslice.dnn == dnn:
-                    if found_ip_pool is None:
-                        found_ip_pool = dnnslice.cidr
-                    elif found_ip_pool != dnnslice.cidr:
-                        raise ValueError("The same dnn for different slices must have the same ip pool")
-        if found_ip_pool is None:
-            raise ValueError(f"Unable to find ip pool for dnn '{dnn}'")
-        return found_ip_pool
-
-    def get_slices_for_dnn(self, dnn: str) -> List[Slice5GWithDNNs]:
-        served_slices: List[Slice5GWithDNNs] = []
-        for slice in self.state.current_config.slices:
-            if dnn in list(map(lambda x: x.dnn, slice.dnn_list)):
-                served_slices.append(slice)
-        return served_slices
-
     def deploy_upf_vm(self, dnn: str) -> DeployedUPFInfo:
         upf_vm = VmResource(
             area=self.state.current_config.area_id,

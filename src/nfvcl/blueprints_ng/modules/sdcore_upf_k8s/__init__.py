@@ -1,0 +1,1 @@
+from .sdcore_upf_k8s_blueprint import SdCoreUPFK8SBlueprintNG as SdCoreUPFK8SBlueprintNG

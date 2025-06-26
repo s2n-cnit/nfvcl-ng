@@ -33,6 +33,10 @@ class Generic5GGNBK8sBlueprintNG(Generic5GGNBBlueprintNG[Generic5GGNBK8sBlueprin
         pass
 
     @abstractmethod
+    def restart_gnb(self):
+        pass
+
+    @abstractmethod
     def get_svc_name(self) -> str:
         pass
 

@@ -211,9 +211,9 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                                 "dnnInfos": [
                                     {
                                         "dnn": "internet",
-                                        "dnaiList": [
-                                            "mec"
-                                        ],
+                                        # "dnaiList": [
+                                        #     "mec"
+                                        # ],
                                         "dns": {
                                             "ipv4": "8.8.8.8"
                                         }

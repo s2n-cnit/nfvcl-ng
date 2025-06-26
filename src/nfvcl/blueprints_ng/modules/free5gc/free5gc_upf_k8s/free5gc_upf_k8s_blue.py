@@ -60,19 +60,23 @@ class Free5GCUpfK8s(Generic5GUPFK8SBlueprintNG[Free5gcUpfK8sBlueprintNGState, UP
             self.state.upf_values.global_.n4network.set_multus(True, self.state.multus_network_info.n4)
             self.state.upf_values.upf.n4if.ip_address = self.state.multus_network_info.n4.ip_address.exploded
         if self.state.multus_network_info.n3:
+            self.state.multus_network_info.n3.gateway_ip = self.state.router.network.n3_ip
             self.state.upf_values.global_.n3network.set_multus(True, self.state.multus_network_info.n3)
             self.state.upf_values.upf.n3if.ip_address = self.state.multus_network_info.n3.ip_address.exploded
         if self.state.multus_network_info.n6:
+            self.state.multus_network_info.n6.gateway_ip = self.state.router.network.n6_ip
             self.state.upf_values.global_.n6network.set_multus(True, self.state.multus_network_info.n6)
             self.state.upf_values.upf.n6if.ip_address = self.state.multus_network_info.n6.ip_address.exploded
-
+            self.state.upf_values.upf.gnb_cidr = self.state.router.network.gnb_cidr.exploded
         # Clearing previous config
         self.state.upf_values.upf.configuration.dnn_list.clear()
+        self.state.upf_values.global_.uesubnet.clear()
 
         for new_slice in self.state.current_config.slices:
             for dnn in new_slice.dnn_list:
                 self.state.upf_values.upf.configuration.dnn_list.append(dnn)
                 self.state.upf_values.global_.uesubnet.append(dnn.cidr)
+                self.add_route_to_router(dnn.cidr, self.state.multus_network_info.n6.ip_address.exploded)
 
         self.state.upf_values.upf.name = f"upf{self.state.current_config.area_id}"
 

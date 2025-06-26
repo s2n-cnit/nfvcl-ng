@@ -88,6 +88,15 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCo
         This will also set the UPFs IPs on the slices
         """
         self.config_ref.from_generic_5g_model(self.state.current_config)
+        if self.state.network_endpoints.n2:
+            self.state.sdcore_config_values.field_5g_control_plane.global_.n2network.set_multus(True, self.state.network_endpoints.n2.multus)
+            self.state.sdcore_config_values.field_5g_control_plane.config.amf.ngapp.enabled = False
+            self.state.sdcore_config_values.field_5g_control_plane.config.amf.ngapp.n2if = self.state.network_endpoints.n2.multus.ip_address.exploded
+        if self.state.network_endpoints.n4:
+            self.state.sdcore_config_values.field_5g_control_plane.global_.n4network.set_multus(True, self.state.network_endpoints.n4.multus)
+            self.state.sdcore_config_values.field_5g_control_plane.config.smf.n4.isPfcpNeeded = True
+            self.state.sdcore_config_values.field_5g_control_plane.config.smf.n4.n4if = self.state.network_endpoints.n4.multus.ip_address.exploded
+            self.state.sdcore_config_values.field_5g_control_plane.config.smf.cfg_files.smfcfg_conf.configuration.pfcp.addr = self.state.network_endpoints.n4.multus.ip_address.exploded
 
         # TODO fix this
         if self.state.current_config.config.persistence.enabled:

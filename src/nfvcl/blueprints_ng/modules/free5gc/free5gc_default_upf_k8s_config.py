@@ -57,6 +57,7 @@ default_upfk8s_config: Free5gcK8sUpfConfig = Free5gcK8sUpfConfig.model_validate(
         "n6if": {
             "ipAddress": "127.0.0.1"
         },
+        "gnb_cidr": "10.1.128.0/17",
         "configuration": {
             "dnnList": [
                 {

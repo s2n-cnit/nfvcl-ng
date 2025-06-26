@@ -100,8 +100,9 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
         for sim in self.sims:
             fixed_sim = sim.model_dump(exclude_none=True, by_alias=True)
             for session in fixed_sim["sessions"]:
-                session["apn"] = session["dnn"]
-                del session["dnn"]
+                if "dnn" in session:
+                    session["apn"] = session["dnn"]
+                    del session["dnn"]
 
             ue_sim_config_path = f"/opt/UERANSIM/ue-sim-{sim.imsi}.conf"
             ansible_builder.add_template_task(rel_path("config/ue_conf_file.jinja2"), ue_sim_config_path,
@@ -177,8 +178,8 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
                 flavor=self.ueransim_flavor,
                 username="ubuntu",
                 password="ubuntu",
-                management_network=self.create_config.config.network_endpoints.mgt,
-                additional_networks=[self.create_config.config.network_endpoints.n2, self.create_config.config.network_endpoints.n3, radio_network_name],
+                management_network=self.create_config.config.network_endpoints.mgt.net_name,
+                additional_networks=[self.create_config.config.network_endpoints.n2.net_name, self.create_config.config.network_endpoints.n3.net_name, radio_network_name],
                 require_port_security_disabled=True
             )
 
@@ -200,7 +201,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
                 flavor=self.ueransim_flavor,
                 username="ubuntu",
                 password="ubuntu",
-                management_network=self.create_config.config.network_endpoints.mgt,
+                management_network=self.create_config.config.network_endpoints.mgt.net_name,
                 additional_networks=[radio_network_name]
             )
             self.register_resource(vm_ue)
@@ -292,9 +293,9 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             vm_resource=area.vm_gnb,
             configuration=model,
             radio_addr=area.vm_gnb.network_interfaces[area.radio_net.name][0].fixed.ip,
-            ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2][0].fixed.ip,
-            gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.ip,
-            n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3][0].fixed.interface_name,
+            ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2.net_name][0].fixed.ip,
+            gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3.net_name][0].fixed.ip,
+            n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3.net_name][0].fixed.interface_name,
             additional_routes=model.additional_routes
         )
 

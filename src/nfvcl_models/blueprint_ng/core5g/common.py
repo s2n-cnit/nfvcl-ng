@@ -144,16 +144,16 @@ class SubSlices(NFVCLBaseModel):
 class SubAreaNetwork(NFVCLBaseModel):
     n3: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N3 interface")
     n6: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N6 interface")
-    gnb: Optional[NetworkEndPoint] = Field(default=None, description="Network endpoint for GNB network, only required if a router is needed for this UPF configuration")
+    gnb: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for GNB network, only required if a router is needed for this UPF configuration")
     external_router: Optional[Router5GNetworkInfo] = Field(default=None)
 
-    @field_validator("gnb", mode="before")
-    def str_to_network_endpoint(cls, v: object) -> object:
-        if isinstance(v, str):
-            return NetworkEndPoint(net_name=v)
-        return v
+    # @field_validator("gnb", mode="before")
+    # def str_to_network_endpoint(cls, v: object) -> object:
+    #     if isinstance(v, str):
+    #         return NetworkEndPoint(net_name=v)
+    #     return v
 
-    @field_validator("n3", "n6", mode="before")
+    @field_validator("n3", "n6", "gnb", mode="before")
     def str_to_network_endpoint_with_type(cls, v: object) -> object:
         if isinstance(v, str):
             return NetworkEndPointWithType(net_name=v)

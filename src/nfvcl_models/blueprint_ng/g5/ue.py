@@ -14,7 +14,7 @@ from nfvcl_core_models.custom_types import AreaIDType, IPHostType
 
 class UESession(NFVCLBaseModel):
     type: PDUSessionType
-    dnn: DNNType = Field(validation_alias=AliasChoices("dnn", "apn"))
+    dnn: DNNType = Field(validation_alias=AliasChoices("dnn", "apn"), alias="apn")
     slice: Slice5G
 
 class OpType(Enum):

@@ -220,3 +220,11 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     @register_performance()
     def restart_deployment(self, helm_chart_resource: HelmChartResource, deployment_name: str):
         return self.get_k8s_provider(helm_chart_resource.area).restart_deployment(helm_chart_resource, deployment_name)
+
+    @register_performance()
+    def restart_all_deployments(self, helm_chart_resource: HelmChartResource, namespace: str):
+        return self.get_k8s_provider(helm_chart_resource.area).restart_all_deployments(helm_chart_resource, namespace)
+
+    @register_performance()
+    def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name=None, container_name=None):
+        return self.get_k8s_provider(helm_chart_resource.area).exec_command_in_pod(helm_chart_resource, command, pod_name, container_name)

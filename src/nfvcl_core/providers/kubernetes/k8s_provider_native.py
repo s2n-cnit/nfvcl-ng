@@ -246,3 +246,22 @@ class K8SProviderNative(K8SProviderInterface):
         wait_res = self.kube_utils.wait_for_deployment_to_be_ready(updated_dep)
         self.logger.debug(f"Restarted deployment: {deployment_name} in namespace '{helm_chart_resource.namespace.lower()}', ready wait result: {wait_res}")
         return wait_res
+
+    def restart_all_deployments(self, helm_chart_resource: HelmChartResource, namespace: str):
+        self.logger.debug(f"Restarting all deployments in namespace '{namespace}'")
+        updated_deps = self.kube_utils.restart_all_deployments(namespace)
+        failed_deployments = []
+        for dep in updated_deps:
+            wait_res = self.kube_utils.wait_for_deployment_to_be_ready(dep)
+            if wait_res:
+                self.logger.debug(f"Restarted deployment: {dep.metadata.name} in namespace '{namespace}' successful")
+            else:
+                failed_deployments.append(dep)
+                self.logger.error(f"Restarted deployment: {dep.metadata.name} in namespace '{namespace}' failed")
+        if len(failed_deployments) == 0:
+            return True
+        return False, failed_deployments
+
+    def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name=None, container_name=None):
+        self.logger.debug(f"Executing command '{" ".join(command)}' in pod {pod_name} namespace '{helm_chart_resource.namespace.lower()}'")
+        return self.kube_utils.exec_command_in_pod(helm_chart_resource.namespace.lower(), command, pod_name, container_name)

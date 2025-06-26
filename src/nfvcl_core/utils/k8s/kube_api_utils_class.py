@@ -14,6 +14,7 @@ from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccou
     V1ResourceQuotaSpec, V1Deployment, V1DeploymentSpec, V1NodeList, V1Node, V1Container, V1DaemonSetList, \
     V1StorageClassList, V1PodList, V1ServiceList, V1DeploymentList, V1ConfigMap, VersionInfo, V1StorageClass, \
     V1CustomResourceDefinitionList, V1RoleList
+from kubernetes.stream import stream
 
 from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl_core.utils.log import create_logger
@@ -1087,3 +1088,61 @@ self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='
                 return name_list
         except ApiException as error:
             raise NFVCLCoreException(f"Exception when calling ApiextensionsV1Api>get_custom_resource_definitions: {error}", http_equivalent_code=error.status)
+
+    def restart_all_deployments(self, namespace: str) -> List[V1Deployment]:
+        """
+        Restart all deployments in a namespace.
+
+        Args:
+            namespace: The namespace in which the deployment resides.
+
+        Returns:
+            The updated deployments.
+        """
+        api_instance_app = kubernetes.client.AppsV1Api(self.api_client)
+        deployments: V1DeploymentList = api_instance_app.list_namespaced_deployment(namespace=namespace.lower())
+        updated_deployments: List[V1Deployment] = []
+
+        # Iterate over each deployment and trigger a rolling restart
+        for deployment in deployments.items:
+            deployment_name = deployment.metadata.name
+
+            if deployment.spec.template.metadata.annotations is None:
+                deployment.spec.template.metadata.annotations = {}
+            deployment.spec.template.metadata.annotations['nfvcl/restartedAt'] = datetime.now(timezone.utc).isoformat()
+
+            try:
+                updated_deployment = api_instance_app.patch_namespaced_deployment(name=deployment_name, namespace=namespace.lower(), body=deployment)
+                updated_deployments.append(updated_deployment)
+            except ApiException as error:
+                self.logger.error(f"Exception when calling AppsV1Api>patch_namespaced_deployment: {error}")
+                raise error
+
+        return updated_deployments
+
+    def exec_command_in_pod(self, namespace, command, pod_name=None, container_name=None) -> str:
+        """
+        Executes an arbitrary command in a specified container in a pod.
+
+        :param namespace: Namespace of the pod
+        :param pod_name: Name of the pod
+        :param container_name: Name of the container in the pod
+        :param command: List of strings representing the command and args (example ['ls', '-l'])
+        :return: The stdout and stderr output of the command
+        """
+
+        if pod_name is None:
+            pods = self.core_v1_api.list_namespaced_pod(namespace=namespace)
+            pod_name = [pod.metadata.name for pod in pods.items][0]
+
+        resp = stream(self.core_v1_api.connect_get_namespaced_pod_exec,
+                      name=pod_name,
+                      namespace=namespace,
+                      container=container_name,
+                      command=command,
+                      stderr=True,
+                      stdin=False,
+                      stdout=True,
+                      tty=False)
+
+        return resp

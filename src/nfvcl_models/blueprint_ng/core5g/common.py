@@ -75,7 +75,7 @@ class SubFlows(NFVCLBaseModel):
 class SubpduSessions(NFVCLBaseModel):
     pduSessionId: str = Field(description="ID of the PDU session")
     pduSessionAmbr: Optional[BitrateStringType] = Field(default=None, description="Aggregate Maximum Bit Rate for this PDU session, exp: 10 Mbps")
-    flows: List[SubFlows] = Field(default_factory=list, description="List of flows for this PDU session")
+    flows: Optional[List[SubFlows]] = Field(default_factory=list, description="List of flows for this PDU session")
 
 
 class SubProfileParams(NFVCLBaseModel):
@@ -83,7 +83,7 @@ class SubProfileParams(NFVCLBaseModel):
     sliceAmbr: Optional[BitrateStringType] = Field(default='1000 Mbps', description="Aggregate Maximum Bit Rate for this slice, exp: 1000 Mbps")
     ueAmbr: Optional[BitrateStringType] = Field(default='50 Mbps', description="Aggregate Maximum Bit Rate for each UE on this slice, exp: 50 Mbps")
     maximumNumberUE: Optional[int] = Field(default=None, description="Maximum number of UEs on this slice")
-    pduSessions: List[SubpduSessions] = Field(default_factory=list, description="List of PDU sessions for this slice")
+    pduSessions: Optional[List[SubpduSessions]] = Field(default_factory=list, description="List of PDU sessions for this slice")
 
 
 class SubLocationConstraints(NFVCLBaseModel):
@@ -109,7 +109,7 @@ class SubSliceProfiles(NFVCLBaseModel):
 class SubSnssai(NFVCLBaseModel):
     sliceId: SDType = Field(description="Slice ID (SD)")
     sliceType: SSTType = Field(description="Slice Type (SST)")
-    pduSessionIds: List[str] = Field(default_factory=list, description="List of PDU session IDs for this SNSSAI, need to be present in the pduSessions list of the corresponding slice profile")
+    pduSessionIds: Optional[List[str]] = Field(default_factory=list, description="List of PDU session IDs for this SNSSAI, need to be present in the pduSessions list of the corresponding slice profile")
     default_slice: Optional[bool] = Field(default=None, description="Set this slice as the default for the subscriber")
 
 

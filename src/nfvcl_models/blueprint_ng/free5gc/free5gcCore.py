@@ -1604,7 +1604,7 @@ class Free5gcSubScriber(NFVCLBaseModel):
 
                                         smsd.dnn_configurations.root[dnn.dnn] = DnnInfoRoot(
                                             field_5g_qos_profile=Field5gQosProfile(
-                                                field_5qi=int(snssai.profileParams.pduSessions[0].flows[0].qi)
+                                                field_5qi=9
                                             ),
                                             session_ambr=SessionAmbr(
                                                 uplink=snssai.profileParams.sliceAmbr,

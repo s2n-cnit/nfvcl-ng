@@ -9,6 +9,7 @@ from .blueprint_manager import BlueprintManager
 from .performance_manager import PerformanceManager
 from .pdu_manager import PDUManager as PDUManager
 from .vim_clients_manager import VimClientsManager
+from .kubernetes_manager import KubernetesManager
 from nfvcl_core.containers.nfvcl_container import NFVCLContainer
 
 
@@ -35,3 +36,7 @@ def get_persistence_manager(_persistence_manager: PersistenceManager = Provide[N
 @inject
 def get_vim_clients_manager(_vim_clients_manager: VimClientsManager = Provide[NFVCLContainer.vim_clients_manager]) -> VimClientsManager:
     return _vim_clients_manager
+
+@inject
+def get_kubernetes_manager(_kubernetes_manager: KubernetesManager = Provide[NFVCLContainer.kubernetes_manager]) -> KubernetesManager:
+    return _kubernetes_manager

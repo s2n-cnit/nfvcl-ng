@@ -163,6 +163,9 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 self.provider.destroy_vm(value.value)
             elif isinstance(value.value, HelmChartResource):
                 self.provider.uninstall_helm_chart(value.value)
+            # TODO this is not implemented, currently the NetResource are destroyed by the provider in the final_cleanup
+            # elif isinstance(value.value, NetResource):
+            #     self.provider.destroy_net(value.value)
         self.provider.final_cleanup()
 
     def __find_field_occurrences(self, obj, type_to_find, path=(), check_fun=lambda x: True):

@@ -486,7 +486,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         for zone in zones:
             if zone.zone.lower() == "nfvcl":
                 return zone
-        raise VirtualizationProviderProxmoxException("NFVCL sdn zone not found, you must create a zone called nfvcl (case sensitive)")
+        raise VirtualizationProviderProxmoxException("NFVCL sdn zone not found, you must create a zone called 'nfvcl' with DHCP enabled (case sensitive)")
 
     def __get_ips_for_subnets(self, cidr: str) -> (str, str, str):
         ips = ipaddress.ip_network(cidr)
@@ -550,6 +550,9 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __create_sdn_subnet(self, vnet: NetResource):
         self.logger.info(f"Creating Vnet Subnet {vnet.cidr}")
         gateway, start_dhcp, end_dhcp = self.__get_ips_for_subnets(vnet.cidr)
+        if vnet.allocation_pool:
+            start_dhcp = vnet.allocation_pool.start.exploded
+            end_dhcp = vnet.allocation_pool.end.exploded
         try:
             self.__execute_proxmox_request(
                 url=f"cluster/sdn/vnets/{self.data.proxmox_vnet[vnet.name]}/subnets",

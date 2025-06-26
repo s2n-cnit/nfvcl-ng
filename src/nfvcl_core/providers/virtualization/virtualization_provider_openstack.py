@@ -290,12 +290,17 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name, "project_id": self.os_client.project_id}):
             raise VirtualizationProviderOpenstackException(f"Subnet with cidr {net_resource.cidr} already exist")
 
+        allocation_pools = None
+        if net_resource.allocation_pool:
+            allocation_pools = [{"start": net_resource.allocation_pool.start.exploded, "end": net_resource.allocation_pool.end.exploded}]
+
         network: Network = self.conn.create_network(net_resource.name, port_security_enabled=False)
         subnet: Subnet = self.conn.create_subnet(
             network.id,
             cidr=net_resource.cidr,
             enable_dhcp=True,
             disable_gateway_ip=True,
+            allocation_pools=allocation_pools
         )
 
         self.data.subnets.append(subnet.id)

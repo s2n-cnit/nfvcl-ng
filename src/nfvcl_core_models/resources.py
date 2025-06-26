@@ -7,6 +7,7 @@ from pydantic import Field
 from typing_extensions import Literal
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType, K8sDeployment, K8sStatefulSet, K8sPod
 
 
@@ -101,9 +102,13 @@ class VmResourceNetworkInterface(NFVCLBaseModel):
     fixed: VmResourceNetworkInterfaceAddress = Field()
     floating: Optional[VmResourceNetworkInterfaceAddress] = Field(default=None)
 
+class NetResourcePool(NFVCLBaseModel):
+    start: SerializableIPv4Address = Field()
+    end: SerializableIPv4Address = Field()
 
 class NetResource(ResourceDeployable):
     cidr: str = Field()
+    allocation_pool: Optional[NetResourcePool] = Field(default=None, description="Allocation Pool for the network, used to allocate IPs from the network")
 
 
 class VmResource(ResourceDeployable):

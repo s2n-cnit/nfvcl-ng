@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, Tuple, Set
 
 from nfvcl_core.managers import TopologyManager
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGProviderModel
@@ -204,6 +204,9 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
 
     def get_pdu_configurator(self, pdu_model: PduModel) -> Any:
         return self.get_pdu_provider().get_pdu_configurator(pdu_model)
+
+    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+        return self.get_virt_provider(area).check_networks(area, networks_to_check)
 
     @register_performance(params_to_info=[(1, "blueprint_type")])
     def create_blueprint(self, path: str, msg: Any):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import List
+from typing import List, Tuple, Set
 
 from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, NetResource
@@ -31,6 +31,10 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
         if not vm_resource_configuration.vm_resource.created:
             raise VirtualizationProviderException("VM Resource not created")
         return {}
+
+    @abc.abstractmethod
+    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+        pass
 
     @abc.abstractmethod
     def attach_nets(self, vm_resource: VmResource, nets_name: List[str]) -> List[str]:

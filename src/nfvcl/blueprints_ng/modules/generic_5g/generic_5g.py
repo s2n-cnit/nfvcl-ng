@@ -123,13 +123,40 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         #         if net.gateway_ip is None:
         #             raise BlueprintNGException(f"To use multus on N6, you must provide a gateway ip for {net.name}")
 
+    def extract_unique_net_names(self, model: Create5gModel) -> {}:
+        core_net_names = set()
+
+        ne_core = model.config.network_endpoints
+        for endpoint in [ne_core.mgt, ne_core.n2, ne_core.n4]:
+            if endpoint:
+                core_net_names.add(endpoint.net_name)
+
+        ne_areas = {}
+        for area in model.areas:
+            area_net_names = set()
+            for net_cfg in [area.networks.n3, area.networks.n6, area.networks.gnb]:
+                area_net_names.add(net_cfg.net_name)
+            if area.core:
+                area_net_names = area_net_names.union(core_net_names)
+            ne_areas[str(area.id)] = area_net_names
+
+        return ne_areas
+
     def configuration_feasibility_check(self, config_model: Create5gModel):
         """
         Check if the config is feasible
         Args:
             config_model: Config model of which to check for feasibility
         """
-        # Check multiple slices with the same DNN
+
+        network_per_area = self.extract_unique_net_names(config_model)
+        error = ""
+        for area in network_per_area.keys():
+            ok, missing_net = self.provider.check_networks(int(area), network_per_area[area])
+            if not ok:
+                error += f"Missing nets {missing_net}, from area {area}\n"
+        if len(error) > 0:
+            raise Exception(error)
         ddns = []
         for slice in config_model.config.sliceProfiles:
             ddns.extend(slice.dnnList)

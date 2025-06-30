@@ -1,5 +1,5 @@
 import hashlib
-from typing import List, Dict
+from typing import List, Dict, Set, Tuple
 
 import requests
 from openstack.compute.v2.flavor import Flavor
@@ -25,7 +25,8 @@ from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResour
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
 from nfvcl_core_models.vim.vim_models import VimModel
 
-DEFAULT_OPENSTACK_TIMEOUT = 180 # See openstack/cloud/_compute.py
+DEFAULT_OPENSTACK_TIMEOUT = 180  # See openstack/cloud/_compute.py
+
 
 class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
     os_dict: Dict[str, str] = Field(default_factory=dict)
@@ -36,6 +37,7 @@ class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
 
 class VirtualizationProviderOpenstackException(VirtualizationProviderException):
     pass
+
 
 class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
     """
@@ -53,6 +55,7 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
         )
 
         return ansible_playbook_builder.build()
+
 
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     vim: VimModel
@@ -140,7 +143,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             if new_image_hash512 != os_remote_image_hash512:
                 # WE NEED TO CHANGE NAME SINCE WE CANNOT DELETE THE OLD ONE BECAUSE IT CAN BE USED BY OTHER INSTANCES
                 # We are using the HASH to compute the new name soo we can identify if it is already present
-                vm_image.name = vm_image.name+new_image_hash512[0:12]
+                vm_image.name = vm_image.name + new_image_hash512[0:12]
                 image = self.conn.get_image(vm_image.name)
                 if image is None:
                     self.logger.info(f"Updated image {vm_image.name} not found on VIM, downloading on VIM from {vm_image.url}")
@@ -448,3 +451,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             network_detail: Network = self.os_client.get_network(network_name)
             subnet_detail_list[network_name] = self.conn.get_subnet(network_detail.subnet_ids[0])
         return subnet_detail_list
+
+    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+        networks_tmp = self.os_client.get_available_networks()
+        networks = set(networks_tmp.keys())
+        return networks_to_check.issubset(networks), networks_to_check.difference(networks)

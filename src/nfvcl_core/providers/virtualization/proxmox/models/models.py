@@ -137,3 +137,22 @@ class Subnet(ProxmoxBaseModel):
 
 class Subnets(ProxmoxBaseModel):
     data: List[Subnet] = Field(default_factory=list)
+
+class Network(ProxmoxBaseModel):
+    active: Optional[int] = Field(default=1)
+    address: Optional[str] = Field(default=None)
+    autostart: Optional[int] = Field(default=1)
+    bridge_fd: Optional[str] = Field(default=None)
+    bridge_ports: Optional[str] = Field(default=None)
+    bridge_stp: Optional[str] = Field(default=None)
+    bridge_vids: Optional[str] = Field(default=None)
+    bridge_vlan_aware: Optional[int] = Field(default=1)
+    cidr: Optional[str] = Field(default=None)
+    families: Optional[List[str]] = Field(default_factory=list)
+    gateway: Optional[str] = Field(default=None)
+    iface: Optional[str] = Field(default=None)
+    method: Optional[str] = Field(default=None)
+    method6: Optional[str] = Field(default=None)
+    netmask: Optional[str] = Field(default=None)
+    priority: Optional[int] = Field(default=4)
+    type: Optional[str] = Field(default=None)

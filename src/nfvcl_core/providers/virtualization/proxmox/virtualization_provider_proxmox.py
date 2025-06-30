@@ -4,7 +4,7 @@ import re
 import time
 from enum import Enum
 from time import sleep
-from typing import Dict, List
+from typing import Dict, List, Tuple, Set
 
 from pydantic import Field, TypeAdapter
 
@@ -14,7 +14,7 @@ from nfvcl_core.providers.virtualization.common.models.netplan import VmAddNicNe
     NetplanInterface
 from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible
 from nfvcl_core.providers.virtualization.proxmox.models.models import ProxmoxZone, Subnet, \
-    ProxmoxNetsDevice, ProxmoxMac, ProxmoxTicket, ProxmoxNode, Vnet
+    ProxmoxNetsDevice, ProxmoxMac, ProxmoxTicket, ProxmoxNode, Vnet, Network
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
@@ -27,6 +27,7 @@ cloud_init_packages = ['qemu-guest-agent']
 cloud_init_runcmd = ["systemctl enable qemu-guest-agent.service", "systemctl start qemu-guest-agent.service"]
 
 DEFAULT_PROXMOX_TIMEOUT = 180
+
 
 class ApiRequestType(Enum):
     POST = "POST"
@@ -136,7 +137,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             "sockets": 1,
             "cpu": vm_resource.flavor.vcpu_type,
             "scsihw": "virtio-scsi-pci",
-            "tags": "nfvcl", # If you want add more tags, you have to separate them with ";"
+            "tags": "nfvcl",  # If you want add more tags, you have to separate them with ";"
             "agent": 1,
             "scsi0": f"file={vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters().proxmox_vm_volume}:0,import-from=local:0/{vm_resource.image.name}.qcow2,iothread=on",
             "ide2": f"{vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters().proxmox_vm_volume}:cloudinit",
@@ -583,3 +584,28 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         )
         self.__apply_sdn()
         self.logger.success(f"Subnet {subnet.id} deleted")
+
+    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+        networks = set()
+        network_tmp = self.__execute_proxmox_request(
+            url=f'nodes/{self.data.proxmox_node_name}/network',
+            r_type=ApiRequestType.GET,
+        )
+        ta = TypeAdapter(List[Network])
+        networks_tmp = ta.validate_python(network_tmp)
+        for net in networks_tmp:
+            if net.address:
+                networks.add(net.iface)
+
+        vnet_tmp = self.__execute_proxmox_request(
+            url=f'/cluster/sdn/vnets',
+            r_type=ApiRequestType.GET,
+        )
+        ta = TypeAdapter(List[Vnet])
+        vnets = ta.validate_python(vnet_tmp)
+
+        for vnet in vnets:
+            if vnet.zone == "nfvcl":
+                networks.add(vnet.vnet)
+
+        return networks_to_check.issubset(networks), networks_to_check.difference(networks)

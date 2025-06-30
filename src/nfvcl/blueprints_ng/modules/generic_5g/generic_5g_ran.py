@@ -1,6 +1,6 @@
 import copy
 from abc import abstractmethod
-from typing import Optional, TypeVar, Generic, final
+from typing import Optional, TypeVar, Generic, final, List
 
 from pydantic import Field
 
@@ -53,10 +53,31 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
     def state(self) -> StateTypeVar5GRAN:
         return super().state
 
+    def extract_unique_net_names(self, model: RANBlueCreateModel) -> set:
+        net_names = set()
+
+        for endpoint in [model.networks.n2, model.networks.n3, model.networks.f1, model.networks.e1, model.networks.ru1, model.networks.ru2]:
+            if endpoint:
+                net_names.add(endpoint.net_name)
+
+        return net_names
+
+    def configuration_feasibility_check(self, config_model: RANBlueCreateModel):
+        """
+        Check if the config is feasible
+        Args:
+            config_model: Config model of which to check for feasibility
+        """
+        networks = self.extract_unique_net_names(config_model)
+        ok, missing_nets = self.provider.check_networks(config_model.area_id, networks)
+        if not ok:
+            raise Exception(f"Missing nets {missing_nets}, from area {config_model.area_id}")
+
     @final
     def create(self, create_model: RANBlueCreateModel):
         super().create(create_model)
         self.state.current_config = copy.deepcopy(create_model)
+        self.configuration_feasibility_check(create_model)
         base = RANBlueCreateModelGeneric(
             mcc=self.state.current_config.mcc,
             mnc=self.state.current_config.mnc,

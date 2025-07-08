@@ -4,16 +4,18 @@ from typing import Optional, List, Dict, Literal
 
 from pydantic import Field
 
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUPFVMBlueprintNGState, Generic5GUPFVMBlueprintNG
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
-from nfvcl_core_models.http_models import HttpRequestType
-from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
-from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
 from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition, GrafanaDashboard
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address, EndPointV4
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
 
 SDCORE_UPF_BLUE_TYPE = "sdcore_upf"
 
@@ -239,6 +241,34 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         del self.state.vm_configurators[upf_info.vm_configurator_id]
 
         return upf_info
+
+    def blueprint_monitoring_definition(self) -> Optional[BlueprintMonitoringDefinition]:
+        targets = []
+        for dnn, deployed_upf_info in self.state.currently_deployed_dnns.items():
+            ip = self.state.vm_resources[deployed_upf_info.vm_resource_id].access_ip
+            targets.append(
+                PrometheusTargetModel(
+                    endpoints=[EndPointV4(ip=ip, port=8080)],
+                    labels={"dnn": dnn}
+                )
+            )
+            targets.append(
+                PrometheusTargetModel(
+                    endpoints=[EndPointV4(ip=ip, port=9100)],
+                    labels={"dnn": dnn}
+                )
+            )
+
+        dashboards = [
+            GrafanaDashboard(name="gtpu-path-monitoring", path=str(rel_path("dashboards/gtpu-path-monitoring.json"))),
+            GrafanaDashboard(name="upf-custom", path=str(rel_path("dashboards/upf-custom.json"))),
+            GrafanaDashboard(name="upf-session", path=str(rel_path("dashboards/upf-session.json"))),
+            GrafanaDashboard(name="upf-session-summary", path=str(rel_path("dashboards/upf-session-summary.json"))),
+            GrafanaDashboard(name="upf-session-summary-latency-heatmap", path=str(rel_path("dashboards/upf-session-summary-latency-heatmap.json"))),
+            GrafanaDashboard(name="node-exporter", path="monitoring/grafana/node_exporter.json"),
+        ]
+
+        return BlueprintMonitoringDefinition(prometheus_targets=targets, grafana_dashboards=dashboards)
 
     @day2_function("/green_queue_setup", [HttpRequestType.PUT])
     def green_queue_setup(self, model: SDCoreUPFGreenQueueConfiguration):

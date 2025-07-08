@@ -1,6 +1,7 @@
 from typing import Optional, List, Union, Callable
 
 from nfvcl_core_models.custom_types import NFVCLCoreException
+from nfvcl_core_models.monitoring.grafana_model import GrafanaServerModel, GrafanaDashboardModel, GrafanaFolderModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
 from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
@@ -11,7 +12,7 @@ from nfvcl_core.database.topology_repository import TopologyRepository
 from nfvcl_core.managers import GenericManager
 from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
 from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface
-from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel, PrometheusTargetModel
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.vim.vim_models import VimModel
 
@@ -379,14 +380,165 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return prometheus
 
-    def delete_prometheus(self, prometheus_id: str):
-        self._topology.del_prometheus_srv(prometheus_id, False)
+    def delete_prometheus(self, prometheus_id: str, force: Optional[bool] = False):
+        self._topology.del_prometheus_srv(prometheus_id, force)
         self.save_to_db()
 
-    def trigger_file_upload(self, prometheus_id: str) -> PrometheusServerModel:
+    def add_prometheus_target(self, prometheus_id: str, target: PrometheusTargetModel) -> PrometheusServerModel:
+        """
+        Add a new target to the specified Prometheus server.
+
+        Args:
+            prometheus_id: The ID of the Prometheus server.
+            target: The target to add.
+
+        Returns:
+            The updated PrometheusServerModel.
+        """
         prom_server = self._topology.find_prom_srv(prometheus_id)
-        prom_server.update_remote_sd_file()
+        prom_server.add_target(target)
+        self.save_to_db()
         return prom_server
+
+    def delete_prometheus_target(self, prometheus_id: str, target: PrometheusTargetModel) -> PrometheusServerModel:
+        """
+        Remove a target from the specified Prometheus server.
+
+        Args:
+            prometheus_id: The ID of the Prometheus server.
+            target: The target to remove.
+
+        Returns:
+            The updated PrometheusServerModel.
+        """
+        prom_server = self._topology.find_prom_srv(prometheus_id)
+        prom_server.del_targets([target])
+        self.save_to_db()
+        return prom_server
+
+    def delete_prometheus_targets(self, prometheus_id: str, targets: List[PrometheusTargetModel]) -> PrometheusServerModel:
+        """
+        Remove a list of targets from the specified Prometheus server.
+
+        Args:
+            prometheus_id: The ID of the Prometheus server.
+            targets: The list of targets to remove.
+
+        Returns:
+            The updated PrometheusServerModel.
+        """
+        prom_server = self._topology.find_prom_srv(prometheus_id)
+        prom_server.del_targets(targets)
+        self.save_to_db()
+        return prom_server
+
+    ############################ Grafana ########################################
+
+    def get_grafana_list(self) -> List[GrafanaServerModel]:
+        return self._topology.grafana_srv
+
+    def get_grafana(self, grafana_id: str) -> GrafanaServerModel:
+        return self._topology.find_grafana_srv(grafana_id)
+
+    def add_grafana(self, grafana: GrafanaServerModel) -> GrafanaServerModel:
+        self._topology.add_grafana_srv(grafana)
+        self.save_to_db()
+        return grafana
+
+    def update_grafana(self, grafana: GrafanaServerModel) -> GrafanaServerModel:
+        self._topology.upd_grafana_srv(grafana)
+        self.save_to_db()
+        return grafana
+
+    def delete_grafana(self, grafana_id: str):
+        self._topology.del_grafana_srv(grafana_id, False)
+        self.save_to_db()
+
+    def add_grafana_folder(self, grafana_id: str, folder: GrafanaFolderModel, parent_folder_uid: Optional[str] = None, parent_by_blue_id: Optional[str] = None) -> GrafanaServerModel:
+        """
+        Add a new folder to the specified Grafana server.
+
+        Args:
+            grafana_id: The ID of the Grafana server.
+            folder: The folder to add.
+
+        Returns:
+            The updated GrafanaServerModel.
+        """
+        grafana_server = self._topology.find_grafana_srv(grafana_id)
+        if parent_by_blue_id:
+            parent_folder = grafana_server.root_folder.find_folder_by_blueprint_id(parent_by_blue_id)
+            parent_folder.add_folder(folder)
+        else:
+            grafana_server.add_folder(folder, parent_folder_uid)
+        self.save_to_db()
+        return grafana_server
+
+    def delete_grafana_folder(self, grafana_id: str, folder_uid: str) -> GrafanaServerModel:
+        """
+        Remove a folder from the specified Grafana server.
+
+        Args:
+            grafana_id: The ID of the Grafana server.
+            folder_uid: The UID of the folder to remove.
+
+        Returns:
+            The updated GrafanaServerModel.
+        """
+        grafana_server = self._topology.find_grafana_srv(grafana_id)
+        grafana_server.remove_folder(folder_uid)
+        self.save_to_db()
+        return grafana_server
+
+    def add_grafana_dashboard(self, grafana_id: str, dashboard: GrafanaDashboardModel, parent_folder_uid: Optional[str] = None) -> GrafanaServerModel:
+        """
+        Add a new dashboard to the specified Grafana server.
+
+        Args:
+            grafana_id: The ID of the Grafana server.
+            dashboard: The dashboard to add.
+
+        Returns:
+            The updated GrafanaServerModel.
+        """
+        grafana_server = self._topology.find_grafana_srv(grafana_id)
+        grafana_server.add_dashboard(dashboard, parent_folder_uid)
+        self.save_to_db()
+        return grafana_server
+
+    def delete_grafana_dashboard(self, grafana_id: str, dashboard: GrafanaDashboardModel) -> GrafanaServerModel:
+        """
+        Remove a dashboard from the specified Grafana server.
+
+        Args:
+            grafana_id: The ID of the Grafana server.
+            dashboard: The dashboard to remove.
+
+        Returns:
+            The updated GrafanaServerModel.
+        """
+        grafana_server = self._topology.find_grafana_srv(grafana_id)
+        grafana_server.remove_dashboard(dashboard.uid)
+        self.save_to_db()
+        return grafana_server
+
+    def delete_grafana_dashboards(self, grafana_id: str, dashboards: List[GrafanaDashboardModel]) -> GrafanaServerModel:
+        """
+        Remove a list of dashboards from the specified Grafana server.
+
+        Args:
+            grafana_id: The ID of the Grafana server.
+            dashboards: The list of dashboards to remove.
+
+        Returns:
+            The updated GrafanaServerModel.
+        """
+        grafana_server = self._topology.find_grafana_srv(grafana_id)
+        for dashboard in dashboards:
+            grafana_server.remove_dashboard(dashboard.uid)
+        self.save_to_db()
+        return grafana_server
+
 
     ###############
     #    PDUs     #

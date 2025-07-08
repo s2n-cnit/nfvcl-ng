@@ -1,20 +1,26 @@
 from __future__ import annotations
+
 import copy
+import json
 import threading
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Optional
 
 from pydantic import ValidationError
 
-from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource
-from nfvcl_core_models.http_models import BlueprintNotFoundException
-from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, \
-    HelmChartResource
+from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_core.providers.aggregator import ProvidersAggregator
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_core.utils.log import create_logger
+from nfvcl_core.utils.metrics.grafana_utils import replace_all_datasources, update_queries_in_panels
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest
+from nfvcl_core_models.http_models import BlueprintNotFoundException, HttpRequestType
+from nfvcl_core_models.monitoring.grafana_model import GrafanaFolderModel
+from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition
+from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, \
+    HelmChartResource
 
 StateTypeVar = TypeVar("StateTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
@@ -22,6 +28,7 @@ CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
 
 class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
     provider: ProvidersAggregator
+    blueprint_type: str
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = None):
         """
@@ -142,6 +149,9 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         self.base_model.create_config_type = get_class_path_str_from_obj(model)
 
     def destroy(self):
+        if self.base_model.monitoring_state:
+            self.disable_monitoring(DisableMonitoringRequest(recursive=False))
+
         for children_id in self.base_model.children_blue_ids.copy():
             try:
                 self.provider.delete_blueprint(children_id)
@@ -356,7 +366,14 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         if detailed:
             return self.serialize_base_model()
         else:
-            dict_to_ret = {"id": self.base_model.id, "type": self.base_model.type, "status": self.base_model.status, "created": self.base_model.created, "protected": self.base_model.protected}
+            dict_to_ret = {
+                "id": self.base_model.id,
+                "type": self.base_model.type,
+                "status": self.base_model.status,
+                "created": self.base_model.created,
+                "protected": self.base_model.protected,
+                "monitoring_enabled": self.base_model.monitoring_state is not None,
+            }
             if include_childrens:
                 dict_to_ret["childrens"] = []
                 for children_id in self.base_model.children_blue_ids:
@@ -369,3 +386,109 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 dict_to_ret["corrupted"] = True
             return dict_to_ret
 
+    def blueprint_monitoring_definition(self) -> Optional[BlueprintMonitoringDefinition]:
+        """
+        Return the monitoring definition for this blueprint, if any.
+        """
+        return None
+
+    @day2_function("/enable_monitoring", [HttpRequestType.PUT])
+    def enable_monitoring(self, request: EnableMonitoringRequest) -> None:
+        self.logger.info("Enabling monitoring on blueprint")
+
+        prometheus_id = request.prometheus_id
+        grafana_id = request.grafana_id
+
+        if self.base_model.monitoring_state is not None:
+            raise BlueprintNGException(f"Monitoring is already enabled for this blueprint on prometheus server: {self.base_model.monitoring_state.prometheus_server_id}")
+
+        monitoring_definition = self.blueprint_monitoring_definition()
+        if monitoring_definition is None:
+            raise BlueprintNGException("No monitoring definition found for this blueprint, cannot enable monitoring")
+
+        self.base_model.monitoring_state = MonitoringState(
+            prometheus_server_id=prometheus_id,
+            grafana_server_id=grafana_id
+        )
+
+        for prometheus_target in monitoring_definition.prometheus_targets:
+            prometheus_target.labels["deployed_by"] = "nfvcl"
+            prometheus_target.labels["blueprint"] = self.id
+            prometheus_target.labels["blueprint_type"] = self.blueprint_type
+
+            self.base_model.monitoring_state.prometheus_targets.append(prometheus_target)
+
+            # Save del target in the blueprint state
+            self.provider.topology_manager.add_prometheus_target(prometheus_id, prometheus_target)
+
+        grafana_server = self.provider.topology_manager.get_grafana(grafana_id)
+
+        if grafana_id:
+            self.provider.topology_manager.add_grafana_folder(grafana_id, GrafanaFolderModel(name=f"{self.id} - {self.blueprint_type}", blueprint_id=self.id), parent_by_blue_id=self.base_model.parent_blue_id)
+
+        # TODO maybe we should move this in the provider?
+        from nfvcl_core.managers import get_monitoring_manager
+        get_monitoring_manager().sync_prometheus_targets_to_server(prometheus_id)
+        get_monitoring_manager().sync_grafana_folders_to_server(grafana_server.id)
+
+        self.base_model.monitoring_state.grafana_folder_id = grafana_server.root_folder.find_folder_by_blueprint_id(self.id).uid
+
+        if grafana_id:
+            for grafana_dashboard in monitoring_definition.grafana_dashboards:
+                with open(grafana_dashboard.path, 'r', encoding='utf-8') as f:
+                    try:
+                        dashboard = json.load(f)
+                        if "id" in dashboard:
+                            dashboard["id"] = None
+                        if "uid" in dashboard:
+                            dashboard["uid"] = None
+                        replace_all_datasources(dashboard, get_monitoring_manager().get_grafana_datasource_uid(grafana_id, prometheus_id))
+                        update_queries_in_panels(dashboard.get("panels", []), f'"blueprint" = "{self.id}"')
+                        get_monitoring_manager().add_grafana_dashboard(grafana_id, dashboard, grafana_server.root_folder.find_folder_by_blueprint_id(self.id).uid)
+                    except json.JSONDecodeError as e:
+                        print(f"Error decoding {grafana_dashboard.path}: {e}")
+
+        self.to_db()
+
+        if request.recursive:
+            # If recursive is set, enable monitoring on all children blueprints
+            for children_id in self.base_model.children_blue_ids:
+                try:
+                    self.provider.call_blueprint_function(children_id, "enable_monitoring", request)
+                except BlueprintNGException:
+                    self.logger.warning(f"Could not enable monitoring on children blueprint {children_id}, skipping...")
+
+        self.logger.info("Enabled monitoring on blueprint")
+
+    @day2_function("/disable_monitoring", [HttpRequestType.PUT])
+    def disable_monitoring(self, request: DisableMonitoringRequest) -> None:
+        self.logger.info("Disabling monitoring on blueprint")
+        # Removing from prometheus scraping using the reference.
+        if self.base_model.monitoring_state is not None:
+            prometheus_server = self.provider.topology_manager.get_prometheus(self.base_model.monitoring_state.prometheus_server_id)
+            try:
+                self.logger.debug(f"Removing targets from prometheus server {prometheus_server.ip}")
+                self.provider.topology_manager.delete_prometheus_targets(prometheus_server.id, self.base_model.monitoring_state.prometheus_targets)
+            except ValueError as e:
+                self.logger.error(f"Could not remove targets from prometheus server {prometheus_server.id}: {e}")
+            from nfvcl_core.managers import get_monitoring_manager
+            get_monitoring_manager().sync_prometheus_targets_to_server(prometheus_server.id)
+
+            if self.base_model.monitoring_state.grafana_server_id and self.base_model.parent_blue_id is None:
+                grafana_server = self.provider.topology_manager.delete_grafana_folder(self.base_model.monitoring_state.grafana_server_id, self.base_model.monitoring_state.grafana_folder_id)
+                get_monitoring_manager().sync_grafana_folders_to_server(grafana_server.id)
+
+            self.base_model.monitoring_state = None
+            self.to_db()
+        else:
+            self.logger.warning("Monitoring is not enabled for this blueprint, nothing to disable, disabling for children...")
+
+        if request.recursive:
+            # If recursive is set, disable monitoring on all children blueprints
+            for children_id in self.base_model.children_blue_ids:
+                try:
+                    self.provider.call_blueprint_function(children_id, "disable_monitoring", request)
+                except BlueprintNGException:
+                    self.logger.warning(f"Could not disable monitoring on children blueprint {children_id}, skipping...")
+
+        self.logger.info("Disabled monitoring on blueprint")

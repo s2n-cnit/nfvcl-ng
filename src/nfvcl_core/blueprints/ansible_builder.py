@@ -57,6 +57,12 @@ class AnsibleCopyTask(AnsibleTask):
     backup: str = Field(default="yes")
     remote_src: bool = Field(default=False)
 
+class AnsibleCopyContentTask(AnsibleTask):
+    content: str = Field()
+    dest: str = Field()
+    mode: int = Field(default=0o777)
+    force: str = Field(default="yes")
+    backup: str = Field(default="yes")
 
 class AnsibleReplaceTask(AnsibleTask):
     """
@@ -95,6 +101,14 @@ class AnsibleServiceTask(AnsibleTask):
     state: str
     enabled: str = Field(default='true')
 
+class AnsibleBlockInFileTask(AnsibleTask):
+    """
+    https://docs.ansible.com/ansible/latest/collections/ansible/builtin/blockinfile_module.html
+    """
+    path: str = Field()
+    insertafter: Optional[str] = Field(default=None)
+    insertbefore: Optional[str] = Field(default=None)
+    block: str = Field()
 
 class AnsiblePlaybookBuilder:
     def __init__(self, name, become=True, gather_facts=False, connection=None):
@@ -375,6 +389,39 @@ class AnsiblePlaybookBuilder:
             f"Pause Task for '{seconds}' sec",
             "ansible.builtin.pause",
             AnsiblePauseTask(seconds=seconds)
+        )
+
+    def add_copy_content_task(self, content: str, dest: str, mode: int = 0o777):
+        """
+        Add a task of the 'ansible.builtin.copy' type, this will copy the content string in the dest file on the remote machine
+        Args:
+            content: Content to write in the file
+            dest: Remote destination
+            mode: The file permission (default = 0o777)
+        """
+        self.add_task(
+            f"Copy content task for {dest}",
+            "ansible.builtin.copy",
+            AnsibleCopyContentTask(
+                content=LS(content),
+                dest=dest,
+                mode=mode
+            )
+        )
+
+    def add_blockinfile_task(self, path: str, block: str, insertafter: Optional[str] = None, insertbefore: Optional[str] = None):
+        """
+        Add a blockinfile task to add a block of text to a file
+        Args:
+            path: Path of the file
+            block: The block of text to insert in the file
+            insertafter: If set, the block will be inserted after the line matching this regexp
+            insertbefore: If set, the block will be inserted before the line matching this regexp
+        """
+        self.add_task(
+            f"Insert block in file '{path}'",
+            "ansible.builtin.blockinfile",
+            AnsibleBlockInFileTask(path=path, insertafter=insertafter, insertbefore=insertbefore, block=LS(block))
         )
 
     def add_set_fact(self, fact_name: str, value: str):

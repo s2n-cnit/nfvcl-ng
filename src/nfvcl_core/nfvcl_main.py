@@ -12,7 +12,7 @@ from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_i
 from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
 from nfvcl_core.containers.nfvcl_container import NFVCLContainer
-from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
+from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager, MonitoringManager
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
@@ -29,7 +29,8 @@ from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.network.network_models import PduModel, NetworkModel, RouterModel, IPv4Pool, IPv4ReservedRange
 from nfvcl_core_models.performance import BlueprintPerformance
 from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall
-from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel
+from nfvcl_core_models.resources import HelmChartResource, VmResource
 from nfvcl_core_models.response_model import OssCompliantResponse
 from nfvcl_core_models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
@@ -112,6 +113,7 @@ class NFVCL:
         pdu_manager: PDUManager = Provide[NFVCLContainer.pdu_manager],
         kubernetes_manager: KubernetesManager = Provide[NFVCLContainer.kubernetes_manager],
         user_manager: UserManager = Provide[NFVCLContainer.user_manager],
+        monitoring_manager: Optional[MonitoringManager] = None
     ):
         self.logger = create_logger(self.__class__.__name__)
 
@@ -124,6 +126,7 @@ class NFVCL:
         self.task_manager = task_manager
         self.event_manager = event_manager
         self.user_manager = user_manager
+        self.monitoring_manager = monitoring_manager
 
         urllib3.disable_warnings()
 
@@ -399,7 +402,7 @@ class NFVCL:
 
     @NFVCLPublic( path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, summary="Refresh file on remote Prometheus", sync=True)
     def trigger_file_upload(self, prometheus_id: str, callback=None) -> PrometheusServerModel:
-        return self.add_task(self.topology_manager.trigger_file_upload, prometheus_id, callback=callback)
+        return self.add_task(self.monitoring_manager.sync_prometheus_targets_to_server, prometheus_id, callback=callback)
 
     #####################
     # Blueprint Section #

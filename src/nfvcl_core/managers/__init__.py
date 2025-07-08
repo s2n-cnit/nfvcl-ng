@@ -10,6 +10,7 @@ from .performance_manager import PerformanceManager
 from .pdu_manager import PDUManager as PDUManager
 from .vim_clients_manager import VimClientsManager
 from .kubernetes_manager import KubernetesManager
+from .monitoring_manager import MonitoringManager
 from nfvcl_core.containers.nfvcl_container import NFVCLContainer
 
 
@@ -40,3 +41,7 @@ def get_vim_clients_manager(_vim_clients_manager: VimClientsManager = Provide[NF
 @inject
 def get_kubernetes_manager(_kubernetes_manager: KubernetesManager = Provide[NFVCLContainer.kubernetes_manager]) -> KubernetesManager:
     return _kubernetes_manager
+
+@inject
+def get_monitoring_manager(_monitoring_manager: MonitoringManager = Provide[NFVCLContainer.monitoring_manager]) -> MonitoringManager:
+    return _monitoring_manager

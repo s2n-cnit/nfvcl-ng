@@ -27,7 +27,7 @@ class NFVCLContainer(containers.DeclarativeContainer):
 
     task_manager = providers.Singleton(
         TaskManager,
-        worker_count=4
+        worker_count=config.nfvcl.workers
     )
 
     event_manager = providers.Singleton(

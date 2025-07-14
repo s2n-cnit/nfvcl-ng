@@ -447,7 +447,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             # Needed to escape single quote: https://stackoverflow.com/a/1250279
             command = command.replace("'", """'"'"'""")
             command = f"sudo sh -c '{command}'"
-        stdin, stdout, stderr = self.proxmox_vim_client.ssh_client.exec_command(command)
+        stdin, stdout, stderr = self.proxmox_vim_client.exec_command(command)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status != 0:
             raise VirtualizationProviderProxmoxException(f"Error executing command: {command}")

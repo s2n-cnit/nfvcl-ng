@@ -9,6 +9,11 @@ DEFAULT_PROXMOX_TIMEOUT = 180
 class ProxmoxVimClient(VimClient):
     def __init__(self, vim: VimModel):
         super().__init__(vim)
+        self._connect_ssh()
+        self._connect_proxmoxer()
+
+    def _connect_ssh(self):
+        """Establish SSH connection to Proxmox"""
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh_client.connect(
@@ -18,8 +23,11 @@ class ProxmoxVimClient(VimClient):
             password=self.vim.vim_password,
             timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
         )
+        self.ssh_client.get_transport().set_keepalive(10)
         self.logger.spam("Connected to Proxmox")
 
+    def _connect_proxmoxer(self):
+        """Establish Proxmoxer API connection"""
         if self.vim.proxmox_parameters().proxmox_token_value:
             self.proxmoxer = ProxmoxAPI(
                 self.vim.vim_url,
@@ -38,6 +46,28 @@ class ProxmoxVimClient(VimClient):
                 verify_ssl=False,
                 timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
             )
+
+    def _is_connected(self):
+        """Check if SSH client is still connected"""
+        try:
+            transport = self.ssh_client.get_transport()
+            return transport is not None and transport.is_active()
+        except:
+            return False
+
+    def _reconnect(self):
+        """Reconnect SSH client if connection is lost"""
+        self.logger.warning("SSH connection lost, attempting to reconnect...")
+        try:
+            self.ssh_client.close()
+        except:
+            pass
+        self._connect_ssh()
+
+    def exec_command(self, command: str):
+        if not self._is_connected():
+            self._reconnect()
+        return self.ssh_client.exec_command(command)
 
     def close(self):
         self.logger.spam("Closed Proxmox SSH")

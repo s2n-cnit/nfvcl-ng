@@ -3,6 +3,6 @@
   become: yes
   gather_facts: no
   tasks:
-   - name: Add IP to GreenQueueBypass
+   - name: Add IP to {{module_name}}
      shell: |
-       docker exec -t bess bessctl "command module green_queue_nfvcl enqueue GreenQueueBypassCommandEnqueueIpAddressArg {'ip_address': b'{{ ip }}'}"
+       docker exec -t bess bessctl "command module green_queue_nfvcl enqueue {{module_name}}CommandEnqueueIpAddressArg {'ip_address': b'{{ ip }}'}"

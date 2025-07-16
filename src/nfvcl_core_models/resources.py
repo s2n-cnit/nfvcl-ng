@@ -60,6 +60,7 @@ class VmResourceFlavor(NFVCLBaseModel):
     vcpu_type: Optional[str] = Field(default="host")
     require_port_security_disabled: Optional[bool] = Field(default=False)
     vm_volume: Optional[str] = Field(default=None, description="Used only by Proxmox for now")
+    ssh_keys: Optional[List[str]] = Field(default_factory=list, description="A list of SSH keys to be injected in the VM")
 
 
 class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):

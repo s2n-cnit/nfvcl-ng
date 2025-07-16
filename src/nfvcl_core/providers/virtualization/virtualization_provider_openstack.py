@@ -164,7 +164,12 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         flavor: Flavor = self.create_get_flavor(vm_resource.flavor, vm_resource.name)
 
-        c_init = CloudInit(ssh_authorized_keys=self.vim.ssh_keys)
+        ssh_keys = []
+        ssh_keys.extend(self.vim.ssh_keys)
+        if vm_resource.flavor.ssh_keys:
+            ssh_keys.extend(vm_resource.flavor.ssh_keys)
+
+        c_init = CloudInit(ssh_authorized_keys=ssh_keys)
         c_init.add_user(vm_resource.username, vm_resource.password)
         cloudin = c_init.build_cloud_config()
         self.logger.debug(f"Cloud config:\n{cloudin}")

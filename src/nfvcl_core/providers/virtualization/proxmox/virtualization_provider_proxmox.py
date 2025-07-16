@@ -113,9 +113,15 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__pre_creation_check(tmp_networks)
         self.logger.info(f"Creating VM {vm_resource.name} on node {self.data.proxmox_node_name}")
         self.__download_cloud_image(f'{vm_resource.image.url}', f'{vm_resource.image.name}')
+
+        ssh_keys = []
+        ssh_keys.extend(self.vim.ssh_keys)
+        if vm_resource.flavor.ssh_keys:
+            ssh_keys.extend(vm_resource.flavor.ssh_keys)
+
         c_init = CloudInit(hostname=vm_resource.name,
                            packages=cloud_init_packages,
-                           ssh_authorized_keys=self.vim.ssh_keys,
+                           ssh_authorized_keys=ssh_keys,
                            runcmd=cloud_init_runcmd)
         c_init.add_user(vm_resource.username, vm_resource.password)
         user_cloud_init = c_init.build_cloud_config()

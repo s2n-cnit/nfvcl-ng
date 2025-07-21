@@ -220,6 +220,22 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.logger.success(f"Creating VM {vm_resource.name} finished")
         self.save_to_db()
 
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        self.logger.info(f"Restarting VM {vm_resource.name}")
+        if vm_resource.id not in self.data.os_dict:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM, cannot restart")
+
+        server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
+        if server_obj is None:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM, cannot restart")
+
+        if hard:
+            self.conn.compute.reboot_server(server_obj, reboot_type='HARD')
+        else:
+            self.conn.compute.reboot_server(server_obj, reboot_type='SOFT')
+
+        self.logger.success(f"Restarting VM {vm_resource.name} finished")
+
     def __update_net_info_vm(self, vm_resource: VmResource, server_obj: Server):
         vm_resource.network_interfaces.clear()
         # Getting detailed info about the networks attached to the machine

@@ -60,5 +60,9 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
         pass
 
     @abc.abstractmethod
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        pass
+
+    @abc.abstractmethod
     def final_cleanup(self):
         pass

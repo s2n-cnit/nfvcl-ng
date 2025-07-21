@@ -200,6 +200,28 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.logger.success(f"Creating VM {vm_resource.name} finished")
         self.save_to_db()
 
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        self.logger.info(f"Restarting VM {vm_resource.name}")
+        if vm_resource.id in self.data.proxmox_dict.keys():
+            vmid = self.data.proxmox_dict[vm_resource.id]
+            if hard:
+                self.logger.debug(f"Hard restarting VM {vmid}")
+                self.__execute_proxmox_request(
+                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/reset",
+                    node_name=self.data.proxmox_node_name,
+                    r_type=ApiRequestType.POST
+                )
+            else:
+                self.logger.debug(f"Soft restarting VM {vmid}")
+                self.__execute_proxmox_request(
+                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/reboot",
+                    node_name=self.data.proxmox_node_name,
+                    r_type=ApiRequestType.POST
+                )
+            self.logger.success(f"VM {vmid} restarted")
+        else:
+            raise VirtualizationProviderProxmoxException(f"VM {vm_resource.name} not found")
+
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         # The parent method checks if the resource is created and throw an exception if not
         super().configure_vm(vm_resource_configuration)

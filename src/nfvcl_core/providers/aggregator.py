@@ -153,6 +153,9 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def destroy_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).destroy_vm(vm_resource)
 
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        return self.get_virt_provider(vm_resource.area).reboot_vm(vm_resource, hard=hard)
+
     @register_performance()
     def final_cleanup(self):
         for virt_provider_impl in self.virt_providers_impl.values():

@@ -197,3 +197,7 @@ class EnableMonitoringRequest(NFVCLBaseModel):
 
 class DisableMonitoringRequest(NFVCLBaseModel):
     recursive: Optional[bool] = Field(default=False)
+
+class RestartVmRequest(NFVCLBaseModel):
+    vm_name: str = Field()
+    hard: Optional[bool] = Field(default=False)

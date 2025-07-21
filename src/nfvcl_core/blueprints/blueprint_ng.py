@@ -15,7 +15,7 @@ from nfvcl_core.providers.aggregator import ProvidersAggregator
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.metrics.grafana_utils import replace_all_datasources, update_queries_in_panels
-from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest, RestartVmRequest
 from nfvcl_core_models.http_models import BlueprintNotFoundException, HttpRequestType
 from nfvcl_core_models.monitoring.grafana_model import GrafanaFolderModel
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition
@@ -492,3 +492,24 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                     self.logger.warning(f"Could not disable monitoring on children blueprint {children_id}, skipping...")
 
         self.logger.info("Disabled monitoring on blueprint")
+
+    @day2_function("/reboot_vm", [HttpRequestType.PUT])
+    def reboot_vm(self, restart_vm_request: RestartVmRequest) -> None:
+        """
+        Reboot a VM by name
+        Args:
+            restart_vm_request: The name of the VM to be rebooted and optionally if the reboot should be hard (forceful)
+        """
+        self.logger.info(f"Rebooting VM {restart_vm_request.vm_name} in blueprint {self.id}")
+        # Search the vm in the registered resources
+        vm_resource: Optional[VmResource] = None
+        for resource in self.base_model.registered_resources.values():
+            if isinstance(resource.value, VmResource) and resource.value.name == restart_vm_request.vm_name:
+                vm_resource = resource.value
+                break
+        if vm_resource:
+            self.provider.reboot_vm(vm_resource, hard=restart_vm_request.hard)
+        else:
+            raise BlueprintNGException(f"VM {restart_vm_request.vm_name} not found in blueprint {self.id}")
+
+        self.logger.info(f"Rebooted VM {restart_vm_request.vm_name} in blueprint {self.id}")

@@ -201,3 +201,6 @@ class DisableMonitoringRequest(NFVCLBaseModel):
 class RestartVmRequest(NFVCLBaseModel):
     vm_name: str = Field()
     hard: Optional[bool] = Field(default=False)
+
+class RestartAllVmsRequest(NFVCLBaseModel):
+    hard: Optional[bool] = Field(default=False)

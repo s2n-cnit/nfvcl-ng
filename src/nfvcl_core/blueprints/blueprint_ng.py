@@ -15,7 +15,7 @@ from nfvcl_core.providers.aggregator import ProvidersAggregator
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.metrics.grafana_utils import replace_all_datasources, update_queries_in_panels
-from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest, RestartVmRequest
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest, RestartVmRequest, RestartAllVmsRequest
 from nfvcl_core_models.http_models import BlueprintNotFoundException, HttpRequestType
 from nfvcl_core_models.monitoring.grafana_model import GrafanaFolderModel
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition
@@ -513,3 +513,13 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             raise BlueprintNGException(f"VM {restart_vm_request.vm_name} not found in blueprint {self.id}")
 
         self.logger.info(f"Rebooted VM {restart_vm_request.vm_name} in blueprint {self.id}")
+
+    @day2_function("/reboot_all_vms", [HttpRequestType.PUT])
+    def reboot_all_vms(self, restart_vm_request: RestartAllVmsRequest) -> None:
+        self.logger.info(f"Rebooting all VMs in blueprint {self.id}")
+        # Search the vm in the registered resources
+        for resource in self.base_model.registered_resources.values():
+            if isinstance(resource.value, VmResource):
+                vm_resource: VmResource = resource.value
+                self.provider.reboot_vm(vm_resource, hard=restart_vm_request.hard)
+        self.logger.info(f"Rebooted all VMs in blueprint {self.id}")

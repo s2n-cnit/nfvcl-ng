@@ -16,13 +16,13 @@ from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit
 from nfvcl_core.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
     NetplanInterface
-from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible
+from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl_core.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
-    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
+    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage, VmStatus, VmPowerStatus
 from nfvcl_core_models.vim.vim_models import VimModel
 
 DEFAULT_OPENSTACK_TIMEOUT = 180  # See openstack/cloud/_compute.py
@@ -235,6 +235,56 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             self.conn.compute.reboot_server(server_obj, reboot_type='SOFT')
 
         self.logger.success(f"Restarting VM {vm_resource.name} finished")
+
+    def check_vm_status(self, vm_resource: VmResource) -> VmStatus:
+        """
+        Check the status of a VM and SSH connectivity
+        Args:
+            vm_resource: VM to check
+
+        Returns:
+            VmStatus containing vm_name, power_status, and ssh_reachable
+        """
+        self.logger.info(f"Checking status of VM {vm_resource.name}")
+
+        if vm_resource.id not in self.data.os_dict:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM")
+
+        server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
+        if server_obj is None:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM")
+
+        # Get power status from OpenStack and map to standardized enum
+        openstack_status = server_obj.status
+
+        # Map OpenStack status to standardized VmPowerStatus
+        if openstack_status in ["ACTIVE"]:
+            power_status = VmPowerStatus.RUNNING
+        elif openstack_status in ["SHUTOFF", "STOPPED"]:
+            power_status = VmPowerStatus.SHUTOFF
+        else:
+            # For BUILD, REBOOT, HARD_REBOOT, ERROR, PAUSED, SUSPENDED, etc.
+            power_status = VmPowerStatus.UNKNOWN
+
+        # Check SSH connectivity if VM is running and has an IP
+        ssh_reachable = False
+        if power_status == VmPowerStatus.RUNNING and vm_resource.network_interfaces:
+            # Try SSH connection with short timeout (just for testing connectivity)
+            ssh_reachable = check_ssh_ready(
+                host=vm_resource.access_ip,
+                port=22,
+                user=vm_resource.username,
+                passwd=vm_resource.password,
+                logger_override=self.logger
+            )
+
+        self.logger.info(f"VM {vm_resource.name} status: openstack_status={openstack_status}, mapped_status={power_status}, ssh_reachable={ssh_reachable}")
+
+        return VmStatus(
+            vm_name=vm_resource.name,
+            power_status=power_status,
+            ssh_reachable=ssh_reachable
+        )
 
     def __update_net_info_vm(self, vm_resource: VmResource, server_obj: Server):
         vm_resource.network_interfaces.clear()

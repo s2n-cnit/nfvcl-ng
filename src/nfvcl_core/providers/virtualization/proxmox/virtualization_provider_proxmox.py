@@ -12,7 +12,7 @@ from nfvcl_core.blueprints.cloudinit_builder import CloudInit, CloudInitNetworkR
 from nfvcl_core.managers.vim_clients_manager import ProxmoxVimClient
 from nfvcl_core.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
     NetplanInterface
-from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible
+from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
 from nfvcl_core.providers.virtualization.proxmox.models.models import ProxmoxZone, Subnet, \
     ProxmoxNetsDevice, ProxmoxMac, ProxmoxTicket, ProxmoxNode, Vnet, Network
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
@@ -20,7 +20,7 @@ from nfvcl_core.providers.virtualization.virtualization_provider_interface impor
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl_core.utils.blue_utils import rel_path
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
-    VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource
+    VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource, VmStatus, VmPowerStatus
 from nfvcl_core_models.vim.vim_models import VimModel, ProxmoxPrivilegeEscalationTypeEnum
 
 cloud_init_packages = ['qemu-guest-agent']
@@ -221,6 +221,59 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             self.logger.success(f"VM {vmid} restarted")
         else:
             raise VirtualizationProviderProxmoxException(f"VM {vm_resource.name} not found")
+
+    def check_vm_status(self, vm_resource: VmResource) -> VmStatus:
+        """
+        Check the status of a VM and SSH connectivity
+        Args:
+            vm_resource: VM to check
+
+        Returns:
+            VmStatus containing vm_name, power_status, and ssh_reachable
+        """
+        self.logger.info(f"Checking status of VM {vm_resource.name}")
+
+        if vm_resource.id not in self.data.proxmox_dict:
+            raise VirtualizationProviderProxmoxException(f"VM {vm_resource.name} not found on VIM")
+
+        vmid = self.data.proxmox_dict[vm_resource.id]
+
+        # Get VM status from Proxmox
+        vm_status_response = self.__execute_proxmox_request(
+            url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/current",
+            r_type=ApiRequestType.GET
+        )
+
+        proxmox_status = vm_status_response["status"]
+
+        # Map Proxmox status to standardized VmPowerStatus
+        if proxmox_status in ["running"]:
+            power_status = VmPowerStatus.RUNNING
+        elif proxmox_status in ["stopped", "shutoff"]:
+            power_status = VmPowerStatus.SHUTOFF
+        else:
+            # For paused, suspended, or any other unknown states
+            power_status = VmPowerStatus.UNKNOWN
+
+        # Check SSH connectivity if VM is running and has an IP
+        ssh_reachable = False
+        if power_status == VmPowerStatus.RUNNING:
+            # Try SSH connection with short timeout (just for testing connectivity)
+            ssh_reachable = check_ssh_ready(
+                host=vm_resource.access_ip,
+                port=22,
+                user=vm_resource.username,
+                passwd=vm_resource.password,
+                logger_override=self.logger
+            )
+
+        self.logger.info(f"VM {vm_resource.name} status: proxmox_status={proxmox_status}, mapped_status={power_status}, ssh_reachable={ssh_reachable}")
+
+        return VmStatus(
+            vm_name=vm_resource.name,
+            power_status=power_status,
+            ssh_reachable=ssh_reachable
+        )
 
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         # The parent method checks if the resource is created and throw an exception if not

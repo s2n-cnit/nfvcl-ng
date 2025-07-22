@@ -20,6 +20,32 @@ class VirtualizationConfiguratorException(VirtualizationProviderException):
     pass
 
 
+def check_ssh_ready(host: str, port: int, user: str, passwd: str, logger_override: Optional[verboselogs.VerboseLogger] = None) -> bool:
+    if logger_override:
+        logger = logger_override
+    else:
+        logger = logger_pu
+
+    logger.debug(f"Checking SSH connection to {host}:{port} as user <{user}> and passwd <{passwd}>")
+    client = paramiko.client.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(host, port, username=user, password=passwd, allow_agent=False, look_for_keys=False, timeout=2)
+        logger.debug('SSH transport is available!')
+        client.close()
+        return True
+    except paramiko.ssh_exception.SSHException as e:
+        # socket is open, but not SSH service responded
+        logger.debug(f"Socket is open, but not SSH service responded: {e}")
+        return False
+    except paramiko.ssh_exception.NoValidConnectionsError as e:
+        logger.debug('SSH transport is not ready...')
+        return False
+    except TimeoutError as e:
+        logger.debug('SSH transport is not ready...')
+        return False
+
+
 def wait_for_ssh_to_be_ready(host: str, port: int, user: str, passwd: str, timeout: int, retry_interval: float, logger_override: Optional[verboselogs.VerboseLogger] = None) -> bool:
     if logger_override:
         logger = logger_override

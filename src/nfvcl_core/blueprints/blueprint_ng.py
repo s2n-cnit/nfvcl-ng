@@ -6,7 +6,7 @@ import threading
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import TypeVar, Generic, Optional
+from typing import TypeVar, Generic, Optional, List
 
 from pydantic import ValidationError
 
@@ -20,7 +20,7 @@ from nfvcl_core_models.http_models import BlueprintNotFoundException, HttpReques
 from nfvcl_core_models.monitoring.grafana_model import GrafanaFolderModel
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition
 from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, \
-    HelmChartResource
+    HelmChartResource, VmStatus
 
 StateTypeVar = TypeVar("StateTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
@@ -523,3 +523,17 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 vm_resource: VmResource = resource.value
                 self.provider.reboot_vm(vm_resource, hard=restart_vm_request.hard)
         self.logger.info(f"Rebooted all VMs in blueprint {self.id}")
+
+    @day2_function("/check_vms_status", [HttpRequestType.GET])
+    def check_vms_status(self) -> List[VmStatus]:
+        self.logger.info(f"Checking VMs status")
+        vm_status_list = []
+
+        for resource in self.base_model.registered_resources.values():
+            if isinstance(resource.value, VmResource):
+                vm_resource: VmResource = resource.value
+                vm_status: VmStatus = self.provider.check_vm_status(vm_resource)
+                vm_status_list.append(vm_status)
+                self.logger.debug(f"VM {vm_status.vm_name} status check completed: power={vm_status.power_status}, ssh_reachable={vm_status.ssh_reachable}")
+
+        return vm_status_list

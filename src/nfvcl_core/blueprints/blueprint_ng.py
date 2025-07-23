@@ -406,6 +406,11 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         if monitoring_definition is None:
             raise BlueprintNGException("No monitoring definition found for this blueprint, cannot enable monitoring")
 
+        # Those calls will raise an exception if the prometheus or grafana server is not found in the topology
+        self.provider.topology_manager.get_prometheus(prometheus_id)
+        if grafana_id:
+            self.provider.topology_manager.get_grafana(grafana_id)
+
         self.base_model.monitoring_state = MonitoringState(
             prometheus_server_id=prometheus_id,
             grafana_server_id=grafana_id
@@ -421,17 +426,17 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             # Save del target in the blueprint state
             self.provider.topology_manager.add_prometheus_target(prometheus_id, prometheus_target)
 
-        grafana_server = self.provider.topology_manager.get_grafana(grafana_id)
-
         if grafana_id:
+            grafana_server = self.provider.topology_manager.get_grafana(grafana_id)
             self.provider.topology_manager.add_grafana_folder(grafana_id, GrafanaFolderModel(name=f"{self.id} - {self.blueprint_type}", blueprint_id=self.id), parent_by_blue_id=self.base_model.parent_blue_id)
 
         # TODO maybe we should move this in the provider?
         from nfvcl_core.managers import get_monitoring_manager
         get_monitoring_manager().sync_prometheus_targets_to_server(prometheus_id)
-        get_monitoring_manager().sync_grafana_folders_to_server(grafana_server.id)
 
-        self.base_model.monitoring_state.grafana_folder_id = grafana_server.root_folder.find_folder_by_blueprint_id(self.id).uid
+        if grafana_id:
+            get_monitoring_manager().sync_grafana_folders_to_server(grafana_server.id)
+            self.base_model.monitoring_state.grafana_folder_id = grafana_server.root_folder.find_folder_by_blueprint_id(self.id).uid
 
         if grafana_id:
             for grafana_dashboard in monitoring_definition.grafana_dashboards:

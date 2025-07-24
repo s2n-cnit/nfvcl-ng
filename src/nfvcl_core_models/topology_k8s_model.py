@@ -70,7 +70,7 @@ class TopologyK8sModel(NFVCLBaseModel):
     credentials: str = Field(title="Content of k8s credential file (example admin.conf)")
     vim_name: Optional[str] = Field(default=None, description="Reference VIM, where k8s cluster is deployed.")
     k8s_version: K8sVersion = Field(default=K8sVersion.V1_30, description="The version of the k8s cluster")
-    networks: List[K8sNetworkInfo] = Field(description="List of attached networks to the cluster")
+    networks: Optional[List[K8sNetworkInfo]] = Field(default_factory=list, description="List of attached networks to the cluster")
     areas: List[int] = Field(description="Competence areas of the k8s cluster", min_length=1)
     cni: Optional[str] = Field(default=None, description="The CNI plugin used in the cluster")
     cadvisor_node_port: Optional[int] = Field(default=None, description="The node port on which the cadvisor service is exposed")

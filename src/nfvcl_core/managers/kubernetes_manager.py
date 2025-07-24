@@ -534,10 +534,10 @@ class KubernetesManager(GenericManager):
 
             cluster_id:  The K8s cluster (from the topology) on witch nodes resides
 
-            detailed: If true, a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
+            detailed: If true, a V1PodList in dict form is retrieved, otherwise a list with only names is retrieved.
 
         Returns:
-            If detailed a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
+            If detailed a V1PodList in dict form is retrieved, otherwise a list with only names is retrieved.
         """
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)

@@ -46,6 +46,7 @@ class KubeApiUtils:
         self.certificates_v1_api = kubernetes.client.CertificatesV1Api(self.api_client)
         self.apiextensions_v1_api = kubernetes.client.ApiextensionsV1Api(self.api_client)
         self.admission_registration_v1_api = kubernetes.client.AdmissionregistrationV1Api(self.api_client)
+        self.custom_object_api = kubernetes.client.CustomObjectsApi(self.api_client)
 
     def __del__(self):
         """
@@ -1146,3 +1147,31 @@ self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='
                       tty=False)
 
         return resp
+
+
+    def remove_alloy_finalizier(self, namespace: str):
+        """
+        !!! WARNING !!!
+        This method is a working around for a bug of K8s_monitoring helmchart, its WIP the patch
+        Args:
+            namespace: namespace of the pod
+
+        """
+        # List all CRDs
+        crds = self.apiextensions_v1_api.list_custom_resource_definition()
+        for crd in crds.items:
+            if crd.spec.names.kind == "Alloy":
+                version = [v.name for v in crd.spec.versions][0]
+                _group = crd.spec.group
+                plural = crd.spec.names.plural
+                custom_objs = self.custom_object_api.list_namespaced_custom_object(_group, version, namespace, plural)
+                for obj in custom_objs.get("items", []):
+                    name = obj["metadata"]["name"]
+                    self.custom_object_api.patch_namespaced_custom_object(
+                        group=_group,
+                        version=version,
+                        namespace=namespace,
+                        plural=plural,
+                        name=name,
+                        body={"metadata": {"finalizers": []}}
+                    )

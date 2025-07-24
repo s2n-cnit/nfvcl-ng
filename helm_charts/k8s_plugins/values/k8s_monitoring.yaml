@@ -1,0 +1,111 @@
+cluster:
+  name: "kubernetes"
+  namespace: "k8s-monitoring"
+
+global:
+  platform: ""
+  kubernetesAPIService: ""
+  scrapeInterval: 60s
+  maxCacheSize: 100000
+
+destinations: []
+
+clusterMetrics:
+  enabled: false
+  destinations: []
+  collector: alloy-metrics
+  cadvisor:
+    enabled: true
+    jobLabel: "cadvisor"
+    metricsTuning: # Will only keep these two metrics
+      includeMetrics: [ ]
+      excludeMetrics: [ ]
+      useDefaultAllowList: false
+      dropEmptyContainerLabels: false
+      dropEmptyImageLabels: false
+      keepPhysicalFilesystemDevices: [ ]
+      keepPhysicalNetworkDevices: [ ]
+  node-exporter:
+    deploy: false
+    service:
+      port: 9101
+      targetPort: 9101
+#    labelMatchers:
+#      app.kubernetes.io/name: null
+#      component: node-exporter
+
+clusterEvents:
+  enabled: false
+  destinations: []
+  collector: alloy-logs
+
+nodeLogs:
+  enabled: false
+  destinations: []
+  collector: alloy-logs
+
+podLogs:
+  enabled: false
+  destinations: []
+  collector: alloy-logs
+
+applicationObservability:
+  enabled: false
+  destinations: []
+  receivers: {}
+  collector: alloy-receiver
+
+autoInstrumentation:
+  enabled: false
+  destinations: []
+  collector: alloy-metrics
+
+annotationAutodiscovery:
+  enabled: false
+  destinations: []
+  collector: alloy-metrics
+
+prometheusOperatorObjects:
+  enabled: false
+  destinations: []
+  collector: alloy-metrics
+
+profiling:
+  enabled: false
+  destinations: []
+  collector: alloy-profiles
+
+integrations:
+  destinations: []
+  collector: alloy-metrics
+
+selfReporting:
+  enabled: true
+  destinations: []
+  scrapeInterval: ""
+
+alloy-metrics:
+  enabled: false
+
+alloy-singleton:
+  enabled: false
+
+alloy-logs:
+  enabled: false
+
+alloy-receiver:
+  enabled: false
+  alloy:
+    extraPorts: []
+  extraService:
+    enabled: false
+    name: alloy
+    fullname: ""
+
+alloy-profiles:
+  enabled: false
+
+alloy-operator:
+  deploy: true
+
+extraObjects: []

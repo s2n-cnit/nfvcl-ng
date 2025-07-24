@@ -26,11 +26,10 @@ from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGBaseModel
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core_models.k8s_management_models import Labels
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel
 from nfvcl_core_models.network.network_models import PduModel, NetworkModel, RouterModel, IPv4Pool, IPv4ReservedRange
 from nfvcl_core_models.performance import BlueprintPerformance
-from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall
-from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel
-from nfvcl_core_models.resources import HelmChartResource, VmResource
+from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall, K8sMonitoringConfig
 from nfvcl_core_models.response_model import OssCompliantResponse
 from nfvcl_core_models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
@@ -489,6 +488,26 @@ class NFVCL:
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.install_plugins)
     def k8s_install_plugin(self, cluster_id: str, plugin_name: K8sPluginsToInstall, callback=None) -> OssCompliantResponse:
         return self.add_task(self.kubernetes_manager.install_plugins, cluster_id, plugin_name, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/k8s_monitoring", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.install_k8s_monitoring)
+    def k8s_install_monitoring(self, cluster_id: str, monitoring_config: K8sMonitoringConfig, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.install_k8s_monitoring, cluster_id, monitoring_config, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/add_monitoring_destination", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.add_monitoring_destination)
+    def k8s_add_monitoring_destination(self, cluster_id: str, loki_id: Optional[str], prometheus_id: Optional[str], callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.add_monitoring_destination, cluster_id, loki_id, prometheus_id, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/uninstall_plugin", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.uninstall_plugin)
+    def k8s_uninstall_plugin(self, cluster_id: str, namespace: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.uninstall_plugin, cluster_id, namespace, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/uninstall_k8s_monitoring", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.uninstall_k8s_monitoring)
+    def k8s_uninstall_monitoring(self, cluster_id: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.uninstall_k8s_monitoring, cluster_id, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/del_monitoring_destination", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.del_monitoring_destination)
+    def k8s_del_monitoring_destination(self, cluster_id: str, loki_id: Optional[str], prometheus_id: Optional[str], callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.del_monitoring_destination, cluster_id, loki_id, prometheus_id, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/yaml", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.apply_to_k8s)
     def k8s_apply_yaml(self, cluster_id: str, yaml: Annotated[str, "application/yaml"], callback=None) -> OssCompliantResponse:

@@ -3,6 +3,7 @@ from typing import Optional, List
 
 from pydantic import Field
 from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring
 from nfvcl_core_models.plugin_k8s_model import K8sOperationType
 
 
@@ -55,6 +56,9 @@ class ProvidedBy(str, Enum):
     EXTERNAL = 'EXTERNAL'
     UNKNOWN = 'UNKNOWN'
 
+class TopologyK8sMonitoringMetrics(NFVCLBaseModel):
+    config: K8sMonitoring
+
 
 class K8sNetworkInfo(NFVCLBaseModel):
     name: str = Field(description="The name of the network to be used by the k8s cluster. This name should be the same of one network in the topology. This allow to assign IP pools from the Topology to the k8s cluster automatically.")
@@ -77,6 +81,7 @@ class TopologyK8sModel(NFVCLBaseModel):
     nfvo_status: NfvoStatus = Field(default=NfvoStatus.NOT_ONBOARDED, deprecated=True) # TODO remove
     nfvo_onboard: bool = Field(default=False, deprecated=True) # TODO remove
     anti_spoofing_enabled: Optional[bool] = Field(default=False)
+    k8s_monitoring_metrics: Optional[TopologyK8sMonitoringMetrics] = Field(default=None)
 
     def __eq__(self, other):
         """

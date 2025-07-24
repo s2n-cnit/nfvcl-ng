@@ -1713,18 +1713,22 @@ windows-terminal = ["colorama (>=0.4.6)"]
 [[package]]
 name = "pyhelm3"
 version = "0.4.0"
-description = "Python library for managing Helm releases using Helm 3."
+description = "Python library for managing Helm releases using Helm 3 (i.e. Tiller-less Helm)."
 optional = false
-python-versions = "*"
+python-versions = ">=3.9"
 groups = ["main"]
-files = [
-    {file = "pyhelm3-0.4.0-py3-none-any.whl", hash = "sha256:6f608891fbe8db9b8015b839f29524dccd6eade0da879820690d71de9c3f2f8d"},
-    {file = "pyhelm3-0.4.0.tar.gz", hash = "sha256:7ce688cab8e12df5240641774c36acfd3cad6d9a6325781bc7b5a354e522c594"},
-]
+files = []
+develop = false
 
 [package.dependencies]
-pydantic = "*"
-pyyaml = "*"
+pydantic = "^2.10.6"
+pyyaml = "^6.0.2"
+
+[package.source]
+type = "git"
+url = "https://github.com/s2n-cnit/pyhelm3.git"
+reference = "HEAD"
+resolved_reference = "5ea55930222e804dfcd31e1112b5cedd396b53fa"
 
 [[package]]
 name = "pyjwt"
@@ -2694,4 +2698,4 @@ test = ["websockets"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "99afc338f02c29c10ab3376bcf9664f312cf4aa26c65b2f1f810ddad8e97e187"
+content-hash = "f22bb78fef193b26178859d61bf8c1c60b3656b0e5e77ac4a6b7b85c66042db6"

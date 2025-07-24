@@ -7,15 +7,16 @@ from typing import List
 import yaml
 from kubernetes.client import V1DaemonSet
 from kubernetes.utils import FailToCreateError
+from pyhelm3 import Client
 from verboselogs import VerboseLogger
 
+from nfvcl_core.utils.file_utils import render_file_from_template_to_file, create_tmp_file
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core.utils.log import create_logger
-from nfvcl_core.utils.file_utils import render_file_from_template_to_file, create_tmp_file
-from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring, DestinationType
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData
-from pyhelm3 import Client
+from nfvcl_core_models.resources import HelmChartResource
 
 
 def build_helm_client_from_credential_file_path(k8s_credential_file_path) -> Client:
@@ -67,6 +68,7 @@ class HelmPluginManager:
         get_installed_plugins(): Retrieves a list of currently installed Helm plugins.
         __apply_yaml_file_to_cluster(plugin_name, yaml_file_path): Applies a YAML file configuration to the Kubernetes cluster.
     """
+
     def __init__(self, k8s_credential_file, context_name: str = "") -> None:
         self.k8s_credential_file = k8s_credential_file
         self.k8s_config = get_k8s_config_from_file_content(k8s_credential_file)
@@ -112,6 +114,19 @@ class HelmPluginManager:
             atomic=True,
             wait=True
         ))
+
+    def uninstall_plugin(self, namespace: str, wait=True):
+        """
+        Args:
+            wait: True if uninstall should wait for completion.
+            namespace: str, The namespace in which the chart will be installed.
+        """
+
+        helm_client: Client = self.helm_client
+        releases = asyncio.run(helm_client.list_releases(namespace=namespace))
+        self.logger.info(f"Uninstalling plugin in {namespace}")
+        for release in releases:
+            asyncio.run(helm_client.uninstall_release(release.name, namespace=namespace, wait=wait))
 
     def install_plugins(self, plugin_names: list[K8sPluginName], plugin_data: K8sPluginAdditionalData):
         """
@@ -202,6 +217,94 @@ class HelmPluginManager:
             namespace="multus",
             values={}
         )
+
+    def install_k8s_monitoring(self, plugin_data: K8sPluginAdditionalData) -> K8sMonitoring:
+        k8s_monitoring_chart_path = PLUGIN_PATH / 'k8s-monitoring-3.2.0.tgz'
+        with open(PLUGIN_VALUE_PATH / 'k8s_monitoring.yaml', 'r') as k8s_monitoring_chart_path_values_file:
+            k8s_monitoring_values = yaml.safe_load(k8s_monitoring_chart_path_values_file)
+            k8s_monitoring_config = K8sMonitoring.model_validate(k8s_monitoring_values)
+            k8s_monitoring_config.cluster.namespace = f"alloy-metrics"
+
+            if plugin_data.loki:
+                k8s_monitoring_config.add_destination(
+                    name=f"loki-{plugin_data.loki.id}",
+                    _type=DestinationType.LOKI,
+                    url=f"http://{plugin_data.loki.ip}:{plugin_data.loki.port}/loki/api/v1/push",
+                    username=plugin_data.loki.user,
+                    password=plugin_data.loki.password
+                )
+
+            if plugin_data.prometheus:
+                k8s_monitoring_config.add_destination(
+                    name=f"prometheus-{plugin_data.prometheus.id}",
+                    _type=DestinationType.PROMETHEUS,
+                    url=f"http://{plugin_data.prometheus.ip}:{plugin_data.prometheus.port}/api/v1/write",
+                    username=plugin_data.prometheus.user,
+                    password=plugin_data.prometheus.password
+                )
+            if plugin_data.k8smonitoring_node_exporter_enabled:
+                k8s_monitoring_config.enable_node_exporter(plugin_data.k8smonitoring_node_exporter_label)
+
+        self.install_plugin(
+            name=K8sPluginName.K8S_MONITORING,
+            chart_name=str(k8s_monitoring_chart_path),
+            version="3.2.0",
+            namespace=k8s_monitoring_config.cluster.namespace,
+            values=k8s_monitoring_config.model_dump(exclude_none=True, by_alias=True)
+        )
+        return k8s_monitoring_config
+
+    def add_metrics_destination(self, plugin_data: K8sPluginAdditionalData):
+        k8s_monitoring_chart_path = PLUGIN_PATH / 'k8s-monitoring-3.2.0.tgz'
+        tmp = plugin_data.k8smonitoring_config.__deepcopy__()
+        if plugin_data.loki:
+            plugin_data.k8smonitoring_config.add_destination(
+                name=f"loki-{plugin_data.loki.id}",
+                _type=DestinationType.LOKI,
+                url=f"http://{plugin_data.loki.ip}:{plugin_data.loki.port}/loki/api/v1/push",
+                username=plugin_data.loki.user,
+                password=plugin_data.loki.password
+            )
+
+        if plugin_data.prometheus:
+            plugin_data.k8smonitoring_config.add_destination(
+                name=f"prometheus-{plugin_data.prometheus.id}",
+                _type=DestinationType.PROMETHEUS,
+                url=f"http://{plugin_data.prometheus.ip}:{plugin_data.prometheus.port}/api/v1/write",
+                username=plugin_data.prometheus.user,
+                password=plugin_data.prometheus.password
+            )
+
+        if tmp != plugin_data.k8smonitoring_config:
+            self.install_plugin(
+                name=K8sPluginName.K8S_MONITORING,
+                chart_name=str(k8s_monitoring_chart_path),
+                version="3.2.0",
+                namespace=plugin_data.k8smonitoring_config.cluster.namespace,
+                values=plugin_data.k8smonitoring_config.model_dump(exclude_none=True, by_alias=True)
+            )
+            return plugin_data.k8smonitoring_config
+        return tmp
+
+    def del_metrics_destination(self, plugin_data: K8sPluginAdditionalData):
+        k8s_monitoring_chart_path = PLUGIN_PATH / 'k8s-monitoring-3.2.0.tgz'
+        tmp = plugin_data.k8smonitoring_config.__deepcopy__()
+        if plugin_data.loki:
+            plugin_data.k8smonitoring_config.del_destination(name=f"loki-{plugin_data.loki.id}")
+
+        if plugin_data.prometheus:
+            plugin_data.k8smonitoring_config.del_destination(name=f"prometheus-{plugin_data.prometheus.id}")
+
+        if tmp != plugin_data.k8smonitoring_config:
+            self.install_plugin(
+                name=K8sPluginName.K8S_MONITORING,
+                chart_name=str(k8s_monitoring_chart_path),
+                version="3.2.0",
+                namespace=plugin_data.k8smonitoring_config.cluster.namespace,
+                values=plugin_data.k8smonitoring_config.model_dump(exclude_none=True, by_alias=True)
+            )
+            return plugin_data.k8smonitoring_config
+        return tmp
 
     def _install_metallb(self, plugin_data: K8sPluginAdditionalData):
         """
@@ -313,13 +416,12 @@ class HelmPluginManager:
             if 'app.kubernetes.io/name' in daemon_set.metadata.labels:
                 if daemon_set.metadata.labels['app.kubernetes.io/name'] == 'metallb':
                     plugin_list.append(K8sPluginName.METALLB)
-            if 'openebs.io/component-name' in daemon_set.metadata.labels: # Value should be ndm
+            if 'openebs.io/component-name' in daemon_set.metadata.labels:  # Value should be ndm
                 if K8sPluginName.OPEN_EBS not in plugin_list:
                     plugin_list.append(K8sPluginName.OPEN_EBS)
             if 'k8s-app' in daemon_set.metadata.labels:  # Value should be calico-node
                 if daemon_set.metadata.labels['k8s-app'] == 'calico-node':
                     plugin_list.append(K8sPluginName.CALICO)
-
 
         # for deployment in deployments.items:
         #     # If some plugin is detectable by the list of deployments

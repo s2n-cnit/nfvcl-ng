@@ -1,18 +1,18 @@
 from typing import Optional, List, Union, Callable
 
-from nfvcl_core_models.custom_types import NFVCLCoreException
-from nfvcl_core_models.monitoring.grafana_model import GrafanaServerModel, GrafanaDashboardModel, GrafanaFolderModel
-from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
-
-from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
-from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
-
-from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core.database.topology_repository import TopologyRepository
 from nfvcl_core.managers import GenericManager
-from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
-from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface
+from nfvcl_core_models.custom_types import NFVCLCoreException
+from nfvcl_core_models.monitoring.grafana_model import GrafanaServerModel, GrafanaDashboardModel, GrafanaFolderModel
+from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring
+from nfvcl_core_models.monitoring.loki_model import LokiServerModel
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel, PrometheusTargetModel
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface
+from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
+from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
+from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.vim.vim_models import VimModel
 
@@ -187,7 +187,7 @@ class TopologyManager(GenericManager):
             self.save_to_db()
             return removed_range
         except ValueError as e:
-            raise NFVCLCoreException(str(e), http_equivalent_code=404) # Not found
+            raise NFVCLCoreException(str(e), http_equivalent_code=404)  # Not found
 
     def get_reserved_ranges_from_network(self, network_id: str) -> List[IPv4ReservedRange]:
         network = self._topology.get_network(network_id)
@@ -268,6 +268,17 @@ class TopologyManager(GenericManager):
 
     def get_k8s_cluster_by_id(self, cluster_id: str) -> TopologyK8sModel:
         return self._topology.get_k8s_cluster(cluster_id)
+
+    def get_k8s_cluster_monitoring_metrics_config(self, cluster_id: str) -> K8sMonitoring:
+        return self._topology.get_monitoring_metrics_config(cluster_id)
+
+    def add_edit_k8s_cluster_monitoring_metrics(self, cluster_id: str, config: K8sMonitoring):
+        self._topology.add_edit_monitoring_metrics(cluster_id, config)
+        self.save_to_db()
+
+    def delete_k8s_cluster_monitoring_metrics(self, cluster_id: str):
+        self._topology.delete_monitoring_metrics(cluster_id)
+        self.save_to_db()
 
     def add_kubernetes(self, k8s: TopologyK8sModel) -> TopologyK8sModel:
         self._topology.add_k8s_cluster(k8s)
@@ -539,6 +550,27 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return grafana_server
 
+    ############################ Loki ########################################
+
+    def get_loki_list(self) -> List[LokiServerModel]:
+        return self._topology.loki_srv
+
+    def get_loki(self, loki_id: str) -> LokiServerModel:
+        return self._topology.find_loki_srv(loki_id)
+
+    def add_loki(self, loki: LokiServerModel) -> LokiServerModel:
+        self._topology.add_loki_srv(loki)
+        self.save_to_db()
+        return loki
+
+    def update_loki(self, loki: LokiServerModel) -> LokiServerModel:
+        self._topology.upd_loki_srv(loki)
+        self.save_to_db()
+        return loki
+
+    def delete_loki(self, loki_id: str):
+        self._topology.del_loki_srv(loki_id)
+        self.save_to_db()
 
     ###############
     #    PDUs     #

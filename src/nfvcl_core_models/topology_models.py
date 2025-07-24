@@ -1,12 +1,17 @@
+from typing import List, Optional
+
+from pydantic import HttpUrl, Field
+
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.monitoring.grafana_model import GrafanaServerModel
-from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
+from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring
+from nfvcl_core_models.monitoring.loki_model import LokiServerModel
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel
+from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
+from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, TopologyK8sMonitoringMetrics
 from nfvcl_core_models.vim.vim_models import VimModel
-from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
-from pydantic import HttpUrl, Field
-from typing import List, Optional
+
 
 class TopoK8SHasBlueprintException(Exception):
     pass
@@ -28,6 +33,7 @@ class TopologyModel(NFVCLBaseModel):
     # " installed deployed services. When needed the NFVCL will add a new job to the server in order to pull data."
     prometheus_srv: List[PrometheusServerModel] = Field(default_factory=list)
     grafana_srv: List[GrafanaServerModel] = Field(default_factory=list)
+    loki_srv: List[LokiServerModel] = Field(default_factory=list)
 
     def add_prometheus_srv(self, prom_srv: PrometheusServerModel):
         """
@@ -103,6 +109,79 @@ class TopologyModel(NFVCLBaseModel):
         index = self.find_grafana_srv_index(grafana_server.id)
         self.grafana_srv[index] = grafana_server
         return grafana_server
+
+    def add_loki_srv(self, loki_srv: LokiServerModel):
+        """
+        Add a Loki instance to the topology.
+        Args:
+            loki_srv: The server to be added.
+        """
+        # The if is working because the __eq__ function has been overwritten in the GrafanaServerModel (on the id).
+        if loki_srv in self.loki_srv:
+            msg_err = "In the topology is already present a Loki server with id ->{}<-".format(loki_srv.id)
+            raise ValueError(msg_err)
+        else:
+            self.loki_srv.append(loki_srv)
+
+    def del_loki_srv(self, loki_srv_id: str) -> LokiServerModel:
+        index = self.find_loki_srv_index(loki_srv_id)
+        return self.loki_srv.pop(index)
+
+    def upd_loki_srv(self, loki_server: LokiServerModel) -> LokiServerModel:
+        """
+        Update a Loki server in the server list. The instance is identified by ID.
+        Args:
+            loki_server: The server to be updated.
+
+        Returns:
+            The updated server
+        """
+        index = self.find_loki_srv_index(loki_server.id)
+        self.loki_srv[index] = loki_server
+        return loki_server
+
+    def get_monitoring_metrics_config(self, cluster_id: str) -> K8sMonitoring | None:
+        """
+        Get the K8sMonitoring Metrics enabled status of the cluster.
+        Args:
+            cluster_id:
+
+        Returns:
+
+        """
+        try:
+            cluster = self.get_k8s_cluster(cluster_id)
+        except NFVCLCoreException:
+            return None
+        if cluster.k8s_monitoring_metrics:
+            return cluster.k8s_monitoring_metrics.config
+        return None
+
+    def add_edit_monitoring_metrics(self, cluster_id: str, config: K8sMonitoring):
+        """
+        Add the K8sMonitoring Metrics at cluster.
+        Args:
+            cluster_id:
+            config:
+
+        """
+        cluster = self.get_k8s_cluster(cluster_id)
+        if cluster.k8s_monitoring_metrics:
+            cluster.k8s_monitoring_metrics.config = config
+        else:
+            cluster.k8s_monitoring_metrics = TopologyK8sMonitoringMetrics(
+                config=config
+            )
+
+    def delete_monitoring_metrics(self, cluster_id: str):
+        """
+        Delete the K8sMonitoring Metrics from cluster.
+        Args:
+            cluster_id:
+
+        """
+        cluster = self.get_k8s_cluster(cluster_id)
+        cluster.k8s_monitoring_metrics = None
 
     def get_k8s_clusters(self) -> List[TopologyK8sModel]:
         """
@@ -492,6 +571,37 @@ class TopologyModel(NFVCLBaseModel):
         grafana_srv = self.grafana_srv[grafana_srv_index]
 
         return grafana_srv
+
+    def find_loki_srv_index(self, loki_srv_id: str):
+        """
+        Find the index of loki server in the topology list
+        Args:
+            loki_srv_id: The identifier of the loki server.
+
+        Returns:
+            The position of the loki server in the list
+        """
+        loki_svr_to_search = LokiServerModel(id=loki_srv_id)
+        try:
+            loki_svr_index = self.loki_srv.index(loki_svr_to_search)
+        except ValueError:
+            msg_err = "The Loki server ->{}<- has not been found".format(loki_srv_id)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=404)
+
+        return loki_svr_index
+
+    def find_loki_srv(self, loki_srv_id: str):
+        """
+        Find the desired loki server in the list and retrieve it.
+        Args:
+            loki_srv_id: The identifier of the loki server.
+
+        Returns: The desired loki server instance
+        """
+        loki_svr_index = self.find_loki_srv_index(loki_srv_id)
+        loki_srv = self.loki_srv[loki_svr_index]
+
+        return loki_srv
 
     def find_k8s_cluster(self, cluster_name: str) -> TopologyK8sModel:
         """

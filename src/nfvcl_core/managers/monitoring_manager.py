@@ -67,6 +67,7 @@ class MonitoringManager(GenericManager):
 
             for subfolder in folder_model.folders:
                 rec(subfolder, parent_uid=folder_model.uid)
+
         rec(grafana_server.root_folder, None)
 
         # Delete folders that are not in the topology
@@ -96,29 +97,36 @@ class MonitoringManager(GenericManager):
 
         return datasource["uid"]
 
-    def add_grafana_datasource(self, grafana_server_id: str, prometheus_server_id: str):
+    def add_grafana_datasource(self, grafana_server_id: str, datasource: Dict[str, str]):
         grafana_server = self._topology_manager.get_grafana(grafana_server_id)
         if not grafana_server:
             raise NFVCLCoreException(f"Grafana server with ID '{grafana_server_id}' not found in topology")
-        prometheus_server = self._topology_manager.get_prometheus(prometheus_server_id)
-        if not prometheus_server:
-            raise NFVCLCoreException(f"Prometheus server with ID '{prometheus_server_id}' not found in topology")
 
         grafana_client = GrafanaApi.from_url(
             url=f"http://{grafana_server.ip}:{grafana_server.port}",
             credential=(grafana_server.user, grafana_server.password),
         )
-
-        # Check if the datasource already exists
         try:
-            grafana_client.datasource.get_datasource_by_name(prometheus_server.id)
+            grafana_client.datasource.get_datasource_by_name(datasource["name"])
             existing_datasource = True
         except GrafanaClientError:
             existing_datasource = False
 
         if existing_datasource:
-            self.logger.warning(f"Datasource '{prometheus_server.id}' already exists in Grafana server '{grafana_server_id}'. Skipping creation.")
+            self.logger.warning(f"Datasource '{datasource["name"]}' already exists in Grafana server '{grafana_server_id}'. Skipping creation.")
             return
+
+        result = grafana_client.datasource.create_datasource(datasource)
+        if "id" in result:
+            self.logger.success(f"Datasource added to Grafana server '{grafana_server_id}'")
+        else:
+            self.logger.error(f"Failed to add datasource: {result}")
+            raise NFVCLCoreException(f"Failed to add datasource: {result}")
+
+    def add_grafana_prometheus(self, grafana_server_id: str, prometheus_server_id: str):
+        prometheus_server = self._topology_manager.get_prometheus(prometheus_server_id)
+        if not prometheus_server:
+            raise NFVCLCoreException(f"Prometheus server with ID '{prometheus_server_id}' not found in topology")
 
         datasource = {
             "name": prometheus_server.id,
@@ -126,13 +134,26 @@ class MonitoringManager(GenericManager):
             "access": "proxy",
             "url": f"http://{prometheus_server.ip}:{prometheus_server.port}",
         }
-        result = grafana_client.datasource.create_datasource(datasource)
-        if "uid" in result:
-            self.logger.success(f"Datasource '{prometheus_server.id}' added to Grafana server '{grafana_server_id}'")
-        else:
-            self.logger.error(f"Failed to add datasource: {result}")
-            raise NFVCLCoreException(f"Failed to add datasource: {result}")
 
+        self.add_grafana_datasource(grafana_server_id, datasource)
+
+    def add_grafana_loki(self, grafana_server_id: str):
+        grafana_server = self._topology_manager.get_grafana(grafana_server_id)
+        if not grafana_server:
+            raise NFVCLCoreException(f"Grafana server with ID '{grafana_server_id}' not found in topology")
+
+        datasource = {
+            "name": "Loki",
+            "type": "loki",
+            "access": "proxy",
+            "url": f"http://{grafana_server.ip}:3100",
+            "basicAuth": False,
+            "isDefault": False,
+            "jsonData": {
+                "httpMethod": "GET"
+            }
+        }
+        self.add_grafana_datasource(grafana_server_id, datasource)
 
     def add_grafana_dashboard(self, grafana_server_id: str, dashboard: Dict, folder_uid: str = "0"):
         grafana_server = self._topology_manager.get_grafana(grafana_server_id)

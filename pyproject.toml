@@ -50,7 +50,7 @@ python-multipart = "^0.0.20"
 blinker = "^1.9.0"
 proxmoxer = "^2.2.0"
 grafana-client = "^4.3.2"
-pyhelm3 = {git = "https://github.com/s2n-cnit/pyhelm3.git"}
+pyhelm3 = {git = "https://github.com/s2n-cnit/pyhelm3.git", rev = "5c25193"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"

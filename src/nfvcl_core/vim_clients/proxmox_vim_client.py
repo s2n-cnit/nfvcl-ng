@@ -1,3 +1,5 @@
+import time
+
 import paramiko
 from proxmoxer import ProxmoxAPI
 
@@ -7,6 +9,8 @@ from nfvcl_core_models.vim.vim_models import VimModel
 DEFAULT_PROXMOX_TIMEOUT = 180
 
 class ProxmoxVimClient(VimClient):
+    proxmoxer: ProxmoxAPI
+
     def __init__(self, vim: VimModel):
         super().__init__(vim)
         self._connect_ssh()
@@ -28,24 +32,37 @@ class ProxmoxVimClient(VimClient):
 
     def _connect_proxmoxer(self):
         """Establish Proxmoxer API connection"""
-        if self.vim.proxmox_parameters().proxmox_token_value:
-            self.proxmoxer = ProxmoxAPI(
-                self.vim.vim_url,
-                user=f'{self.vim.vim_user}@{self.vim.proxmox_parameters().proxmox_realm}',
-                token_name=self.vim.proxmox_parameters().proxmox_token_name,
-                token_value=self.vim.proxmox_parameters().proxmox_token_value,
-                verify_ssl=False,
-                timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
-            )
-        else:
-            self.proxmoxer = ProxmoxAPI(
-                self.vim.vim_url,
-                user=f'{self.vim.vim_user}@{self.vim.proxmox_parameters().proxmox_realm}',
-                password=self.vim.vim_password,
-                otp=self.vim.proxmox_parameters().proxmox_otp_code if self.vim.proxmox_parameters().proxmox_otp_code else None,
-                verify_ssl=False,
-                timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
-            )
+        connection_attempts = 0
+        max_retries = 5
+        while connection_attempts < max_retries:
+            try:
+                if self.vim.proxmox_parameters().proxmox_token_value:
+                    self.proxmoxer = ProxmoxAPI(
+                        self.vim.vim_url,
+                        user=f'{self.vim.vim_user}@{self.vim.proxmox_parameters().proxmox_realm}',
+                        token_name=self.vim.proxmox_parameters().proxmox_token_name,
+                        token_value=self.vim.proxmox_parameters().proxmox_token_value,
+                        verify_ssl=False,
+                        timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
+                    )
+                else:
+                    self.proxmoxer = ProxmoxAPI(
+                        self.vim.vim_url,
+                        user=f'{self.vim.vim_user}@{self.vim.proxmox_parameters().proxmox_realm}',
+                        password=self.vim.vim_password,
+                        otp=self.vim.proxmox_parameters().proxmox_otp_code if self.vim.proxmox_parameters().proxmox_otp_code else None,
+                        verify_ssl=False,
+                        timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
+                    )
+                version = self.proxmoxer("version").get()
+                self.logger.debug(f"Connected to Proxmox API version: {version['version']}")
+                break
+            except Exception as e:
+                connection_attempts += 1
+                self.logger.error(f"Failed to connect to Proxmox API: {e}. Attempt {connection_attempts} of {max_retries}")
+                if connection_attempts >= max_retries:
+                    raise ConnectionError("Failed to connect to Proxmox API after multiple attempts")
+            time.sleep(3)
 
     def _is_connected(self):
         """Check if SSH client is still connected"""

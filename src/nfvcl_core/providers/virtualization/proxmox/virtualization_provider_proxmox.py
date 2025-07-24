@@ -6,6 +6,7 @@ from enum import Enum
 from time import sleep
 from typing import Dict, List, Tuple, Set
 
+import proxmoxer
 from pydantic import Field, TypeAdapter
 
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit, CloudInitNetworkRoot
@@ -78,7 +79,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         ta = TypeAdapter(List[ProxmoxNode])
         nodes = ta.validate_python(response)
         for node in nodes:
-            node_details = self.proxmox_vim_client.proxmoxer.nodes(node.node).network.get()
+            node_details = self.__execute_proxmox_request(url=f"nodes/{node.node}/network", r_type=ApiRequestType.GET)
             for interface in node_details:
                 if "address" in interface and interface["address"] == self.vim.vim_url:
                     return node.node
@@ -514,7 +515,10 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         timeout = time.time() + (DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout)
         while exit_status != 0 and time.time() < timeout:
             try:
-                response = self.proxmox_vim_client.proxmoxer.nodes(self.data.proxmox_node_name).qemu(vmid).agent.ping.post()
+                response = self.__execute_proxmox_request(
+                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/agent/ping",
+                    r_type=ApiRequestType.POST
+                )
                 if response is not None:
                     exit_status = 0
                     return
@@ -536,27 +540,37 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             return stdout
 
     def __execute_proxmox_request(self, url: str, r_type: ApiRequestType, node_name=None, parameters=None):
-        match r_type:
-            case ApiRequestType.GET:
-                response = self.proxmox_vim_client.proxmoxer(url).get(**parameters if parameters else {})
-            case ApiRequestType.POST:
-                response = self.proxmox_vim_client.proxmoxer(url).post(**parameters if parameters else {})
-            case ApiRequestType.PUT:
-                response = self.proxmox_vim_client.proxmoxer(url).put(**parameters if parameters else {})
-            case ApiRequestType.DELETE:
-                response = self.proxmox_vim_client.proxmoxer(url).delete(**parameters if parameters else {})
-            case _:
-                raise VirtualizationProviderProxmoxException("Api request type not supported")
+        connection_attempts = 0
+        max_retries = 5
+        while connection_attempts < max_retries:
+            try:
+                match r_type:
+                    case ApiRequestType.GET:
+                        response = self.proxmox_vim_client.proxmoxer(url).get(**parameters if parameters else {})
+                    case ApiRequestType.POST:
+                        response = self.proxmox_vim_client.proxmoxer(url).post(**parameters if parameters else {})
+                    case ApiRequestType.PUT:
+                        response = self.proxmox_vim_client.proxmoxer(url).put(**parameters if parameters else {})
+                    case ApiRequestType.DELETE:
+                        response = self.proxmox_vim_client.proxmoxer(url).delete(**parameters if parameters else {})
+                    case _:
+                        raise VirtualizationProviderProxmoxException("Api request type not supported")
 
-        if node_name:
-            data = {"status": ""}
-            while data["status"] != "stopped":
-                output = f"{response.split(':')[5]}, VMid {response.split(':')[6]}" if response.split(':')[6] else f"{response.split(':')[5]}"
-                self.logger.debug(f"Waiting for task: {output}")
-                data = self.proxmox_vim_client.proxmoxer.nodes(node_name).tasks(response).status.get()
-                sleep(3)
-
-        return response
+                if node_name:
+                    data = {"status": ""}
+                    while data["status"] != "stopped":
+                        output = f"{response.split(':')[5]}, VMid {response.split(':')[6]}" if response.split(':')[6] else f"{response.split(':')[5]}"
+                        self.logger.debug(f"Waiting for task: {output}")
+                        data = self.proxmox_vim_client.proxmoxer.nodes(node_name).tasks(response).status.get()
+                        sleep(3)
+                return response
+            except proxmoxer.core.AuthenticationError as e: # TODO add other possible exceptions
+                connection_attempts += 1
+                self.logger.error(f"Error executing Proxmox request: {e}, attempt {connection_attempts}/{max_retries}")
+                if connection_attempts >= max_retries:
+                    raise VirtualizationProviderProxmoxException(f"Failed to execute Proxmox request after {max_retries} attempts")
+                sleep(2)
+        return None
 
     def __get_nfvcl_sdn_zone(self) -> ProxmoxZone:
         response = self.__execute_proxmox_request(

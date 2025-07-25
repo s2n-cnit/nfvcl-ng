@@ -223,6 +223,7 @@ class HelmPluginManager:
         with open(PLUGIN_VALUE_PATH / 'k8s_monitoring.yaml', 'r') as k8s_monitoring_chart_path_values_file:
             k8s_monitoring_values = yaml.safe_load(k8s_monitoring_chart_path_values_file)
             k8s_monitoring_config = K8sMonitoring.model_validate(k8s_monitoring_values)
+            k8s_monitoring_config.cluster.name = plugin_data.k8smonitoring_cluster_id
             k8s_monitoring_config.cluster.namespace = f"alloy-metrics"
 
             if plugin_data.loki:

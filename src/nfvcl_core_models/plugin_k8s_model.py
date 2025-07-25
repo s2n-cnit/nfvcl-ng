@@ -87,6 +87,7 @@ class K8sPluginAdditionalData(NFVCLBaseModel):
     k8smonitoring_node_exporter_enabled: Optional[bool] = Field(default=False, description="Whether the node exporter should be enabled")
     k8smonitoring_node_exporter_label: Optional[str] = Field(default=None, description="The label of another node exporter already running on the cluster")
     k8smonitoring_config: Optional[K8sMonitoring] = Field(default=None, description="The K8s monitoring configuration")
+    k8smonitoring_cluster_id: Optional[str] = Field(default=None, description="The K8s cluster ID")
 
 
 class K8sPluginsToInstall(NFVCLBaseModel):

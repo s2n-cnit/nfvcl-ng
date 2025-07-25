@@ -131,7 +131,12 @@ class KubernetesManager(GenericManager):
         else:
             cluster, loki, prometheus = self.retrieve_monitoring_data(cluster_id, config.loki_id, config.prometheus_id)
             if cluster and (loki or prometheus):
-                template_fill_data = K8sPluginAdditionalData(loki=loki, prometheus=prometheus, k8smonitoring_node_exporter_enabled=config.node_exporter_enabled, k8smonitoring_node_exporter_label=config.node_exporter_label)
+                template_fill_data = K8sPluginAdditionalData(
+                    loki=loki, prometheus=prometheus,
+                    k8smonitoring_node_exporter_enabled=config.node_exporter_enabled,
+                    k8smonitoring_node_exporter_label=config.node_exporter_label,
+                    k8smonitoring_cluster_id=cluster_id
+                )
                 helm_plugin_manager = HelmPluginManager(cluster.credentials, cluster_id)
                 config = helm_plugin_manager.install_k8s_monitoring(template_fill_data)
                 self._topology_manager.add_edit_k8s_cluster_monitoring_metrics(cluster_id, config)

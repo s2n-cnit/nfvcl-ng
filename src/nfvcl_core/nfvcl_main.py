@@ -131,8 +131,9 @@ class NFVCL:
 
         register_pdu_implementations(pdu_manager)
 
-        self.blueprint_manager.load()
-        self.performance_manager.load()
+        if not global_ref.nfvcl_config.nfvcl.rescue_mode:
+            self.blueprint_manager.load()
+            self.performance_manager.load()
         self.user_manager.load()
 
         # TODO rework plugin loading

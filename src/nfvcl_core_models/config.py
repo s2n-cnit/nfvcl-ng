@@ -13,6 +13,7 @@ class NFVCLParameters(NFVCLBaseModel):
     ip: str
     port: int
     workers: int = Field(default=4, description="The number of workers to handle the requests")
+    rescue_mode: Optional[bool] = Field(default=False, description="Enable the rescue mode (will not load blueprints)")
     authentication: bool = Field(default=False, description="Enable the authentication")
     mounted_folder: str = Field(default="mounted_folder", description="The folder in which files are generated to be exposed in API 'NFVCL_URL:NFVCL_PORT/files/'")
     tmp_folder: str = Field(default="/tmp/nfvcl", description="The folder in which the tmp files are saved")

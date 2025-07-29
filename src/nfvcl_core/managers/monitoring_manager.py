@@ -118,7 +118,7 @@ class MonitoringManager(GenericManager):
 
         result = grafana_client.datasource.create_datasource(datasource)
         if "id" in result:
-            self.logger.success(f"Datasource added to Grafana server '{grafana_server_id}'")
+            self.logger.success(f"Datasource of type {datasource["type"]} added to Grafana server '{grafana_server_id}'")
         else:
             self.logger.error(f"Failed to add datasource: {result}")
             raise NFVCLCoreException(f"Failed to add datasource: {result}")

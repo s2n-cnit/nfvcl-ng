@@ -1,4 +1,5 @@
 import time
+from typing import Optional
 
 import paramiko
 from proxmoxer import ProxmoxAPI
@@ -9,12 +10,11 @@ from nfvcl_core_models.vim.vim_models import VimModel
 DEFAULT_PROXMOX_TIMEOUT = 180
 
 class ProxmoxVimClient(VimClient):
-    proxmoxer: ProxmoxAPI
-
     def __init__(self, vim: VimModel):
         super().__init__(vim)
+        self.proxmoxer: Optional[ProxmoxAPI] = None
         self._connect_ssh()
-        self._connect_proxmoxer()
+        self.connect_proxmoxer()
 
     def _connect_ssh(self):
         """Establish SSH connection to Proxmox"""
@@ -30,8 +30,12 @@ class ProxmoxVimClient(VimClient):
         self.ssh_client.get_transport().set_keepalive(10)
         self.logger.spam("Connected to Proxmox")
 
-    def _connect_proxmoxer(self):
+    def connect_proxmoxer(self):
         """Establish Proxmoxer API connection"""
+        if self.proxmoxer is not None:
+            self.logger.debug("Proxmoxer already connected, closing previous connection")
+            del self.proxmoxer
+
         connection_attempts = 0
         max_retries = 5
         while connection_attempts < max_retries:

@@ -567,6 +567,8 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             except proxmoxer.core.AuthenticationError as e: # TODO add other possible exceptions
                 connection_attempts += 1
                 self.logger.error(f"Error executing Proxmox request: {e}, attempt {connection_attempts}/{max_retries}")
+                self.logger.debug("Forcing proxmox client to re-authenticate")
+                self.proxmox_vim_client.connect_proxmoxer()
                 if connection_attempts >= max_retries:
                     raise VirtualizationProviderProxmoxException(f"Failed to execute Proxmox request after {max_retries} attempts")
                 sleep(2)

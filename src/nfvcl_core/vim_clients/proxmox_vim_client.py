@@ -32,10 +32,6 @@ class ProxmoxVimClient(VimClient):
 
     def connect_proxmoxer(self):
         """Establish Proxmoxer API connection"""
-        if self.proxmoxer is not None:
-            self.logger.debug("Proxmoxer already connected, closing previous connection")
-            del self.proxmoxer
-
         connection_attempts = 0
         max_retries = 5
         while connection_attempts < max_retries:
@@ -67,6 +63,14 @@ class ProxmoxVimClient(VimClient):
                 if connection_attempts >= max_retries:
                     raise ConnectionError("Failed to connect to Proxmox API after multiple attempts")
             time.sleep(3)
+
+    def force_token_refresh(self):
+        if not self.vim.proxmox_parameters().proxmox_token_value:
+            self.logger.debug("Forcing proxmoxer token refresh")
+            self.proxmoxer._backend.auth._get_new_tokens(
+                password=self.vim.vim_password,
+                otp=self.vim.proxmox_parameters().proxmox_otp_code if self.vim.proxmox_parameters().proxmox_otp_code else None
+            )
 
     def _is_connected(self):
         """Check if SSH client is still connected"""

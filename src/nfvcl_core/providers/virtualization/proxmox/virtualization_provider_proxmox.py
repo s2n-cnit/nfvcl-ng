@@ -523,7 +523,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     exit_status = 0
                     return
             except Exception as e:
-                self.logger.debug("Waiting qemu guest agent...")
+                self.logger.debug(f"Waiting qemu guest agent... ({e})")
                 sleep(3)
         raise VirtualizationProviderProxmoxException(f"Timeout waiting for qemu guest agent")
 
@@ -561,14 +561,17 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     while data["status"] != "stopped":
                         output = f"{response.split(':')[5]}, VMid {response.split(':')[6]}" if response.split(':')[6] else f"{response.split(':')[5]}"
                         self.logger.debug(f"Waiting for task: {output}")
-                        data = self.proxmox_vim_client.proxmoxer.nodes(node_name).tasks(response).status.get()
+                        data = self.proxmox_vim_client.proxmoxer(f"nodes/{node_name}/tasks/{response}/status").get()
                         sleep(3)
                 return response
-            except proxmoxer.core.AuthenticationError as e: # TODO add other possible exceptions
+            except (proxmoxer.core.AuthenticationError, proxmoxer.core.ResourceException) as e: # TODO add other possible exceptions
+                if isinstance(e, proxmoxer.core.ResourceException) and not e.status_code == 401:
+                    # If the error is not an authentication error, we raise it immediately
+                    raise e
                 connection_attempts += 1
                 self.logger.error(f"Error executing Proxmox request: {e}, attempt {connection_attempts}/{max_retries}")
                 self.logger.debug("Forcing proxmox client to re-authenticate")
-                self.proxmox_vim_client.connect_proxmoxer()
+                self.proxmox_vim_client.force_token_refresh()
                 if connection_attempts >= max_retries:
                     raise VirtualizationProviderProxmoxException(f"Failed to execute Proxmox request after {max_retries} attempts")
                 sleep(2)

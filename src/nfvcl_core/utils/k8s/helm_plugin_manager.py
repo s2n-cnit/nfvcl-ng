@@ -7,15 +7,16 @@ from typing import List
 import yaml
 from kubernetes.client import V1DaemonSet
 from kubernetes.utils import FailToCreateError
+from pyhelm3 import Client
 from verboselogs import VerboseLogger
 
-from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
-from nfvcl_core.utils.log import create_logger
-from nfvcl_core.utils.k8s.kube_api_utils import get_daemon_sets, apply_def_to_cluster, read_namespaced_storage_class, patch_namespaced_storage_class
 from nfvcl_core.utils.file_utils import render_file_from_template_to_file, create_tmp_file
-from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
+from nfvcl_core.utils.log import create_logger
+from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring, DestinationType
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData
-from pyhelm3 import Client
+from nfvcl_core_models.resources import HelmChartResource
 
 
 def build_helm_client_from_credential_file_path(k8s_credential_file_path) -> Client:
@@ -67,9 +68,11 @@ class HelmPluginManager:
         get_installed_plugins(): Retrieves a list of currently installed Helm plugins.
         __apply_yaml_file_to_cluster(plugin_name, yaml_file_path): Applies a YAML file configuration to the Kubernetes cluster.
     """
+
     def __init__(self, k8s_credential_file, context_name: str = "") -> None:
         self.k8s_credential_file = k8s_credential_file
         self.k8s_config = get_k8s_config_from_file_content(k8s_credential_file)
+        self.kube_utils = KubeApiUtils(self.k8s_config)
         self.helm_client = build_helm_client_from_credential_file_content(k8s_credential_file, create_tmp_file("k8s", "k8s_helm_client_credentials", True))
         self.context_name = context_name
         self.logger: VerboseLogger = create_logger(self.__class__.__name__, blueprintid=context_name)
@@ -112,6 +115,19 @@ class HelmPluginManager:
             wait=True
         ))
 
+    def uninstall_plugin(self, namespace: str, wait=True):
+        """
+        Args:
+            wait: True if uninstall should wait for completion.
+            namespace: str, The namespace in which the chart will be installed.
+        """
+
+        helm_client: Client = self.helm_client
+        releases = asyncio.run(helm_client.list_releases(namespace=namespace))
+        self.logger.info(f"Uninstalling plugin in {namespace}")
+        for release in releases:
+            asyncio.run(helm_client.uninstall_release(release.name, namespace=namespace, wait=wait))
+
     def install_plugins(self, plugin_names: list[K8sPluginName], plugin_data: K8sPluginAdditionalData):
         """
         Args:
@@ -141,8 +157,14 @@ class HelmPluginManager:
         for plugin_name in plugin_names_copy:
             if plugin_name == K8sPluginName.OPEN_EBS:
                 self._install_openebs()
+            elif plugin_name == K8sPluginName.MULTUS:
+                self._install_multus(plugin_data)
             elif plugin_name == K8sPluginName.METALLB:
                 self._install_metallb(plugin_data)
+            elif plugin_name == K8sPluginName.CERT_MANAGER:
+                self._install_cert_manager(plugin_data)
+            elif plugin_name == K8sPluginName.NFVCL_WEBHOOK:
+                self._install_nfvcl_webhook(plugin_data)
 
     def _install_openebs(self):
         """
@@ -166,10 +188,10 @@ class HelmPluginManager:
             values=values_disable_replication
         )
         # Get the storage class to make it default
-        storage_class = read_namespaced_storage_class(self.k8s_config, "openebs-hostpath")
+        storage_class = self.kube_utils.read_namespaced_storage_class("openebs-hostpath")
         # Set it the default sc
         storage_class.metadata.annotations["storageclass.kubernetes.io/is-default-class"] = 'true'
-        patch_namespaced_storage_class(self.k8s_config, storage_class)
+        self.kube_utils.patch_namespaced_storage_class(storage_class)
 
     def _install_flannel(self, plugin_data: K8sPluginAdditionalData):
         """
@@ -185,6 +207,105 @@ class HelmPluginManager:
             namespace="flannel",
             values=values
         )
+
+    def _install_multus(self, plugin_data: K8sPluginAdditionalData):
+        multus_chart_path = PLUGIN_PATH / 'multus-cni-2.2.17.tgz'
+        self.install_plugin(
+            name=K8sPluginName.MULTUS,
+            chart_name=str(multus_chart_path),
+            version="2.2.17",
+            namespace="multus",
+            values={}
+        )
+
+    def install_k8s_monitoring(self, plugin_data: K8sPluginAdditionalData) -> K8sMonitoring:
+        k8s_monitoring_chart_path = PLUGIN_PATH / 'k8s-monitoring-3.2.0.tgz'
+        with open(PLUGIN_VALUE_PATH / 'k8s_monitoring.yaml', 'r') as k8s_monitoring_chart_path_values_file:
+            k8s_monitoring_values = yaml.safe_load(k8s_monitoring_chart_path_values_file)
+            k8s_monitoring_config = K8sMonitoring.model_validate(k8s_monitoring_values)
+            k8s_monitoring_config.cluster.name = plugin_data.k8smonitoring_cluster_id
+            k8s_monitoring_config.cluster.namespace = f"alloy-metrics"
+
+            if plugin_data.loki:
+                k8s_monitoring_config.add_destination(
+                    name=f"loki-{plugin_data.loki.id}",
+                    _type=DestinationType.LOKI,
+                    url=f"http://{plugin_data.loki.ip}:{plugin_data.loki.port}/loki/api/v1/push",
+                    username=plugin_data.loki.user,
+                    password=plugin_data.loki.password
+                )
+
+            if plugin_data.prometheus:
+                k8s_monitoring_config.add_destination(
+                    name=f"prometheus-{plugin_data.prometheus.id}",
+                    _type=DestinationType.PROMETHEUS,
+                    url=f"http://{plugin_data.prometheus.ip}:{plugin_data.prometheus.port}/api/v1/write",
+                    username=plugin_data.prometheus.user,
+                    password=plugin_data.prometheus.password
+                )
+            if plugin_data.k8smonitoring_node_exporter_enabled:
+                k8s_monitoring_config.enable_node_exporter(plugin_data.k8smonitoring_node_exporter_label)
+
+        self.install_plugin(
+            name=K8sPluginName.K8S_MONITORING,
+            chart_name=str(k8s_monitoring_chart_path),
+            version="3.2.0",
+            namespace=k8s_monitoring_config.cluster.namespace,
+            values=k8s_monitoring_config.model_dump(exclude_none=True, by_alias=True)
+        )
+        return k8s_monitoring_config
+
+    def add_metrics_destination(self, plugin_data: K8sPluginAdditionalData):
+        k8s_monitoring_chart_path = PLUGIN_PATH / 'k8s-monitoring-3.2.0.tgz'
+        tmp = plugin_data.k8smonitoring_config.__deepcopy__()
+        if plugin_data.loki:
+            plugin_data.k8smonitoring_config.add_destination(
+                name=f"loki-{plugin_data.loki.id}",
+                _type=DestinationType.LOKI,
+                url=f"http://{plugin_data.loki.ip}:{plugin_data.loki.port}/loki/api/v1/push",
+                username=plugin_data.loki.user,
+                password=plugin_data.loki.password
+            )
+
+        if plugin_data.prometheus:
+            plugin_data.k8smonitoring_config.add_destination(
+                name=f"prometheus-{plugin_data.prometheus.id}",
+                _type=DestinationType.PROMETHEUS,
+                url=f"http://{plugin_data.prometheus.ip}:{plugin_data.prometheus.port}/api/v1/write",
+                username=plugin_data.prometheus.user,
+                password=plugin_data.prometheus.password
+            )
+
+        if tmp != plugin_data.k8smonitoring_config:
+            self.install_plugin(
+                name=K8sPluginName.K8S_MONITORING,
+                chart_name=str(k8s_monitoring_chart_path),
+                version="3.2.0",
+                namespace=plugin_data.k8smonitoring_config.cluster.namespace,
+                values=plugin_data.k8smonitoring_config.model_dump(exclude_none=True, by_alias=True)
+            )
+            return plugin_data.k8smonitoring_config
+        return tmp
+
+    def del_metrics_destination(self, plugin_data: K8sPluginAdditionalData):
+        k8s_monitoring_chart_path = PLUGIN_PATH / 'k8s-monitoring-3.2.0.tgz'
+        tmp = plugin_data.k8smonitoring_config.__deepcopy__()
+        if plugin_data.loki:
+            plugin_data.k8smonitoring_config.del_destination(name=f"loki-{plugin_data.loki.id}")
+
+        if plugin_data.prometheus:
+            plugin_data.k8smonitoring_config.del_destination(name=f"prometheus-{plugin_data.prometheus.id}")
+
+        if tmp != plugin_data.k8smonitoring_config:
+            self.install_plugin(
+                name=K8sPluginName.K8S_MONITORING,
+                chart_name=str(k8s_monitoring_chart_path),
+                version="3.2.0",
+                namespace=plugin_data.k8smonitoring_config.cluster.namespace,
+                values=plugin_data.k8smonitoring_config.model_dump(exclude_none=True, by_alias=True)
+            )
+            return plugin_data.k8smonitoring_config
+        return tmp
 
     def _install_metallb(self, plugin_data: K8sPluginAdditionalData):
         """
@@ -203,19 +324,69 @@ class HelmPluginManager:
         rendered_file = render_file_from_template_to_file(template_file_metallb, plugin_data.model_dump(), self.context_name, ".yaml")
         self.__apply_yaml_file_to_cluster(K8sPluginName.METALLB, rendered_file)
 
+    def _install_cert_manager(self, plugin_data: K8sPluginAdditionalData):
+        """
+        Args:
+            plugin_data: K8sPluginAdditionalData used to fill values inside helm charts (i.e. the cidr of pods in flannel and calico)
+        """
+        cert_manager_chart_path = PLUGIN_PATH / 'cert-manager-v1.18.0.tgz'
+        self.install_plugin(
+            name=K8sPluginName.CERT_MANAGER,
+            chart_name=str(cert_manager_chart_path),
+            version="v1.18.0",
+            namespace="cert-manager",
+            values={"crds": {"enabled": True}}
+        )
+
+    def _install_nfvcl_webhook(self, plugin_data: K8sPluginAdditionalData):
+        base_path = Path("src/nfvcl/config_templates/k8s/nfvcl_webhook")
+
+        template_file_certificates = Path(base_path, "certificate.yaml")
+        template_file_deployment = Path(base_path, "deployment.yaml")
+        template_file_webhook = Path(base_path, "mutatingwebhookconfiguration.yaml.j2")
+
+        rendered_file_certificates = render_file_from_template_to_file(template_file_certificates, plugin_data.model_dump(), self.context_name, ".yaml")
+        rendered_file_deployment = render_file_from_template_to_file(template_file_deployment, plugin_data.model_dump(), self.context_name, ".yaml")
+        self.__apply_yaml_file_to_cluster(K8sPluginName.NFVCL_WEBHOOK, rendered_file_certificates)
+        self.__apply_yaml_file_to_cluster(K8sPluginName.NFVCL_WEBHOOK, rendered_file_deployment)
+
+        # Poll until the secret is available
+        max_retries = 30
+        retry_interval = 1  # seconds
+        ca_b64 = None
+        for attempt in range(max_retries):
+            try:
+                secret = self.kube_utils.get_secrets("nfvcl-webhook", "webhook-tls")
+                if secret and secret.items and len(secret.items) > 0 and "ca.crt" in secret.items[0].data:
+                    ca_b64 = secret.items[0].data["ca.crt"]
+                    break
+                self.logger.debug(f"Secret not ready yet, waiting (attempt {attempt + 1}/{max_retries})...")
+            except Exception as e:
+                self.logger.debug(f"Error retrieving secret: {e}")
+
+            time.sleep(retry_interval)
+        else:
+            self.logger.error("Timed out waiting for webhook-tls secret")
+            raise TimeoutError("Timed out waiting for webhook-tls secret to become available")
+
+        if ca_b64:
+            rendered_file_webhook = render_file_from_template_to_file(template_file_webhook, {"cabundle": ca_b64}, self.context_name, ".yaml")
+            self.__apply_yaml_file_to_cluster(K8sPluginName.NFVCL_WEBHOOK, rendered_file_webhook)
+
     def _install_calico(self, plugin_data: K8sPluginAdditionalData):
         """
         Args:
             plugin_data: K8sPluginAdditionalData instance containing additional data relevant to the plugin installation process.
         """
-        calico_chart_path = PLUGIN_PATH / 'tigera-operator-v3.29.0.tgz'
-        calico_values = yaml.safe_load(PLUGIN_VALUE_PATH / 'calico.yaml')
+        calico_chart_path = PLUGIN_PATH / 'tigera-operator-v3.30.1.tgz'
+        with open(PLUGIN_VALUE_PATH / 'calico.yaml', 'r') as calico_values_file:
+            calico_values = yaml.safe_load(calico_values_file)
         calico_values["installation"]["calicoNetwork"]["ipPools"][0]['cidr'] = plugin_data.pod_network_cidr if plugin_data.pod_network_cidr else "10.254.0.0/16"
         self.install_plugin(
             name=K8sPluginName.CALICO,
             chart_name=str(calico_chart_path),
-            version="3.29.0",
-            namespace="calico",
+            version="3.30.1",
+            namespace="tigera-operator",
             values=calico_values
         )
 
@@ -226,12 +397,14 @@ class HelmPluginManager:
         Returns:
             List[K8sPluginName]: A list containing the names of the installed plugins.
         """
-        daemon_sets = get_daemon_sets(self.k8s_config)
+        daemon_sets = self.kube_utils.get_daemon_sets()
         # deployments = get_deployments(self.k8s_config)
         plugin_list = []
 
         daemon_set: V1DaemonSet
         for daemon_set in daemon_sets.items:
+            if daemon_set.metadata.labels is None:
+                continue
             if 'app' in daemon_set.metadata.labels:
                 app = daemon_set.metadata.labels['app']
                 match app:
@@ -244,13 +417,12 @@ class HelmPluginManager:
             if 'app.kubernetes.io/name' in daemon_set.metadata.labels:
                 if daemon_set.metadata.labels['app.kubernetes.io/name'] == 'metallb':
                     plugin_list.append(K8sPluginName.METALLB)
-            if 'openebs.io/component-name' in daemon_set.metadata.labels: # Value should be ndm
+            if 'openebs.io/component-name' in daemon_set.metadata.labels:  # Value should be ndm
                 if K8sPluginName.OPEN_EBS not in plugin_list:
                     plugin_list.append(K8sPluginName.OPEN_EBS)
             if 'k8s-app' in daemon_set.metadata.labels:  # Value should be calico-node
                 if daemon_set.metadata.labels['k8s-app'] == 'calico-node':
                     plugin_list.append(K8sPluginName.CALICO)
-
 
         # for deployment in deployments.items:
         #     # If some plugin is detectable by the list of deployments
@@ -269,9 +441,9 @@ class HelmPluginManager:
         # Element in position 1 because apply_def_to_cluster is working on yaml file, please look at the source
         # code of apply_def_to_cluster
         try:
-            apply_def_to_cluster(self.k8s_config, yaml_file_to_be_applied=yaml_file_path)[1]
+            self.kube_utils.apply_def_to_cluster(yaml_file_to_be_applied=yaml_file_path)[1]
         except FailToCreateError as fail:
             self.logger.warning(traceback.format_tb(fail.__traceback__))
             self.logger.warning("Definition <{}> for plugin <{}> has gone wrong. Retrying in 30 seconds...".format(str(yaml_file_path), plugin_name.name))
             time.sleep(30)
-            apply_def_to_cluster(self.k8s_config, yaml_file_to_be_applied=yaml_file_path)[1]
+            self.kube_utils.apply_def_to_cluster(yaml_file_to_be_applied=yaml_file_path)[1]

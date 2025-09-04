@@ -452,6 +452,12 @@ default_core_config: OaiCoreValuesModel = OaiCoreValuesModel.model_validate({
             "pullPolicy": "IfNotPresent"
         },
         "includeTcpDumpContainer": False,
+        "hostAliases": [
+            {
+                "ip": "10.180.2.41",
+                "hostnames": "oai-upf"
+            }
+        ],
         "persistent": {
             "sharedvolume": False
         },

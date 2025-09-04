@@ -293,7 +293,7 @@ def check_py_version():
     """
     v_info = sys.version_info
     logger.info(f"Running on Python {v_info.major}.{v_info.minor}")
-    if v_info.major < PY_MIN_MAJOR or v_info.minor < PY_MIN_MINOR:
+    if v_info.major < PY_MIN_MAJOR or (v_info.major >= PY_MIN_MAJOR and v_info.minor < PY_MIN_MINOR):
         logger.error(f"The version of Python must be greater then {PY_MIN_MAJOR}.{PY_MIN_MINOR}. "
                      f"You are using the {sys.version}")
         exit(-1)

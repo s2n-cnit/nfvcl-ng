@@ -130,7 +130,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             self.state.oai_config_values.oai_smf.multus.n4Interface.set_multus(True, self.state.network_endpoints.n4.multus)
             self.state.oai_config_values.global_.coreconfig.nfs.smf.n4.interface_name = "n4" if self.state.network_endpoints.n4.multus else "eth0"
 
-        # self.state.oai_config_values.oai_smf.hostAliases.clear()
+        self.state.oai_config_values.oai_smf.hostAliases.clear()
         self.state.oai_config_values.global_.coreconfig.smf.upfs.clear()
         self.state.oai_config_values.global_.coreconfig.snssais.clear()
         self.state.oai_config_values.global_.coreconfig.amf.plmn_support_list.clear()
@@ -140,8 +140,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         for sub_area in self.state.current_config.areas:
             # TODO this work only for oai UPF, with the sdcore one multiple UPFs may be deployed for a single area
-            # deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
-            # oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, deployed_upf_info.network_info.n4_ip.exploded)
+            deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
+            oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, deployed_upf_info.network_info.n4_ip.exploded)
             oai_utils.add_available_upf(self.state.oai_config_values.global_.coreconfig, sub_area.id)
 
             for _slice in sub_area.slices:
@@ -162,6 +162,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                     oai_utils.add_local_subscription_info(self.state.oai_config_values.global_.coreconfig, new_snssai, dnn_info)
                     oai_utils.add_dnn_dnns(self.state.oai_config_values.global_.coreconfig, dnn_info.dnn, dnn_info.pools[0].cidr)
                     oai_utils.add_dnn_snssai_smf_info_list_item(self.state.oai_config_values.global_.coreconfig, new_snssai, dnn_item)
+
 
     def update_core(self):
         """
@@ -444,6 +445,11 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.update_core_values()
         self.update_core()
         self.update_edge_areas(force=True)
+
+        nfs = self.network_functions_dictionary()
+        smf_dep = nfs[NF5GType.SMF][0]
+        self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments[smf_dep].name)
+
         self.update_gnb_config()
 
     def del_tac(self, area: Core5GDelTacModel):
@@ -458,6 +464,11 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.update_core_values()
         self.update_core()
         self.update_edge_areas(force=True)
+
+        nfs = self.network_functions_dictionary()
+        smf_dep = nfs[NF5GType.SMF][0]
+        self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments[smf_dep].name)
+
         self.update_gnb_config()
 
     def add_dnn(self, dnn: Core5GAddDnnModel):

@@ -53,6 +53,7 @@ default_cu_config: CU = CU.model_validate({
         "f1IfName": "eth0",
         "f1cuPort": "2153",
         "f1duPort": "2153",
-        "gnbId": "0xe00"
+        "gnbId": "0xe00",
+        "additional_routes": []
     }
 })

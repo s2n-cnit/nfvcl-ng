@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import List, Optional
 from pydantic import Field
+
+from nfvcl_core_models.network.network_models import MultusInterface
 from nfvcl_models.blueprint_ng.core5g.common import SubDataNets, SubSliceProfiles, SubArea, SubSubscribers, Create5gModel
 from nfvcl_core_models.base_model import NFVCLBaseModel
 
@@ -77,15 +79,22 @@ class AmfcfgConf(NFVCLBaseModel):
 class CfgFiles(NFVCLBaseModel):
     amfcfg_conf: AmfcfgConf = Field(..., alias='amfcfg.conf')
 
+class Ngapp(NFVCLBaseModel):
+    enabled: bool = Field(default=True, alias='enabled')
+    port: int = Field(default=38412, alias='port')
+    n2if: str
 
 class Amf(NFVCLBaseModel):
+    ngapp: Ngapp
     service_type: str = Field(..., alias='serviceType')
     cfg_files: CfgFiles = Field(..., alias='cfgFiles')
 
+class PfcpConf(NFVCLBaseModel):
+    addr: str = Field(default="POD_IP", alias='addr')
 
 class Configuration1(NFVCLBaseModel):
     enable_db_store: bool = Field(..., alias='enableDBStore')
-
+    pfcp: PfcpConf = Field(..., alias='pfcp')
 
 class SmfcfgConf(NFVCLBaseModel):
     configuration: Configuration1
@@ -96,9 +105,14 @@ class SMFCfgFiles(NFVCLBaseModel):
 
 
 class Smf(NFVCLBaseModel):
+    n4: N4 = Field(..., alias='n4')
     service_type: str = Field(..., alias='serviceType')
     cfg_files: SMFCfgFiles = Field(..., alias='cfgFiles')
 
+class N4(NFVCLBaseModel):
+    port: int = Field(default=8805, alias='port')
+    isPfcpNeeded: bool = Field(default=True, alias='isPfcpNeeded')
+    n4if: str
 
 class Configuration2(NFVCLBaseModel):
     mongo_db_stream_enable: bool = Field(..., alias='mongoDBStreamEnable')
@@ -130,6 +144,27 @@ class Config(NFVCLBaseModel):
     smf: Smf
     nrf: Nrf
 
+class Nnetwork(NFVCLBaseModel):
+    enabled: bool
+    name: str
+    type: str
+    master_if: str = Field(..., alias='masterIf')
+    subnet_ip: str = Field(..., alias='subnetIP')
+    cidr: int
+    gateway_ip: Optional[str] = Field(default=None, alias='gatewayIP')
+    exclude_ip: Optional[str] = Field(default=None, alias='excludeIP')
+
+    def set_multus(self, create: bool, multus_interface: MultusInterface):
+        self.enabled = create
+        self.type = "macvlan"
+        self.subnet_ip = multus_interface.network_cidr.network_address.exploded
+        self.cidr = multus_interface.prefixlen
+        self.gateway_ip = multus_interface.gateway_ip.exploded if multus_interface.gateway_ip else None
+        self.master_if = multus_interface.host_interface
+
+class Global(NFVCLBaseModel):
+    n2network: Nnetwork
+    n4network: Nnetwork
 
 class Field5gControlPlane(NFVCLBaseModel):
     enable5_g: bool = Field(..., alias='enable5G')
@@ -138,6 +173,7 @@ class Field5gControlPlane(NFVCLBaseModel):
     mongodb: Mongodb
     resources: Resources
     config: Config
+    global_: Global = Field(..., alias='global')
 
 
 class Images1(NFVCLBaseModel):

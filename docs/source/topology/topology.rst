@@ -8,9 +8,9 @@ Everything that is contained in the Topology is used by the NFVCL to manage the 
 
 For example, when a Blueprint is deploying VMs, the VIM to be used is identified using the VIM data saved in the Topology.
 
-.. image:: ../../images/blueprint/NVFCL-diagrams-BlueprintV1vsV2.drawio.svg
+.. image:: ../../images/NVFCL-diagrams-General-Scheme.drawio.svg
   :width: 400
-  :alt: Flavor
+  :alt:
   :align: center
 
 As you can see from the picture, the topology information is modified by user's requests.

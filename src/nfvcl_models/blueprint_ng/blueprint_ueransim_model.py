@@ -1,15 +1,29 @@
 from typing import List, Any, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
+from nfvcl_core_models.custom_types import AreaIDType
+from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPoint, NetworkEndPointWithType
 from nfvcl_models.blueprint_ng.g5.ue import UESim
 from nfvcl_core_models.base_model import NFVCLBaseModel
 
 
 class UeransimNetworkEndpoints(NFVCLBaseModel):
-    mgt: str = Field(..., description='name of the topology network to be used for management')
-    n2: str = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
-    n3: str = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
+    mgt: Optional[NetworkEndPoint] = Field(..., description='name of the topology network to be used for management')
+    n2: Optional[NetworkEndPointWithType] = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
+    n3: Optional[NetworkEndPointWithType] = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
+
+    @field_validator("mgt", mode="before")
+    def str_to_network_endpoint(cls, v: object) -> object:
+        if isinstance(v, str):
+            return NetworkEndPoint(net_name=v)
+        return v
+
+    @field_validator("n2", "n3", mode="before")
+    def str_to_network_endpoint_with_type(cls, v: object) -> object:
+        if isinstance(v, str):
+            return NetworkEndPointWithType(net_name=v)
+        return v
 
 class UeransimConfig(NFVCLBaseModel):
     network_endpoints: UeransimNetworkEndpoints
@@ -33,7 +47,7 @@ class UeransimUe(NFVCLBaseModel):
         return False
 
 class UeransimArea(NFVCLBaseModel):
-    id: int = Field(..., description='Area identifier, it will be used as TAC in the NodeB configuration')
+    id: AreaIDType = Field(..., description='Area identifier, it will be used as TAC in the NodeB configuration')
     nci: Optional[str] = Field(default=None, description='gNodeB nci identifier')
     idLength: Optional[int] = Field(default=None, description='gNodeB nci identifier length')
     ues: List[UeransimUe] = Field(description='list of virtual UEs to be instantiated')

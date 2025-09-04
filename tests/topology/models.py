@@ -10,7 +10,7 @@ TOPOLOGY_OK = {
             "vim_type": "openstack",
             "schema_version": "1.0",
             "vim_url": unittest_config.config.vim.url,
-            "vim_tenant_name": unittest_config.config.vim.tenant,
+            "vim_tenant_name": unittest_config.config.vim.tenant, # TODO refactor after vim change
             "vim_user": unittest_config.config.vim.user,
             "vim_password": unittest_config.config.vim.password,
             "config": {
@@ -112,7 +112,7 @@ VIM_TO_ADD1 = {
     "vim_type": "openstack",
     "schema_version": "1.0",
     "vim_url": "http://os-lab2.maas:5000/v3",
-    "vim_tenant_name": "user",
+    "vim_tenant_name": "user", # TODO refactor after vim change
     "vim_user": "user",
     "vim_password": "pwd",
     "config": {
@@ -139,7 +139,7 @@ VIM_TO_ADD2 = {
     "vim_type": "openstack",
     "schema_version": "1.0",
     "vim_url": "http://os-lab2.maas:5000/v3",
-    "vim_tenant_name": "user",
+    "vim_tenant_name": "user", # TODO refactor after vim change
     "vim_user": "user",
     "vim_password": "pwd",
     "config": {

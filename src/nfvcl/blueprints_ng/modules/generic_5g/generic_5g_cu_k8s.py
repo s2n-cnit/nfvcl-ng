@@ -33,6 +33,10 @@ class Generic5GCUK8sBlueprintNG(Generic5GCUBlueprintNG[Generic5GCUK8sBlueprintNG
         pass
 
     @abstractmethod
+    def restart_cu(self):
+        pass
+
+    @abstractmethod
     def get_svc_name(self) -> str:
         pass
 

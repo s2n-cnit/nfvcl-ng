@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 echo "Adding MongoDB GPG keys..."
 curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
 echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
@@ -10,7 +11,7 @@ sudo apt-add-repository --yes --update ppa:ansible/ansible
 sudo apt update
 
 echo "Installing python3.12"
-sudo apt install -y python3.12 python3.12-dev python3.12-venv python3.12-distutils pipx
+sudo apt install -y python3.12 python3.12-dev python3.12-venv pipx
 
 pipx ensurepath
 

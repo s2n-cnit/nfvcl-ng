@@ -1,13 +1,24 @@
 import abc
 from pathlib import Path
 from typing import Optional, List, Dict, Union
+from enum import Enum
 
 from kubernetes.client import V1ServiceList, V1DeploymentList, V1PodList
 from pydantic import Field
 from typing_extensions import Literal
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType, K8sDeployment, K8sStatefulSet, K8sPod
+
+
+class VmPowerStatus(str, Enum):
+    """
+    Standardized VM power status across different virtualization platforms
+    """
+    RUNNING = "RUNNING"     # VM is running/active
+    SHUTOFF = "SHUTOFF"     # VM is stopped/powered off
+    UNKNOWN = "UNKNOWN"     # Unknown or error state
 
 
 class Resource(NFVCLBaseModel):
@@ -37,6 +48,20 @@ class ResourceConfiguration(Resource):
     type: Literal['ResourceConfiguration'] = "ResourceConfiguration"
 
 
+class VmStatus(NFVCLBaseModel):
+    """
+    Represents the status of a VM including power state and SSH connectivity
+
+    Attributes:
+        vm_name (str): The name of the VM
+        power_status (VmPowerStatus): The power status of the VM using standardized enum values
+        ssh_reachable (bool): Whether SSH connection is reachable on the VM
+    """
+    vm_name: str = Field(description="The name of the VM")
+    power_status: VmPowerStatus = Field(description="VM power status using standardized enum values")
+    ssh_reachable: bool = Field(description="Whether SSH connection is reachable")
+
+
 class VmResourceImage(NFVCLBaseModel):
     """
     Represents a VM Image
@@ -58,6 +83,8 @@ class VmResourceFlavor(NFVCLBaseModel):
     storage_gb: str = Field(default="32")
     vcpu_type: Optional[str] = Field(default="host")
     require_port_security_disabled: Optional[bool] = Field(default=False)
+    vm_volume: Optional[str] = Field(default=None, description="Used only by Proxmox for now")
+    ssh_keys: Optional[List[str]] = Field(default_factory=list, description="A list of SSH keys to be injected in the VM")
 
 
 class VmResourceNetworkInterfaceAddress(NFVCLBaseModel):
@@ -100,9 +127,13 @@ class VmResourceNetworkInterface(NFVCLBaseModel):
     fixed: VmResourceNetworkInterfaceAddress = Field()
     floating: Optional[VmResourceNetworkInterfaceAddress] = Field(default=None)
 
+class NetResourcePool(NFVCLBaseModel):
+    start: SerializableIPv4Address = Field()
+    end: SerializableIPv4Address = Field()
 
 class NetResource(ResourceDeployable):
     cidr: str = Field()
+    allocation_pool: Optional[NetResourcePool] = Field(default=None, description="Allocation Pool for the network, used to allocate IPs from the network")
 
 
 class VmResource(ResourceDeployable):
@@ -257,7 +288,6 @@ class HelmChartResource(ResourceDeployable):
     services: Optional[Dict[str, K8sService]] = Field(default=None)
     deployments: Optional[Dict[str, K8sDeployment]] = Field(default=None)
     statefulsets: Optional[Dict[str, K8sStatefulSet]] = Field(default=None)
-
 
     def set_services_from_k8s_api(self, k8s_services: V1ServiceList):
         self.services = {}

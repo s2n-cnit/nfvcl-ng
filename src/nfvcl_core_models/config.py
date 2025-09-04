@@ -12,6 +12,8 @@ class NFVCLParameters(NFVCLBaseModel):
     version: str = Field(default="0.4.0", description="The version of the NFVCL")
     ip: str
     port: int
+    workers: int = Field(default=4, description="The number of workers to handle the requests")
+    rescue_mode: Optional[bool] = Field(default=False, description="Enable the rescue mode (will not load blueprints)")
     authentication: bool = Field(default=False, description="Enable the authentication")
     mounted_folder: str = Field(default="mounted_folder", description="The folder in which files are generated to be exposed in API 'NFVCL_URL:NFVCL_PORT/files/'")
     tmp_folder: str = Field(default="/tmp/nfvcl", description="The folder in which the tmp files are saved")
@@ -33,9 +35,9 @@ class NFVCLParameters(NFVCLBaseModel):
             try:
                 port = int(port)
             except ValueError:
-                raise ValueError(f"Config decode error for Mongo PORT: >{port}< cannot be converted to int.")
+                raise ValueError(f"Config decode error for NFVCL PORT: >{port}< cannot be converted to int.")
         elif not isinstance(port, int):
-            raise ValueError(f"Config decode error for Mongo PORT: >{port}< must be str or int.")
+            raise ValueError(f"Config decode error for NFVCL PORT: >{port}< must be str or int.")
         return port
 
 
@@ -61,7 +63,7 @@ class MongoParameters(NFVCLBaseModel):
         return port
 
     @field_validator('host', mode='before')
-    def validate_mongo_host(cls, host: int):
+    def validate_mongo_host(cls, host: str):
         if isinstance(host, str):
             return host
         raise ValueError(f"Config decode error for Mongo DB host: >{host}< is not a valid string.")
@@ -104,8 +106,8 @@ class NFVCLConfigModel(BaseSettings):
 
     log_level: int = Field(default=20, description="10 = DEBUG, CRITICAL = 50,FATAL = CRITICAL, ERROR = 40, WARNING = 30, WARN = WARNING, INFO = 20, DEBUG = 10, NOTSET = 0")
     nfvcl: NFVCLParameters = Field(default_factory=NFVCLParameters)
-    mongodb: MongoParameters = Field(default_factory=NFVCLParameters)
-    redis: RedisParameters = Field(default_factory=NFVCLParameters)
+    mongodb: MongoParameters = Field(default_factory=MongoParameters)
+    redis: RedisParameters = Field(default_factory=RedisParameters)
 
     @classmethod
     def settings_customise_sources(

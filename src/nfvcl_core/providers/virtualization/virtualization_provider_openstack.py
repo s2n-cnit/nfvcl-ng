@@ -1,5 +1,5 @@
 import hashlib
-from typing import List, Dict
+from typing import List, Dict, Set, Tuple
 
 import requests
 from openstack.compute.v2.flavor import Flavor
@@ -16,14 +16,16 @@ from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit
 from nfvcl_core.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
     NetplanInterface
-from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible
+from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl_core.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
-    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage
+    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage, VmStatus, VmPowerStatus
 from nfvcl_core_models.vim.vim_models import VimModel
+
+DEFAULT_OPENSTACK_TIMEOUT = 180  # See openstack/cloud/_compute.py
 
 
 class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
@@ -35,6 +37,7 @@ class VirtualizationProviderDataOpenstack(VirtualizationProviderData):
 
 class VirtualizationProviderOpenstackException(VirtualizationProviderException):
     pass
+
 
 class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
     """
@@ -52,6 +55,7 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
         )
 
         return ansible_playbook_builder.build()
+
 
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     vim: VimModel
@@ -139,7 +143,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             if new_image_hash512 != os_remote_image_hash512:
                 # WE NEED TO CHANGE NAME SINCE WE CANNOT DELETE THE OLD ONE BECAUSE IT CAN BE USED BY OTHER INSTANCES
                 # We are using the HASH to compute the new name soo we can identify if it is already present
-                vm_image.name = vm_image.name+new_image_hash512[0:12]
+                vm_image.name = vm_image.name + new_image_hash512[0:12]
                 image = self.conn.get_image(vm_image.name)
                 if image is None:
                     self.logger.info(f"Updated image {vm_image.name} not found on VIM, downloading on VIM from {vm_image.url}")
@@ -160,7 +164,12 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         flavor: Flavor = self.create_get_flavor(vm_resource.flavor, vm_resource.name)
 
-        c_init = CloudInit(ssh_authorized_keys=self.vim.ssh_keys)
+        ssh_keys = []
+        ssh_keys.extend(self.vim.ssh_keys)
+        if vm_resource.flavor.ssh_keys:
+            ssh_keys.extend(vm_resource.flavor.ssh_keys)
+
+        c_init = CloudInit(ssh_authorized_keys=ssh_keys)
         c_init.add_user(vm_resource.username, vm_resource.password)
         cloudin = c_init.build_cloud_config()
         self.logger.debug(f"Cloud config:\n{cloudin}")
@@ -179,6 +188,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                 raise VirtualizationProviderOpenstackException("Multiple floating ip networks found")
 
         # Create the VM and wait for completion
+        request_timeout = DEFAULT_OPENSTACK_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
         server_obj: Server = self.conn.create_server(
             vm_resource.name,
             image=image,
@@ -189,7 +199,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             ip_pool=floating_ip_net,
             network=self.os_client.network_names_to_ids(vm_resource.get_all_connected_network_names()),
             userdata=cloudin,
-            meta={"part_of_blueprint": self.blueprint_id, "deployed_by": "NFVCL"}
+            meta={"part_of_blueprint": self.blueprint_id, "deployed_by": "NFVCL"},
+            timeout=request_timeout
         )
         # NOTE: Trying to add a Tag (self.conn.compute.add_tag_to_server(test_server, "TEST")) will raise an 404 HTTP exception, probably TAGs are not enabled on OS
 
@@ -208,6 +219,72 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         self.logger.success(f"Creating VM {vm_resource.name} finished")
         self.save_to_db()
+
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        self.logger.info(f"Restarting VM {vm_resource.name}")
+        if vm_resource.id not in self.data.os_dict:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM, cannot restart")
+
+        server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
+        if server_obj is None:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM, cannot restart")
+
+        if hard:
+            self.conn.compute.reboot_server(server_obj, reboot_type='HARD')
+        else:
+            self.conn.compute.reboot_server(server_obj, reboot_type='SOFT')
+
+        self.logger.success(f"Restarting VM {vm_resource.name} finished")
+
+    def check_vm_status(self, vm_resource: VmResource) -> VmStatus:
+        """
+        Check the status of a VM and SSH connectivity
+        Args:
+            vm_resource: VM to check
+
+        Returns:
+            VmStatus containing vm_name, power_status, and ssh_reachable
+        """
+        self.logger.info(f"Checking status of VM {vm_resource.name}")
+
+        if vm_resource.id not in self.data.os_dict:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM")
+
+        server_obj: Server = self.conn.get_server(self.data.os_dict[vm_resource.id])
+        if server_obj is None:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM")
+
+        # Get power status from OpenStack and map to standardized enum
+        openstack_status = server_obj.status
+
+        # Map OpenStack status to standardized VmPowerStatus
+        if openstack_status in ["ACTIVE"]:
+            power_status = VmPowerStatus.RUNNING
+        elif openstack_status in ["SHUTOFF", "STOPPED"]:
+            power_status = VmPowerStatus.SHUTOFF
+        else:
+            # For BUILD, REBOOT, HARD_REBOOT, ERROR, PAUSED, SUSPENDED, etc.
+            power_status = VmPowerStatus.UNKNOWN
+
+        # Check SSH connectivity if VM is running and has an IP
+        ssh_reachable = False
+        if power_status == VmPowerStatus.RUNNING and vm_resource.network_interfaces:
+            # Try SSH connection with short timeout (just for testing connectivity)
+            ssh_reachable = check_ssh_ready(
+                host=vm_resource.access_ip,
+                port=22,
+                user=vm_resource.username,
+                passwd=vm_resource.password,
+                logger_override=self.logger
+            )
+
+        self.logger.info(f"VM {vm_resource.name} status: openstack_status={openstack_status}, mapped_status={power_status}, ssh_reachable={ssh_reachable}")
+
+        return VmStatus(
+            vm_name=vm_resource.name,
+            power_status=power_status,
+            ssh_reachable=ssh_reachable
+        )
 
     def __update_net_info_vm(self, vm_resource: VmResource, server_obj: Server):
         vm_resource.network_interfaces.clear()
@@ -287,12 +364,17 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name, "project_id": self.os_client.project_id}):
             raise VirtualizationProviderOpenstackException(f"Subnet with cidr {net_resource.cidr} already exist")
 
+        allocation_pools = None
+        if net_resource.allocation_pool:
+            allocation_pools = [{"start": net_resource.allocation_pool.start.exploded, "end": net_resource.allocation_pool.end.exploded}]
+
         network: Network = self.conn.create_network(net_resource.name, port_security_enabled=False)
         subnet: Subnet = self.conn.create_subnet(
             network.id,
             cidr=net_resource.cidr,
             enable_dhcp=True,
-            disable_gateway_ip=True
+            disable_gateway_ip=True,
+            allocation_pools=allocation_pools
         )
 
         self.data.subnets.append(subnet.id)
@@ -341,8 +423,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                     requested_flavor.storage_gb,
                     is_public=False
                 )
-                project = self.conn.get_project(self.vim.vim_tenant_name)
-                self.conn.add_flavor_access(flavor.id, project['id'])
+                self.conn.add_flavor_access(flavor.id, self.os_client.project_id)
                 self.data.flavors.append(flavor_name)
             return flavor
 
@@ -390,7 +471,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def destroy_vm(self, vm_resource: VmResource):
         self.logger.info(f"Destroying VM {vm_resource.name}")
         if vm_resource.id in self.data.os_dict:
-            self.conn.delete_server(self.data.os_dict[vm_resource.id], wait=True)
+            request_timeout = DEFAULT_OPENSTACK_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
+            self.conn.delete_server(self.data.os_dict[vm_resource.id], wait=True, timeout=request_timeout)
         else:
             self.logger.warning(f"Unable to find VM id for resource '{vm_resource.id}' with name '{vm_resource.name}', manually check on VIM")
         self.logger.success(f"Destroying VM {vm_resource.name} finished")
@@ -440,3 +522,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             network_detail: Network = self.os_client.get_network(network_name)
             subnet_detail_list[network_name] = self.conn.get_subnet(network_detail.subnet_ids[0])
         return subnet_detail_list
+
+    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+        networks_tmp = self.os_client.get_available_networks()
+        networks = set(networks_tmp.keys())
+        return networks_to_check.issubset(networks), networks_to_check.difference(networks)

@@ -2,9 +2,8 @@ import copy
 
 import pytest
 
-from nfvcl_core.nfvcl_main import NFVCL
 from nfvcl_core_models.network.network_models import PduModel
-from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.vim.vim_models import VimModel

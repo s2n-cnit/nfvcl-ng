@@ -163,7 +163,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                                     "mcc": "001",
                                     "mnc": "01"
                                 },
-                                "tac": "000000"
+                                "tac": "000000" # TAC is a 6-digit hexadecimal number
                             }
                         ],
                         "plmnSupportList": [
@@ -211,9 +211,9 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                                 "dnnInfos": [
                                     {
                                         "dnn": "internet",
-                                        "dnaiList": [
-                                            "mec"
-                                        ],
+                                        # "dnaiList": [
+                                        #     "mec"
+                                        # ],
                                         "dns": {
                                             "ipv4": "8.8.8.8"
                                         }

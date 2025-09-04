@@ -75,7 +75,7 @@ class SubFlows(NFVCLBaseModel):
 class SubpduSessions(NFVCLBaseModel):
     pduSessionId: str = Field(description="ID of the PDU session")
     pduSessionAmbr: Optional[BitrateStringType] = Field(default=None, description="Aggregate Maximum Bit Rate for this PDU session, exp: 10 Mbps")
-    flows: List[SubFlows] = Field(default_factory=list, description="List of flows for this PDU session")
+    flows: Optional[List[SubFlows]] = Field(default_factory=list, description="List of flows for this PDU session")
 
 
 class SubProfileParams(NFVCLBaseModel):
@@ -83,7 +83,7 @@ class SubProfileParams(NFVCLBaseModel):
     sliceAmbr: Optional[BitrateStringType] = Field(default='1000 Mbps', description="Aggregate Maximum Bit Rate for this slice, exp: 1000 Mbps")
     ueAmbr: Optional[BitrateStringType] = Field(default='50 Mbps', description="Aggregate Maximum Bit Rate for each UE on this slice, exp: 50 Mbps")
     maximumNumberUE: Optional[int] = Field(default=None, description="Maximum number of UEs on this slice")
-    pduSessions: List[SubpduSessions] = Field(default_factory=list, description="List of PDU sessions for this slice")
+    pduSessions: Optional[List[SubpduSessions]] = Field(default_factory=list, description="List of PDU sessions for this slice")
 
 
 class SubLocationConstraints(NFVCLBaseModel):
@@ -109,7 +109,7 @@ class SubSliceProfiles(NFVCLBaseModel):
 class SubSnssai(NFVCLBaseModel):
     sliceId: SDType = Field(description="Slice ID (SD)")
     sliceType: SSTType = Field(description="Slice Type (SST)")
-    pduSessionIds: List[str] = Field(default_factory=list, description="List of PDU session IDs for this SNSSAI, need to be present in the pduSessions list of the corresponding slice profile")
+    pduSessionIds: Optional[List[str]] = Field(default_factory=list, description="List of PDU session IDs for this SNSSAI, need to be present in the pduSessions list of the corresponding slice profile")
     default_slice: Optional[bool] = Field(default=None, description="Set this slice as the default for the subscriber")
 
 
@@ -144,16 +144,16 @@ class SubSlices(NFVCLBaseModel):
 class SubAreaNetwork(NFVCLBaseModel):
     n3: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N3 interface")
     n6: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for N6 interface")
-    gnb: Optional[NetworkEndPoint] = Field(default=None, description="Network endpoint for GNB network, only required if a router is needed for this UPF configuration")
+    gnb: Optional[NetworkEndPointWithType] = Field(default=None, description="Network endpoint for GNB network, only required if a router is needed for this UPF configuration")
     external_router: Optional[Router5GNetworkInfo] = Field(default=None)
 
-    @field_validator("gnb", mode="before")
-    def str_to_network_endpoint(cls, v: object) -> object:
-        if isinstance(v, str):
-            return NetworkEndPoint(net_name=v)
-        return v
+    # @field_validator("gnb", mode="before")
+    # def str_to_network_endpoint(cls, v: object) -> object:
+    #     if isinstance(v, str):
+    #         return NetworkEndPoint(net_name=v)
+    #     return v
 
-    @field_validator("n3", "n6", mode="before")
+    @field_validator("n3", "n6", "gnb", mode="before")
     def str_to_network_endpoint_with_type(cls, v: object) -> object:
         if isinstance(v, str):
             return NetworkEndPointWithType(net_name=v)

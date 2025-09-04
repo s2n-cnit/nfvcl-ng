@@ -9,7 +9,7 @@ from nfvcl_core.utils.log import create_logger
 
 logger: logging.Logger = create_logger("K8S CLIENT EXTENSION")
 
-handled_custom_api = ["metallb.io/v1beta1", "operator.tigera.io/v1"]
+handled_custom_api = ["metallb.io/v1beta1", "operator.tigera.io/v1", "cert-manager.io/v1"]
 
 """
 This extension to k8s is necessary when using Custom Resources Definitions (CRDs).
@@ -139,6 +139,8 @@ def create_custom_resource(k8s_client: ApiClient, yml_document):
     plural = api_kind.lower() + 's'
     custom_api_client = kubernetes.client.CustomObjectsApi(k8s_client)
 
+    # TODO: if the namespace is present in the yaml but the resource doesn't support it, it will fail.
+    # In kubectl the yaml is applied anyway, but the namespace is ignored.
     if 'namespace' in yml_document['metadata']:
         namespace = yml_document['metadata']['namespace']
         created = custom_api_client.create_namespaced_custom_object(group=api_grp, version=api_version,

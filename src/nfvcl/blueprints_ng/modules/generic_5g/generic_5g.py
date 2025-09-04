@@ -117,11 +117,30 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         for pdu_model in self.get_gnb_pdus():
             if self.provider.is_pdu_locked(pdu_model):
                 raise BlueprintNGException(f"GNB PDU {pdu_model.name} is already locked")
-        for area in self.state.current_config.areas:
-            if area.networks.n6.type == NetworkEndPointType.MULTUS:
-                net = self.provider.topology.get_network(area.networks.n6.net_name)
-                if net.gateway_ip is None:
-                    raise BlueprintNGException(f"To use multus on N6, you must provide a gateway ip for {net.name}")
+        # for area in self.state.current_config.areas:
+        #     if area.networks.n6.type == NetworkEndPointType.MULTUS:
+        #         net = self.provider.topology.get_network(area.networks.n6.net_name)
+        #         if net.gateway_ip is None:
+        #             raise BlueprintNGException(f"To use multus on N6, you must provide a gateway ip for {net.name}")
+
+    def extract_unique_net_names(self, model: Create5gModel) -> {}:
+        core_net_names = set()
+
+        ne_core = model.config.network_endpoints
+        for endpoint in [ne_core.mgt, ne_core.n2, ne_core.n4]:
+            if endpoint:
+                core_net_names.add(endpoint.net_name)
+
+        ne_areas = {}
+        for area in model.areas:
+            area_net_names = set()
+            for net_cfg in [area.networks.n3, area.networks.n6, area.networks.gnb]:
+                area_net_names.add(net_cfg.net_name)
+            if area.core:
+                area_net_names = area_net_names.union(core_net_names)
+            ne_areas[str(area.id)] = area_net_names
+
+        return ne_areas
 
     def configuration_feasibility_check(self, config_model: Create5gModel):
         """
@@ -129,7 +148,15 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         Args:
             config_model: Config model of which to check for feasibility
         """
-        # Check multiple slices with the same DNN
+
+        network_per_area = self.extract_unique_net_names(config_model)
+        error = ""
+        for area in network_per_area.keys():
+            ok, missing_net = self.provider.check_networks(int(area), network_per_area[area])
+            if not ok:
+                error += f"Missing nets {missing_net}, from area {area}\n"
+        if len(error) > 0:
+            raise Exception(error)
         ddns = []
         for slice in config_model.config.sliceProfiles:
             ddns.extend(slice.dnnList)
@@ -374,7 +401,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             configurator_instance.configure(gnb_configuration_request)
             if str(pdu.area) not in self.state.ran_areas:
                 self.state.ran_areas[str(pdu.area)] = RANAreaInfo(area=pdu.area)
-            self.state.ran_areas[str(pdu.area)].pdu_names.append(pdu.name)
+            if pdu.name not in self.state.ran_areas[str(pdu.area)].pdu_names:
+                self.state.ran_areas[str(pdu.area)].pdu_names.append(pdu.name)
 
         # Unlock PDUs for removed areas
         currently_existing_areas: Set[str] = set(map(lambda x: str(x.id), self.state.current_config.areas))

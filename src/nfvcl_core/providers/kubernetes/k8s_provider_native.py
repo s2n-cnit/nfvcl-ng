@@ -8,6 +8,7 @@ from kubernetes.client import V1PodList
 from pydantic import Field
 from pyhelm3 import Client, ReleaseRevisionStatus
 
+from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import MultusInterface
 from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
@@ -16,8 +17,6 @@ from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core.utils.file_utils import create_tmp_file, create_tmp_folder
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
-from nfvcl_core.utils.k8s.kube_api_utils import get_pods_for_k8s_namespace, get_logs_for_pod, get_deployments, \
-    get_services, k8s_delete_namespace, restart_deployment, wait_for_deployment_to_be_ready_by_name, wait_for_deployment_to_be_ready
 from nfvcl_core.utils.k8s.helm_plugin_manager import build_helm_client_from_credential_file_content
 
 
@@ -37,6 +36,7 @@ class K8SProviderNative(K8SProviderInterface):
         self.HELM_TMP_FOLDER_PATH = create_tmp_folder('helm')
         self.data: K8SProviderDataNative = K8SProviderDataNative()
         self.k8s_cluster: TopologyK8sModel = self.topology_manager.get_k8s_cluster_by_area(self.area)
+        self.kube_utils = KubeApiUtils(get_k8s_config_from_file_content(self.k8s_cluster.credentials))
         self.helm_client = self.get_helm_client_by_area(self.area)
 
     def get_helm_client_by_area(self, area: int) -> Client:
@@ -69,6 +69,14 @@ class K8SProviderNative(K8SProviderInterface):
             version=helm_chart_resource.version
         ))
 
+        ns_labels = {
+            "nfvcl-webhook-enabled": "true",
+            "nfvcl-area": f"{helm_chart_resource.area}",
+        }
+
+        self.logger.debug(f"Creating namespace for Helm chart {helm_chart_resource.name} with labels: {ns_labels}")
+        self.kube_utils.create_namespace(namespace_name=helm_chart_resource.namespace.lower(), labels=ns_labels)
+
         self.logger.debug(f"Helm chart internal name: {chart.metadata.name}, version: {chart.metadata.version}")
 
         # Install or upgrade a release, if fails print debug cmd to reproduce locally the error with debug option. Pyhelm3 does not support debug option.
@@ -79,7 +87,8 @@ class K8SProviderNative(K8SProviderInterface):
                 values,
                 namespace=helm_chart_resource.namespace.lower(),
                 atomic=True,
-                wait=True
+                wait=True,
+                create_namespace=False
             ))
         except pyhelm3.errors.Error as helmError:
             self.logger.error(f"Helm chart deployment failed. You can debug installation in this way from nfvcl folder:\n{self._generate_debug_cmd_cli(helm_chart_resource, values, chart.metadata.version)}")
@@ -102,14 +111,13 @@ class K8SProviderNative(K8SProviderInterface):
         cluster.deployed_blueprints.append(self.blueprint_id)
         self.topology_manager.update_kubernetes(cluster)
 
-        k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
-        services = get_services(kube_client_config=k8s_config, namespace=helm_chart_resource.namespace.lower())
-        deployments = get_deployments(kube_client_config=k8s_config, namespace=helm_chart_resource.namespace.lower())
+        services = self.kube_utils.get_services(namespace=helm_chart_resource.namespace.lower())
+        deployments = self.kube_utils.get_deployments(namespace=helm_chart_resource.namespace.lower(), detailed=True)
 
         deployments_pods: Dict[str, V1PodList] = {}
 
         for deployment in deployments.items:
-            deployment_pods = get_pods_for_k8s_namespace(k8s_config, namespace=helm_chart_resource.namespace.lower(), label_selector=','.join([f'{k}={v}' for k, v in deployment.spec.selector.match_labels.items()]))
+            deployment_pods = self.kube_utils.get_pods_for_namespace(namespace=helm_chart_resource.namespace.lower(), label_selector=','.join([f'{k}={v}' for k, v in deployment.spec.selector.match_labels.items()]))
             deployments_pods[deployment.metadata.name] = deployment_pods
 
         helm_chart_resource.set_services_from_k8s_api(services)
@@ -204,11 +212,10 @@ class K8SProviderNative(K8SProviderInterface):
 
     def final_cleanup(self):
         self.logger.info(f"Performing k8s final cleanup")
-        k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
         for ns in self.data.namespaces:
             self.logger.debug(f"Deleting k8s namespace '{ns}'")
             try:
-                k8s_delete_namespace(k8s_config, ns)
+                self.kube_utils.delete_namespace(ns)
             except Exception as e:
                 self.logger.error(f"Error deleting k8s namespace '{ns}': {str(e)}")
         for reserved_ip in self.data.reserved_ips:
@@ -216,8 +223,7 @@ class K8SProviderNative(K8SProviderInterface):
             self.topology_manager.release_k8s_multus_ip(self.k8s_cluster.name, reserved_ip.network_name, reserved_ip.ip_address)
 
     def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
-        k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
-        return get_logs_for_pod(k8s_config, helm_chart_resource.namespace.lower(), pod_name, tail_lines=tail_lines)
+        return self.kube_utils.get_logs_for_pod(helm_chart_resource.namespace.lower(), pod_name, tail_lines=tail_lines)
 
     def reserve_k8s_multus_ip(self, area: int, network_name: str) -> MultusInterface:
         multus_interface = self.topology_manager.reserve_k8s_multus_ip(self.k8s_cluster.name, network_name)
@@ -236,8 +242,26 @@ class K8SProviderNative(K8SProviderInterface):
 
     def restart_deployment(self, helm_chart_resource: HelmChartResource, deployment_name: str):
         self.logger.debug(f"Restarting deployment '{deployment_name}' in namespace '{helm_chart_resource.namespace.lower()}'")
-        k8s_config = get_k8s_config_from_file_content(self.k8s_cluster.credentials)
-        updated_dep = restart_deployment(k8s_config, helm_chart_resource.namespace.lower(), deployment_name)
-        wait_res = wait_for_deployment_to_be_ready(k8s_config, updated_dep)
+        updated_dep = self.kube_utils.restart_deployment(helm_chart_resource.namespace.lower(), deployment_name)
+        wait_res = self.kube_utils.wait_for_deployment_to_be_ready(updated_dep)
         self.logger.debug(f"Restarted deployment: {deployment_name} in namespace '{helm_chart_resource.namespace.lower()}', ready wait result: {wait_res}")
         return wait_res
+
+    def restart_all_deployments(self, helm_chart_resource: HelmChartResource, namespace: str):
+        self.logger.debug(f"Restarting all deployments in namespace '{namespace}'")
+        updated_deps = self.kube_utils.restart_all_deployments(namespace)
+        failed_deployments = []
+        for dep in updated_deps:
+            wait_res = self.kube_utils.wait_for_deployment_to_be_ready(dep)
+            if wait_res:
+                self.logger.debug(f"Restarted deployment: {dep.metadata.name} in namespace '{namespace}' successful")
+            else:
+                failed_deployments.append(dep)
+                self.logger.error(f"Restarted deployment: {dep.metadata.name} in namespace '{namespace}' failed")
+        if len(failed_deployments) == 0:
+            return True
+        return False, failed_deployments
+
+    def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name=None, container_name=None):
+        self.logger.debug(f"Executing command '{" ".join(command)}' in pod {pod_name} namespace '{helm_chart_resource.namespace.lower()}'")
+        return self.kube_utils.exec_command_in_pod(helm_chart_resource.namespace.lower(), command, pod_name, container_name)

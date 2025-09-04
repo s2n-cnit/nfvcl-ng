@@ -1,16 +1,13 @@
-.. contents::
-
 ====================
 Blueprint
 ====================
+
+.. contents::
+   :local:
+
 The NFVCL is deploying ecosystems instances using Blueprints. A network ecosystem is meant to be a complete functional
 network environment, such as a 5G system, an overlay system for network cybersecurity or a simple application service
 mesh.
-
-.. image:: ../../images/blueprint/NVFCL-diagrams-BlueprintV1vsV2.drawio.svg
-  :width: 400
-  :alt: Flavor
-  :align: center
 
 Blueprint System
 +++++++++++++++++
@@ -42,8 +39,8 @@ but we can interact with several providers.
 
 Flavors
 *******
-Flavors of a blueprint could be problematic, usually flavors for VMs are created on Blueprint creation or when adding nodes to
-an existing Blueprint. It is not always possible to do this operation, depending on user permission.
+Flavors are the technical specification of a VM in a Blueprint, using the right one can be problematic. Usually flavors for VMs are created on Blueprint creation or when adding nodes to
+an existing Blueprint. It is not always possible to do this operation, depending on user permission on the VIM.
 In this case it is possible to use an existing flavor.
 The scheme below summarize the behavior depending on the case.
 
@@ -54,49 +51,45 @@ The scheme below summarize the behavior depending on the case.
 
 Blueprint Type List
 +++++++++++++++++++
+Here you find a list of all developed Blueprints, their type and the requirements for their deployment.
 
 .. list-table:: Blueprint list
-   :widths: 25 50 50 25
+   :widths: 25 50 50
    :header-rows: 1
 
    * - Blueprint name
      - Type
      - Requirements
-     - Blue Version
    * - :doc:`k8s/k8s_blue_index`
      - Kubernetes cluster
      - VIM(s) for VMs deployment
-     - 2
-   * - :doc:`free5gc/free5gc_blue_index`
-     - 5G Core
-     - K8s in topology + VIM
-     - 2
+   * - :doc:`5gcores/free5gc/free5gc_blue_index`
+     - :doc:`5gcores/5gcore_blue_index`
+     - (K8s + VIM) in topology
    * - :doc:`5gcores/openairinterface/openairinterface_blue_index`
      - :doc:`5gcores/5gcore_blue_index`
-     - K8s in topology + VIM
-     - 2
+     - (K8s + VIM) in topology
    * - :doc:`5gcores/sdcore/sdcore_blue_index`
      - :doc:`5gcores/5gcore_blue_index`
-     - K8s in topology + VIM
-     - 2
+     - (K8s + VIM) in topology
    * - :doc:`vyos/vyos_blue_index`
      - Virtual Router
      - VIM
-     - 2
    * - :doc:`ueransim/ueransim_blue_index`
      - gNodeB and UE emulator
      - VIM
-     - 2
    * - Ubuntu Blueprint
      - Creates a VM running Ubuntu 22/24
      - VIM
-     - 2
 
 
 Blueprint LCM Management
 ++++++++++++++++++++++++
 This section describes how the NFVCL user can use the Blueprint system to deploy, manage and destroy Blueprints.
-The specific guide for APIs is found in the Blueprint dedicated page and in the NFVCL API swagger.
+
+.. important::
+   The specific guide for APIs is found in the Blueprint dedicated page and in the NFVCL **API SWAGGER**.
+   The Swagger is accessible on NFVCL port once **it has been started!!!**
 
 Blueprint deployment/instantiation
 **********************************
@@ -106,24 +99,117 @@ needed in the Topology.
 The K8S cluster can be deployed on VMs using the dedicated Blueprint (K8S) or can be added as external (already existing)
 cluster to the topology.
 
-To instantiate a blueprint it is sufficient to call a POST API, each blueprint has the dedicated call for its creation.
-**For further details** please see the specific Blueprint dedicated page.
+.. note::
+   To instantiate a blueprint it is sufficient to call a POST API, each blueprint has the dedicated call for its creation.
+   **For further details** please see the specific Blueprint dedicated page.
+
+Flavor permission error
+-----------------------
+.. important::
+   If during the creation of a blueprint you receive an error indicating that you don't have permission to create a
+   flavor, you can use an existing one. Just indicate in the request flavor tha name of the existing one
+   (vpcu, ram, disk are ignored)
+
+.. code-block:: json
+   :emphasize-lines: 6
+
+   {
+     "area": 666,
+     "mgmt_net": "your-network",
+     "version": "UBUNTU24",
+	   "flavor": {
+		"name": "m1.medium"
+     }
+   }
+
+.. code-block:: json
+   :emphasize-lines: 10,21
+
+   {
+     "cni": "flannel",
+     "pod_network_cidr": "10.254.0.0/16",
+     "service_cidr": "10.200.0.0/16",
+     "topology_onboard": true,
+     "password": "3bU85qRRDnu6Yz",
+   	 "ubuntu_version": "UBUNTU24",
+     "require_port_security_disabled": true,
+     "master_flavors": {
+   		"name": "m1.medium"
+     },
+     "areas": [
+       {
+         "area_id": 1,
+         "is_master_area": true,
+         "mgmt_net": "ttilab-network",
+         "additional_networks": [],
+         "load_balancer_pools_ips": [],
+         "worker_replicas": 1,
+         "worker_flavors": {
+           "name": "m1.medium"
+         }
+       }
+     ]
+   }
 
 Blueprint day 2 operation
 *************************
 Some operations can be performed after the blueprint has been created/deployed, these actions include reconfiguration of
 the blueprint (change the config of a VM) or the deployment of an new VM/Helm-Chart (like the addition of a VM to the blueprint)
 
-Blueprint deletion
-******************
+Blueprint Destroy/Deletion
+**************************
 To remove a Blueprint it should be only needed to call the DELETE call with the target ID.
+
+.. note::
+   API (DELETE): `http://NFVCL_URL:5002/nfvcl/v2/api/blue/BLUE_ID`
+
+If an error occurs during the deletion of a blueprint, you can force the operation using the ``force_deletion`` set to
+true as parameter in the request.
+
+.. warning::
+   Forcing the deletion will not ensure that remote resources like (PODs, VMs, etc...) are deleted from VIMs or K8s
+   clusters.
+
+Blueprint Protection
+********************
+The protection of a blueprint can be used to prevent the deletion of a blueprint. It it a PATCH request:
+
+.. note::
+   API (PATCH): `http://NFVCL_URL:5002/nfvcl/v2/api/blue/protect/BLUE_ID`
+
 
 Blueprint instances
 *******************
 To retrieve a list of instantiated blueprints you can make a GET request to:
 
-http://NFVCL_URL:5002/nfvcl/v2/api/blue/
+.. note::
+   API (GET): `http://NFVCL_URL:5002/nfvcl/v2/api/blue/`
+
 
 To get a list that includes all the details of a Blueprint instance you can add the following query param:
 
-http://NFVCL_URL:5002/nfvcl/v2/api/blue/?detailed=true
+.. note::
+   API (GET): `http://NFVCL_URL:5002/nfvcl/v2/api/blue/?detailed=true`
+
+Blueprint Snapshots
++++++++++++++++++++
+Snapshots are used to save the state of a Blueprint instance. The snapshot can be used to restore the state of the Blueprint, the way that the snapshot is restored is
+performing every single operation that was performed on the Blueprint instance since its creation till the state at the snapshot creation.
+**You can find all possible operations on the Swagger.**
+
+Snapshot Creation
+*************************
+To create a snapshot of a Blueprint instance it is sufficient to call a POST API
+
+.. note::
+   API (POST): `http://192.168.12.42:5002/nfvcl/v2/api/snapshot/BLUE_ID?snapshot_name=TEST-ABC2`
+
+
+Snapshot Destroy/Deletion
+*************************
+To remove a snapshot it should be only needed to call the DELETE call with the target ID.
+
+.. note::
+   API (DELETE): `http://NFVCL_URL:5002/nfvcl/v2/api/snapshot/TEST-ABC2`
+
+

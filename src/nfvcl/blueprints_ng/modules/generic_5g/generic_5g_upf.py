@@ -5,6 +5,7 @@ from typing import Generic, TypeVar, Optional, final, List
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from pydantic import Field
 
+from nfvcl_models.blueprint_ng.core5g.common import Router5GNetworkInfo
 from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
@@ -18,6 +19,7 @@ class DeployedUPFInfo(NFVCLBaseModel):
     network_info: Optional[UPFNetworkInfo] = Field(default=None)
     vm_resource_id: Optional[str] = Field(default=None)
     vm_configurator_id: Optional[str] = Field(default=None)
+    helm_chart_resource_id: Optional[str] = Field(default=None)
     router_gnb_ip: Optional[SerializableIPv4Address] = Field(default=None)
 
     def served_dnns(self) -> List[str]:
@@ -27,10 +29,15 @@ class DeployedUPFInfo(NFVCLBaseModel):
                 served_dnns_list.append(served_dnn.dnn)
         return served_dnns_list
 
+class Router5GInfo(NFVCLBaseModel):
+    blue_id: Optional[str] = Field(default=None)
+    external: bool = Field()
+    network: Router5GNetworkInfo = Field()
 
 class Generic5GUPFBlueprintNGState(BlueprintNGState):
     current_config: Optional[UPFBlueCreateModel] = Field(default=None)
     upf_list: List[DeployedUPFInfo] = Field(default_factory=list)
+    router: Optional[Router5GInfo] = Field(default=None)
 
 
 StateTypeVar5GUPF = TypeVar("StateTypeVar5GUPF", bound=Generic5GUPFBlueprintNGState)
@@ -38,6 +45,8 @@ CreateConfigTypeVar5GUPF = TypeVar("CreateConfigTypeVar5GUPF")
 
 
 class Generic5GUPFBlueprintNG(BlueprintNG[Generic5GUPFBlueprintNGState, UPFBlueCreateModel], Generic[StateTypeVar5GUPF, CreateConfigTypeVar5GUPF]):
+    router_needed: bool = True
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFBlueprintNGState] = StateTypeVar5GUPF):
         super().__init__(blueprint_id, state_type)
 
@@ -51,7 +60,7 @@ class Generic5GUPFBlueprintNG(BlueprintNG[Generic5GUPFBlueprintNGState, UPFBlueC
         self.state.current_config = copy.deepcopy(create_model)
         self.pre_create_upf()
         self.create_upf()
-        self.post_update_upf()
+        self.post_create_upf()
 
     def pre_create_upf(self):
         pass
@@ -97,3 +106,49 @@ class Generic5GUPFBlueprintNG(BlueprintNG[Generic5GUPFBlueprintNGState, UPFBlueC
         Returns: List of DeployedUPFInfo
         """
         return copy.copy(self.state.upf_list)
+
+    @abstractmethod
+    def add_route_to_router(self, cidr: str, nexthop: str):
+        pass
+
+    @abstractmethod
+    def deploy_router_blueprint(self) -> Router5GInfo:
+        pass
+
+    def update_router_deployment(self):
+        if self.router_needed:
+            router_info: Router5GInfo
+            if True: #not area.networks.external_router: TODO fix this
+                router_info = self.deploy_router_blueprint()
+            else:
+                pass
+                # router_info = Router5GInfo(external=True, network=area.networks.external_router)
+            self.state.router = router_info
+
+    def update_router_routes(self):
+        # The router need to route the traffic for the DNN ip pool through the UPF N6 interface
+        if self.router_needed:
+            for deployed_upf in self.state.upf_list:
+                for slice in deployed_upf.served_slices:
+                    for dnn in slice.dnn_list:
+                        self.add_route_to_router(dnn.cidr, deployed_upf.network_info.n6_ip.exploded)
+
+    def get_dnn_ip_pool(self, dnn: str) -> str:
+        found_ip_pool: Optional[str] = None
+        for slice in self.state.current_config.slices:
+            for dnnslice in slice.dnn_list:
+                if dnnslice.dnn == dnn:
+                    if found_ip_pool is None:
+                        found_ip_pool = dnnslice.cidr
+                    elif found_ip_pool != dnnslice.cidr:
+                        raise ValueError("The same dnn for different slices must have the same ip pool")
+        if found_ip_pool is None:
+            raise ValueError(f"Unable to find ip pool for dnn '{dnn}'")
+        return found_ip_pool
+
+    def get_slices_for_dnn(self, dnn: str) -> List[Slice5GWithDNNs]:
+        served_slices: List[Slice5GWithDNNs] = []
+        for slice in self.state.current_config.slices:
+            if dnn in list(map(lambda x: x.dnn, slice.dnn_list)):
+                served_slices.append(slice)
+        return served_slices

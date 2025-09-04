@@ -6,6 +6,7 @@ from pydantic import Field
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core_models.custom_types import AreaIDType
+from nfvcl_core_models.linux.ip import Route
 from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPointWithType
 from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 
@@ -29,6 +30,7 @@ class RANBlueCreateModelGeneric(BlueprintNGCreateModel):
     tac: int = Field(alias='tac')
     area_id: AreaIDType = Field(alias='area_id')
     gnb_id: Optional[int] = Field(default=1, alias='gnb_id')
+    additional_routes: Optional[List[Route]] = Field(default_factory=list, alias='additional_routes')
 
 
 ################################ CU ###############################################

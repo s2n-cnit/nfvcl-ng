@@ -5,4 +5,4 @@ installation:
     bgp: Disabled
     ipPools:
     - cidr: 10.254.0.0/16
-      encapsulation: IPIP
+      encapsulation: VXLAN

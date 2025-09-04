@@ -18,7 +18,7 @@ class BlueCreateModelNetworks(NFVCLBaseModel):
     n4: NetworkEndPointWithType = Field()
     n3: NetworkEndPointWithType = Field()
     n6: NetworkEndPointWithType = Field()
-    gnb: Optional[NetworkEndPoint] = Field(default=None)
+    gnb: Optional[NetworkEndPointWithType] = Field(default=None)
 
 class UPFNetworkInfo(NFVCLBaseModel):
     n4_cidr: SerializableIPv4Network = Field()

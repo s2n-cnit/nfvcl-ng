@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Literal
 
 from pydantic import Field
 
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUPFVMBlueprintNGState, Generic5GUPFVMBlueprintNG
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
-from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
-from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
-from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition, GrafanaDashboard
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address, EndPointV4
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
+from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
 
 SDCORE_UPF_BLUE_TYPE = "sdcore_upf"
 
@@ -20,6 +23,7 @@ SDCORE_UPF_BLUE_TYPE = "sdcore_upf"
 class SdCoreUPFBlueprintNGState(Generic5GUPFVMBlueprintNGState):
     vm_configurators: Dict[str, SDCoreUPFConfigurator] = Field(default_factory=dict)
     currently_deployed_dnns: Dict[str, DeployedUPFInfo] = Field(default_factory=dict)
+    currently_enabled_green_modules: Optional[Dict[str, str]] = Field(default_factory=dict)
 
 class SDCoreUPFConfiguration(NFVCLBaseModel):
     upf_mode: str = Field()
@@ -45,6 +49,28 @@ class SDCoreUPFConfiguration(NFVCLBaseModel):
     ue_ip_pool_cidr: str = Field()
 
 
+class SDCoreUPFGreenQueueConfiguration(NFVCLBaseModel):
+    module_class: Literal['GreenQueueBypass', 'GreenBypass'] = Field(default="GreenQueueBypass")
+    dnn: str = Field()
+    src_mac: str = Field()
+    dst_mac: str = Field()
+    src_ip: str = Field()
+    dst_ip: str = Field()
+    ip_ttl: int = Field()
+    src_port: int = Field()
+    dst_port: int = Field()
+    sleep_ms: int = Field()
+    enable_bypass: bool = Field()
+    release_single_packet: bool = Field()
+
+class SDCoreUPFGreenQueueIPConfiguration(NFVCLBaseModel):
+    dnn: str = Field()
+    ip: str = Field()
+
+class SDCoreUPFGreenQueueRemoveConfiguration(NFVCLBaseModel):
+    dnn: str = Field()
+
+
 class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
     configuration: Optional[SDCoreUPFConfiguration] = Field(default=None)
 
@@ -68,9 +94,59 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
 
         return ansible_builder.build()
 
+class SDCoreUPFGreenQueueConfigurator(VmResourceAnsibleConfiguration):
+    configuration: Optional[SDCoreUPFGreenQueueConfiguration] = Field(default=None)
+    n6_nic_name: str = Field()
 
-UPF_IMAGE_NAME = "sd-core-upf-v2.0.0-2"
-UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.0.0-2-ubuntu2404.qcow2"
+    def dump_playbook(self) -> str:
+        ansible_builder = AnsiblePlaybookBuilder("Playbook SDCoreUPFGreenQueueConfigurator")
+        ansible_builder.add_tasks_from_file(rel_path("config/green_queue_setup.yaml"))
+
+        ansible_builder.set_vars_from_fields(self.configuration)
+        ansible_builder.set_var("n6_nic_name", self.n6_nic_name)
+
+        return ansible_builder.build()
+
+class SDCoreUPFGreenQueueAddIPConfigurator(VmResourceAnsibleConfiguration):
+    configuration: Optional[SDCoreUPFGreenQueueIPConfiguration] = Field(default=None)
+    module_name: str = Field()
+
+    def dump_playbook(self) -> str:
+        ansible_builder = AnsiblePlaybookBuilder("Playbook SDCoreUPFGreenQueueAddIPConfigurator")
+        ansible_builder.add_tasks_from_file(rel_path("config/green_queue_add_ip.yaml"))
+
+        ansible_builder.set_vars_from_fields(self.configuration)
+        ansible_builder.set_var("module_name", self.module_name)
+
+        return ansible_builder.build()
+
+
+class SDCoreUPFGreenQueueReleaseIPConfigurator(VmResourceAnsibleConfiguration):
+    configuration: Optional[SDCoreUPFGreenQueueIPConfiguration] = Field(default=None)
+    module_name: str = Field()
+
+    def dump_playbook(self) -> str:
+        ansible_builder = AnsiblePlaybookBuilder("Playbook SDCoreUPFGreenQueueReleaseIPConfigurator")
+        ansible_builder.add_tasks_from_file(rel_path("config/green_queue_release.yaml"))
+
+        ansible_builder.set_vars_from_fields(self.configuration)
+        ansible_builder.set_var("module_name", self.module_name)
+
+        return ansible_builder.build()
+
+class SDCoreUPFGreenQueueRemoveConfigurator(VmResourceAnsibleConfiguration):
+    n6_nic_name: str = Field()
+
+    def dump_playbook(self) -> str:
+        ansible_builder = AnsiblePlaybookBuilder("Playbook SDCoreUPFGreenQueueRemoveConfigurator")
+        ansible_builder.add_tasks_from_file(rel_path("config/green_queue_remove.yaml"))
+
+        ansible_builder.set_var("n6_nic_name", self.n6_nic_name)
+
+        return ansible_builder.build()
+
+UPF_IMAGE_NAME = "sd-core-upf-v2.0.2-s2n-6"
+UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.0.2-s2n-6-ubuntu2404.qcow2"
 
 
 @blueprint_type(SDCORE_UPF_BLUE_TYPE)
@@ -106,26 +182,6 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             deployed_info = self.undeploy_upf_vm(dnn)
             self.state.upf_list.remove(deployed_info)
             del self.state.currently_deployed_dnns[dnn]
-
-    def get_dnn_ip_pool(self, dnn: str) -> str:
-        found_ip_pool: Optional[str] = None
-        for slice in self.state.current_config.slices:
-            for dnnslice in slice.dnn_list:
-                if dnnslice.dnn == dnn:
-                    if found_ip_pool is None:
-                        found_ip_pool = dnnslice.cidr
-                    elif found_ip_pool != dnnslice.cidr:
-                        raise ValueError("The same dnn for different slices must have the same ip pool")
-        if found_ip_pool is None:
-            raise ValueError(f"Unable to find ip pool for dnn '{dnn}'")
-        return found_ip_pool
-
-    def get_slices_for_dnn(self, dnn: str) -> List[Slice5GWithDNNs]:
-        served_slices: List[Slice5GWithDNNs] = []
-        for slice in self.state.current_config.slices:
-            if dnn in list(map(lambda x: x.dnn, slice.dnn_list)):
-                served_slices.append(slice)
-        return served_slices
 
     def deploy_upf_vm(self, dnn: str) -> DeployedUPFInfo:
         upf_vm = VmResource(
@@ -190,3 +246,77 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         del self.state.vm_configurators[upf_info.vm_configurator_id]
 
         return upf_info
+
+    def blueprint_monitoring_definition(self) -> Optional[BlueprintMonitoringDefinition]:
+        targets = []
+        for dnn, deployed_upf_info in self.state.currently_deployed_dnns.items():
+            ip = self.state.vm_resources[deployed_upf_info.vm_resource_id].access_ip
+            targets.append(
+                PrometheusTargetModel(
+                    endpoints=[EndPointV4(ip=ip, port=8080)],
+                    labels={"dnn": dnn}
+                )
+            )
+            targets.append(
+                PrometheusTargetModel(
+                    endpoints=[EndPointV4(ip=ip, port=9100)],
+                    labels={"dnn": dnn}
+                )
+            )
+
+        dashboards = [
+            GrafanaDashboard(name="gtpu-path-monitoring", path=str(rel_path("dashboards/gtpu-path-monitoring.json"))),
+            GrafanaDashboard(name="upf-custom", path=str(rel_path("dashboards/upf-custom.json"))),
+            GrafanaDashboard(name="upf-session", path=str(rel_path("dashboards/upf-session.json"))),
+            GrafanaDashboard(name="upf-session-summary", path=str(rel_path("dashboards/upf-session-summary.json"))),
+            GrafanaDashboard(name="upf-session-summary-latency-heatmap", path=str(rel_path("dashboards/upf-session-summary-latency-heatmap.json"))),
+            GrafanaDashboard(name="node-exporter", path="monitoring/grafana/node_exporter.json"),
+        ]
+
+        return BlueprintMonitoringDefinition(prometheus_targets=targets, grafana_dashboards=dashboards)
+
+    @day2_function("/green_queue_setup", [HttpRequestType.PUT])
+    def green_queue_setup(self, model: SDCoreUPFGreenQueueConfiguration):
+        upf_info = self.state.currently_deployed_dnns[model.dnn]
+        upf_vm = self.state.vm_resources[upf_info.vm_resource_id]
+        green_configurator = SDCoreUPFGreenQueueConfigurator(
+            vm_resource=upf_vm,
+            n6_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name,
+            configuration=model
+        )
+        self.provider.configure_vm(green_configurator)
+        self.state.currently_enabled_green_modules[model.dnn] = str(model.module_class)
+
+
+    @day2_function("/green_queue_remove", [HttpRequestType.PUT])
+    def green_queue_remove(self, model: SDCoreUPFGreenQueueRemoveConfiguration):
+        upf_info = self.state.currently_deployed_dnns[model.dnn]
+        upf_vm = self.state.vm_resources[upf_info.vm_resource_id]
+        green_configurator = SDCoreUPFGreenQueueRemoveConfigurator(
+            vm_resource=upf_vm,
+            n6_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name
+        )
+        self.provider.configure_vm(green_configurator)
+        del self.state.currently_enabled_green_modules[model.dnn]
+
+    @day2_function("/green_queue_add_ip", [HttpRequestType.PUT])
+    def green_queue_add_ip(self, model: SDCoreUPFGreenQueueIPConfiguration):
+        upf_info = self.state.currently_deployed_dnns[model.dnn]
+        upf_vm = self.state.vm_resources[upf_info.vm_resource_id]
+        green_configurator = SDCoreUPFGreenQueueAddIPConfigurator(
+            vm_resource=upf_vm,
+            configuration=model,
+            module_name=self.state.currently_enabled_green_modules[model.dnn]
+        )
+        self.provider.configure_vm(green_configurator)
+
+    @day2_function("/green_queue_release_ip", [HttpRequestType.PUT])
+    def green_queue_release_ip(self, model: SDCoreUPFGreenQueueIPConfiguration):
+        upf_info = self.state.currently_deployed_dnns[model.dnn]
+        upf_vm = self.state.vm_resources[upf_info.vm_resource_id]
+        green_configurator = SDCoreUPFGreenQueueReleaseIPConfigurator(
+            vm_resource=upf_vm,
+            configuration=model,
+            module_name=self.state.currently_enabled_green_modules[model.dnn]
+        )
+        self.provider.configure_vm(green_configurator)

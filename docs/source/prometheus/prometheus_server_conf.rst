@@ -1,11 +1,10 @@
 Prometheus server configuration example
 =======================================
 
-In this section an example of configuration of Prometheus with Service discovery file is shown (sd_file).
-You can prepare 2 configuration files for prometheus:
+In this section, there is an example of Prometheus configuration with Service Discovery (SD) enabled of files (sd_file).
+You can prepare the main Prometheus configuration file at:
 
-* The configuration file -> **/home/ubuntu/config.yaml**
-* The sd_file -> **/home/ubuntu/sd_file.yaml**
+* **/home/ubuntu/prometheus.yaml**
 
 In the configuration file (**prometheus.yml**) you have to setup the location of the sd_file
 
@@ -35,7 +34,7 @@ In the configuration file (**prometheus.yml**) you have to setup the location of
           - "sd_file.yaml"
           refresh_interval: 1m
 
-Then you can set an empty array as content for the sd_file.yaml:
+Then you can create the SD file **/home/ubuntu/sd_file.yaml** and set an empty array as content for the sd_file.yaml:
 
 .. code-block:: yaml
 

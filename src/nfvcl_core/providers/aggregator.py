@@ -1,11 +1,11 @@
 from functools import wraps
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, Tuple, Set
 
 from nfvcl_core.managers import TopologyManager
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGProviderModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import PduType, PduModel, MultusInterface
-from nfvcl_core_models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource
+from nfvcl_core_models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource, VmStatus
 from nfvcl_core_models.vim.vim_models import VimTypeEnum
 from nfvcl_core.providers.blueprint.blueprint_provider import BlueprintProvider
 from nfvcl_core.providers.kubernetes.k8s_provider_native import K8SProviderNative
@@ -153,6 +153,13 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def destroy_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).destroy_vm(vm_resource)
 
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        return self.get_virt_provider(vm_resource.area).reboot_vm(vm_resource, hard=hard)
+
+    @register_performance([(1, "vm_resource", lambda x: x.name)])
+    def check_vm_status(self, vm_resource: VmResource) -> VmStatus:
+        return self.get_virt_provider(vm_resource.area).check_vm_status(vm_resource)
+
     @register_performance()
     def final_cleanup(self):
         for virt_provider_impl in self.virt_providers_impl.values():
@@ -205,6 +212,9 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def get_pdu_configurator(self, pdu_model: PduModel) -> Any:
         return self.get_pdu_provider().get_pdu_configurator(pdu_model)
 
+    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+        return self.get_virt_provider(area).check_networks(area, networks_to_check)
+
     @register_performance(params_to_info=[(1, "blueprint_type")])
     def create_blueprint(self, path: str, msg: Any):
         return self.get_blueprint_provider().create_blueprint(path, msg)
@@ -220,3 +230,11 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     @register_performance()
     def restart_deployment(self, helm_chart_resource: HelmChartResource, deployment_name: str):
         return self.get_k8s_provider(helm_chart_resource.area).restart_deployment(helm_chart_resource, deployment_name)
+
+    @register_performance()
+    def restart_all_deployments(self, helm_chart_resource: HelmChartResource, namespace: str):
+        return self.get_k8s_provider(helm_chart_resource.area).restart_all_deployments(helm_chart_resource, namespace)
+
+    @register_performance()
+    def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name=None, container_name=None):
+        return self.get_k8s_provider(helm_chart_resource.area).exec_command_in_pod(helm_chart_resource, command, pod_name, container_name)

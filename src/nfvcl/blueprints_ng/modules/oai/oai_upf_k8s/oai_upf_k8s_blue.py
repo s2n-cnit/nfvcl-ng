@@ -61,9 +61,14 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
         if self.state.multus_network_info.n4:
             self.state.upf_values.multus.n4Interface.set_multus(True, self.state.multus_network_info.n4)
         if self.state.multus_network_info.n3:
+            self.state.multus_network_info.n3.gateway_ip = self.state.router.network.n3_ip
             self.state.upf_values.multus.n3Interface.set_multus(True, self.state.multus_network_info.n3)
         if self.state.multus_network_info.n6:
+            self.state.multus_network_info.n6.gateway_ip = self.state.router.network.n6_ip
             self.state.upf_values.multus.n6Interface.set_multus(True, self.state.multus_network_info.n6)
+            self.state.upf_values.upfconfig.upf.support_features.enable_snat = "no"
+            self.state.upf_values.upfconfig.upf.remote_n6_gw = self.state.router.network.n6_ip.exploded
+            self.state.upf_values.upfconfig.upf.gnb_cidr = self.state.router.network.gnb_cidr.exploded
 
         # Clearing previous config
         self.state.upf_values.upfconfig.snssais.clear()
@@ -79,8 +84,8 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
 
         self.state.upf_values.upfconfig.nfs.nrf.host = f"oai-nrf-svc-lb.{self.base_model.parent_blue_id}" #svc.cluster.local"
 
-        if self.state.current_config.smf_ip:
-            self.state.upf_values.upfconfig.upf.smfs = [AvailableSmf(host=self.state.current_config.smf_ip.exploded)]
+        # if self.state.current_config.smf_ip:
+        #     self.state.upf_values.upfconfig.upf.smfs = [AvailableSmf(host=self.state.current_config.smf_ip.exploded)]
 
         self.state.upf_values.upfconfig.upf.remote_n6_gw = self.state.multus_network_info.n6.gateway_ip.exploded if self.state.multus_network_info.n6 and self.state.multus_network_info.n6.gateway_ip else "127.0.0.1"
 
@@ -93,6 +98,7 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
                 # Add DNNS
                 oai_utils.add_dnn_dnns(self.state.upf_values.upfconfig, dnn.dnn, dnn.cidr)
                 oai_utils.add_dnn_snssai_upf_info_list_item(self.state.upf_values.upfconfig, new_snssai, dnn_item)
+                self.add_route_to_router(dnn.cidr, self.state.multus_network_info.n6.ip_address.exploded)
 
     def update_upf(self):
         """
@@ -113,8 +119,8 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
                 n4_cidr=self.state.multus_network_info.n4.network_cidr if self.state.multus_network_info.n4 else SerializableIPv4Network("1.1.1.1/32"),
                 n3_cidr=self.state.multus_network_info.n3.network_cidr if self.state.multus_network_info.n3 else SerializableIPv4Network("1.1.1.1/32"),
                 n6_cidr=self.state.multus_network_info.n6.network_cidr if self.state.multus_network_info.n6 else SerializableIPv4Network("1.1.1.1/32"),
-                n4_ip=self.state.multus_network_info.n4.ip_address if self.state.multus_network_info.n6 else SerializableIPv4Address("1.1.1.1"),
-                n3_ip=self.state.multus_network_info.n3.ip_address if self.state.multus_network_info.n6 else SerializableIPv4Address("1.1.1.1"),
+                n4_ip=self.state.multus_network_info.n4.ip_address if self.state.multus_network_info.n4 else SerializableIPv4Address("1.1.1.1"),
+                n3_ip=self.state.multus_network_info.n3.ip_address if self.state.multus_network_info.n3 else SerializableIPv4Address("1.1.1.1"),
                 n6_ip=self.state.multus_network_info.n6.ip_address if self.state.multus_network_info.n6 else SerializableIPv4Address("1.1.1.1")
             )
         )

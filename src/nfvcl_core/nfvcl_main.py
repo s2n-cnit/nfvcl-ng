@@ -14,6 +14,7 @@ from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, Bluepri
 from nfvcl_core.containers.nfvcl_container import NFVCLContainer
 from nfvcl_core.database.extra_repository import ExtraRepository
 from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
+from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager, MonitoringManager
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
@@ -27,10 +28,10 @@ from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGBaseModel
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core_models.k8s_management_models import Labels
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel
 from nfvcl_core_models.network.network_models import PduModel, NetworkModel, RouterModel, IPv4Pool, IPv4ReservedRange
 from nfvcl_core_models.performance import BlueprintPerformance
-from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall
-from nfvcl_core_models.prometheus.prometheus_model import PrometheusServerModel
+from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall, K8sMonitoringConfig
 from nfvcl_core_models.response_model import OssCompliantResponse
 from nfvcl_core_models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
@@ -101,7 +102,6 @@ class NFVCL:
     K8S_SECTION = NFVCLPublicSectionModel(name="Kubernetes cluster management", description="Operations related to kubernetes clusters", path="/k8s")
     UTILS_SECTION = NFVCLPublicSectionModel(name="Utils", description="Utils", path="/v2/utils")
     USER_SECTION = NFVCLPublicSectionModel(name="Users", description="User management", path="/v2/users")
-    HORSE_SECTION = NFVCLPublicSectionModel(name="Horse", description="Horse", path="/v2/horse")
 
     def __init__(
         self,
@@ -114,6 +114,7 @@ class NFVCL:
         pdu_manager: PDUManager = Provide[NFVCLContainer.pdu_manager],
         kubernetes_manager: KubernetesManager = Provide[NFVCLContainer.kubernetes_manager],
         user_manager: UserManager = Provide[NFVCLContainer.user_manager],
+        monitoring_manager: Optional[MonitoringManager] = None,
         extra_repository: ExtraRepository = Provide[NFVCLContainer.extra_repository],
     ):
         self.logger = create_logger(self.__class__.__name__)
@@ -127,14 +128,16 @@ class NFVCL:
         self.task_manager = task_manager
         self.event_manager = event_manager
         self.user_manager = user_manager
+        self.monitoring_manager = monitoring_manager
         self.extra_repository = extra_repository
 
         urllib3.disable_warnings()
 
         register_pdu_implementations(pdu_manager)
 
-        self.blueprint_manager.load()
-        self.performance_manager.load()
+        if not global_ref.nfvcl_config.nfvcl.rescue_mode:
+            self.blueprint_manager.load()
+            self.performance_manager.load()
         self.user_manager.load()
 
         # TODO rework plugin loading
@@ -259,14 +262,14 @@ class NFVCL:
         """
         return self.add_task(self.topology_manager.get_topology, callback=callback)
 
-    @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST)
+    @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def create_topology(self, topology: TopologyModel, callback=None):
         """
         Create the topology
         """
         return self.add_task(self.topology_manager.create_topology, topology, callback=callback)
 
-    @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)
+    @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_topology(self, callback=None):
         return self.add_task(self.topology_manager.delete_topology, callback=callback)
 
@@ -274,15 +277,15 @@ class NFVCL:
     def get_vim(self, vim_id: str, callback=None) -> VimModel:
         return self.add_task(self.topology_manager.get_vim, vim_id, callback=callback)
 
-    @NFVCLPublic(path="/vim", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST)
+    @NFVCLPublic(path="/vim", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def create_vim(self, vim: VimModel, callback=None):
         return self.add_task(self.topology_manager.create_vim, vim, callback=callback)
 
-    @NFVCLPublic(path="/vim/update", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT)
+    @NFVCLPublic(path="/vim/update", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, sync=True)
     def update_vim(self, vim: VimModel, callback=None):
         return self.add_task(self.topology_manager.update_vim, vim, callback=callback)
 
-    @NFVCLPublic(path="/vim/{vim_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE)
+    @NFVCLPublic(path="/vim/{vim_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_vim(self, vim_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_vim, vim_id, callback=callback)
 
@@ -365,7 +368,7 @@ class NFVCL:
         summary=ADD_EXTERNAL_K8SCLUSTER_SUMMARY,
         description=ADD_EXTERNAL_K8SCLUSTER, sync=True
     )
-    def create_kubernetes_external(self, kubernetes_model: TopologyK8sModel, callback=None):
+    def create_kubernetes_external(self, kubernetes_model: TopologyK8sModel, callback=None, sync=True):
         kubernetes_model.provided_by = ProvidedBy.EXTERNAL
         return self.add_task(self.topology_manager.add_kubernetes, kubernetes_model, callback=callback)
 
@@ -377,62 +380,37 @@ class NFVCL:
     def delete_kubernetes(self, cluster_id: str, callback=None) -> TopologyK8sModel:
         return self.add_task(self.topology_manager.delete_kubernetes, cluster_id, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.GET,
-        sync=True,
-        summary=GET_PROM_LIST_SRV_SUMMARY,
-        description=GET_PROM_LIST_SRV_DESCRIPTION
-    )
+    ######################
+    # Prometheus Section #
+    ######################
+
+    @NFVCLPublic(path="/prometheus",section=TOPOLOGY_SECTION,method=NFVCLPublicMethod.GET,sync=True,summary=GET_PROM_LIST_SRV_SUMMARY,description=GET_PROM_LIST_SRV_DESCRIPTION)
     def get_prometheus_list(self, callback=None) -> List[PrometheusServerModel]:
         return self.add_task(self.topology_manager.get_prometheus_list, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus/{prometheus_id}",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.GET,
-        sync=True,
-        summary=GET_PROM_SRV_SUMMARY,
-        description=GET_PROM_SRV_DESCRIPTION
-    )
+    @NFVCLPublic(path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.GET, sync=True, summary=GET_PROM_SRV_SUMMARY, description=GET_PROM_SRV_DESCRIPTION)
     def get_prometheus(self, prometheus_id: str, callback=None) -> PrometheusServerModel:
         return self.add_task(self.topology_manager.get_prometheus, prometheus_id, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.POST,
-        summary=ADD_PROM_SRV_SUMMARY,
-        description=ADD_PROM_SRV_DESCRIPTION,
-        sync=True
-    )
-    def create_prometheus(self, prometheus_model: PrometheusServerModel, callback=None):
+    @NFVCLPublic(path="/prometheus", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, summary=ADD_PROM_SRV_SUMMARY, description=ADD_PROM_SRV_DESCRIPTION, sync=True)
+    def create_prometheus(self, prometheus_model: PrometheusServerModel, callback=None) -> PrometheusServerModel:
         return self.add_task(self.topology_manager.add_prometheus, prometheus_model, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus/{prometheus_id}",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.PUT,
-        summary=UPD_PROM_SRV_SUMMARY,
-        description=UPD_PROM_SRV_DESCRIPTION,
-        sync=True
-    )
-    def update_prometheus(self, prometheus_model: PrometheusServerModel, callback=None):
+    @NFVCLPublic(path="/prometheus", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PUT, summary=UPD_PROM_SRV_SUMMARY, description=UPD_PROM_SRV_DESCRIPTION, sync=True)
+    def update_prometheus(self, prometheus_model: PrometheusServerModel, callback=None) -> PrometheusServerModel:
         return self.add_task(self.topology_manager.update_prometheus, prometheus_model, callback=callback)
 
-    @NFVCLPublic(
-        path="/prometheus/{prometheus_id}",
-        section=TOPOLOGY_SECTION,
-        method=NFVCLPublicMethod.DELETE,
-        summary=DEL_PROM_SRV_SUMMARY,
-        description=DEL_PROM_SRV_DESCRIPTION,
-        sync=True
-    )
+    @NFVCLPublic( path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, summary=DEL_PROM_SRV_SUMMARY, description=DEL_PROM_SRV_DESCRIPTION, sync=True)
     def delete_prometheus(self, prometheus_id: str, callback=None):
         return self.add_task(self.topology_manager.delete_prometheus, prometheus_id, callback=callback)
 
-    ############# Blueprints #############
+    @NFVCLPublic( path="/prometheus/{prometheus_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.PATCH, summary="Refresh file on remote Prometheus", sync=True)
+    def trigger_file_upload(self, prometheus_id: str, callback=None) -> PrometheusServerModel:
+        return self.add_task(self.monitoring_manager.sync_prometheus_targets_to_server, prometheus_id, callback=callback)
+
+    #####################
+    # Blueprint Section #
+    #####################
 
     @NFVCLPublic(path="", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.GET, sync=True)
     def get_blueprints(self, blue_type: str = None, detailed: bool = False, tree: bool = False, callback=None) -> List[dict]:
@@ -455,8 +433,8 @@ class NFVCL:
         return self.add_task(self.blueprint_manager.get_from_blueprint, blue_id, day2_path, callback=callback)
 
     @NFVCLPublic(path="/{blueprint_id}", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.DELETE)
-    def delete_blueprint(self, blueprint_id: str, callback=None):
-        return self.add_task(self.blueprint_manager.delete_blueprint, blueprint_id, callback=callback)
+    def delete_blueprint(self, blueprint_id: str, force_deletion: bool = False, callback=None):
+        return self.add_task(self.blueprint_manager.delete_blueprint, blueprint_id, force_deletion=force_deletion,callback=callback)
 
     @NFVCLPublic(path="/all/blue", section=BLUEPRINTS_SECTION, method=NFVCLPublicMethod.DELETE)
     def delete_all_blueprints(self, callback=None):
@@ -504,7 +482,9 @@ class NFVCL:
     # def delete_performance(self, blueprint_id: str, callback=None):
     #     return self._add_task(self._performance_manager.delete_performance, blueprint_id, callback=callback)
 
-    ############# Kubernetes cluster management #############
+    #################################
+    # Kubernetes cluster management #
+    #################################
 
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_installed_plugins)
     def k8s_get_installed_plugins(self, cluster_id: str, callback=None) -> List[str]:
@@ -513,6 +493,26 @@ class NFVCL:
     @NFVCLPublic(path="/{cluster_id}/plugins", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.install_plugins)
     def k8s_install_plugin(self, cluster_id: str, plugin_name: K8sPluginsToInstall, callback=None) -> OssCompliantResponse:
         return self.add_task(self.kubernetes_manager.install_plugins, cluster_id, plugin_name, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/k8s_monitoring", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.install_k8s_monitoring)
+    def k8s_install_monitoring(self, cluster_id: str, monitoring_config: K8sMonitoringConfig, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.install_k8s_monitoring, cluster_id, monitoring_config, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/add_monitoring_destination", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.add_monitoring_destination)
+    def k8s_add_monitoring_destination(self, cluster_id: str, loki_id: Optional[str], prometheus_id: Optional[str], callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.add_monitoring_destination, cluster_id, loki_id, prometheus_id, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/uninstall_plugin", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.uninstall_plugin)
+    def k8s_uninstall_plugin(self, cluster_id: str, namespace: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.uninstall_plugin, cluster_id, namespace, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/uninstall_k8s_monitoring", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.uninstall_k8s_monitoring)
+    def k8s_uninstall_monitoring(self, cluster_id: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.uninstall_k8s_monitoring, cluster_id, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/del_monitoring_destination", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.del_monitoring_destination)
+    def k8s_del_monitoring_destination(self, cluster_id: str, loki_id: Optional[str], prometheus_id: Optional[str], callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.del_monitoring_destination, cluster_id, loki_id, prometheus_id, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/yaml", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=False, doc_by=KubernetesManager.apply_to_k8s)
     def k8s_apply_yaml(self, cluster_id: str, yaml: Annotated[str, "application/yaml"], callback=None) -> OssCompliantResponse:
@@ -542,7 +542,7 @@ class NFVCL:
     def k8s_get_namespace_list(self, cluster_id: str, namespace: Optional[str] = None, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.get_k8s_namespace_list, cluster_id, namespace, callback=callback)
 
-    @NFVCLPublic(path="/{cluster_id}/namespace/{name}", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=True, doc_by=KubernetesManager.create_k8s_namespace)
+    @NFVCLPublic(path="/{cluster_id}/namespace/{name}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_k8s_namespace)
     def k8s_create_namespace(self, cluster_id: str, name: str, labels: dict, callback=None) -> OssCompliantResponse:
         return self.add_task(self.kubernetes_manager.create_k8s_namespace, cluster_id, name, labels, callback=callback)
 
@@ -550,33 +550,34 @@ class NFVCL:
     def k8s_delete_namespace(self, cluster_id: str, name: str, callback=None) -> OssCompliantResponse:
         return self.add_task(self.kubernetes_manager.delete_k8s_namespace, cluster_id, name, callback=callback)
 
+    @NFVCLPublic(path="/{cluster_id}/sa/{namespace}/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_service_account)
+    def k8s_create_service_account(self, cluster_id: str, namespace: str, user: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.create_service_account, cluster_id, namespace, user, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/sa/admin/{namespace}/{username}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_admin_sa_for_namespace)
+    def k8s_create_admin_sa_for_namespace(self, cluster_id: str, namespace: str, username: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.create_admin_sa_for_namespace, cluster_id, namespace, username, callback=callback)
+
     @NFVCLPublic(path="/{cluster_id}/sa", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_service_account)
     def k8s_get_service_account(self, cluster_id: str, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.get_k8s_service_account, cluster_id, callback=callback)
 
-    @NFVCLPublic(path="/{cluster_id}/roles", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_roles)
-    def k8s_get_roles(self, cluster_id: str, rolename: Optional[str] = None, namespace: Optional[str] = None, callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.get_k8s_roles, cluster_id, rolename, namespace, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/roles/admin/sa/{namespace}/{s_account}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_admin_rights_to_sa)
-    def k8s_give_admin_rights_to_sa(self, cluster_id: str, namespace: str, s_account: str, role_binding_name: Annotated[str, "text/plain"], callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.give_admin_rights_to_sa, cluster_id, namespace, s_account, role_binding_name, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/roles/admin/{namespace}/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_admin_rights_to_user_namespaced)
-    def k8s_give_admin_rights_to_user_namespaced(self, cluster_id: str, namespace: str, user: str, role_binding_name: Annotated[str, "text/plain"], callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.give_admin_rights_to_user_namespaced, cluster_id, namespace, user, role_binding_name, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/roles/cluster-admin/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_cluster_admin_rights)
-    def k8s_give_cluster_admin_rights(self, cluster_id: str, user: str, cluster_role_binding_name: Annotated[str, "text/plain"], callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.give_cluster_admin_rights, cluster_id, user, cluster_role_binding_name, callback=callback)
-
-    @NFVCLPublic(path="/{cluster_id}/sa/{namespace}/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.PUT, sync=True, doc_by=KubernetesManager.create_service_account)
-    def k8s_create_service_account(self, cluster_id: str, namespace: str, user: str, callback=None) -> dict:
-        return self.add_task(self.kubernetes_manager.create_service_account, cluster_id, namespace, user, callback=callback)
-
     @NFVCLPublic(path="/{cluster_id}/secret/{namespace}/{user}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_secret_for_sa)
     def k8s_create_secret_for_sa(self, cluster_id: str, namespace: str, user: str, secret_name: Annotated[str, "text/plain"], callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.create_secret_for_sa, cluster_id, namespace, user, secret_name, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/roles", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_k8s_roles)
+    def k8s_get_roles(self, cluster_id: str, rolename: Optional[str] = None, namespace: Optional[str] = None, callback=None) -> dict:
+        role_list = self.add_task(self.kubernetes_manager.get_k8s_roles, cluster_id, rolename, namespace, callback=callback)
+        return role_list.to_dict()
+
+    @NFVCLPublic(path="/{cluster_id}/roles/admin/sa/{namespace}/{s_account}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_admin_rights_to_sa)
+    def k8s_give_admin_rights_to_sa(self, cluster_id: str, namespace: str, s_account: str, role_binding_name: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.give_admin_rights_to_sa, cluster_id, namespace, s_account, role_binding_name, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/roles/cluster-admin/{namespace}/{s_account}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.give_cluster_admin_rights)
+    def k8s_give_cluster_admin_rights(self, cluster_id: str, s_account: str, namespace: str, cluster_role_binding_name: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.give_cluster_admin_rights, cluster_id, s_account, namespace, cluster_role_binding_name, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/secrets", section=K8S_SECTION, method=NFVCLPublicMethod.GET, sync=True, doc_by=KubernetesManager.get_secrets)
     def k8s_get_secrets(self, cluster_id: str, namespace: str = "", secret_name: str = "", owner: str = "", callback=None) -> dict:
@@ -589,6 +590,14 @@ class NFVCL:
     @NFVCLPublic(path="/{cluster_id}/user/{username}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.create_k8s_kubectl_user, summary="Create (the user) and retrieve info for a new kubectl user")
     def k8s_create_kubectl_user(self, cluster_id: str, username: str, expire_seconds: int = 31536000, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.create_k8s_kubectl_user, cluster_id, username, expire_seconds, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/admission-webhook/nfvcl", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=False, doc_by=KubernetesManager.install_nfvcl_admission_webhook, summary="Install NFVCL admission webhook")
+    def k8s_install_admission_webhook(self, cluster_id: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.install_nfvcl_admission_webhook, cluster_id, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/admission-webhook/nfvcl", section=K8S_SECTION, method=NFVCLPublicMethod.DELETE, sync=False, doc_by=KubernetesManager.uninstall_nfvcl_admission_webhook, summary="Uninstall NFVCL admission webhook")
+    def k8s_uninstall_admission_webhook(self, cluster_id: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.uninstall_nfvcl_admission_webhook, cluster_id, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/quota/{namespace}/{quota_name}", section=K8S_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=KubernetesManager.apply_resource_quota_namespace)
     def k8s_apply_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota, callback=None) -> OssCompliantResponse:

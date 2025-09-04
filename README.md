@@ -1,9 +1,8 @@
 <a name="readme-top"></a>
 
-# 🐎 HORSE Section 
-You can find APIs examples in [Horse test section](/nfvcl_horse/api_examples)
-
-The file containing APIs for HORSE is [there](src/nfvcl_horse/horse_old.py)
+<p style="text-align: center;">
+  <img src="/docs/images/logo/logo.png" alt="Description" width="200" height="200">
+</p>
 
 <!-- TABLE OF CONTENTS -->
 

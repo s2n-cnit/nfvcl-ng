@@ -2,6 +2,7 @@ from dependency_injector import containers, providers
 
 from nfvcl_core.database.extra_repository import ExtraRepository
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
+from nfvcl_core.managers.monitoring_manager import MonitoringManager
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core.database.topology_repository import TopologyRepository
 from nfvcl_core.database.blueprint_repository import BlueprintRepository
@@ -27,7 +28,7 @@ class NFVCLContainer(containers.DeclarativeContainer):
 
     task_manager = providers.Singleton(
         TaskManager,
-        worker_count=4
+        worker_count=config.nfvcl.workers
     )
 
     event_manager = providers.Singleton(
@@ -75,6 +76,11 @@ class NFVCLContainer(containers.DeclarativeContainer):
 
     vim_clients_manager = providers.Singleton(
         VimClientsManager,
+        topology_manager=topology_manager
+    )
+
+    monitoring_manager = providers.Singleton(
+        MonitoringManager,
         topology_manager=topology_manager
     )
 

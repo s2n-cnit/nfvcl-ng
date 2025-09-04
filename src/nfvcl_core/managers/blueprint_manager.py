@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 
+from keystoneauth1.exceptions import Unauthorized
+
 from nfvcl_core.database.blueprint_repository import BlueprintRepository
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core.managers import GenericManager, EventManager
@@ -248,6 +250,8 @@ class BlueprintManager(GenericManager):
             path: The blueprint-specific path, the last part of the URL for the creation request (e.g., /nfvcl/v2/api/blue/vyos ----> path='vyos')
         """
         blueprint = self.get_blueprint_instance(blueprint_id)
+        if blueprint is None:
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} does not exist", http_equivalent_code=404)
         function = blueprint_type.get_function_to_be_called(path)
 
         if blueprint.lock.locked():
@@ -285,13 +289,14 @@ class BlueprintManager(GenericManager):
             self._performance_manager.end_operation(performance_operation_id)
         return result
 
-    def delete_blueprint(self, blueprint_id: str, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> str:
+    def delete_blueprint(self, blueprint_id: str, force_deletion: Optional[bool] = False, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> str:
         """
         Deletes the blueprint from the NFVCL if the blueprint is not protected.
 
         Args:
             blueprint_id: The ID of the blueprint to be deleted.
             pre_work_callback: Callback that is called before the creation of the blueprint.
+            force_deletion: Force deletion without ensuring that resources are deleted from remote VIMs or K8S Clusters
 
         Raises:
             BlueprintNotFoundException if blue does nor exist.
@@ -315,10 +320,16 @@ class BlueprintManager(GenericManager):
                 self.blueprint_dict.pop(blueprint_id)
                 self._blueprint_repository.delete_blueprint(blueprint_id)
             except Exception as e:
-                self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
-                self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))
-                self._performance_manager.set_error(blueprint_id, True)
-                raise e
+                if force_deletion:
+                    self.logger.warning("Force deletion is enabled! Blue will be destroyed without ensuring that resources are deleted from remote VIMs or K8S Clusters")
+                    self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
+                    self.blueprint_dict.pop(blueprint_id)
+                    self._blueprint_repository.delete_blueprint(blueprint_id)
+                else:
+                    self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
+                    self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))
+                    self._performance_manager.set_error(blueprint_id, True)
+                    raise e
             self._performance_manager.end_operation(performance_operation_id)
             self.logger.success(f"Blueprint {blueprint_id} deleted successfully")
 
@@ -336,6 +347,8 @@ class BlueprintManager(GenericManager):
                 self.delete_blueprint(blue_id)
             except BlueprintProtectedException:
                 self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped cause it is protected")
+            except Unauthorized: # CLient Openstack crash
+                self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped cause Openstack Client Failed")
 
     def protect_blueprint(self, blueprint_id: str, protect: bool) -> dict:
         """

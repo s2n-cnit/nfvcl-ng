@@ -41,7 +41,6 @@ colorama = "^0.4.6"
 verboselogs = "^1.7"
 ansible-runner = "^2.3.5"
 ansible = "^9.2.0"
-pyhelm3 = "^0.4.0"
 httpx = {extras = ["http2"], version = "^0.28.1"}
 jinja2 = "^3.1.6"
 dependency-injector = "^4.46.0"
@@ -49,6 +48,9 @@ decohints = "^1.0.9"
 python-jose = "^3.4.0"
 python-multipart = "^0.0.20"
 blinker = "^1.9.0"
+proxmoxer = "^2.2.0"
+grafana-client = "^4.3.2"
+pyhelm3 = {git = "https://github.com/s2n-cnit/pyhelm3.git", rev = "5c25193"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"

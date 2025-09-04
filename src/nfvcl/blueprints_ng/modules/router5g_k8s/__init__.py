@@ -1,0 +1,1 @@
+from .router_5g_k8s import Router5GK8sBlueprintNG as Router5GK8sBlueprintNG

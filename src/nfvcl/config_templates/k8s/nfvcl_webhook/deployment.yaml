@@ -1,0 +1,66 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nfvcl-webhook-namespace-reader
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nfvcl-webhook-namespace-reader-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nfvcl-webhook-namespace-reader
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: nfvcl-webhook
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfvcl-webhook
+  namespace: nfvcl-webhook
+  labels:
+    app: nfvcl-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfvcl-webhook
+  template:
+    metadata:
+      labels:
+        app: nfvcl-webhook
+    spec:
+      containers:
+        - name: webhook
+          image: "ghcr.io/s2n-cnit/nfvcl-k8s-admission-webhook:v0.0.2"
+          ports:
+            - containerPort: 443
+              name: https
+          volumeMounts:
+            - name: tls
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: webhook-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfvcl-webhook
+  namespace: nfvcl-webhook
+spec:
+  selector:
+    app: nfvcl-webhook
+  ports:
+    - port: 443
+      targetPort: https

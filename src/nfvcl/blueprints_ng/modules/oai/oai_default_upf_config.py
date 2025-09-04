@@ -34,7 +34,7 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
             "general": "info"
         },
         "register_nf": {
-            "general": "no"
+            "general": "yes"
         },
         "http_version": 2,
         "snssais": [
@@ -134,6 +134,7 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
             "connection_timeout": 300
         },
         "upf": {
+            "gnb_cidr": "10.1.128.0/17",
             "support_features": {
                 "enable_bpf_datapath": "no",
                 "enable_snat": "yes",

@@ -280,6 +280,7 @@ class AvailableSmf(NFVCLBaseModel):
 
 
 class Upf2(NFVCLBaseModel):
+    gnb_cidr: str
     support_features: SupportFeaturesUpf
     remote_n6_gw: str
     smfs: List[AvailableSmf]
@@ -436,9 +437,13 @@ class OaiAmf(OaiNF):
 class StartSmf(Start):
     smf: bool
 
+class SMFHostAliases(NFVCLBaseModel):
+    ip: str = Field()
+    hostnames: str = Field()
 
 class OaiSmf(OaiNF):
     start: StartSmf
+    hostAliases: List[SMFHostAliases]
     multus: Optional[OAIMultusSMF] = Field(default=None)
 
 
@@ -571,6 +576,7 @@ class CUConfig(NFVCLBaseModel):
     f1cu_port: str = Field(..., alias='f1cuPort')
     f1du_port: str = Field(..., alias='f1duPort')
     gnb_id: str = Field(default="0xe00", alias='gnbId')
+    additional_routes: Optional[List[str]] = Field(default=None, alias='additional_routes')
 
 
 class PodSecurityContext(NFVCLBaseModel):
@@ -704,6 +710,7 @@ class CUUPConfig(NFVCLBaseModel):
     f1cu_port: str = Field(..., alias='f1cuPort')
     f1du_port: str = Field(..., alias='f1duPort')
     gnb_id: str = Field(default="0xe00", alias='gnbId')
+    additional_routes: Optional[List[str]] = Field(default=None, alias='additional_routes')
 
 
 class CUUPStart(NFVCLBaseModel):
@@ -791,6 +798,7 @@ class GNBConfig(NFVCLBaseModel):
     n3_if_name: str = Field(default="eth0", alias='n3IfName')
     amf_ip_address: str = Field(..., alias='amfIpAddress')
     gnb_id: str = Field(default="0xe00", alias='gnbId')
+    additional_routes: Optional[List[str]] = Field(default=None, alias='additional_routes')
 
 
 class GNBStart(NFVCLBaseModel):

@@ -13,7 +13,6 @@ from nfvcl_core_models.http_models import HttpRequestType
 from nfvcl_models.k8s.cadvisor import cadvisor_exposed_metrics
 from nfvcl_models.k8s.k8s_objects import K8sService, K8sDeployment
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
-from nfvcl_core.utils.k8s.kube_api_utils import k8s_scale_k8s_deployment
 from nfvcl_core.utils.metrics.prometheus_utils import create_prometheus_query
 
 
@@ -107,9 +106,8 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
         """
         self.logger.info(f"Scaling {nf_scaling.nf} to {nf_scaling.replica_count} replicas")
 
-        k8s_config = get_k8s_config_from_file_content(self.provider.get_k8s_provider(list(filter(lambda x: x.core, self.state.current_config.areas))[0].id).k8s_cluster.credentials)
-        k8s_scale_k8s_deployment(
-            k8s_config,
+        # TODO this function should be available directly from the provider
+        self.provider.get_k8s_provider(list(filter(lambda x: x.core, self.state.current_config.areas))[0].id).kube_utils.scale_k8s_deployment(
             namespace=self.state.core_helm_chart.namespace.lower(),
             deployment_name=self.state.k8s_network_functions[nf_scaling.nf].deployment.name,
             replica_num=nf_scaling.replica_count

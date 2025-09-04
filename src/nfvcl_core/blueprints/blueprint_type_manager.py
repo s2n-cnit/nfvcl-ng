@@ -84,6 +84,9 @@ class blueprint_type:
             if hasattr(method, "day2_fun"):
                 self.register_day2(method)
 
+        # Add the blueprint type to the class for easy access
+        original_class.blueprint_type = self.blue_type
+
         # Don't wrap the class, just return the original
         return original_class
 

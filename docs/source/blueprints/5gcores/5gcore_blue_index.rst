@@ -14,3 +14,4 @@
 
    openairinterface/openairinterface_blue_index.rst
    sdcore/sdcore_blue_index.rst
+   free5gc/free5gc_blue_index.rst

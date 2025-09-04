@@ -91,3 +91,7 @@ class OpenAirInterfaceDu(Generic5GDUK8sBlueprintNG[OAIDuBlueprintNGState, DUBlue
             self.state.du_helm_chart,
             self.state.oai_du_config_values.model_dump(exclude_none=True, by_alias=True)
         )
+
+    def restart_du(self):
+        self.logger.info("Restarting DU")
+        self.provider.restart_all_deployments(self.state.du_helm_chart, self.id)

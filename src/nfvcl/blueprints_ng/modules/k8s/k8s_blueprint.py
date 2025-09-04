@@ -5,23 +5,26 @@ from typing import Optional, List
 from pydantic import Field
 from starlette.responses import PlainTextResponse
 
-from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
-from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
-from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day0_configurator import VmK8sDay0Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_day2_configurator import VmK8sDay2Configurator
 from nfvcl.blueprints_ng.modules.k8s.config.k8s_dayN_configurator import VmK8sDayNConfigurator
-from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
-from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
-    KarmadaInstallModel, K8sDelNodeModel
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
+from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
+from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
+from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_core_models.k8s_management_models import Labels
+from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition, GrafanaDashboard
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel, PrometheusServerModel
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address, EndPointV4
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
+from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
 from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException, TopoK8SNotFoundException
-from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
-from nfvcl_core.utils.k8s.kube_api_utils import get_config_map, patch_config_map, get_k8s_cidr_info
-from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
+from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
+    KarmadaInstallModel, K8sDelNodeModel
+from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
 
 K8S_BLUE_TYPE = "k8s"
 K8S_VERSION = K8sVersion.V1_30
@@ -55,6 +58,7 @@ class K8sBlueprintNGState(BlueprintNGState):
     base_image_url: str = Field(default=BASE_IMAGE24_URL)
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Indicates if the blueprint will require port security disabled (on openstack)")
     topology_onboarded: bool = Field(default=False, description="If the blueprint cluster has to be added to the topology")
+    prometheus_server_reference: Optional[PrometheusServerModel]= Field(default=None, description="A copy of the prometheus server, containing only targets from this blueprint")
 
     master_area: Optional[K8sAreaDeployment] = Field(default=None, description="A copy of the master area")
     area_list: List[K8sAreaDeployment] = Field(default=[], description="The list of deployed areas")
@@ -170,6 +174,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         self.day0conf(configure_master=True)
         # Fix DNS Problem
         self.fix_dns_problem()
+        # Label nodes to indicate the area they belong to. Used to constrain deployments to run on specific areas.i
+        self.label_nodes()
         # Install K8s Plugins if required (default=yes)
         if create_model.install_plugins:
             self.install_default_plugins()
@@ -259,22 +265,33 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
     def setup_load_balancer_pool(self):
         """
-        Creates the load balancer pool to be used by MetalLB.
-        By default, TODO
+        Sets up load balancer pools for the Kubernetes cluster by reserving a range of IPs
+        in the service network and assigning them to specific areas based on their associated
+        workers and master nodes. Each area is configured with its own load balancer pool.
 
+        Attributes:
+            state.load_balancer_ips_area (Dict[int, List[str]]): A dictionary where keys are
+                area IDs and values are lists of IP addresses allocated for each area.
+            state.vm_workers (List[WorkerNode]): List of worker nodes in the cluster, each of
+                which contains information about its area and name.
+            state.vm_master (MasterNode): The master node of the cluster containing its area
+                and name information.
+            state.load_balancer_pools (List[K8sLoadBalancerPoolArea]): List of load balancer
+                pool areas generated after setting up.
         """
         # Reserve a range of IP in the service net
         lb_area_list: List[K8sLoadBalancerPoolArea] = []
 
-        for key, value in self.state.load_balancer_ips_area.items():
+        for area_id, value in self.state.load_balancer_ips_area.items():
             # All workers in the area will be hosts that announce the LB pool
-            hostnames = [vm.name.lower() for vm in self.state.vm_workers if vm.area == int(key)]
-            # If the controller is in the area add it
-            if self.state.vm_master.area == int(key):
+            hostnames = [vm.name.lower() for vm in self.state.vm_workers if vm.area == int(area_id)]
+            # If the controller is in the area, add it
+            if self.state.vm_master.area == int(area_id):
                 hostnames.append(self.state.vm_master.name.lower())
             if len(hostnames) == 0:
                 hostnames = None
-            lb_area = K8sLoadBalancerPoolArea(pool_name=f"{self.id.lower()}-area1", ip_list=value, host_names=hostnames)
+            # We build the lbpool such that only workers(+master if in that area) in the area will be hosts that announce the LB pool
+            lb_area = K8sLoadBalancerPoolArea(pool_name=f"{self.id.lower()}-area-{area_id}", ip_list=value, host_names=hostnames)
             lb_area_list.append(lb_area)
 
         self.state.load_balancer_pools = lb_area_list
@@ -315,16 +332,30 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         Internal .maas domain is SOMETIMES not resolved by the internal K8S DNS. This function fixes the problem.
         """
         client_config = get_k8s_config_from_file_content(self.state.master_credentials)
+        kube_utils = KubeApiUtils(client_config)
         # Get the Core DNS configmap
-        config_map = get_config_map(client_config, "kube-system", "coredns")
+        config_map = kube_utils.get_config_map("kube-system", "coredns")
         # Extract data
         dns_config_file_content: str = config_map.data['Corefile']
         # Add internal DNS to solve maas domain
         dns_config_file_content += "maas:53 {\n    forward . 192.168.17.25\n}\n"
         config_map.data['Corefile'] = dns_config_file_content
         # Patch the config map
-        result = patch_config_map(client_config, "coredns", "kube-system", config_map)
+        result = kube_utils.patch_config_map("coredns", "kube-system", config_map)
         return result
+
+    def label_nodes(self):
+        """
+        Label each node with the area it belongs to. Used to constrain deployments to run on specific areas(or workers)
+        """
+        k8s_config = get_k8s_config_from_file_content(self.state.master_credentials)
+        kube_utils = KubeApiUtils(k8s_config)
+        for vm in self.state.vm_workers:
+            area = vm.area
+            labels = Labels(labels={"area": str(area)})
+            hostname = vm.name.lower() # always lower case for hostnames
+            kube_utils.add_label_to_k8s_node(hostname, labels=labels)
+        kube_utils.add_label_to_k8s_node(self.state.vm_master.name.lower(), Labels(labels={"area": str(self.state.vm_master.area)}))
 
     def install_default_plugins(self):
         """
@@ -333,6 +364,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         self.logger.info(f"Starting default plugin installation on {self.id} K8S cluster")
         client_config = get_k8s_config_from_file_content(self.state.master_credentials)
+        kube_utils = KubeApiUtils(client_config)
         # It builds plugin list
         plug_list: List[K8sPluginName] = []
 
@@ -344,11 +376,11 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         plug_list.append(K8sPluginName.OPEN_EBS)
 
         # Get the k8s pod network cidr
-        pod_network_cidr = get_k8s_cidr_info(client_config)
+        pod_network_cidr = kube_utils.get_cidr_info()
         plugin_data = K8sPluginAdditionalData(areas=self.state.load_balancer_pools, pod_network_cidr=pod_network_cidr, cadvisor_node_port=self.state.cadvisor_node_port) # TODO cadvisor is not anymore present
 
         helm_plugin_manager = HelmPluginManager(k8s_credential_file=self.state.master_credentials, context_name=self.id)
-        helm_plugin_manager.install_plugins([K8sPluginName.FLANNEL, K8sPluginName.METALLB, K8sPluginName.OPEN_EBS], plugin_data)
+        helm_plugin_manager.install_plugins(plug_list, plugin_data)
 
 
 
@@ -441,6 +473,22 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         copy_kubeconfig = copy.deepcopy(self.state.master_credentials)
         return PlainTextResponse(copy_kubeconfig, media_type="text/plain")
+
+    def blueprint_monitoring_definition(self) -> Optional[BlueprintMonitoringDefinition]:
+        targets: List[EndPointV4] = [EndPointV4(ip=self.state.vm_master.access_ip, port=9100)]
+        for vm in self.state.vm_workers:
+            targets.append(EndPointV4(ip=vm.access_ip, port=9100)) # Node exporter on port 9100
+
+        prometheus_target = PrometheusTargetModel(endpoints=targets, labels={"k8s_cluster": self.id, "deployed_by": "nfvcl", "blueprint": self.id})
+
+        return BlueprintMonitoringDefinition(
+            prometheus_targets=[
+                prometheus_target
+            ],
+            grafana_dashboards=[
+                GrafanaDashboard(name="node-exporter", path="monitoring/grafana/node_exporter.json"),
+            ]
+        )
 
     def destroy(self):
         """

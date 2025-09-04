@@ -53,6 +53,7 @@ class PDUSessionType(str, Enum):
 
 DNNType = Annotated[str, Field(pattern=HOSTNAME_PATTERN, description="Data Network Name")]
 IMSIType = Annotated[str, Field(pattern=r'^[0-9]*$', min_length=15, max_length=15, description="IMSI")]
+SUPIType = Annotated[str, Field(pattern=r'^imsi-[0-9]*$', min_length=20, max_length=20, description="SUPI")]
 PLMNType = Annotated[str, Field(pattern=r'^[0-9]*$', min_length=5, max_length=5, description="PLMN")]
 MCCType = Annotated[str, Field(pattern=r'^[0-9]*$', min_length=3, max_length=3, description="MCC")]
 MNCType = Annotated[str, Field(pattern=r'^[0-9]*$', min_length=2, max_length=2, description="MNC")]

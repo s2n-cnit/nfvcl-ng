@@ -2,60 +2,13 @@ import tempfile
 from logging import Logger
 from typing import List
 
-import kubernetes.client
 import kubernetes.utils
 from kubernetes import config
 from kubernetes.client import Configuration
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName
-from nfvcl_core_models.topology_k8s_model import K8sVersion
-from nfvcl_core.utils.k8s.kube_api_utils import get_k8s_version
 from nfvcl_core.utils.log import create_logger
 
 logger: Logger = create_logger("K8S UTILS")
-
-
-class check_k8s_version(object):
-    """
-    This is a DECORATOR. Allow to decorate a method to require a minimum version of k8s cluster
-    The decorated method (or function) **must** have as first parameter the kubernetes.client.Configuration for building the k8s
-    client.
-
-    Raises:
-        ValueError if the decorator is used on not compatible method or if the k8s version is too low for it.
-    """
-
-    def __init__(self, min_version: K8sVersion):
-        """
-        Args:
-            min_version: the minimum version required
-        """
-        # this is actually needed in the complete code
-        self.min_version: K8sVersion = min_version
-
-    def __call__(self, func):
-        """
-        This method is called when the decorated method is called.
-        """
-
-        def wrapped_f(*args, **kwargs):
-            if len(args) > 0:
-                if isinstance(args[0], kubernetes.client.Configuration):
-                    target_config: kubernetes.client.Configuration = args[0]
-                    actual_version = get_k8s_version(target_config)
-                    if not actual_version.is_minor(self.min_version):
-                        return func(*args, **kwargs)
-                    else:
-                        msg_err = "The version of k8s cluster is too low. Requested APIs for this method are not implemented."
-                        logger.error(msg_err)
-                        raise ValueError(msg_err)
-
-            # In any unforeseen case, throw error.
-            msg_err = "The decorator has been used on incompatible method, first argument must be instance " \
-                      "of kubernetes.client.Configuration"
-            logger.error(msg_err)
-            raise ValueError(msg_err)
-
-        return wrapped_f
 
 
 def get_k8s_config_from_file_content(kube_client_config_file_content: str) -> kubernetes.client.Configuration:

@@ -10,14 +10,14 @@ Example request body:
 .. code-block:: json
 
     {
-      "id": "prom_serv_id",
-      "ip": "127.0.0.1",
-      "port": "9100",   ##!!!TO REMOVE -> The port of Prometheus
-      "user": "ubuntu",
-      "password": "ubuntu",
-      "ssh_port": 22,
-      "jobs": [],   ##!!!TO REMOVE -> It will be configured by NFVCL
-      "sd_file_location": "sd_targets.yml"
+        "id": "instance_id",
+        "ip": "192.168.1.1",
+        "port": "9090",
+        "user": "ubuntu",
+        "password": "sasd!sdsad-sdaa",
+        "ssh_port": 22,
+        "targets": [],
+        "sd_file_location": "/home/ubuntu/sd_file_nfvcl.yaml"
     }
 
 .. warning::

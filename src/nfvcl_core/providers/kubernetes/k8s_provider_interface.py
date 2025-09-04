@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
@@ -48,4 +48,12 @@ class K8SProviderInterface(BlueprintNGProviderInterface):
 
     @abc.abstractmethod
     def restart_deployment(self, helm_chart_resource: HelmChartResource, deployment_name: str):
+        pass
+
+    @abc.abstractmethod
+    def restart_all_deployments(self, helm_chart_resource: HelmChartResource, namespace: str):
+        pass
+
+    @abc.abstractmethod
+    def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name: str, container_name=None):
         pass

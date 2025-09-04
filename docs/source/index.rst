@@ -6,11 +6,11 @@ Home
    This project is under active development.
 
 The Network Resource Management offered by CNIT is called NFVCL and it is an open-source software[1] devoted to network-oriented meta-orchestration, specifically designed for zeroOps and continuous automation.
-The NFVCL is deploying ecosystem instances using Blueprints (Day-1). The deployment of a Blueprint can be done over a VIM and a Kubernetes cluster (some components may require to be VMs and others Containers). In detail, a network ecosystem is meant to be a complete functional network environment, such as a 5G system, an overlay system for network cybersecurity or a simple application service mesh.
+The NFVCL is deploying network ecosystem instances using Blueprints (Day-0 and Day-1), these network ecosystems can be composed by different components, such VMs or K8S pods, offering a service.
+The deployment of a Blueprint can be done over a VIM and a Kubernetes cluster (some components may require to be VMs and others Containers). In detail, a network ecosystem is meant to be a complete functional network environment, such as a 5G system, an overlay system for network cybersecurity or a simple application service mesh.
 Once a Blueprint instance has been deployed, the NFVCL is capable of managing Day-2 and Day-N operation, requested by the user, to the specific instance. The supported operations (Day-X) must be supported by the code of the specific Blueprint. In general, it can be said that the NFVCL is managing all the life-cycle of the Blueprint (LCM).
 
 .. contents::
-
 
 The installation procedure is described in the main `README <https://github.com/s2n-cnit/nfvcl-ng>`_.
 
@@ -119,7 +119,6 @@ For more details you can go to :doc:`prometheus/prometheus`
    blueprints/k8s/k8s_blue_index
    blueprints/ueransim/ueransim_blue_index
    blueprints/5gcores/5gcore_blue_index
-   blueprints/free5gc/free5gc_blue_index
    blueprints/vyos/vyos_blue_index
 
 .. toctree::

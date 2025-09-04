@@ -13,7 +13,6 @@ from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
 from nfvcl_core.containers.nfvcl_container import NFVCLContainer
 from nfvcl_core.database.extra_repository import ExtraRepository
-from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager
 from nfvcl_core.managers import TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager, MonitoringManager
 from nfvcl_core.managers.blueprint_manager import PreWorkCallbackResponse
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
@@ -102,6 +101,7 @@ class NFVCL:
     K8S_SECTION = NFVCLPublicSectionModel(name="Kubernetes cluster management", description="Operations related to kubernetes clusters", path="/k8s")
     UTILS_SECTION = NFVCLPublicSectionModel(name="Utils", description="Utils", path="/v2/utils")
     USER_SECTION = NFVCLPublicSectionModel(name="Users", description="User management", path="/v2/users")
+    HORSE_SECTION = NFVCLPublicSectionModel(name="Horse", description="Operations related to the horse", path="/v2/horse")
 
     def __init__(
         self,

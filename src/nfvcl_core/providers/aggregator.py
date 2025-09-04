@@ -5,7 +5,7 @@ from nfvcl_core.managers import TopologyManager
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGProviderModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import PduType, PduModel, MultusInterface
-from nfvcl_core_models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource
+from nfvcl_core_models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource, VmStatus
 from nfvcl_core_models.vim.vim_models import VimTypeEnum
 from nfvcl_core.providers.blueprint.blueprint_provider import BlueprintProvider
 from nfvcl_core.providers.kubernetes.k8s_provider_native import K8SProviderNative
@@ -152,6 +152,13 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     @register_performance(params_to_info=[(0, 1, "vim", lambda x, y: x.get_virt_provider(y.area).get_vim_info().name), (1, "vm_name", lambda x: x.name)])
     def destroy_vm(self, vm_resource: VmResource):
         return self.get_virt_provider(vm_resource.area).destroy_vm(vm_resource)
+
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        return self.get_virt_provider(vm_resource.area).reboot_vm(vm_resource, hard=hard)
+
+    @register_performance([(1, "vm_resource", lambda x: x.name)])
+    def check_vm_status(self, vm_resource: VmResource) -> VmStatus:
+        return self.get_virt_provider(vm_resource.area).check_vm_status(vm_resource)
 
     @register_performance()
     def final_cleanup(self):

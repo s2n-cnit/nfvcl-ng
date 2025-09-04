@@ -9,7 +9,7 @@ from pydantic import Field, SerializeAsAny, field_validator, ValidationError
 
 from nfvcl_core.utils.blue_utils import get_class_from_path
 from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core_models.prometheus.prometheus_model import PrometheusTargetModel
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel
 from nfvcl_core_models.providers.providers import BlueprintNGProviderData
 from nfvcl_core_models.resources import Resource
 
@@ -90,6 +90,15 @@ class BlueprintNGProviderModel(NFVCLBaseModel):
     # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
     provider_data: Optional[SerializeAsAny[BlueprintNGProviderData]] = Field(default=None)
 
+class MonitoringState(NFVCLBaseModel):
+    """
+    State of the monitoring for the blueprint.
+    It contains the information about the monitoring state of the blueprint.
+    """
+    prometheus_server_id: str = Field(default=None, description="Prometheus server used to monitor the blueprint")
+    grafana_server_id: Optional[str] = Field(default=None, description="Grafana server used to visualize the metrics collected by Prometheus")
+    prometheus_targets: List[PrometheusTargetModel] = Field(default_factory=list, description="List of targets monitored by Prometheus in this blueprint")
+    grafana_folder_id: Optional[str] = Field(default=None, description="Grafana folder id where the dashboards are stored")
 
 class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTypeVar]):
     id: str = Field()
@@ -122,6 +131,9 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
     status: BlueprintNGStatus = Field(default=BlueprintNGStatus())
 
     node_exporters: List[PrometheusTargetModel] = Field(default=[], description="List of node exporters (for prometheus) active in the blueprint.")
+
+    # None means that the blueprint is not monitored
+    monitoring_state: Optional[MonitoringState] = Field(default=None, description="State of the monitoring for the blueprint.")
 
     day_2_call_history: List[RegisteredBlueprintCall] = Field(default=[], description="The history of calls that have been made to the blueprint instance")
 
@@ -175,3 +187,20 @@ class BlueprintNGState(NFVCLBaseModel):
 
 class BlueprintNGException(Exception):
     pass
+
+
+class EnableMonitoringRequest(NFVCLBaseModel):
+    prometheus_id: str
+    grafana_id: Optional[str] = Field(default=None)
+    recursive: Optional[bool] = Field(default=False)
+
+
+class DisableMonitoringRequest(NFVCLBaseModel):
+    recursive: Optional[bool] = Field(default=False)
+
+class RestartVmRequest(NFVCLBaseModel):
+    vm_name: str = Field()
+    hard: Optional[bool] = Field(default=False)
+
+class RestartAllVmsRequest(NFVCLBaseModel):
+    hard: Optional[bool] = Field(default=False)

@@ -1,3 +1,4 @@
+from time import sleep
 from typing import List
 
 from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1NamespaceList, \
@@ -14,7 +15,7 @@ from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall, K8sLoadBalancerPoolArea, \
-    K8sPluginAdditionalData
+    K8sPluginAdditionalData, K8sMonitoringConfig
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota
 
@@ -88,6 +89,159 @@ class KubernetesManager(GenericManager):
         helm_plugin_manager.install_plugins(plug_to_install_list.plugin_list, template_fill_data)
 
         self.logger.success(f"Plugins {plug_to_install_list.plugin_list} have been installed")
+
+    def retrieve_monitoring_data(self, cluster_id: str, loki_id: str, prometheus_id: str):
+        """
+
+        Args:
+            cluster_id: from the topology
+            loki_id: from the topology
+            prometheus_id: from the topology
+
+        Returns: cluster, loki, prometheus from topology if there exist otherwise None for each one
+
+        """
+        try:
+            cluster = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
+        except NFVCLCoreException:
+            cluster = None
+        try:
+            loki = self._topology_manager.get_loki(loki_id)
+        except NFVCLCoreException:
+            loki = None
+        try:
+            prometheus = self._topology_manager.get_prometheus(prometheus_id)
+        except NFVCLCoreException:
+            prometheus = None
+        return cluster, loki, prometheus
+
+    def install_k8s_monitoring(self, cluster_id: str, config: K8sMonitoringConfig):
+        """
+        Install k8s-monitoring to a target k8s cluster
+
+        Args:
+            cluster_id: The target k8s cluster
+
+
+            config: K8sMonitoring configuration data
+        """
+        metrics = self._topology_manager.get_k8s_cluster_monitoring_metrics_config(cluster_id)
+        if metrics:
+            self.logger.warning(f"K8sMonitoring already installed in cluster {cluster_id}")
+        else:
+            cluster, loki, prometheus = self.retrieve_monitoring_data(cluster_id, config.loki_id, config.prometheus_id)
+            if cluster and (loki or prometheus):
+                template_fill_data = K8sPluginAdditionalData(
+                    loki=loki, prometheus=prometheus,
+                    k8smonitoring_node_exporter_enabled=config.node_exporter_enabled,
+                    k8smonitoring_node_exporter_label=config.node_exporter_label,
+                    k8smonitoring_cluster_id=cluster_id
+                )
+                helm_plugin_manager = HelmPluginManager(cluster.credentials, cluster_id)
+                config = helm_plugin_manager.install_k8s_monitoring(template_fill_data)
+                self._topology_manager.add_edit_k8s_cluster_monitoring_metrics(cluster_id, config)
+                self.logger.success(f"Plugins {[K8sPluginName.K8S_MONITORING]} have been installed")
+            else:
+                self.logger.warning(f"Cluster retrieved is {cluster.name if cluster else None}, Loki is {loki.id if loki else None}, Prometheus is {prometheus.id if prometheus else None}")
+
+    def add_monitoring_destination(self, cluster_id: str, loki_id: str, prometheus_id: str):
+        """
+
+        Args:
+            cluster_id: where k8-monitoring running
+            loki_id:
+            prometheus_id:
+
+        """
+        metrics = self._topology_manager.get_k8s_cluster_monitoring_metrics_config(cluster_id)
+        tmp = metrics.__deepcopy__()
+        if metrics:
+            cluster, loki, prometheus = self.retrieve_monitoring_data(cluster_id, loki_id, prometheus_id)
+            if cluster and (loki or prometheus):
+                template_fill_data = K8sPluginAdditionalData(loki=loki, prometheus=prometheus, k8smonitoring_config=metrics)
+                helm_plugin_manager = HelmPluginManager(cluster.credentials, cluster_id)
+                config = helm_plugin_manager.add_metrics_destination(template_fill_data)
+                if config == tmp:
+                    self.logger.warning("Destination already exits")
+                    return
+                self._topology_manager.add_edit_k8s_cluster_monitoring_metrics(cluster_id, config)
+                self.logger.success(f"Plugins {[K8sPluginName.K8S_MONITORING]} have been updated")
+            else:
+                self.logger.warning(f"Cluster retrieved is {cluster.name if cluster else None}, Loki is {loki.id if loki else None}, Prometheus is {prometheus.id if prometheus else None}")
+        else:
+            self.logger.warning(f"K8sMonitoring is not installed in cluster {cluster_id}")
+
+    def del_monitoring_destination(self, cluster_id: str, loki_id: str, prometheus_id: str):
+        """
+
+        Args:
+            cluster_id:
+            loki_id:
+            prometheus_id:
+
+        Returns:
+
+        """
+        metrics = self._topology_manager.get_k8s_cluster_monitoring_metrics_config(cluster_id)
+        if metrics:
+            if len(metrics.destinations) <= 1:
+                self.logger.warning(f"At least one monitoring destination is needed, uninstall the plugin if you want to remove it")
+                return
+            cluster, loki, prometheus = self.retrieve_monitoring_data(cluster_id, loki_id, prometheus_id)
+            if cluster and (loki or prometheus):
+                template_fill_data = K8sPluginAdditionalData(loki=loki, prometheus=prometheus, k8smonitoring_config=metrics)
+                helm_plugin_manager = HelmPluginManager(cluster.credentials, cluster_id)
+                config = helm_plugin_manager.del_metrics_destination(template_fill_data)
+                if config == metrics:
+                    self.logger.warning("Destination not exits")
+                    return
+                self._topology_manager.add_edit_k8s_cluster_monitoring_metrics(cluster_id, config)
+                self.logger.success(f"Plugins {[K8sPluginName.K8S_MONITORING]} have been updated")
+            else:
+                self.logger.warning(f"Cluster retrieved is {cluster.name if cluster else None}, Loki is {loki.id if loki else None}, Prometheus is {prometheus.id if prometheus else None}")
+        else:
+            self.logger.warning(f"K8sMonitoring is not installed in cluster {cluster_id}")
+
+    def uninstall_plugin(self, cluster_id: str, namespace: str, wait=True):
+        """
+        Uninstall a plugin to a target k8s cluster
+
+        Args:
+            wait: for task to finish
+            cluster_id: The target k8s cluster
+            namespace: Namespace to be uninstalled
+        """
+        cluster = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
+
+        helm_plugin_manager = HelmPluginManager(cluster.credentials, cluster_id)
+        helm_plugin_manager.uninstall_plugin(namespace.lower(), wait=wait)
+        self.logger.success(f"Plugin at namespace {namespace.lower()} have been uninstalled")
+
+    def uninstall_k8s_monitoring(self, cluster_id: str):
+        """
+        Uninstall a plugin to a target k8s cluster
+
+        Args:
+            cluster_id: The target k8s cluster
+        """
+        metrics = self._topology_manager.get_k8s_cluster_monitoring_metrics_config(cluster_id)
+        if metrics:
+            namespace = "alloy-metrics"
+            self.uninstall_plugin(cluster_id, namespace, wait=False)
+            k8s = self.get_k8s_api_utils(cluster_id)
+            k8s.remove_alloy_finalizier(namespace)
+            k8s.delete_namespace(namespace)
+            not_deleted = True
+            while not_deleted:
+                namespaces = k8s.get_namespaces(namespace)
+                if len(namespaces.items) == 0:
+                    not_deleted = False
+                self.logger.info(f"Waiting namespace {namespace} have been deleted")
+                sleep(5)
+            self._topology_manager.delete_k8s_cluster_monitoring_metrics(cluster_id)
+            self.logger.success(f"K8sMonitoring successfully uninstalled")
+        else:
+            self.logger.warning(f"K8sMonitoring is not installed in cluster {cluster_id}")
 
     def apply_to_k8s(self, cluster_id: str, body):
         """
@@ -534,10 +688,10 @@ class KubernetesManager(GenericManager):
 
             cluster_id:  The K8s cluster (from the topology) on witch nodes resides
 
-            detailed: If true, a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
+            detailed: If true, a V1PodList in dict form is retrieved, otherwise a list with only names is retrieved.
 
         Returns:
-            If detailed a list with only names is retrieved, otherwise a V1PodList in dict form is retrieved.
+            If detailed a V1PodList in dict form is retrieved, otherwise a list with only names is retrieved.
         """
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)

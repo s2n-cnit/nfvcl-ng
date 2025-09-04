@@ -4,7 +4,7 @@ import abc
 from typing import List, Tuple, Set
 
 from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
-from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, NetResource
+from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, NetResource, VmStatus
 
 
 class VirtualizationProviderData(BlueprintNGProviderData):
@@ -57,6 +57,22 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
 
     @abc.abstractmethod
     def destroy_vm(self, vm_resource: VmResource):
+        pass
+
+    @abc.abstractmethod
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        pass
+
+    @abc.abstractmethod
+    def check_vm_status(self, vm_resource: VmResource) -> VmStatus:
+        """
+        Check the status of a VM
+        Args:
+            vm_resource: VM to check
+
+        Returns:
+            VmStatus containing vm_name, power_status, and ssh_reachable
+        """
         pass
 
     @abc.abstractmethod

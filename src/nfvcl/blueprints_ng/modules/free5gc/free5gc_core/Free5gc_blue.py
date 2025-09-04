@@ -170,7 +170,7 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
 
         for sub_area in self.state.current_config.areas:
             deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
-            self.state.free5gc_config_values.add_item_amf_supportTaiList(self.state.mcc, self.state.mnc, str(sub_area.id).zfill(6))
+            self.state.free5gc_config_values.add_item_amf_supportTaiList(self.state.mcc, self.state.mnc, f"{sub_area.id:x}".zfill(6))
 
             for sub_slice in sub_area.slices:
                 _slice = Snssai(
@@ -183,7 +183,7 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
                 self.state.nsi_nssf_id = self.state.nsi_nssf_id + 1
                 # self.state.free5gc_config_values.add_supported_nssai_nssf(self.state.supported_nssai_availability_nssf_id, self.state.mcc, self.state.mnc, str(sub_area.id).zfill(6), _slice)
                 self.state.supported_nssai_availability_nssf_id = self.state.supported_nssai_availability_nssf_id + 1
-                self.state.free5gc_config_values.add_tai_supportedsnssailist_nssf_item(self.state.mcc, self.state.mnc, str(sub_area.id).zfill(6), _slice)
+                self.state.free5gc_config_values.add_tai_supportedsnssailist_nssf_item(self.state.mcc, self.state.mnc, f"{sub_area.id:x}".zfill(6), _slice)
 
                 for dnn in self.get_slice(_slice.sd).dnnList:
                     _dnn = self.get_dnn(dnn)

@@ -12,6 +12,10 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBl
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_default_config import default_config
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_values_model import SDCoreValuesModel, SimAppYamlConfiguration
 from nfvcl.blueprints_ng.modules.sdcore_upf.sdcore_upf_blueprint import SDCORE_UPF_BLUE_TYPE
+from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition, GrafanaDashboard
+from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel
+from nfvcl_core_models.network.ipam_models import EndPointV4
 from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
 
@@ -44,7 +48,8 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCo
             NF5GType.PCF: ("pcf", "pcf"),
             NF5GType.SMF: ("smf", "smf"),
             NF5GType.UDM: ("udm", "udm"),
-            NF5GType.UDR: ("udr", "udr")
+            NF5GType.UDR: ("udr", "udr"),
+            NF5GType.METRICFUNC: ("metricfunc", "metricfunc")
         }
 
     def create_5g(self, create_model: BlueSDCoreCreateModel):
@@ -118,3 +123,16 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCo
         """
         self.update_sdcore_values()
         self.provider.update_values_helm_chart(self.state.core_helm_chart, self.state.sdcore_config_values.model_dump_for_helm())
+
+    def blueprint_monitoring_definition(self) -> Optional[BlueprintMonitoringDefinition]:
+        monitoring_ip = self.state.k8s_network_functions[NF5GType.METRICFUNC].service.external_ip[0]
+
+        return BlueprintMonitoringDefinition(
+            prometheus_targets=[
+                PrometheusTargetModel(endpoints=[EndPointV4(ip=monitoring_ip,port=9089)])
+            ],
+            grafana_dashboards=[
+                GrafanaDashboard(name="sdcore", path=str(rel_path("dashboards/sdcore.json"))),
+            ]
+        )
+

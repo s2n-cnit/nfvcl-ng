@@ -6,13 +6,14 @@ from enum import Enum
 from time import sleep
 from typing import Dict, List, Tuple, Set
 
+import proxmoxer
 from pydantic import Field, TypeAdapter
 
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit, CloudInitNetworkRoot
 from nfvcl_core.managers.vim_clients_manager import ProxmoxVimClient
 from nfvcl_core.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
     NetplanInterface
-from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible
+from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
 from nfvcl_core.providers.virtualization.proxmox.models.models import ProxmoxZone, Subnet, \
     ProxmoxNetsDevice, ProxmoxMac, ProxmoxTicket, ProxmoxNode, Vnet, Network
 from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
@@ -20,7 +21,7 @@ from nfvcl_core.providers.virtualization.virtualization_provider_interface impor
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl_core.utils.blue_utils import rel_path
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
-    VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource
+    VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource, VmStatus, VmPowerStatus
 from nfvcl_core_models.vim.vim_models import VimModel, ProxmoxPrivilegeEscalationTypeEnum
 
 cloud_init_packages = ['qemu-guest-agent']
@@ -78,7 +79,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         ta = TypeAdapter(List[ProxmoxNode])
         nodes = ta.validate_python(response)
         for node in nodes:
-            node_details = self.proxmox_vim_client.proxmoxer.nodes(node.node).network.get()
+            node_details = self.__execute_proxmox_request(url=f"nodes/{node.node}/network", r_type=ApiRequestType.GET)
             for interface in node_details:
                 if "address" in interface and interface["address"] == self.vim.vim_url:
                     return node.node
@@ -113,9 +114,15 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__pre_creation_check(tmp_networks)
         self.logger.info(f"Creating VM {vm_resource.name} on node {self.data.proxmox_node_name}")
         self.__download_cloud_image(f'{vm_resource.image.url}', f'{vm_resource.image.name}')
+
+        ssh_keys = []
+        ssh_keys.extend(self.vim.ssh_keys)
+        if vm_resource.flavor.ssh_keys:
+            ssh_keys.extend(vm_resource.flavor.ssh_keys)
+
         c_init = CloudInit(hostname=vm_resource.name,
                            packages=cloud_init_packages,
-                           ssh_authorized_keys=self.vim.ssh_keys,
+                           ssh_authorized_keys=ssh_keys,
                            runcmd=cloud_init_runcmd)
         c_init.add_user(vm_resource.username, vm_resource.password)
         user_cloud_init = c_init.build_cloud_config()
@@ -193,6 +200,81 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         self.logger.success(f"Creating VM {vm_resource.name} finished")
         self.save_to_db()
+
+    def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        self.logger.info(f"Restarting VM {vm_resource.name}")
+        if vm_resource.id in self.data.proxmox_dict.keys():
+            vmid = self.data.proxmox_dict[vm_resource.id]
+            if hard:
+                self.logger.debug(f"Hard restarting VM {vmid}")
+                self.__execute_proxmox_request(
+                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/reset",
+                    node_name=self.data.proxmox_node_name,
+                    r_type=ApiRequestType.POST
+                )
+            else:
+                self.logger.debug(f"Soft restarting VM {vmid}")
+                self.__execute_proxmox_request(
+                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/reboot",
+                    node_name=self.data.proxmox_node_name,
+                    r_type=ApiRequestType.POST
+                )
+            self.logger.success(f"VM {vmid} restarted")
+        else:
+            raise VirtualizationProviderProxmoxException(f"VM {vm_resource.name} not found")
+
+    def check_vm_status(self, vm_resource: VmResource) -> VmStatus:
+        """
+        Check the status of a VM and SSH connectivity
+        Args:
+            vm_resource: VM to check
+
+        Returns:
+            VmStatus containing vm_name, power_status, and ssh_reachable
+        """
+        self.logger.info(f"Checking status of VM {vm_resource.name}")
+
+        if vm_resource.id not in self.data.proxmox_dict:
+            raise VirtualizationProviderProxmoxException(f"VM {vm_resource.name} not found on VIM")
+
+        vmid = self.data.proxmox_dict[vm_resource.id]
+
+        # Get VM status from Proxmox
+        vm_status_response = self.__execute_proxmox_request(
+            url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/current",
+            r_type=ApiRequestType.GET
+        )
+
+        proxmox_status = vm_status_response["status"]
+
+        # Map Proxmox status to standardized VmPowerStatus
+        if proxmox_status in ["running"]:
+            power_status = VmPowerStatus.RUNNING
+        elif proxmox_status in ["stopped", "shutoff"]:
+            power_status = VmPowerStatus.SHUTOFF
+        else:
+            # For paused, suspended, or any other unknown states
+            power_status = VmPowerStatus.UNKNOWN
+
+        # Check SSH connectivity if VM is running and has an IP
+        ssh_reachable = False
+        if power_status == VmPowerStatus.RUNNING:
+            # Try SSH connection with short timeout (just for testing connectivity)
+            ssh_reachable = check_ssh_ready(
+                host=vm_resource.access_ip,
+                port=22,
+                user=vm_resource.username,
+                passwd=vm_resource.password,
+                logger_override=self.logger
+            )
+
+        self.logger.info(f"VM {vm_resource.name} status: proxmox_status={proxmox_status}, mapped_status={power_status}, ssh_reachable={ssh_reachable}")
+
+        return VmStatus(
+            vm_name=vm_resource.name,
+            power_status=power_status,
+            ssh_reachable=ssh_reachable
+        )
 
     def configure_vm(self, vm_resource_configuration: VmResourceConfiguration) -> dict:
         # The parent method checks if the resource is created and throw an exception if not
@@ -433,12 +515,15 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         timeout = time.time() + (DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout)
         while exit_status != 0 and time.time() < timeout:
             try:
-                response = self.proxmox_vim_client.proxmoxer.nodes(self.data.proxmox_node_name).qemu(vmid).agent.ping.post()
+                response = self.__execute_proxmox_request(
+                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/agent/ping",
+                    r_type=ApiRequestType.POST
+                )
                 if response is not None:
                     exit_status = 0
                     return
             except Exception as e:
-                self.logger.debug("Waiting qemu guest agent...")
+                self.logger.debug(f"Waiting qemu guest agent... ({e})")
                 sleep(3)
         raise VirtualizationProviderProxmoxException(f"Timeout waiting for qemu guest agent")
 
@@ -447,7 +532,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             # Needed to escape single quote: https://stackoverflow.com/a/1250279
             command = command.replace("'", """'"'"'""")
             command = f"sudo sh -c '{command}'"
-        stdin, stdout, stderr = self.proxmox_vim_client.ssh_client.exec_command(command)
+        stdin, stdout, stderr = self.proxmox_vim_client.exec_command(command)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status != 0:
             raise VirtualizationProviderProxmoxException(f"Error executing command: {command}")
@@ -455,27 +540,42 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             return stdout
 
     def __execute_proxmox_request(self, url: str, r_type: ApiRequestType, node_name=None, parameters=None):
-        match r_type:
-            case ApiRequestType.GET:
-                response = self.proxmox_vim_client.proxmoxer(url).get(**parameters if parameters else {})
-            case ApiRequestType.POST:
-                response = self.proxmox_vim_client.proxmoxer(url).post(**parameters if parameters else {})
-            case ApiRequestType.PUT:
-                response = self.proxmox_vim_client.proxmoxer(url).put(**parameters if parameters else {})
-            case ApiRequestType.DELETE:
-                response = self.proxmox_vim_client.proxmoxer(url).delete(**parameters if parameters else {})
-            case _:
-                raise VirtualizationProviderProxmoxException("Api request type not supported")
+        connection_attempts = 0
+        max_retries = 5
+        while connection_attempts < max_retries:
+            try:
+                match r_type:
+                    case ApiRequestType.GET:
+                        response = self.proxmox_vim_client.proxmoxer(url).get(**parameters if parameters else {})
+                    case ApiRequestType.POST:
+                        response = self.proxmox_vim_client.proxmoxer(url).post(**parameters if parameters else {})
+                    case ApiRequestType.PUT:
+                        response = self.proxmox_vim_client.proxmoxer(url).put(**parameters if parameters else {})
+                    case ApiRequestType.DELETE:
+                        response = self.proxmox_vim_client.proxmoxer(url).delete(**parameters if parameters else {})
+                    case _:
+                        raise VirtualizationProviderProxmoxException("Api request type not supported")
 
-        if node_name:
-            data = {"status": ""}
-            while data["status"] != "stopped":
-                output = f"{response.split(':')[5]}, VMid {response.split(':')[6]}" if response.split(':')[6] else f"{response.split(':')[5]}"
-                self.logger.debug(f"Waiting for task: {output}")
-                data = self.proxmox_vim_client.proxmoxer.nodes(node_name).tasks(response).status.get()
-                sleep(3)
-
-        return response
+                if node_name:
+                    data = {"status": ""}
+                    while data["status"] != "stopped":
+                        output = f"{response.split(':')[5]}, VMid {response.split(':')[6]}" if response.split(':')[6] else f"{response.split(':')[5]}"
+                        self.logger.debug(f"Waiting for task: {output}")
+                        data = self.proxmox_vim_client.proxmoxer(f"nodes/{node_name}/tasks/{response}/status").get()
+                        sleep(3)
+                return response
+            except (proxmoxer.core.AuthenticationError, proxmoxer.core.ResourceException) as e: # TODO add other possible exceptions
+                if isinstance(e, proxmoxer.core.ResourceException) and not e.status_code == 401:
+                    # If the error is not an authentication error, we raise it immediately
+                    raise e
+                connection_attempts += 1
+                self.logger.error(f"Error executing Proxmox request: {e}, attempt {connection_attempts}/{max_retries}")
+                self.logger.debug("Forcing proxmox client to re-authenticate")
+                self.proxmox_vim_client.force_token_refresh()
+                if connection_attempts >= max_retries:
+                    raise VirtualizationProviderProxmoxException(f"Failed to execute Proxmox request after {max_retries} attempts")
+                sleep(2)
+        return None
 
     def __get_nfvcl_sdn_zone(self) -> ProxmoxZone:
         response = self.__execute_proxmox_request(

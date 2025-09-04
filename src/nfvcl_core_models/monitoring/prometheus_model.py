@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 
 from nfvcl_core.utils.blue_utils import yaml
 from nfvcl_core.utils.file_utils import create_tmp_file
-from nfvcl_core.utils.ssh_utils import sftp_upload_file, create_scp_client, sftp_delete_file
 from nfvcl_core.utils.util import generate_id
 from nfvcl_core_models.network.ipam_models import EndPointV4
 
@@ -28,7 +27,7 @@ class PrometheusServerModel(BaseModel):
     """
     id: str
     ip: str = Field(default='127.0.0.1')
-    port: str = Field(default='9100')
+    port: str = Field(default='9090')
     user: str = Field(default='ubuntu')
     password: str = Field(default='ubuntu')
     ssh_port: int = Field(default=22)
@@ -45,7 +44,7 @@ class PrometheusServerModel(BaseModel):
         return prom_targets
 
     def add_target(self, new_target: PrometheusTargetModel):
-        """\
+        """
         If the target is NOT present in any job, it creates a new job with the new target. Otherwise, it updates
         the existing target inside the relative job
         Args:
@@ -137,18 +136,6 @@ class PrometheusServerModel(BaseModel):
         with relative_path.open("+w") as file:
             file.write(yaml.dump(self.serialize_for_prometheus()))
         return str(relative_path.absolute())
-
-    def update_remote_sd_file(self):
-        """
-        Create or update the remote sd_file to be used by Prometheus to select targets
-        """
-        scp_client = create_scp_client(self.ip, self.ssh_port, self.user, self.password)
-        # If no targets we remove the file
-        if len(self.targets) > 0:
-            sftp_upload_file(scp_client, self.dump_sd_file(), self.sd_file_location)
-        else:
-            sftp_delete_file(scp_client, self.sd_file_location)
-
 
     def __eq__(self, other):
         """

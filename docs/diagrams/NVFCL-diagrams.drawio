@@ -1,4 +1,4 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.5.0 Safari/537.36" version="26.1.1" pages="15">
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.3.3 Safari/537.36" version="26.1.1" pages="15">
   <diagram name="BlueprintV1vsV2" id="74b105a0-9070-1c63-61bc-23e55f88626e">
     <mxGraphModel dx="1566" dy="1112" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1.5" pageWidth="1169" pageHeight="826" background="none" math="0" shadow="0">
       <root>
@@ -1836,7 +1836,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="p2F6-XNxCf3UbNgZDGr-" name="NS-NE-relationship">
-    <mxGraphModel dx="2074" dy="1196" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+    <mxGraphModel dx="1430" dy="823" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -1864,21 +1864,53 @@
         <mxCell id="YfjpAYUrKOWHM5i9J2-L-7" value="VM&lt;div&gt;Router&lt;/div&gt;&lt;div&gt;&lt;i style=&quot;font-weight: normal;&quot;&gt;VNF&lt;/i&gt;&lt;br&gt;&lt;/div&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" parent="1" vertex="1">
           <mxGeometry x="400" y="316.5" width="60" height="50" as="geometry" />
         </mxCell>
+        <mxCell id="x_VVtLNacw3mOjlW3Oig-6" value="5G Network Ecosystem" style="ellipse;whiteSpace=wrap;html=1;fillColor=#CDA7F0;strokeColor=#432D57;fontColor=#000000;opacity=60;verticalAlign=bottom;fontStyle=1;spacingBottom=5;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="595" y="600" width="225" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="x_VVtLNacw3mOjlW3Oig-7" value="VM&lt;div&gt;UPF&lt;/div&gt;&lt;div&gt;&lt;i style=&quot;font-weight: normal;&quot;&gt;VNF&lt;/i&gt;&lt;br&gt;&lt;/div&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="615" y="630" width="45" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="x_VVtLNacw3mOjlW3Oig-8" value="&lt;div&gt;5G Core&lt;/div&gt;&lt;div&gt;Deployment&lt;/div&gt;&lt;div&gt;&lt;i style=&quot;font-weight: normal;&quot;&gt;KNF&lt;/i&gt;&lt;br&gt;&lt;/div&gt;" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="690" y="630" width="100" height="43" as="geometry" />
+        </mxCell>
+        <mxCell id="x_VVtLNacw3mOjlW3Oig-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.875;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;endArrow=none;startFill=0;curved=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;" edge="1" parent="1" source="x_VVtLNacw3mOjlW3Oig-10">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="622" y="670" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="560" y="655" />
+              <mxPoint x="560" y="700" />
+              <mxPoint x="622" y="700" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_VVtLNacw3mOjlW3Oig-10" value="Internet" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="410" y="613" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="x_VVtLNacw3mOjlW3Oig-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;curved=1;endArrow=none;startFill=0;strokeWidth=2;fillColor=#0050ef;strokeColor=#001DBC;" edge="1" parent="1" source="x_VVtLNacw3mOjlW3Oig-7" target="x_VVtLNacw3mOjlW3Oig-8">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="638" y="680" />
+              <mxPoint x="670" y="680" />
+              <mxPoint x="670" y="660" />
+              <mxPoint x="690" y="660" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
   <diagram id="rywkMaLkwMrHouiVppRv" name="Blueprints-building-blocks">
-    <mxGraphModel dx="988" dy="570" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+    <mxGraphModel dx="2074" dy="1193" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="C4xjak6YwV4_q5vs53ac-6" value="" style="verticalLabelPosition=bottom;verticalAlign=top;html=1;shape=mxgraph.basic.patternFillRect;fillStyle=diagGrid;step=5;fillStrokeWidth=0.2;fillStrokeColor=#dddddd;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
           <mxGeometry x="170" y="150" width="550" height="225" as="geometry" />
         </mxCell>
-        <mxCell id="C4xjak6YwV4_q5vs53ac-1" value="&lt;b&gt;DNS Blueprint&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;Deploy 1 or more DNS servers configured as the request require&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;" parent="1" vertex="1">
+        <mxCell id="C4xjak6YwV4_q5vs53ac-1" value="&lt;b&gt;DNS Blueprint&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;Deploy 1 or more DNS servers configured as the request require&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
           <mxGeometry x="190" y="227.5" width="140" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="C4xjak6YwV4_q5vs53ac-4" value="&lt;b&gt;PyEnv Blueprint&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;Deploy an environment dedicated for a Python APP&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;" parent="1" vertex="1">
+        <mxCell id="C4xjak6YwV4_q5vs53ac-4" value="&lt;b&gt;PyEnv Blueprint&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;Deploy an environment dedicated for a Python APP&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
           <mxGeometry x="340" y="227.5" width="140" height="70" as="geometry" />
         </mxCell>
         <mxCell id="C4xjak6YwV4_q5vs53ac-5" value="&lt;b&gt;5G Blueprint&lt;/b&gt;&lt;div&gt;&lt;i&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;Deploy a 5GC using Open Air Interface Core and UERANSIM RAN (from user request)&lt;/font&gt;&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;verticalAlign=top;fillColor=#EA6B66;strokeColor=#b46504;fillStyle=auto;glass=0;shadow=0;gradientColor=none;" parent="1" vertex="1">
@@ -1887,10 +1919,10 @@
         <mxCell id="C4xjak6YwV4_q5vs53ac-7" value="5G Custom App Blueprint" style="text;strokeColor=none;fillColor=none;html=1;fontSize=24;fontStyle=1;verticalAlign=middle;align=center;" parent="1" vertex="1">
           <mxGeometry x="395" y="160" width="100" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="u-WOxrua0QkyZc-kGu1N-1" value="&lt;div&gt;&lt;b&gt;AOI Core&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;i style=&quot;&quot;&gt;Blueprint&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;" vertex="1" parent="1">
+        <mxCell id="u-WOxrua0QkyZc-kGu1N-1" value="&lt;div&gt;&lt;b&gt;AOI Core&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;i style=&quot;&quot;&gt;Blueprint&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
           <mxGeometry x="510" y="280" width="90" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="u-WOxrua0QkyZc-kGu1N-3" value="&lt;b&gt;UeRANSIM&lt;/b&gt;&lt;div&gt;&lt;i&gt;Blueprint&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;" vertex="1" parent="1">
+        <mxCell id="u-WOxrua0QkyZc-kGu1N-3" value="&lt;b&gt;UeRANSIM&lt;/b&gt;&lt;div&gt;&lt;i&gt;Blueprint&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingRight=2;spacingLeft=2;fillColor=#d0cee2;strokeColor=#56517e;" parent="1" vertex="1">
           <mxGeometry x="600" y="280" width="90" height="70" as="geometry" />
         </mxCell>
       </root>

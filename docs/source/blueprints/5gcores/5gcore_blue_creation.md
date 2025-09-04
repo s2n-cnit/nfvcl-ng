@@ -20,7 +20,9 @@ a specific core check the following pages:
   Check [Onboarding external K8S Cluster](../../../topology/topology_nfvcl_k8s_onboarding.md) for more info on adding an
   external cluster or [Kubernetes Blueprint](../../k8s/k8s_blue_creation.md) to deploy a new cluster automatically
   onboarded by NFVCL.
-- Having a gNB running for every area that will be added to the core. The PDU for the gNB need to be present in the topology, see TODO. A simulated gNB + UE can be deployed through the [UERANSIM Blueprint](../../ueransim/ueransim_blue_creation.md) and will be automatically added to the PDUs.
+- (Optional) If you want NFVCL to configure automatically a (supported) gNB:
+    - Having a gNB running for every area that will be added to the core. The PDU for the gNB need to be present in the topology, see [TODO]. 
+      A simulated gNB + UE can be deployed through the [UERANSIM Blueprint](../../ueransim/ueransim_blue_creation.md) and will be automatically added to the PDUs.
 - Use kubectl to ensure that Metallb (or other load balancer) **have sufficient IPs** in the address pool to support
   the 5G Core chart deployment (one IP for each LoadBalancer service deployed by the blueprint).
   ```
@@ -37,10 +39,12 @@ a specific core check the following pages:
 > operations he performed (slices, areas, users added/deleted). The consistency
 > is not guaranteed.
 
-In the following example `{{ blueprint_type }}` need to be replaced with the type of the blueprint that you want to deploy, for example:
-- sdcore
-- oai
-- free5gc
+In the following example `{{ blueprint_type }}`, **in the URL**, need to be replaced with the type of the blueprint that you want to deploy, for example:
+- 'sdcore'
+- 'oai'
+- 'free5gc'
+
+**The description of fields is after the body of the request!**
 
 > API (POST): *{{ base_url }}/nfvcl/v2/api/blue/{{ blueprint_type }}*
 
@@ -176,6 +180,13 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
   - `mgt` is the management network, used when the UPF/Router is a VM.
   - `n2` is the network used for AMF <-> gNB connection.
   - `n4` is the network used for SMF <-> UPF connection.
+  - `n2` and `n4` can concide as networks, no internet connection is required, it can be the 'mgt' network if needed. Better to be a dedicated and isolated net.
+Some networks have a `type` field, this is used to specify the network type, currently supported types are `MULTUS` and `LB` (LoadBalancer), the `type` field is ignored when the component is not deployed on k8s.
+> ⚠️ Mixing the network types may not work.
+> 
+> Currently not all implementations support Multus, only `oai`
+
+
 - The `dnn` and `net_name` fields in `data_nets` section can be chosen as desired, but it must be the same for both.
   Furthermore, when you create a UERANSIM blueprint you must set the field `apn` equal to `dnn` and `net_name` value.
 - Dnn `cidrs` must not overlap.
@@ -186,16 +197,13 @@ In the following example `{{ blueprint_type }}` need to be replaced with the typ
     - `oai_upf_k8s`: This is the UPF implementation for the OAI blueprint deployed in a K8s cluster.
     - `free5gc_upf`
   
-    NFVCL will configure every Core and UPF combination but mixing the implementations may not work.  
+    **NFVCL will configure every Core and UPF combination but mixing the implementations may not work.**  
   - `networks`:
     - `n3`: The network to use for user plane data between gNB and UPF (going through the router)
     - `n6`: The network to use for user plane data between UPF and internet (going through the router)
     - `gnb`: The network between gNB and Router
-
-Some networks have a `type` field, this is used to specify the network type, currently supported types are `MULTUS` and `LB` (LoadBalancer), the `type` field is ignored when the component is not deployed on k8s.
-> ⚠️ Mixing the network types may not work.
-> 
-> Currently not all implementations support Multus, only `oai`
+    - `n3`, `n6` and `gnb`: They must be different (virtual) networks, some implementations require having dedicated interfaces that must not
+       have the same address space.
 
 For more details about the networks check 5G topology TODO
 

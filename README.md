@@ -134,6 +134,21 @@ docker compose -f compose.yaml down
 - The `latest` (`compose-dev.yaml`) It is the branch used for development.
 - The `build` (`compose-build.yaml`) is the one used to build the application locally on the branch you have downloaded.
 
+### Build the application locally
+```bash
+git clone https://github.com/s2n-cnit/nfvcl-ng.git
+# OPTIONAL change to the desired branch
+cd nfvcl-ng
+cd docker-compose
+docker compose -f compose-build.yaml up -d
+```
+To update the local application, run the following command:
+```bash
+git pull
+docker compose -f compose-build.yaml down
+docker compose -f compose-build.yaml build --no-cache
+docker compose -f compose-build.yaml up
+```
 
 ## :anchor: Getting Started - K8s
 [Helm installation (Kubernetes)](https://nfvcl-ng.readthedocs.io/en/latest/helm.html)

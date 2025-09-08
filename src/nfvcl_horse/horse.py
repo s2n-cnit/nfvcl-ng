@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
-from typing import Annotated, Union, Dict, Any
+from typing import Annotated, Union, Dict, Any, Optional
 
 import httpx
 from fastapi import HTTPException, Query
@@ -45,11 +45,12 @@ class MitigationActionModel(NFVCLBaseModel):
     ])
 
     attacked_host: SerializableIPv4Address = Field(default="0.0.0.0", examples=["10.0.0.1"])
-    mitigation_host: SerializableIPv4Address = Field(default="0.0.0.0", examples=["172.16.2.1"])
+    mitigation_host: str = Field(default="0.0.0.0", examples=["172.16.2.1"])
     duration: int = Field(default=0, examples=[7000])
     status: str = Field(default="pending", examples=["completed"], description="Current status of the mitigation action")
     info: str = Field(default="to be enforced", examples=["Action successfully executed"], description="Additional information about the action status")
     ansible_command: str = Field(default="", examples=["- hosts: [172.16.2.1]\n  tasks:\n..."], description="The generated Ansible playbook command")
+    testbed: Optional[str] = Field(default="upc", examples=["upc"], description="The testbed name")
 
 
 class DocModuleInfo(NFVCLBaseModel):
@@ -142,7 +143,8 @@ class NFVCLHorsePlugin(NFVCLPlugin):
         try:
             # Trying sending request to DOC
             self.logger.info(f"Sending request to DOC: \n {doc_request.model_dump_json()}")
-            doc_response = httpx.post(f"http://{doc_mod_info.url()}", data=doc_request.model_dump_json(), headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
+            data = doc_request.model_dump_json(exclude_none=True)
+            doc_response = httpx.post(f"http://{doc_mod_info.url()}", data=data, headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
             # Returning the code that
             if doc_response.status_code != HTTPStatus.OK.value:
                 raise HTTPException(status_code=doc_response.status_code, detail=f"DOC response code is different from 200: {doc_response.text}")

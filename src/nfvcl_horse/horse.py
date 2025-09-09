@@ -141,8 +141,11 @@ class NFVCLHorsePlugin(NFVCLPlugin):
             raise HTTPException(status_code=HTTPStatus.PRECONDITION_REQUIRED, detail="DOC module is not configured, you should set using the appropriate API (/set_doc_ip_port)")
         doc_mod_info = DocModuleInfo.model_validate(doc_info)
         try:
-            # Trying sending request to DOC
             self.logger.info(f"Sending request to DOC: \n {doc_request.model_dump_json()}")
+            ############### Fix fields to be forward to DOC #####################
+            if isinstance(doc_request.action, dict):
+                doc_request.action['intent_id'] = doc_request.intent_id
+            ############### ------------------------------- #####################
             data = doc_request.model_dump_json(exclude_none=True)
             doc_response = httpx.post(f"http://{doc_mod_info.url()}", data=data, headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
             # Returning the code that

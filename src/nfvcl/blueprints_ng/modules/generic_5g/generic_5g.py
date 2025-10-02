@@ -262,6 +262,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             start=True,
             nrf_ip=SerializableIPv4Address(self.get_nrf_ip()) if self.state.core_deployed else None,
             smf_ip=SerializableIPv4Address(self.get_smf_ip()) if self.state.core_deployed else None,
+            external_router=self.state.current_config.get_area(area_id).networks.external_router
         )
         return upf_create_model
 

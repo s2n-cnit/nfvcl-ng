@@ -118,11 +118,28 @@ class Generic5GUPFBlueprintNG(BlueprintNG[Generic5GUPFBlueprintNGState, UPFBlueC
     def update_router_deployment(self):
         if self.router_needed:
             router_info: Router5GInfo
-            if True: #not area.networks.external_router: TODO fix this
+            if not self.create_config.external_router:
                 router_info = self.deploy_router_blueprint()
+            elif not (self.create_config.external_router.n3_ip and self.create_config.external_router.n6_ip):
+                self.logger.debug("At least one of the router's N3 or N6 IPs is not provided, deploying a new router")
+                router_info = self.deploy_router_blueprint()
+                # If only one of the gateway IPs is provided, override the router's IPs with the provided ones
+                if self.create_config.external_router.n3_ip:
+                    router_info.network.n3_ip = self.create_config.external_router.n3_ip
+                if self.create_config.external_router.n6_ip:
+                    router_info.network.n6_ip = self.create_config.external_router.n6_ip
             else:
-                pass
-                # router_info = Router5GInfo(external=True, network=area.networks.external_router)
+                # If the router is external and both N3 and N6 IPs are provided, use the provided router info
+                router_info = Router5GInfo(
+                    blue_id=None,
+                    external=True,
+                    network=self.create_config.external_router
+                )
+
+            self.state.current_config.n3_gateway_ip = router_info.network.n3_ip
+            self.state.current_config.n6_gateway_ip = router_info.network.n6_ip
+            self.state.current_config.gnb_cidr = router_info.network.gnb_cidr
+
             self.state.router = router_info
 
     def update_router_routes(self):

@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from pydantic import Field
 
-from nfvcl_models.blueprint_ng.core5g.common import SubSliceProfiles, SubDataNets, NetworkEndPoint, NetworkEndPointWithType
+from nfvcl_models.blueprint_ng.core5g.common import SubSliceProfiles, SubDataNets, NetworkEndPoint, NetworkEndPointWithType, Router5GNetworkInfo
 from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl_models.blueprint_ng.g5.custom_types_5g import DNNType
 from nfvcl_core_models.base_model import NFVCLBaseModel
@@ -39,6 +39,7 @@ class UPFBlueCreateModel(BlueprintNGCreateModel):
     n3_gateway_ip: Optional[SerializableIPv4Address] = Field(default=None)
     n6_gateway_ip: Optional[SerializableIPv4Address] = Field(default=None)
     gnb_cidr: Optional[SerializableIPv4Network] = Field(default=None)
+    external_router: Optional[Router5GNetworkInfo] = Field(default=None)
 
 
 #####################################################

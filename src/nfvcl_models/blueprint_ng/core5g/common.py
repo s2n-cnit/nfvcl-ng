@@ -5,6 +5,7 @@ from typing import List, Optional
 from typing import Literal
 
 from pydantic import Field, field_validator
+from pydantic_extra_types.mac_address import MacAddress
 
 from nfvcl_models.blueprint_ng.g5.custom_types_5g import SDType, SSTType, BitrateStringType, DNNType, OPCType, KEYType, IMSIType, PLMNType
 from nfvcl_core_models.base_model import NFVCLBaseModel
@@ -26,10 +27,12 @@ class SubDataNets(NFVCLBaseModel):
     default5qi: Optional[str] = Field(default=None)
 
 class Router5GNetworkInfo(NFVCLBaseModel):
-    n3_ip: SerializableIPv4Address = Field()
-    n6_ip: SerializableIPv4Address = Field()
-    gnb_ip: SerializableIPv4Address = Field()
-    gnb_cidr: SerializableIPv4Network = Field()
+    n3_ip: Optional[SerializableIPv4Address] = Field(default=None, description="IP address of the router N3 interface")
+    # n3_mac: Optional[MacAddress] = Field(default=None, description="MAC address of the router N3 interface")
+    n6_ip: Optional[SerializableIPv4Address] = Field(default=None, description="IP address of the router N6 interface")
+    # n6_mac: Optional[MacAddress] = Field(default=None, description="MAC address of the router N6 interface")
+    gnb_ip: Optional[SerializableIPv4Address] = Field(default=None)
+    gnb_cidr: Optional[SerializableIPv4Network] = Field(default=None)
 
 class MultusRoute(NFVCLBaseModel):
     dst: str = Field(description="Destination network CIDR")

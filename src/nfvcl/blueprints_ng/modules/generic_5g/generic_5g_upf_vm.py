@@ -59,10 +59,6 @@ class Generic5GUPFVMBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFVMBlueprintN
         router_info: Router5GNetworkInfo = self.provider.call_blueprint_function(router_id, ROUTER_GET_INFO_FUNCTION)
         self.logger.info(f"Deployed router")
 
-        self.state.current_config.n3_gateway_ip = router_info.n3_ip
-        self.state.current_config.n6_gateway_ip = router_info.n6_ip
-        self.state.current_config.gnb_cidr = router_info.gnb_cidr
-
         return Router5GInfo(external=False, blue_id=router_id, network=router_info)
 
     def add_route_to_router(self, cidr: str, nexthop: str):

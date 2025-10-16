@@ -373,8 +373,8 @@ class NFVCL:
         return self.add_task(self.topology_manager.update_kubernetes, cluster, callback=callback)
 
     @NFVCLPublic(path="/kubernetes/{cluster_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
-    def delete_kubernetes(self, cluster_id: str, callback=None) -> TopologyK8sModel:
-        return self.add_task(self.topology_manager.delete_kubernetes, cluster_id, callback=callback)
+    def delete_kubernetes(self, cluster_id: str, force_deletion: bool = False,callback=None) -> TopologyK8sModel:
+        return self.add_task(self.topology_manager.delete_kubernetes, cluster_id, force_deletion=force_deletion, callback=callback)
 
     ######################
     # Prometheus Section #

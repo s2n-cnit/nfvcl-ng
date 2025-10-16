@@ -217,18 +217,20 @@ class TopologyModel(NFVCLBaseModel):
 
         self.kubernetes.append(k8s_cluster)
 
-    def del_k8s_cluster(self, k8s_cluster_id: str) -> TopologyK8sModel:
+    def del_k8s_cluster(self, k8s_cluster_id: str, force_deletion: bool = False) -> TopologyK8sModel:
         """
         Delete a k8s cluster instance to the topology. If it was onboarded on OSM it also delete it from there.
         Args:
             k8s_cluster_id: The ID of the cluster to be deleted
+            force_deletion: Delete even if there are BP deployed in it.
         """
         k8s_index = self.find_k8s_cluster_index(k8s_cluster_id)
 
         # If some blueprint is deployed on the cluster it is not possible to delete it from the topology
-        k8s_cluster = self.kubernetes[k8s_index]
-        if len(k8s_cluster.deployed_blueprints) > 0:
-            raise TopoK8SHasBlueprintException('The cluster has blueprints deployed in it.')
+        if not force_deletion:
+            k8s_cluster = self.kubernetes[k8s_index]
+            if len(k8s_cluster.deployed_blueprints) > 0:
+                raise TopoK8SHasBlueprintException('The cluster has blueprints deployed in it.')
 
         k8s_deleted = self.kubernetes.pop(k8s_index)
 

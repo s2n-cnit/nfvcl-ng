@@ -96,7 +96,7 @@ saved and the process can be repeated to reproduce multiple times the same envir
 * Openstack APIs: Creating, connecting and initialising VMs. Creating dedicated networks for the operation of some type of Blueprints
 * Proxmox APIs: used to create, connect and initialise VMs on Proxmox
 * SSH: accessing and upload files on Proxmox hypervisors, required to apply Ansible playbooks on remote VMs
-* Poetry: managing the Python dependencies
+* uv: managing the Python dependencies
 * Redis: used to send log and events
 * MongoDB: storing all the permanent data required to track Blueprints
 
@@ -183,9 +183,9 @@ git switch stable
 ### Install
 
 Enter NFVCL folder and run setup.sh, this script will:
-- Install uvicorn, Poetry, Redis and MongoDB.
+- Install uvicorn, uv, Redis and MongoDB.
 - Configure Redis to listen from all interfaces
-- Install dependencies using Poetry
+- Install dependencies using uv
 ``` 
 cd nfvcl-ng
 chmod +x ./setup.sh
@@ -200,10 +200,10 @@ You can use `screen` or create a service to run the NFVCL in the background
 
 #### Using Screen
 Once configuration is done you can run the NFVCL in the background using **screen**.
-> :warning: It may be necessary to use the absolute path '/home/ubuntu/.local/bin/poetry' for running the NFVCL.
+> :warning: It may be necessary to use the absolute path '/home/ubuntu/.local/bin/uv' for running the NFVCL.
 ``` 
 screen -S nfvcl
-poetry run python src/nfvcl_rest/__main__.py
+uv run python -m nfvcl_rest
 ```
 > :warning: To detach from screen press **CTRL+a** then **d**.
 > To resume the screen run `screen -r nfvcl`.
@@ -223,7 +223,7 @@ Type=simple
 Restart=always
 RestartSec=10
 User=ubuntu
-ExecStart=/home/ubuntu/.local/bin/poetry run python /home/ubuntu/nfvcl-ng/src/nfvcl/__main__.py
+ExecStart=/home/ubuntu/.local/bin/uv run python -m nfvcl_rest
 
 [Install]
 WantedBy=multi-user.target

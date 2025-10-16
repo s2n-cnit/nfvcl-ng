@@ -33,8 +33,8 @@ echo echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildki
 sudo apt-get update
 sudo apt-get install helm
 
-echo "Installing Poetry"
-pipx install poetry
+echo "Installing uv"
+pipx install uv
 
 echo "install uvicorn..."
 sudo apt install -y uvicorn
@@ -59,7 +59,7 @@ echo "Installing build essential tools"
 sudo apt install -y build-essential sshpass
 
 echo "Installing Python project dependencies"
-/home/ubuntu/.local/bin/poetry install
+/home/ubuntu/.local/bin/uv sync
 
 echo "Installing Ansible Collections"
 ansible-galaxy collection install vyos.vyos

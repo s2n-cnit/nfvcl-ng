@@ -3,12 +3,17 @@ from __future__ import annotations
 import copy
 from typing import Optional, List, Dict, Tuple
 
-import httpx
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.modules.oai.oai_upf.OpenAirInterfaceUpf_blue import OAI_UPF_BLUE_TYPE
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
+from nfvcl_core.providers.virtualization.proxmox.virtualization_provider_proxmox import ApiRequestType
+from nfvcl_core.utils.curl_utils import generate_curl_command
+from nfvcl_core.utils.log import create_logger
+from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, \
     SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile, OaiCoreValuesModel
 from nfvcl_models.blueprint_ng.core5g.common import SubArea, SubSubscribers, SubDataNets, \
@@ -17,10 +22,6 @@ from nfvcl_models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAd
     Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
     Core5GUpdateSliceModel, NF5GType, Core5GAddSubscriberModel
 from nfvcl_models.blueprint_ng.g5.upf import DnnWithCidrModel
-from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
-from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core_models.resources import HelmChartResource
-from nfvcl_core.utils.log import create_logger
 
 OAI_CORE_BLUE_TYPE = "oai"
 logger = create_logger('OpenAirInterface')
@@ -184,21 +185,27 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             new_subscriber: new SubSubscribers to add.
 
         """
+        payload_ue = Ue(
+            authentication_method=new_subscriber.authenticationMethod,
+            enc_permanent_key=new_subscriber.k,
+            protection_parameter_id=new_subscriber.k,
+            enc_opc_key=new_subscriber.opc,
+            enc_topc_key=new_subscriber.opc,
+            supi=new_subscriber.imsi
+        )
 
-        with httpx.Client(http1=False, http2=True, base_url=self.state.base_udr_url) as client:
-            # Add UE to DB
-            api_url_ue = f"/{new_subscriber.imsi}/authentication-data/authentication-subscription"
-            payload_ue = Ue(
-                authentication_method=new_subscriber.authenticationMethod,
-                enc_permanent_key=new_subscriber.k,
-                protection_parameter_id=new_subscriber.k,
-                enc_opc_key=new_subscriber.opc,
-                enc_topc_key=new_subscriber.opc,
-                supi=new_subscriber.imsi
-            )
-            response = client.put(api_url_ue, json=payload_ue.model_dump(by_alias=True))
-            logger.info(f"Status code: {response.status_code}")
-            logger.info(f"Response content: {response.text}")
+        output = generate_curl_command(
+            method=ApiRequestType.PUT,
+            url=f"{self.state.base_udr_url}/{new_subscriber.imsi}/authentication-data/authentication-subscription",
+            payload=payload_ue.model_dump(by_alias=True),
+            as_list=True
+        )
+        response = self.provider.exec_command_in_pod(
+            helm_chart_resource=self.state.core_helm_chart,
+            command=output,
+            pod_name=self.state.core_helm_chart.deployments['oai-mysql'].pods[0].name,
+            container_name='oai-mysql'
+        )
 
     def del_subscriber_to_conf(self, imsi: str):
         """
@@ -207,16 +214,19 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             imsi: the imsi of the subscriber to delete.
 
         """
-        # self.logger.info(f"Deleting subscriber with imsi: {imsi}")
-        # subscriber = self.get_subscriber(imsi)
-        with httpx.Client(http1=False, http2=True, base_url=self.state.base_udr_url) as client:
-            api_url = f"/{imsi}/authentication-data/authentication-subscription"
-            response = client.delete(api_url)
-            logger.info(f"Status code: {response.status_code}")
-            logger.info(f"Response content: {response.text}")
-
-            if response.status_code != 204:
-                raise BlueprintNGException(f"Subscriber with imsi: {imsi} not deleted")
+        output = generate_curl_command(
+            method=ApiRequestType.DELETE,
+            url=f"{self.state.base_udr_url}/{imsi}/authentication-data/authentication-subscription",
+            as_list=True
+        )
+        response = self.provider.exec_command_in_pod(
+            helm_chart_resource=self.state.core_helm_chart,
+            command=output,
+            pod_name=self.state.core_helm_chart.deployments['oai-mysql'].pods[0].name,
+            container_name='oai-mysql'
+        )
+        if int(response) != 204:
+            raise BlueprintNGException(f"Subscriber with imsi: {imsi} not deleted")
 
     def associating_subscriber_with_slice(self, imsi: str):
         """
@@ -231,34 +241,44 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         subscriber = self.get_subscriber(imsi)
         sub_slice = self.get_slice(subscriber.snssai[0].sliceId)
-        with httpx.Client(http1=False, http2=True, base_url=self.state.base_udr_url) as client:
-            # Add Session Management Subscription to DB
-            api_url_sms = f"/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data"
-            single_nssai = Snssai(
-                sst=subscriber.snssai[0].sliceType,
-                sd=str(int(subscriber.snssai[0].sliceId, 16)) # Must be int without leading 0
-            )
-            # Only 1 slice for subscriber and plmn is supported by OAI
-            self.state.ue_dict[imsi] = []
-            self.state.ue_dict[imsi].append(single_nssai)
-            payload_sms = SessionManagementSubscriptionData(
-                single_nssai=single_nssai
-            )
-            for dnn in sub_slice.dnnList:
-                sub_dnn = self.get_dnn(dnn)
-                configuration = DnnConfiguration(
-                    s_ambr=SessionAmbr(
-                        uplink=sub_dnn.uplinkAmbr.replace(" ", ""),
-                        downlink=sub_dnn.downlinkAmbr.replace(" ", "")
-                    ),
-                    five_qosProfile=FiveQosProfile(
-                        five_qi=int(sub_dnn.default5qi)
-                    )
+
+        single_nssai = Snssai(
+            sst=subscriber.snssai[0].sliceType,
+            sd=str(int(subscriber.snssai[0].sliceId, 16))  # Must be int without leading 0
+        )
+        # Only 1 slice for subscriber and plmn is supported by OAI
+        self.state.ue_dict[imsi] = []
+        self.state.ue_dict[imsi].append(single_nssai)
+        payload_sms = SessionManagementSubscriptionData(
+            single_nssai=single_nssai
+        )
+        for dnn in sub_slice.dnnList:
+            sub_dnn = self.get_dnn(dnn)
+            configuration = DnnConfiguration(
+                s_ambr=SessionAmbr(
+                    uplink=sub_dnn.uplinkAmbr.replace(" ", ""),
+                    downlink=sub_dnn.downlinkAmbr.replace(" ", "")
+                ),
+                five_qosProfile=FiveQosProfile(
+                    five_qi=int(sub_dnn.default5qi)
                 )
-                payload_sms.add_configuration(dnn, configuration)
-                response = client.put(api_url_sms, json=payload_sms.model_dump(by_alias=True))
-                logger.info(f"Status code: {response.status_code}")
-                logger.info(f"Response content: {response.text}")
+            )
+            payload_sms.add_configuration(dnn, configuration)
+            #TODO here
+
+        # TODO This block may be called inside the dnn loop above
+        output = generate_curl_command(
+            method=ApiRequestType.PUT,
+            url=f"{self.state.base_udr_url}/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data",
+            payload=payload_sms.model_dump(by_alias=True),
+            as_list=True
+        )
+        response = self.provider.exec_command_in_pod(
+            helm_chart_resource=self.state.core_helm_chart,
+            command=output,
+            pod_name=self.state.core_helm_chart.deployments['oai-mysql'].pods[0].name,
+            container_name='oai-mysql'
+        )
 
     def disassociating_subscriber_from_slice(self, imsi: str):
         """
@@ -269,13 +289,19 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         """
         for sms in self.state.ue_dict[imsi]:
             # if sms.sd == sd:
-            with httpx.Client(http1=False, http2=True, base_url=self.state.base_udr_url) as client:
-                api_url = f"/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data"
-                response = client.delete(api_url, params={'sst': sms.sst, 'sd': sms.sd})
-                logger.info(f"Status code: {response.status_code}")
-                logger.info(f"Response content: {response.text}")
+            output = generate_curl_command(
+                method=ApiRequestType.DELETE,
+                url=f"{self.state.base_udr_url}/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data",
+                as_list=True
+            )
+            response = self.provider.exec_command_in_pod(
+                helm_chart_resource=self.state.core_helm_chart,
+                command=output,
+                pod_name=self.state.core_helm_chart.deployments['oai-mysql'].pods[0].name,
+                container_name='oai-mysql'
+            )
 
-            if response.status_code == 204:
+            if int(response) == 204:
                 self.state.ue_dict[imsi].remove(sms)
                 if len(self.state.ue_dict[imsi]) == 0:
                     del self.state.ue_dict[imsi]

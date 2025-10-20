@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, List
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
 from nfvcl_core_models.network.network_models import MultusInterface
-from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderData, \
+from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderData, \
     BlueprintNGProviderInterface
 from nfvcl_core_models.resources import HelmChartResource
 

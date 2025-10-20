@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from typing import Optional, List, Dict, Tuple
 
+from nfvcl_providers.virtualization.proxmox.virtualization_provider_proxmox import ApiRequestType
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState
@@ -10,7 +11,6 @@ from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.modules.oai.oai_upf.OpenAirInterfaceUpf_blue import OAI_UPF_BLUE_TYPE
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.providers.virtualization.proxmox.virtualization_provider_proxmox import ApiRequestType
 from nfvcl_core.utils.curl_utils import generate_curl_command
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core_models.resources import HelmChartResource

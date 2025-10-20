@@ -1,4 +1,6 @@
-from pydantic import ConfigDict
+from typing import Dict, Optional
+
+from pydantic import ConfigDict, Field, SerializeAsAny
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
 
@@ -10,6 +12,19 @@ class BlueprintNGProviderData(NFVCLBaseModel):
     )
     pass
 
+class BlueprintNGProviderModel(NFVCLBaseModel):
+    provider_type: Optional[str] = Field(default=None)
+    provider_data_type: Optional[str] = Field(default=None)
+    # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
+    provider_data: Optional[SerializeAsAny[BlueprintNGProviderData]] = Field(default=None)
+
+class ProviderDataAggregate(NFVCLBaseModel):
+    blueprint_id: str = Field()
+    # Providers (the key is str because MongoDB doesn't support int as key for dictionary)
+    virtualization: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
+    k8s: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
+    pdu: Optional[BlueprintNGProviderModel] = Field(default=None)
+    blueprint: Optional[BlueprintNGProviderModel] = Field(default=None)
 
 class BlueprintNGProviderException(Exception):
     pass

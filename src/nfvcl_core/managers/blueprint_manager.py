@@ -6,6 +6,7 @@ from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 from keystoneauth1.exceptions import Unauthorized
 
 from nfvcl_core.database.blueprint_repository import BlueprintRepository
+from nfvcl_core.database.provider_repository import ProviderDataRepository
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core.managers import GenericManager, EventManager
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
@@ -15,6 +16,7 @@ from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
 from nfvcl_core_models.performance import BlueprintPerformanceType
 from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
+from nfvcl_core_models.providers.providers import ProviderDataAggregate
 
 if TYPE_CHECKING:
     from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager, VimClientsManager
@@ -24,7 +26,7 @@ from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus, Registered
 from nfvcl_core_models.resources import VmResource
 from nfvcl_core_models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
-from nfvcl_core.providers.aggregator import ProvidersAggregator
+from nfvcl_core.blueprints.provider_aggregator import ProvidersAggregator
 from nfvcl_core.utils.util import generate_blueprint_id
 
 BLUEPRINTS_MODULE_FOLDER: str = "nfvcl.blueprints_ng.modules"
@@ -40,9 +42,10 @@ class BlueprintManager(GenericManager):
     """
     blueprint_dict: Dict[str, BlueprintNG] = {}
 
-    def __init__(self, blueprint_repository: BlueprintRepository, snapshot_repository: SnapshotRepository, topology_manager: TopologyManager, pdu_manager: PDUManager, performance_manager: PerformanceManager, event_manager: EventManager, vim_clients_manager: VimClientsManager):
+    def __init__(self, blueprint_repository: BlueprintRepository, provider_repository: ProviderDataRepository, snapshot_repository: SnapshotRepository, topology_manager: TopologyManager, pdu_manager: PDUManager, performance_manager: PerformanceManager, event_manager: EventManager, vim_clients_manager: VimClientsManager):
         super().__init__()
         self._blueprint_repository = blueprint_repository
+        self._provider_repository = provider_repository
         self._snapshot_repository = snapshot_repository
         self._topology_manager = topology_manager
         self._pdu_manager = pdu_manager
@@ -69,6 +72,7 @@ class BlueprintManager(GenericManager):
         """
         self.blueprint_dict[blueprint.id] = blueprint
         self._blueprint_repository.save_blueprint(blueprint.base_model)
+        self._provider_repository.save_provider_data(blueprint.provider.get_provider_data_aggregate())
 
     def destroy_blueprint(self, blueprint: BlueprintNG) -> None:
         """
@@ -127,7 +131,23 @@ class BlueprintManager(GenericManager):
         """
         for item in self._blueprint_repository.get_all_dict():
             self.logger.debug(f"Loading Blueprint instance {item['id']}")
-            blueprint_instance = BlueprintNG.from_db(item, provider=ProvidersAggregator(topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager, vim_clients_manager=self._vim_clients_manager))
+            blueprint_instance: BlueprintNG = BlueprintNG.from_db(item)
+
+            provider_data_aggregate = self._provider_repository.find_by_blueprint_id(blueprint_instance.id)
+            if provider_data_aggregate is None:
+                provider_data_aggregate = ProviderDataAggregate(blueprint_id=blueprint_instance.id)
+
+            provider = ProvidersAggregator(
+                blueprint_id=blueprint_instance.id,
+                persistence_function=blueprint_instance.to_db,
+                topology_manager=self._topology_manager,
+                blueprint_manager=self,
+                pdu_manager=self._pdu_manager,
+                performance_manager=self._performance_manager,
+                vim_clients_manager=self._vim_clients_manager,
+                provider_data_aggregate=provider_data_aggregate
+            )
+            blueprint_instance.provider = provider
             self.blueprint_dict[item['id']] = blueprint_instance
 
     def create_blueprint(self, path: str, msg: Any, parent_id: str | None = None, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> str:
@@ -160,7 +180,7 @@ class BlueprintManager(GenericManager):
             # Instantiate the object (creation of services is done by the worker)
             created_blue: BlueprintNG = BlueClass(blue_id)
             with created_blue.lock:
-                created_blue.provider = ProvidersAggregator(created_blue, topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager, vim_clients_manager=self._vim_clients_manager)
+                created_blue.provider = ProvidersAggregator(blueprint_id=created_blue.id, persistence_function=created_blue.to_db, topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager, vim_clients_manager=self._vim_clients_manager)
                 created_blue.base_model.parent_blue_id = parent_id
                 if isinstance(msg, NFVCLBaseModel):
                     created_blue.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg=msg.model_dump(), msg_type=get_class_path_str_from_obj(msg), function_type=FunctionType.DAY0))

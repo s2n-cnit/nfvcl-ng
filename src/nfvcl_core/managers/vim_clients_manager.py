@@ -2,9 +2,9 @@ from typing import Dict, cast
 
 from nfvcl_core.managers import TopologyManager
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_core.vim_clients.openstack_vim_client import OpenStackVimClient
-from nfvcl_core.vim_clients.proxmox_vim_client import ProxmoxVimClient
-from nfvcl_core.vim_clients.vim_client import VimClient
+from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
+from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient
+from nfvcl_providers.vim_clients.vim_client import VimClient
 
 
 class VimClientsManager(GenericManager):

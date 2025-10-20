@@ -11,7 +11,7 @@ from typing import TypeVar, Generic, Optional, List
 from pydantic import ValidationError
 
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
-from nfvcl_core.providers.aggregator import ProvidersAggregator
+from nfvcl_core.blueprints.provider_aggregator import ProvidersAggregator
 from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_core.utils.log import create_logger
 from nfvcl_core.utils.metrics.grafana_utils import replace_all_datasources, update_queries_in_panels
@@ -75,13 +75,14 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             raise BlueprintNGException(f"Already registered")
         if not resource.id:
             resource.id = str(uuid.uuid4())
+        # TODO check if the resource is associated with an area, if so check if the area has a VIM associated with it
         # TODO also add a check for k8s resources
-        if isinstance(resource, VmResource):
-            resource_vm: VmResource = resource
-            try:
-                self.provider.topology_manager.get_vim_from_area_id_model(resource_vm.area)
-            except ValueError as e:
-                raise BlueprintNGException("Unable to register resource, the area has no associated VIM")
+        # if isinstance(resource, VmResource):
+        #     resource_vm: VmResource = resource
+        #     try:
+        #         self.provider.topology_manager.get_vim_from_area_id_model(resource_vm.area)
+        #     except ValueError as e:
+        #         raise BlueprintNGException("Unable to register resource, the area has no associated VIM")
         self.base_model.registered_resources[resource.id] = RegisteredResource(type=get_class_path_str_from_obj(resource), value=resource)
 
     def deregister_resource(self, resource: Resource):
@@ -265,7 +266,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         self.provider.blueprint_manager.save_blueprint(self)
 
     @classmethod
-    def from_db(cls, deserialized_dict: dict, provider=None):
+    def from_db(cls, deserialized_dict: dict):
         """
         Load a blueprint from the dictionary and initialize providers.
         Args:
@@ -276,10 +277,6 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         """
         BlueSavedClass = get_class_from_path(deserialized_dict['type'])
         instance = BlueSavedClass(deserialized_dict['id'])
-
-        if provider:
-            provider.set_blueprint(instance)
-            instance.provider = provider
 
         # Remove fields that need to be manually deserialized from the input and validate
         deserialized_dict_edited = copy.deepcopy(deserialized_dict)
@@ -322,33 +319,6 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             instance.logger.error(f"Unable to load state: {str(e)}")
             instance.base_model.corrupted = True
             instance.logger.error(f"Blueprint set as corrupted")
-
-        if provider:
-            # Loading the providers data
-            # get_virt_provider is used to create a new instance of the provider for the area
-            for area, virt_provider in deserialized_dict["virt_providers"].items():
-                provider_data = instance.provider.get_virt_provider(int(area)).data.model_validate(virt_provider["provider_data"])
-                instance.provider.get_virt_provider(int(area)).data = provider_data
-                instance.base_model.virt_providers[str(area)].provider_data = provider_data
-
-            for area, k8s_provider in deserialized_dict["k8s_providers"].items():
-                provider_data = instance.provider.get_k8s_provider(int(area)).data.model_validate(k8s_provider["provider_data"])
-                instance.provider.get_k8s_provider(int(area)).data = provider_data
-                instance.base_model.k8s_providers[str(area)].provider_data = provider_data
-
-            if "pdu_provider" in deserialized_dict:
-                pdu_provider = deserialized_dict["pdu_provider"]
-                if pdu_provider:
-                    provider_data = instance.provider.get_pdu_provider().data.model_validate(pdu_provider["provider_data"])
-                    instance.provider.get_pdu_provider().data = provider_data
-                    instance.base_model.pdu_provider.provider_data = provider_data
-
-            if "blueprint_provider" in deserialized_dict:
-                blueprint_provider = deserialized_dict["blueprint_provider"]
-                if blueprint_provider:
-                    provider_data = instance.provider.get_blueprint_provider().data.model_validate(blueprint_provider["provider_data"])
-                    instance.provider.get_blueprint_provider().data = provider_data
-                    instance.base_model.blueprint_provider.provider_data = provider_data
 
         return instance
 

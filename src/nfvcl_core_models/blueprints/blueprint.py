@@ -82,14 +82,6 @@ class RegisteredResource(NFVCLBaseModel):
     type: str = Field()
     value: SerializeAsAny[Resource] = Field()
 
-
-class BlueprintNGProviderModel(NFVCLBaseModel):
-    # area_id: Optional[int] = Field(default=None)
-    provider_type: Optional[str] = Field(default=None)
-    provider_data_type: Optional[str] = Field(default=None)
-    # Provider data, contain information that allow the provider to correlate blueprint resources with deployed resources
-    provider_data: Optional[SerializeAsAny[BlueprintNGProviderData]] = Field(default=None)
-
 class MonitoringState(NFVCLBaseModel):
     """
     State of the monitoring for the blueprint.
@@ -117,13 +109,6 @@ class BlueprintNGBaseModel(NFVCLBaseModel, Generic[StateTypeVar, CreateConfigTyp
     # Initial config for the blueprint, may be used in the future for a reset functionality
     create_config_type: Optional[str] = Field(default=None)
     create_config: Optional[CreateConfigTypeVar] = Field(default=None)
-
-    # Providers (the key is str because MongoDB doesn't support int as key for dictionary)
-    # providers_data: List[BlueprintNGProviderModel] = Field(default_factory=list) # SerializeAsAny[BlueprintNGProviderModel]
-    virt_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
-    k8s_providers: Dict[str, BlueprintNGProviderModel] = Field(default_factory=dict)
-    pdu_provider: Optional[BlueprintNGProviderModel] = Field(default=None)
-    blueprint_provider: Optional[BlueprintNGProviderModel] = Field(default=None)
 
     created: Optional[datetime] = Field(default=None)
     corrupted: bool = Field(default=False)

@@ -5,7 +5,7 @@ from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.resources import VmResource
 from nfvcl_core.nfvcl_main import NFVCLPublic, NFVCLPublicMethod
 from nfvcl_core.plugins.plugin import NFVCLPlugin
-from nfvcl_core.providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl_providers.configurators.ansible_utils import run_ansible_playbook
 
 
 class AnsibleRestAnswer(NFVCLBaseModel):
@@ -23,7 +23,7 @@ class NFVCLHorsePlugin(NFVCLPlugin):
 
     @NFVCLPublic(path="/ansible/run_playbook", section=NFVCL.UTILS_SECTION, method=NFVCLPublicMethod.POST)
     def run_ansible_playbook(self, host: str, username: str, password: str, payload: Annotated[str, "application/yaml"], callback=None) -> AnsibleRestAnswer:
-        from nfvcl_core.providers.configurators.ansible_utils import run_ansible_playbook
+        from nfvcl_providers.configurators.ansible_utils import run_ansible_playbook
         self.nfvcl_context.add_task(run_ansible_playbook, host, username, password, payload, callback=callback)
         return AnsibleRestAnswer()
 

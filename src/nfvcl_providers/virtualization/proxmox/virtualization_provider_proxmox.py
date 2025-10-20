@@ -11,12 +11,12 @@ from pydantic import Field, TypeAdapter
 
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit, CloudInitNetworkRoot
 from nfvcl_core.managers.vim_clients_manager import ProxmoxVimClient
-from nfvcl_core.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
+from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
     NetplanInterface
-from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
-from nfvcl_core.providers.virtualization.proxmox.models.models import ProxmoxZone, Subnet, \
+from nfvcl_providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
+from nfvcl_providers.virtualization.proxmox.models.models import ProxmoxZone, Subnet, \
     ProxmoxNetsDevice, ProxmoxMac, ProxmoxTicket, ProxmoxNode, Vnet, Network
-from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
+from nfvcl_providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
 from nfvcl_core.utils.blue_utils import rel_path

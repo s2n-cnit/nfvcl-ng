@@ -1,6 +1,6 @@
 from typing import Any
 
-from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
+from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 from nfvcl_core_models.providers.blueprint import BlueprintProviderData
 
 

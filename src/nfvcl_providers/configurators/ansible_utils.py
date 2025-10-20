@@ -4,8 +4,8 @@ from typing import Optional
 import ansible_runner
 from ansible_runner import Runner
 
-from nfvcl_core.providers.utils import create_ansible_inventory
 from nfvcl_core.utils.log import create_logger
+from nfvcl_providers.utils import create_ansible_inventory
 
 
 def run_ansible_playbook(host: str, username: str, password: str, playbook: str, logger=create_logger("Ansible Configurator"), become_password: Optional[str] = None) -> (Runner, dict):

@@ -11,8 +11,8 @@ from pyhelm3 import Client, ReleaseRevisionStatus
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import MultusInterface
-from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderData
-from nfvcl_core.providers.kubernetes.k8s_provider_interface import K8SProviderInterface, K8SProviderException
+from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderData
+from nfvcl_providers.kubernetes.k8s_provider_interface import K8SProviderInterface, K8SProviderException
 from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core.utils.file_utils import create_tmp_file, create_tmp_folder

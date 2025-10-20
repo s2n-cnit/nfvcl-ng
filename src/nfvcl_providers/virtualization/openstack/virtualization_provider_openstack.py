@@ -14,13 +14,13 @@ from pydantic import Field
 
 from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core.blueprints.cloudinit_builder import CloudInit
-from nfvcl_core.providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
+from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
     NetplanInterface
-from nfvcl_core.providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
-from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
+from nfvcl_providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
+from nfvcl_providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
-from nfvcl_core.vim_clients.openstack_vim_client import OpenStackVimClient
+from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage, VmStatus, VmPowerStatus
 from nfvcl_core_models.vim.vim_models import VimModel

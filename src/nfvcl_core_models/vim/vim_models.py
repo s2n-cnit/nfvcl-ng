@@ -10,8 +10,9 @@ logger: Logger = create_logger('Vim model')
 
 
 class VimTypeEnum(str, Enum):
-    OPENSTACK: str = 'openstack'
-    PROXMOX: str = 'proxmox'
+    OPENSTACK = 'openstack'
+    PROXMOX = 'proxmox'
+    EXTERNAL_REST = 'external_rest'
 
 class ProxmoxPrivilegeEscalationTypeEnum(str, Enum):
     NONE = 'none'
@@ -191,44 +192,3 @@ class VimModel(NFVCLBaseModel):
             logger.error(msg_err)
         else:
             return router_name
-
-
-class VimNetMap(NFVCLBaseModel):
-    vld: str
-    name: str
-    vim_net: str
-    mgt: bool
-    k8s_cluster_net: str = Field(alias='k8s-cluster-net', default='data_net')
-    ip_address: Optional[str] = Field(default=None, alias='ip-address', description="Ip address of the Network mapping")
-
-    @classmethod
-    def build_vnm(cls, vld, name, vim_net, mgt, k8s_cluster_net='data_net'):
-        return VimNetMap(vld=vld, name=name, vim_net=vim_net, mgt=mgt, k8s_cluster_net=k8s_cluster_net)
-
-
-class VimLink(NFVCLBaseModel):
-    vld: str
-    name: str
-    mgt: bool
-    intf_type: Optional[str] = Field(default=None)
-    port_security_enabled: bool = Field(default=True, alias="port-security-enabled")
-
-    @classmethod
-    def build_vim_link(cls, net_map: VimNetMap, intf_type: str = None, port_security_enabled: bool = True):
-        return VimLink(vld=net_map.vld, name=net_map.name, mgt=net_map.mgt, intf_type=intf_type, port_security_enabled=port_security_enabled)
-
-
-class VMFlavors(NFVCLBaseModel):
-    memory_mb: str = Field(default="8192", alias='memory-mb', description="Should be a multiple of 1024")
-    storage_gb: str = Field(default="32", alias='storage-gb')
-    vcpu_count: str = Field(default="4", alias='vcpu-count')
-
-    @field_validator('memory_mb', 'storage_gb', 'vcpu_count', mode='before')
-    def validate_field(cls, input_val) -> str:
-        if isinstance(input_val, str):
-            return input_val
-        elif isinstance(input_val, int):
-            return str(input_val)
-        else:
-            raise ValueError("VMFlavors -> input value is not a string neither an int.")
-

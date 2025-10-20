@@ -6,8 +6,8 @@ from typing import Optional
 import paramiko
 import verboselogs
 
-from nfvcl_core.providers.configurators.ansible_utils import run_ansible_playbook
-from nfvcl_core.providers.virtualization.virtualization_provider_interface import \
+from nfvcl_providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl_providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 from nfvcl_core.utils.file_utils import create_tmp_folder

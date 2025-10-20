@@ -5,7 +5,7 @@ from openstack.exceptions import SDKException
 from openstack.image.v2.image import Image
 from openstack.network.v2.network import Network
 
-from nfvcl_core.vim_clients.vim_client import VimClient
+from nfvcl_providers.vim_clients.vim_client import VimClient
 from nfvcl_core_models.openstack.images import ImageRepo
 from nfvcl_core_models.vim.vim_models import VimModel
 import openstack

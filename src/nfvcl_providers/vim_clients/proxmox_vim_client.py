@@ -4,7 +4,7 @@ from typing import Optional
 import paramiko
 from proxmoxer import ProxmoxAPI
 
-from nfvcl_core.vim_clients.vim_client import VimClient
+from nfvcl_providers.vim_clients.vim_client import VimClient
 from nfvcl_core_models.vim.vim_models import VimModel
 
 DEFAULT_PROXMOX_TIMEOUT = 180

@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 from typing import List, Tuple, Set
 
-from nfvcl_core.providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
+from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, NetResource, VmStatus
 
 

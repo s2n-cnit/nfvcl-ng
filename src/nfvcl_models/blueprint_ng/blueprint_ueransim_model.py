@@ -9,9 +9,10 @@ from nfvcl_core_models.base_model import NFVCLBaseModel
 
 
 class UeransimNetworkEndpoints(NFVCLBaseModel):
-    mgt: Optional[NetworkEndPoint] = Field(..., description='name of the topology network to be used for management')
-    n2: Optional[NetworkEndPointWithType] = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
-    n3: Optional[NetworkEndPointWithType] = Field(..., description='name of the topology network to be used by NodeBs to attach the core network')
+    mgt: NetworkEndPoint = Field(description='Name of the network to be used for management')
+    n2: NetworkEndPointWithType = Field(description='Name of the network to be used for the control plane connection to the AMF')
+    n3: NetworkEndPointWithType = Field(description='Name of the network to be used for the data plane connection to the UPF/ROUTER')
+    radio: Optional[NetworkEndPointWithType] = Field(default=None, description='Name of the network to be used for the radio connection between the UE and the gNB, it will be created if unspecified')
 
     @field_validator("mgt", mode="before")
     def str_to_network_endpoint(cls, v: object) -> object:
@@ -19,9 +20,9 @@ class UeransimNetworkEndpoints(NFVCLBaseModel):
             return NetworkEndPoint(net_name=v)
         return v
 
-    @field_validator("n2", "n3", mode="before")
+    @field_validator("n2", "n3", "radio", mode="before")
     def str_to_network_endpoint_with_type(cls, v: object) -> object:
-        if isinstance(v, str):
+        if v and isinstance(v, str):
             return NetworkEndPointWithType(net_name=v)
         return v
 

@@ -126,10 +126,6 @@ class UeransimUEConfigurator(VmResourceAnsibleConfiguration):
 
 @blueprint_type(UERANSIM_BLUE_TYPE)
 class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprintRequestInstance]):
-    # RADIO_NET_CIDR = '10.168.0.0/16'
-    # RADIO_NET_CIDR_START = '10.168.0.2'
-    # RADIO_NET_CIDR_END = '10.168.255.253'
-
     ueransim_image = VmResourceImage(name="ueransim-v3.2.6-dev-7", url="https://images.tnt-lab.unige.it/ueransim/ueransim-v3.2.6-dev-7-ubuntu2204.qcow2")
     ueransim_flavor = VmResourceFlavor(vcpu_count='2', memory_mb='4096', storage_gb='10')
 
@@ -166,10 +162,15 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
     def _create_gnb(self, area_id: str):
         if area_id not in self.state.areas:
-            radio_network_name = f"radio_{self.id}_{area_id}"
-            network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{int(area_id)%256}.0/24")
-            self.register_resource(network)
-            self.provider.create_net(network)
+            network = None
+            if self.create_config.config.network_endpoints.radio is None:
+                radio_network_name = f"radio_{self.id}_{area_id}"
+                # TODO doesn't always work with Proxmox due to possible overlapping CIDRs
+                network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{(int(area_id)%255) + 1}.0/24")
+                self.register_resource(network)
+                self.provider.create_net(network)
+            else:
+                radio_network_name = self.create_config.config.network_endpoints.radio.net_name
 
             vm_gnb = VmResource(
                 area=int(area_id),
@@ -193,7 +194,10 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     def _create_ue(self, area_id: str, ue: UeransimUe):
         if area_id in self.state.areas:
             blue_ueransim_area = self.state.areas[area_id]
-            radio_network_name = f"radio_{self.id}_{area_id}"
+            if self.create_config.config.network_endpoints.radio is None:
+                radio_network_name = f"radio_{self.id}_{area_id}"
+            else:
+                radio_network_name = self.create_config.config.network_endpoints.radio.net_name
             vm_ue = VmResource(
                 area=int(area_id),
                 name=f"{self.id}_{area_id}_UE_{ue.id}",
@@ -289,10 +293,11 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
     @day2_function("/configure_gnb", [HttpRequestType.POST])
     def configure_gnb(self, model: GNBPDUConfigure):
         area = self.state.areas[str(model.area)]
+        radio_net_name = area.radio_net.name if area.radio_net else self.create_config.config.network_endpoints.radio.net_name
         area.vm_gnb_configurator = UeransimGNBConfigurator(
             vm_resource=area.vm_gnb,
             configuration=model,
-            radio_addr=area.vm_gnb.network_interfaces[area.radio_net.name][0].fixed.ip,
+            radio_addr=area.vm_gnb.network_interfaces[radio_net_name][0].fixed.ip,
             ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2.net_name][0].fixed.ip,
             gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3.net_name][0].fixed.ip,
             n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3.net_name][0].fixed.interface_name,

@@ -209,11 +209,11 @@ class HelmPluginManager:
         )
 
     def _install_multus(self, plugin_data: K8sPluginAdditionalData):
-        multus_chart_path = PLUGIN_PATH / 'multus-cni-2.2.17.tgz'
+        multus_chart_path = PLUGIN_PATH / 'multus-cni-2.2.21.tgz'
         self.install_plugin(
             name=K8sPluginName.MULTUS,
             chart_name=str(multus_chart_path),
-            version="2.2.17",
+            version="2.2.21",
             namespace="multus",
             values={}
         )

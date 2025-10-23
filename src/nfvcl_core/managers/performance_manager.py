@@ -134,7 +134,7 @@ class PerformanceManager(GenericManager):
                     return blueprint_operation, blueprint_performance.blueprint_id
         return None, None
 
-    def end_operation(self, operation_id: str):
+    def end_operation(self, operation_id: str) -> int:
         """
         Log the end of an operation on a blueprint
         Args:
@@ -148,6 +148,7 @@ class PerformanceManager(GenericManager):
         operation.duration = round((operation.end - operation.start).total_seconds() * 1000)
         del self.pending_operations[blueprint_id]
         self._persist_to_db()
+        return operation.duration
 
     def start_provider_call(self, operation_id: Optional[str], method_name: str, info: Dict[str, str]) -> Optional[str]:
         """

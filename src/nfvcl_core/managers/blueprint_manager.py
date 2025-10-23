@@ -203,10 +203,9 @@ class BlueprintManager(GenericManager):
                     self._performance_manager.set_error(blue_id, True)
                     raise e
                 self.set_blueprint_status(blue_id, BlueprintNGStatus.idle())
-                self._performance_manager.end_operation(performance_operation_id)
-
+                duration = self._performance_manager.end_operation(performance_operation_id)
                 self._event_manager.fire_event(NFVCLEventTopics.BLUEPRINT_TOPIC, BlueEventType.BLUE_CREATED, data=created_blue.base_model)
-                self.logger.success(f"Blueprint {blue_id} created successfully")
+                self.logger.success(f"Blueprint {blue_id} created successfully in {duration / 1000} seconds")
             return blue_id
 
     def update_blueprint(self, blueprint_id: str, path: str, msg: Any = None, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> Any:

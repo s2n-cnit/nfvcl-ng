@@ -7,10 +7,14 @@ from time import sleep
 from typing import Dict, List, Tuple, Set
 
 import proxmoxer
+from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient
 from pydantic import Field, TypeAdapter
 
-from nfvcl_core.blueprints.cloudinit_builder import CloudInit, CloudInitNetworkRoot
-from nfvcl_core.managers.vim_clients_manager import ProxmoxVimClient
+from nfvcl_common.cloudinit_builder import CloudInit, CloudInitNetworkRoot
+from nfvcl_common.utils.blue_utils import rel_path
+from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
+    VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource, VmStatus, VmPowerStatus
+from nfvcl_core_models.vim.vim_models import ProxmoxPrivilegeEscalationTypeEnum
 from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
     NetplanInterface
 from nfvcl_providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
@@ -19,22 +23,11 @@ from nfvcl_providers.virtualization.proxmox.models.models import ProxmoxZone, Su
 from nfvcl_providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
-from nfvcl_core.utils.blue_utils import rel_path
-from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
-    VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource, VmStatus, VmPowerStatus
-from nfvcl_core_models.vim.vim_models import VimModel, ProxmoxPrivilegeEscalationTypeEnum
 
 cloud_init_packages = ['qemu-guest-agent']
 cloud_init_runcmd = ["systemctl enable qemu-guest-agent.service", "systemctl start qemu-guest-agent.service"]
 
 DEFAULT_PROXMOX_TIMEOUT = 180
-
-
-class ApiRequestType(Enum):
-    POST = "POST"
-    PUT = "PUT"
-    GET = "GET"
-    DELETE = "DELETE"
 
 
 class VirtualizationProviderDataProxmox(VirtualizationProviderData):
@@ -51,14 +44,11 @@ class VirtualizationProviderProxmoxException(VirtualizationProviderException):
 
 
 class VirtualizationProviderProxmox(VirtualizationProviderInterface):
-    proxmox_vim_client: ProxmoxVimClient
+    vim_client: ProxmoxVimClient
     data: VirtualizationProviderDataProxmox
-    vim: VimModel
 
     def init(self):
         self.data: VirtualizationProviderDataProxmox = VirtualizationProviderDataProxmox()
-        self.vim = self.topology.get_vim_by_area(self.area)
-        self.proxmox_vim_client = self.vim_clients_manager.get_proxmox_client(self, self.vim.name)
         self.path = self.__get_storage_path(self.vim.proxmox_parameters().proxmox_images_volume)
         self.__create_ci_qcow_folders()
         self.__load_scripts()
@@ -317,7 +307,6 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def final_cleanup(self):
         for vnet in list(self.data.proxmox_vnet.keys()).copy():
             self.__delete_sdn_vnet(vnet)
-        self.vim_clients_manager.release_client(self, self.vim.name)
 
     def create_net(self, net_resource: NetResource):
         self.__create_sdn_vnet(net_resource)
@@ -405,7 +394,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         # response = httpx.get(f"{image_url}.SHA256SUM")
         # checksum = response.content.split()[0]
         # download_args = {"url": image_url, "content": "import", "filename": f"{image_name}.img", "checksum": checksum, "checksum-algorithm": "sha256"}
-        # self.proxmox_vim_client.proxmoxer.nodes(self.data.proxmox_node_name).storage(self.vim.vim_proxmox_images_volume)("download-url").post(**download_args)
+        # self.vim_client.proxmoxer.nodes(self.data.proxmox_node_name).storage(self.vim.vim_proxmox_images_volume)("download-url").post(**download_args)
         self.__execute_ssh_command(f'/root/scripts/image_script.sh {image_url} {self.path}/images/0/{image_name}.qcow2')
 
     def __get_macs(self, vmid: int):
@@ -532,7 +521,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             # Needed to escape single quote: https://stackoverflow.com/a/1250279
             command = command.replace("'", """'"'"'""")
             command = f"sudo sh -c '{command}'"
-        stdin, stdout, stderr = self.proxmox_vim_client.exec_command(command)
+        stdin, stdout, stderr = self.vim_client.exec_command(command)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status != 0:
             raise VirtualizationProviderProxmoxException(f"Error executing command: {command}")
@@ -546,13 +535,13 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             try:
                 match r_type:
                     case ApiRequestType.GET:
-                        response = self.proxmox_vim_client.proxmoxer(url).get(**parameters if parameters else {})
+                        response = self.vim_client.proxmoxer(url).get(**parameters if parameters else {})
                     case ApiRequestType.POST:
-                        response = self.proxmox_vim_client.proxmoxer(url).post(**parameters if parameters else {})
+                        response = self.vim_client.proxmoxer(url).post(**parameters if parameters else {})
                     case ApiRequestType.PUT:
-                        response = self.proxmox_vim_client.proxmoxer(url).put(**parameters if parameters else {})
+                        response = self.vim_client.proxmoxer(url).put(**parameters if parameters else {})
                     case ApiRequestType.DELETE:
-                        response = self.proxmox_vim_client.proxmoxer(url).delete(**parameters if parameters else {})
+                        response = self.vim_client.proxmoxer(url).delete(**parameters if parameters else {})
                     case _:
                         raise VirtualizationProviderProxmoxException("Api request type not supported")
 
@@ -561,7 +550,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     while data["status"] != "stopped":
                         output = f"{response.split(':')[5]}, VMid {response.split(':')[6]}" if response.split(':')[6] else f"{response.split(':')[5]}"
                         self.logger.debug(f"Waiting for task: {output}")
-                        data = self.proxmox_vim_client.proxmoxer(f"nodes/{node_name}/tasks/{response}/status").get()
+                        data = self.vim_client.proxmoxer(f"nodes/{node_name}/tasks/{response}/status").get()
                         sleep(3)
                 return response
             except (proxmoxer.core.AuthenticationError, proxmoxer.core.ResourceException) as e: # TODO add other possible exceptions
@@ -571,7 +560,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                 connection_attempts += 1
                 self.logger.error(f"Error executing Proxmox request: {e}, attempt {connection_attempts}/{max_retries}")
                 self.logger.debug("Forcing proxmox client to re-authenticate")
-                self.proxmox_vim_client.force_token_refresh()
+                self.vim_client.force_token_refresh()
                 if connection_attempts >= max_retries:
                     raise VirtualizationProviderProxmoxException(f"Failed to execute Proxmox request after {max_retries} attempts")
                 sleep(2)
@@ -589,7 +578,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                 return zone
         raise VirtualizationProviderProxmoxException("NFVCL sdn zone not found, you must create a zone called 'nfvcl' with DHCP enabled (case sensitive)")
 
-    def __get_ips_for_subnets(self, cidr: str) -> (str, str, str):
+    def __get_ips_for_subnets(self, cidr: str) -> Tuple[str, str, str]:
         ips = ipaddress.ip_network(cidr)
         return ips[-2].__format__('s'), ips[2].__format__('s'), ips[-3].__format__('s')
 

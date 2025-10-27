@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Generic, TypeVar, Dict, Optional
+from typing import Generic, TypeVar, Dict
 
 from pydantic import Field
 
@@ -7,7 +7,6 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import Generic5GUPFBl
 from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel, Router5GCreateModelNetworks, Router5GAddRouteModel
 from nfvcl_models.blueprint_ng.core5g.common import Router5GNetworkInfo
 from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel
-from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.linux.ip import Route
 from nfvcl_core_models.resources import VmResource
 

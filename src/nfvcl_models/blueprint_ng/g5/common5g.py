@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from nfvcl_models.blueprint_ng.g5.custom_types_5g import SDType, SSTType
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class Slice5G(NFVCLBaseModel):

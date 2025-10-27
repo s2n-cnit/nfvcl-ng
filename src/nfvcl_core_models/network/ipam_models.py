@@ -2,7 +2,7 @@ from typing import Annotated
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 from pydantic import PlainSerializer, Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 SerializableIPv4Address = Annotated[IPv4Address, PlainSerializer(lambda x: f'{x.exploded}', return_type=str, when_used='always')]
 SerializableIPv4Network = Annotated[IPv4Network, PlainSerializer(lambda x: f'{x.exploded}', return_type=str, when_used='always')]

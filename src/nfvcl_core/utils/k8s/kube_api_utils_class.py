@@ -17,8 +17,8 @@ from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccou
 from kubernetes.stream import stream
 
 from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
-from nfvcl_core.utils.log import create_logger
-from nfvcl_core.utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
+from nfvcl_common.utils.log import create_logger
+from nfvcl_common.utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.topology_k8s_model import K8sQuota, K8sVersion

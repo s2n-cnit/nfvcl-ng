@@ -1,12 +1,20 @@
 import tempfile
-from typing import Optional
+from typing import Optional, List
 
 import ansible_runner
 from ansible_runner import Runner
 
-from nfvcl_core.utils.log import create_logger
-from nfvcl_providers.utils import create_ansible_inventory
+from nfvcl_common.utils.log import create_logger
 
+def create_ansible_inventory(host: str, username: str, password: str, become_password: Optional[str] = None):
+    str_list: List[str] = [f"ansible_host='{host}'", f"ansible_user='{username}'", f"ansible_password='{password}'"]
+
+    if become_password:
+        str_list.append(f"ansible_become_pass='{become_password}'")
+
+    str_list.append("ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'")
+
+    return f"{host} {' '.join(str_list)}"
 
 def run_ansible_playbook(host: str, username: str, password: str, playbook: str, logger=create_logger("Ansible Configurator"), become_password: Optional[str] = None) -> (Runner, dict):
     tmp_playbook = tempfile.NamedTemporaryFile(mode="w")

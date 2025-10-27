@@ -1,4 +1,4 @@
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 
 class GenericManager:

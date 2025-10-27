@@ -7,7 +7,7 @@ from pydantic._internal import _schema_generation_shared
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
-from nfvcl_core.utils.util import HOSTNAME_PATTERN
+from nfvcl_common.utils.util import HOSTNAME_PATTERN
 
 
 def sst_str_to_int(v: object) -> object:

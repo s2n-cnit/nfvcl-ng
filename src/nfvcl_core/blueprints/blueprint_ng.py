@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import copy
 import json
 import threading
@@ -12,8 +10,8 @@ from pydantic import ValidationError
 
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_core.blueprints.provider_aggregator import ProvidersAggregator
-from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
+from nfvcl_common.utils.log import create_logger
 from nfvcl_core.utils.metrics.grafana_utils import replace_all_datasources, update_queries_in_panels
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest, RestartVmRequest, RestartAllVmsRequest
 from nfvcl_core_models.http_models import BlueprintNotFoundException, HttpRequestType

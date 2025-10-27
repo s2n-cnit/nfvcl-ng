@@ -5,7 +5,7 @@ from fastapi import Form
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class OAuth2PasswordAndRefreshRequestForm(OAuth2PasswordRequestForm):

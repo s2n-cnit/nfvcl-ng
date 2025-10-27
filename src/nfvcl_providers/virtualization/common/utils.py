@@ -6,12 +6,12 @@ from typing import Optional
 import paramiko
 import verboselogs
 
-from nfvcl_providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl_common.ansible_utils import run_ansible_playbook
+from nfvcl_common.utils.file_utils import create_tmp_folder
 from nfvcl_providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
-from nfvcl_core.utils.file_utils import create_tmp_folder
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 logger_pu = create_logger('Providers_Utils')
 

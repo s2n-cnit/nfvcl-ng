@@ -9,8 +9,8 @@ from nfvcl_core.database.blueprint_repository import BlueprintRepository
 from nfvcl_core.database.provider_repository import ProviderDataRepository
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core.managers import GenericManager, EventManager
-from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGBaseModel
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
@@ -27,7 +27,7 @@ from nfvcl_core_models.resources import VmResource
 from nfvcl_core_models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
 from nfvcl_core.blueprints.provider_aggregator import ProvidersAggregator
-from nfvcl_core.utils.util import generate_blueprint_id
+from nfvcl_common.utils.util import generate_blueprint_id
 
 BLUEPRINTS_MODULE_FOLDER: str = "nfvcl.blueprints_ng.modules"
 

@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription, AnsibleShellTask
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription, AnsibleShellTask
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 
 

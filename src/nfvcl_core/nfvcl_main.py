@@ -9,6 +9,7 @@ from dependency_injector.wiring import Provide
 from pydantic import Field, PositiveInt
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_implementations
+from nfvcl_common.utils.file_utils import set_nfvcl_tmp_folder, set_nfvcl_mounted_folder
 from nfvcl_core import global_ref
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, BlueprintModule, BlueprintDay2Route
 from nfvcl_core.containers.nfvcl_container import NFVCLContainer
@@ -21,8 +22,8 @@ from nfvcl_core.public_methods_description import GET_PROM_SRV_SUMMARY, GET_PROM
     GET_PROM_LIST_SRV_SUMMARY, GET_PROM_LIST_SRV_DESCRIPTION, DEL_PROM_SRV_SUMMARY, DEL_PROM_SRV_DESCRIPTION, \
     UPD_PROM_SRV_SUMMARY, UPD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_DESCRIPTION, ADD_PROM_SRV_SUMMARY, \
     UPD_K8SCLUSTER_SUMMARY, UPD_K8SCLUSTER_DESCRIPTION, ADD_EXTERNAL_K8SCLUSTER_SUMMARY, ADD_EXTERNAL_K8SCLUSTER
-from nfvcl_core.utils.log import create_logger
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.utils.log import create_logger
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, BlueprintNGBaseModel
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core_models.k8s_management_models import Labels
@@ -117,6 +118,8 @@ class NFVCL:
         self.logger = create_logger(self.__class__.__name__)
 
         global_ref.nfvcl_config = NFVCLConfigModel.model_validate(config)
+        set_nfvcl_tmp_folder(global_ref.nfvcl_config.nfvcl.tmp_folder)
+        set_nfvcl_mounted_folder(global_ref.nfvcl_config.nfvcl.mounted_folder)
 
         self.topology_manager = topology_manager
         self.blueprint_manager = blueprint_manager

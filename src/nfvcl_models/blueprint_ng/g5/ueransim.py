@@ -1,11 +1,11 @@
-from __future__ import annotations
+
 
 from typing import List
 
 from pydantic import Field
 
 from nfvcl_models.blueprint_ng.g5.ue import UESim
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_models.blueprint_ng.blueprint_ueransim_model import UeransimArea, UeransimConfig, UeransimUe
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
 

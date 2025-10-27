@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import Field, field_validator
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class K8sServiceType(str, Enum):

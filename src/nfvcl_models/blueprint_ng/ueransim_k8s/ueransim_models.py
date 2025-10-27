@@ -2,11 +2,10 @@ from typing import List, Optional, Dict, Any
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core_models.linux.ip import Route
-from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Nnetwork, Nif
+from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Nnetwork
 from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
-from nfvcl_models.blueprint_ng.g5.custom_types_5g import KEYType, OPCType, IMSIType, MCCType, MNCType, DNNType, SUPIType
+from nfvcl_models.blueprint_ng.g5.custom_types_5g import KEYType, OPCType, MCCType, MNCType, SUPIType
 from nfvcl_models.blueprint_ng.g5.ue import OpType, UESession
 
 

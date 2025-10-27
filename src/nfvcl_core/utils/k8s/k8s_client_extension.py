@@ -5,7 +5,7 @@ import kubernetes
 import yaml
 from kubernetes.client import ApiException, ApiClient
 from kubernetes.utils import create_from_dict, FailToCreateError
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 logger: logging.Logger = create_logger("K8S CLIENT EXTENSION")
 

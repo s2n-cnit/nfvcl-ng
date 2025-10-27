@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class Labels(NFVCLBaseModel):

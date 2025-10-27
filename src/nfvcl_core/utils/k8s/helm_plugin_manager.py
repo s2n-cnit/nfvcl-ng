@@ -10,10 +10,10 @@ from kubernetes.utils import FailToCreateError
 from pyhelm3 import Client
 from verboselogs import VerboseLogger
 
-from nfvcl_core.utils.file_utils import render_file_from_template_to_file, create_tmp_file
+from nfvcl_common.utils.file_utils import render_file_from_template_to_file, create_tmp_file
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring, DestinationType
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData
 from nfvcl_core_models.resources import HelmChartResource

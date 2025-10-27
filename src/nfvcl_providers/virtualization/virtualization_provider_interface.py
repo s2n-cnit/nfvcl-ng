@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 import abc
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Optional, Callable
 
-from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, NetResource, VmStatus
+from nfvcl_core_models.vim.vim_models import VimModel
+from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
+from nfvcl_providers.vim_clients.vim_client import VimClient
 
 
 class VirtualizationProviderData(BlueprintNGProviderData):
@@ -17,6 +17,13 @@ class VirtualizationProviderException(Exception):
 
 class VirtualizationProviderInterface(BlueprintNGProviderInterface):
     data: VirtualizationProviderData
+    vim_client: VimClient
+    vim: VimModel
+
+    def __init__(self, area: int, blueprint_id: str, vim_client: VimClient, persistence_function: Optional[Callable] = None):
+        self.vim_client = vim_client
+        self.vim = vim_client.vim
+        super().__init__(area, blueprint_id, persistence_function)
 
     @abc.abstractmethod
     def get_vim_info(self):

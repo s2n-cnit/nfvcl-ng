@@ -2,6 +2,7 @@ from typing import Dict, cast
 
 from nfvcl_core.managers import TopologyManager
 from nfvcl_core.managers.generic_manager import GenericManager
+from nfvcl_core_models.vim.vim_models import VimTypeEnum
 from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient
 from nfvcl_providers.vim_clients.vim_client import VimClient
@@ -12,6 +13,14 @@ class VimClientsManager(GenericManager):
         super().__init__()
         self._topology_manager = topology_manager
         self.clients: Dict[str, VimClient] = {}
+
+    def get_vim_client(self, requester: object, vim_type: VimTypeEnum, vim_name: str) -> VimClient:
+        if vim_type == VimTypeEnum.PROXMOX:
+            return self.get_proxmox_client(requester, vim_name)
+        elif vim_type == VimTypeEnum.OPENSTACK:
+            return self.get_openstack_client(requester, vim_name)
+        else:
+            raise ValueError(f"Unknown VIM type {vim_type}")
 
     def get_proxmox_client(self, requester: object, vim_name: str) -> ProxmoxVimClient:
         return cast(ProxmoxVimClient, self._get_client(requester, vim_name, ProxmoxVimClient))

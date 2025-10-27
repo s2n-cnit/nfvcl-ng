@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 import copy
 from datetime import datetime
@@ -7,10 +7,9 @@ from typing import TypeVar, Optional, Generic, List, Dict, Any
 
 from pydantic import Field, SerializeAsAny, field_validator, ValidationError
 
-from nfvcl_core.utils.blue_utils import get_class_from_path
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.utils.blue_utils import get_class_from_path
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel
-from nfvcl_core_models.providers.providers import BlueprintNGProviderData
 from nfvcl_core_models.resources import Resource
 
 StateTypeVar = TypeVar("StateTypeVar")

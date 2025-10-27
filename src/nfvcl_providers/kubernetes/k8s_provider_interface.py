@@ -1,8 +1,7 @@
-from __future__ import annotations
-
 import abc
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Callable
 
+from nfvcl_core.managers import TopologyManager
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
 from nfvcl_core_models.network.network_models import MultusInterface
@@ -21,6 +20,10 @@ class K8SProviderException(Exception):
 
 class K8SProviderInterface(BlueprintNGProviderInterface):
     data: K8SProviderData
+
+    def __init__(self, area: int, blueprint_id: str, topology_manager: TopologyManager, persistence_function: Optional[Callable] = None):
+        self.topology_manager = topology_manager
+        super().__init__(area, blueprint_id, persistence_function)
 
     @abc.abstractmethod
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):

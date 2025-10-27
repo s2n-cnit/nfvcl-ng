@@ -8,7 +8,7 @@ from kubernetes.utils import FailToCreateError
 
 from nfvcl_core.managers import TopologyManager, BlueprintManager, EventManager
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_core.utils.blue_utils import yaml
+from nfvcl_common.utils.blue_utils import yaml
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils

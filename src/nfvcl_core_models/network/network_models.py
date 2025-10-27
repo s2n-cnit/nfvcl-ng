@@ -4,9 +4,9 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator, PositiveInt
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
-from nfvcl_core.utils.util import generate_id
+from nfvcl_common.utils.util import generate_id
 
 # TODO remove but do a transaction in the DB for NetworkModel (see below)
 class NetworkTypeEnum(str, Enum):

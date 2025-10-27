@@ -1,20 +1,20 @@
-from __future__ import annotations
+
 
 from typing import Optional, List
 
 from pydantic import Field, field_validator
 
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core_models.linux.ip import Route
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_models.blueprint_ng.core5g.common import Router5GNetworkInfo, NetworkEndPoint, NetworkEndPointWithType
 from nfvcl_core_models.http_models import HttpRequestType
-from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_common.utils.blue_utils import rel_path
 
 
 class Router5GCreateModelNetworks(NFVCLBaseModel):

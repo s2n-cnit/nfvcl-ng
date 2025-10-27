@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 from typing import List, Optional, Dict, Any
 
@@ -7,7 +7,7 @@ from pydantic import Field, RootModel
 from nfvcl_models.blueprint_ng.athonet.upf import DnnVrf
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubDataNets
 from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 #################### ATHONET ACCESS TOKEN ####################

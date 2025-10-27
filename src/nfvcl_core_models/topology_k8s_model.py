@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Optional, List
 
 from pydantic import Field
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring
 from nfvcl_core_models.plugin_k8s_model import K8sOperationType
 

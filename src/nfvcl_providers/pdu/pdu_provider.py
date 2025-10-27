@@ -1,12 +1,12 @@
 import copy
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Callable
 
 from pydantic import Field
 
 from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderData, BlueprintNGProviderInterface
 from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_core_models.network.network_models import PduType
-from nfvcl_core.utils.blue_utils import get_class_from_path
+from nfvcl_common.utils.blue_utils import get_class_from_path
 
 
 class PDUProviderData(BlueprintNGProviderData):
@@ -19,6 +19,11 @@ class PDUProviderException(Exception):
 
 class PDUProvider(BlueprintNGProviderInterface):
     data: PDUProviderData
+
+    def __init__(self, area: int, blueprint_id: str, topology_manager, pdu_manager, persistence_function: Optional[Callable] = None):
+        super().__init__(area, blueprint_id, persistence_function)
+        self.topology_manager = topology_manager
+        self.pdu_manager = pdu_manager
 
     def init(self):
         self.data: PDUProviderData = PDUProviderData()
@@ -54,7 +59,7 @@ class PDUProvider(BlueprintNGProviderInterface):
 
         Returns: List of PDUs that match the search parameters
         """
-        all_pdus = self.topology.get_pdus()
+        all_pdus = self.topology_manager.get_topology().get_pdus()
 
         filtered_by_area = list(filter(lambda x: x.area == area, all_pdus))
         filtered_by_type = list(filter(lambda x: x.type == pdu_type, filtered_by_area))
@@ -69,7 +74,7 @@ class PDUProvider(BlueprintNGProviderInterface):
         return found
 
     def find_by_name(self, name: str) -> PduModel:
-        all_pdus = self.topology.get_pdus()
+        all_pdus = self.topology_manager.get_topology().get_pdus()
 
         results = list(filter(lambda x: x.name == name, all_pdus))
         if len(results) == 0:

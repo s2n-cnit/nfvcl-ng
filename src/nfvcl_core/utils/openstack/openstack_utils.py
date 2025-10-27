@@ -4,7 +4,7 @@ from keystoneauth1.exceptions import Unauthorized
 from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.vim.vim_models import VimModel
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 # Logger
 logger = create_logger("OpenStack Client")

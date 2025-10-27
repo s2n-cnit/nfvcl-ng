@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_models.blueprint_ng.common import UbuntuVersion
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core_models.resources import VmResourceFlavor

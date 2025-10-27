@@ -2,7 +2,7 @@ import re
 import time
 from typing import Optional
 
-from nfvcl_core.utils.blue_utils import get_yaml_parser
+from nfvcl_common.utils.blue_utils import get_yaml_parser
 from utils import SSH
 
 

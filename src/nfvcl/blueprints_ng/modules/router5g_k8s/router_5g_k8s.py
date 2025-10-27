@@ -1,6 +1,5 @@
 import copy
-import re
-from typing import Optional, Dict
+from typing import Optional
 
 from pydantic import Field
 
@@ -8,7 +7,7 @@ from nfvcl.blueprints_ng.modules.router5g_k8s import router5g_default_k8s_config
 from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel, Router5GAddRouteModel
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGState
 from nfvcl_core_models.http_models import HttpRequestType
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network

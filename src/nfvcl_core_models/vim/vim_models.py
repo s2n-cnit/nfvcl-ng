@@ -1,10 +1,10 @@
 from enum import Enum
 from logging import Logger
 from typing import List, Optional
-from pydantic import Field, field_validator, computed_field
+from pydantic import Field, field_validator
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_common.utils.log import create_logger
 
 logger: Logger = create_logger('Vim model')
 

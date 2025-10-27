@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 from enum import Enum
 from typing import List, Optional
@@ -8,7 +8,7 @@ from pydantic import Field, model_validator, AliasChoices
 from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPoint, NetworkEndPointWithType
 from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl_models.blueprint_ng.g5.custom_types_5g import IMSIType, PLMNType, KEYType, OPCType, PDUSessionType, DNNType
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core_models.custom_types import AreaIDType, IPHostType
 

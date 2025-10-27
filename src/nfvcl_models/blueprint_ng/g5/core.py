@@ -5,7 +5,7 @@ from pydantic import Field
 
 from nfvcl_models.blueprint_ng.core5g.common import SubSubscribers, SubSliceProfiles, SubArea, SubDataNets
 from nfvcl_models.blueprint_ng.g5.custom_types_5g import DNNType, SDType, IMSIType
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.custom_types import AreaIDType
 
 class Core5GAttachGNBModel(NFVCLBaseModel):

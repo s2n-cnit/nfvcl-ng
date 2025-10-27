@@ -4,7 +4,7 @@ from typing import Optional
 import requests
 from pydantic import Field
 
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core.managers import get_monitoring_manager

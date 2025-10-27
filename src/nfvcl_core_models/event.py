@@ -1,5 +1,5 @@
 from typing import Union
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.event_types import K8sEventType, TopologyEventType, BlueEventType
 
 

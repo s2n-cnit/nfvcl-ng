@@ -1,11 +1,11 @@
-from __future__ import annotations
+
 
 import re
 from typing import Optional, List, Dict, Union, Literal, Annotated
 
 from pydantic import Field, RootModel, field_validator
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.network_models import MultusInterface
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
 

@@ -3,7 +3,7 @@ from blueprints.blue5g.day2_configs import GNB_CONFIGURATION
 from blueprints.blue5g.models.ueransim import GNBConfig, UEConfig, UeransimGNB
 from blueprints.blue5g.parent5g_test import NFVCL5GTestSuite
 from blueprints.ueransim_utils import UeransimSSH
-from nfvcl_core.utils.blue_utils import get_yaml_parser
+from nfvcl_common.utils.blue_utils import get_yaml_parser
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
 
 

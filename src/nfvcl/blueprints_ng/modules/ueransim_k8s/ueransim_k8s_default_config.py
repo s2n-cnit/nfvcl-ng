@@ -24,7 +24,7 @@ ueransimk8s_default_config: UeransimK8sModel = UeransimK8sModel.model_validate({
         },
         "image": {
             "name": "gradiant/ueransim",
-            "tag": "3.2.7",
+            "tag": "3.2.6",
             "pullPolicy": "IfNotPresent"
         }
     },

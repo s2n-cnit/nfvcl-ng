@@ -31,7 +31,7 @@ default_upf_config: OaiUpfValuesModel = OaiUpfValuesModel.model_validate({
     },
     "currentconfig": {
         "log_level": {
-            "general": "info"
+            "general": "debug"
         },
         "register_nf": {
             "general": "yes"

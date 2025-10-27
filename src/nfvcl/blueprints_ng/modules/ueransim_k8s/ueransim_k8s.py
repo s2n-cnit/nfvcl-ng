@@ -209,7 +209,7 @@ class UeransimK8sBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBluep
             tmp = route.as_linux_replace_command()
             if tmp not in self.state.ueransim_config_values[area_id].gnb.additional_routes:
                 additional_route_list.append(tmp)
-        self.state.ueransim_config_values[area_id].gnb.additional_routes = additional_route_list
+        self.state.ueransim_config_values[area_id].gnb.additional_routes.extend(additional_route_list)
         self.update_ueransim(area_id)
         self.restart_ran(area_id)
 

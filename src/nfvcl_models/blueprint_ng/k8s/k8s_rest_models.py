@@ -48,6 +48,7 @@ class K8sCreateModel(BlueprintNGCreateModel):
     password: str = Field(default="ubuntu", description="The password to be set, in every vm, for user ubuntu", pattern=r'^[a-zA-Z0-9_.-]*$')
     ubuntu_version: UbuntuVersion = Field(default=UbuntuVersion.UBU24, description="Version of Ubuntu")
     install_plugins: bool = Field(default=True, description="Whether to install default plugin list on blueprint deployment (default Flannel, MetalLb, OpenEBS)")
+    enable_multus: Optional[bool] = Field(default=False, description="Whether to enable Multus plugin (default false), additional checks and limitations are applied")
     cadvisor_node_port: int = Field(default=30080, ge=30000, le=32767, description="The node port on which the cadvisor service is exposed")
     master_flavors: VmResourceFlavor = VmResourceFlavor(memory_mb="2048", storage_gb='16', vcpu_count='2')
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Global port security disable, override port security in nodes flavors, required for MetalLB (multiple IP not declared on openstack)")

@@ -158,6 +158,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         if create_model.containerd_mirrors:
             self.state.containerd_mirrors = create_model.containerd_mirrors
 
+        if create_model.enable_multus:
+            self.check_multus_requisites()
 
         area: K8sAreaDeployment
         for area in create_model.areas:  # In each area we deploy workers and in the core area also the master (there is always a core area containing the master)
@@ -168,6 +170,10 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             if len(area.load_balancer_pools_ips) > 0:
                 self.state.load_balancer_ips_area[str(area.area_id)] = area.load_balancer_pools_ips
             self.deploy_area(area)
+
+        # If multus is enabled check that the interfaces have the same name across all nodes
+        if create_model.enable_multus:
+            self.check_multus_post()
 
         # Start initial configuration, first it get network list ready. Set self.state.reserved_pools
         self.setup_load_balancer_pool()
@@ -186,15 +192,80 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             topology_manager = self.provider.topology_manager
             area_list = [item.area_id for item in self.state.area_list]
 
+            networks: List[K8sNetworkInfo] = []
+            if self.create_config.enable_multus:
+                # We use vm_master because it should be the same for every node to enable multus
+                networks.append(K8sNetworkInfo(name=self.state.vm_master.management_network))
+                for additional_network in self.state.vm_master.additional_networks:
+                    networks.append(K8sNetworkInfo(name=additional_network, multus_enabled=True, interface_name=self.state.vm_master.network_interfaces[additional_network][0].fixed.interface_name))
+            else:
+                networks = [K8sNetworkInfo(name=network) for network in self.state.attached_networks]
+
             k8s_cluster = TopologyK8sModel(name=self.id, provided_by=ProvidedBy.NFVCL, blueprint_ref=self.id,
                                            credentials=self.state.master_credentials,
                                            vim_name=topology_manager.get_vim_name_from_area_id(self.state.master_area.area_id),
                                            # For the constraint on the model, there is always a master area.
-                                           k8s_version=K8S_VERSION, networks=[K8sNetworkInfo(name=network) for network in self.state.attached_networks], areas=area_list,
+                                           k8s_version=K8S_VERSION, networks=networks, areas=area_list,
                                            cni="", nfvo_onboard=False, cadvisor_node_port=self.state.cadvisor_node_port,
                                            anti_spoofing_enabled=not self.state.require_port_security_disabled)
             topology_manager.add_kubernetes(k8s_cluster)
             self.state.topology_onboarded = create_model.topology_onboard
+
+    def check_multus_requisites(self):
+        """
+        Check that all areas have exactly the same additional_networks, including the same order.
+        This is a prerequisite for enabling Multus support.
+        """
+        reference_networks = self.create_config.areas[0].additional_networks
+
+        for area in self.create_config.areas[1:]:
+            if area.additional_networks != reference_networks:
+                raise ValueError(
+                    f"All areas must have exactly the same additional networks in the same order to enable Multus. "
+                    f"Area {area.area_id} has networks {area.additional_networks}, "
+                    f"but area {self.create_config.areas[0].area_id} has {reference_networks}."
+                )
+
+    def check_multus_post(self):
+        """
+        Check that all VMs have the same interface names for the same CIDRs.
+        This is called after VMs are created to verify Multus prerequisites are met.
+        Raises ValueError if interface names don't match for the same CIDR across VMs.
+        """
+        # Collect all VMs (master + workers)
+        all_vms: List[VmResource] = []
+        if self.state.vm_master and self.state.vm_master.created:
+            all_vms.append(self.state.vm_master)
+        all_vms.extend([vm for vm in self.state.vm_workers if vm.created])
+
+        # Build a mapping of CIDR -> interface_name for the first VM (reference)
+        reference_vm = all_vms[0]
+        cidr_to_interface_name: dict[str, str] = {}
+
+        for net_interface_list in reference_vm.network_interfaces.values():
+            for net_interface in net_interface_list:
+                cidr = net_interface.fixed.cidr
+                interface_name = net_interface.fixed.interface_name
+                if cidr and interface_name:
+                    cidr_to_interface_name[cidr] = interface_name
+
+        # Check all other VMs have the same interface names for the same CIDRs
+        for vm in all_vms[1:]:
+            for net_interface_list in vm.network_interfaces.values():
+                for net_interface in net_interface_list:
+                    cidr = net_interface.fixed.cidr
+                    interface_name = net_interface.fixed.interface_name
+
+                    if cidr in cidr_to_interface_name:
+                        expected_interface_name = cidr_to_interface_name[cidr]
+                        if interface_name != expected_interface_name:
+                            raise ValueError(
+                                f"Interface name mismatch for CIDR {cidr}: "
+                                f"VM '{vm.name}' has interface '{interface_name}', "
+                                f"but VM '{reference_vm.name}' has interface '{expected_interface_name}'. "
+                                f"All VMs must have the same interface names for the same networks when using Multus."
+                                f"This error may not be a misconfiguration, the multus support is still experimental."
+                            )
 
     def set_base_image(self, version: UbuntuVersion):
         match version:
@@ -374,6 +445,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
            plug_list.append(K8sPluginName.CALICO)
         plug_list.append(K8sPluginName.METALLB)
         plug_list.append(K8sPluginName.OPEN_EBS)
+        if self.create_config.enable_multus:
+            plug_list.append(K8sPluginName.MULTUS)
 
         # Get the k8s pod network cidr
         pod_network_cidr = kube_utils.get_cidr_info()
@@ -381,7 +454,6 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
         helm_plugin_manager = HelmPluginManager(k8s_credential_file=self.state.master_credentials, context_name=self.id)
         helm_plugin_manager.install_plugins(plug_list, plugin_data)
-
 
 
     @day2_function("/add_node", [HttpRequestType.POST])
@@ -497,7 +569,26 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         """
         if self.state.topology_onboarded:
             try:
-                self.provider.topology_manager.delete_kubernetes(self.id)
+                # Clean up reserved ranges belonging to this blueprint from the topology
+                topology_manager = self.provider.topology_manager
+                k8s_cluster = topology_manager.get_k8s_cluster_by_id(self.id)
+
+                # Iterate through all networks in the k8s cluster and release their IP pools
+                for network_info in k8s_cluster.networks:
+                    if network_info.ip_pools:
+                        for ip_pool_name in list(network_info.ip_pools):  # Create a copy to avoid modification during iteration
+                            try:
+                                topology_manager.release_range_from_k8s_cluster(
+                                    network_name=network_info.name,
+                                    reserved_range_name=ip_pool_name,
+                                    k8s_cluster_id=self.id
+                                )
+                                self.logger.info(f"Released reserved range {ip_pool_name} from network {network_info.name}")
+                            except Exception as e:
+                                self.logger.error(f"Failed to release reserved range {ip_pool_name} from network {network_info.name}: {str(e)}")
+
+                # Delete the kubernetes cluster from topology
+                topology_manager.delete_kubernetes(self.id)
             except TopoK8SNotFoundException:
                 self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")
             except TopoK8SHasBlueprintException as e:

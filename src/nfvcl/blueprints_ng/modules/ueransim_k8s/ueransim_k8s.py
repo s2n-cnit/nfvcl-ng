@@ -188,7 +188,7 @@ class UeransimK8sBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBluep
         gnb_deployment_name = f"ueransimk8s-{area_id}-gnb"
         self.logger.info(f"Restarting gnb area {area_id}")
         self.provider.restart_deployment(self.state.ueransim_helm_chart[area_id], gnb_deployment_name)
-        self.logger.info("Restarting ues area {area_id}")
+        self.logger.info(f"Restarting ues area {area_id}")
         for ue in self.state.ueransim_config_values[area_id].ue.instances:
             self.provider.restart_deployment(self.state.ueransim_helm_chart[area_id], f"ueransimk8s-{area_id}-{ue.name}")
 

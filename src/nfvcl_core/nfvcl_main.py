@@ -27,7 +27,7 @@ from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, Bluep
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel
-from nfvcl_core_models.network.network_models import PduModel, NetworkModel, RouterModel, IPv4Pool, IPv4ReservedRange
+from nfvcl_core_models.network.network_models import PduModel, NetworkModel, RouterModel, IPv4Pool, IPv4ReservedRange, IPv4ReservedRangeRequest
 from nfvcl_core_models.performance import BlueprintPerformance
 from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall, K8sMonitoringConfig
 from nfvcl_core_models.response_model import OssCompliantResponse
@@ -297,21 +297,21 @@ class NFVCL:
     def update_network(self, network: NetworkModel, callback=None):
         return self.add_task(self.topology_manager.create_network, network, callback=callback)
 
-    @NFVCLPublic(path="/network/{network}/add/pool", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
+    @NFVCLPublic(path="/network/{network}/pool", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True)
     def add_pool_network(self, network: str, pool: IPv4Pool, callback=None) -> IPv4Pool:
         return self.add_task(self.topology_manager.add_allocation_pool_to_network, network, pool, callback=callback)
 
-    @NFVCLPublic(path="/network/{network}/del/pool", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
+    @NFVCLPublic(path="/network/{network}/pool/{pool_name}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def del_pool_network(self, network: str, pool_name: str, callback=None) -> IPv4Pool:
         return self.add_task(self.topology_manager.remove_allocation_pool_from_network, network, pool_name, callback=callback)
 
-    @NFVCLPublic(path="/network/{network}/k8s/reserve", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=TopologyManager.reserve_range_to_k8s_cluster)
-    def reserve_range_to_k8s_cluster(self, network_name: str, k8s_cluster_id: str, length: PositiveInt, callback=None) -> List[IPv4ReservedRange]:
-        return self.add_task(self.topology_manager.reserve_range_to_k8s_cluster, network_name, k8s_cluster_id, length, callback=callback)
+    @NFVCLPublic(path="/network/{network}/reserved_range_k8s", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=TopologyManager.reserve_range_to_k8s_cluster)
+    def reserve_range_to_k8s_cluster(self, network: str, reserved_range_k8s: IPv4ReservedRangeRequest, callback=None) -> List[IPv4ReservedRange]:
+        return self.add_task(self.topology_manager.reserve_range_to_k8s_cluster, network, reserved_range_k8s, callback=callback)
 
-    @NFVCLPublic(path="/network/{network}/k8s/release", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True, doc_by=TopologyManager.release_range_from_k8s_cluster)
-    def release_range_to_k8s_cluster(self, network_name: str, reserved_range_name: str, k8s_cluster_id: str, callback=None) -> IPv4ReservedRange:
-        return self.add_task(self.topology_manager.release_range_from_k8s_cluster, network_name, reserved_range_name, k8s_cluster_id, callback=callback)
+    @NFVCLPublic(path="/network/{network}/reserved_range_k8s/{reserved_range_name}/{k8s_cluster_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True, doc_by=TopologyManager.release_range_from_k8s_cluster)
+    def release_range_to_k8s_cluster(self, network: str, reserved_range_name: str, k8s_cluster_id: str, callback=None) -> IPv4ReservedRange:
+        return self.add_task(self.topology_manager.release_range_from_k8s_cluster, network, reserved_range_name, k8s_cluster_id, callback=callback)
 
     @NFVCLPublic(path="/network/{network_id}", section=TOPOLOGY_SECTION, method=NFVCLPublicMethod.DELETE, sync=True)
     def delete_network(self, network_id: str, callback=None):

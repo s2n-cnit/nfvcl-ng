@@ -8,7 +8,7 @@ from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring
 from nfvcl_core_models.monitoring.loki_model import LokiServerModel
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel, PrometheusTargetModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
-from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface
+from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface, IPv4ReservedRangeRequest
 from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
 from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
@@ -126,17 +126,13 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return removed_pool
 
-    def reserve_range_to_k8s_cluster(self, network_name: str, k8s_cluster_id: str, length: int) -> List[IPv4ReservedRange]:
+    def reserve_range_to_k8s_cluster(self, network_name: str, reserved_range_k8s: IPv4ReservedRangeRequest) -> List[IPv4ReservedRange]:
         """
         Takes one or more allocation pools from the topology network and partially assign them to the K8s cluster, depending on the length requested.
 
         Args:
-
             network_name: The network to reserve the range from
-
-            k8s_cluster_id: The K8s cluster to assign the range to
-
-            length: How many IPs to reserve
+            reserved_range_k8s: The request containing the length of the range to reserve and the K8s cluster id
 
         Returns:
 
@@ -144,10 +140,10 @@ class TopologyManager(GenericManager):
         """
         # Getting info
         network = self._topology.get_network(network_name)
-        k8s_cluster = self._topology.get_k8s_cluster(k8s_cluster_id)
+        k8s_cluster = self._topology.get_k8s_cluster(reserved_range_k8s.k8s_cluster_id)
         k8s_network = k8s_cluster.get_network(network_name)
         # Looking for available ranges and reserve them
-        reserved_networks = network.reserve_range(owner=k8s_cluster.name, assigned_to="K8S Topology cluster", length=length)
+        reserved_networks = network.reserve_range(owner=k8s_cluster.name, assigned_to="K8S Topology cluster", length=reserved_range_k8s.length)
         # Adding to the K8s cluster the id of the reserved range
         k8s_network.ip_pools.extend([res_range.name for res_range in reserved_networks])
 

@@ -2,7 +2,7 @@ from enum import Enum
 from ipaddress import AddressValueError, IPv4Address
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, PositiveInt
 
 from nfvcl_core_models.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
@@ -81,6 +81,10 @@ class IPv4Pool(NFVCLBaseModel):
 class PoolAssignation(str, Enum):
     K8S_CLUSTER: str = 'K8S_CLUSTER'
     MANUAL: str = 'MANUAL'
+
+class IPv4ReservedRangeRequest(NFVCLBaseModel):
+    k8s_cluster_id: str = Field(description="The ID of the Kubernetes cluster to which the reserved range belongs")
+    length: PositiveInt = Field(description="The length of the reserved range")
 
 class IPv4ReservedRange(IPv4Pool):
     """

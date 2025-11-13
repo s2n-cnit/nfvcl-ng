@@ -2,8 +2,8 @@ from typing import List, Optional, Dict
 
 from pydantic import Field, field_validator
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core.utils.blue_utils import get_yaml_parser
+from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_common.utils.blue_utils import get_yaml_parser
 
 
 class CloudInitChpasswd(NFVCLBaseModel):

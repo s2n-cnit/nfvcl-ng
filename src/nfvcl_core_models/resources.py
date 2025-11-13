@@ -7,7 +7,7 @@ from kubernetes.client import V1ServiceList, V1DeploymentList, V1PodList
 from pydantic import Field
 from typing_extensions import Literal
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_models.k8s.k8s_objects import K8sService, K8sServicePort, K8sServiceType, K8sDeployment, K8sStatefulSet, K8sPod
 

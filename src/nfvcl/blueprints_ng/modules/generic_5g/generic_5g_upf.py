@@ -9,8 +9,8 @@ from nfvcl_models.blueprint_ng.core5g.common import Router5GNetworkInfo
 from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo, Slice5GWithDNNs
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_common.utils.api_utils import HttpRequestType
 
 
 class DeployedUPFInfo(NFVCLBaseModel):

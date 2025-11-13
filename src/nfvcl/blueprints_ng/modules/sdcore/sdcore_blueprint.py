@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import copy
 import time
 from typing import Optional, Dict, Tuple
@@ -12,7 +10,7 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBl
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_default_config import default_config
 from nfvcl.blueprints_ng.modules.sdcore.sdcore_values_model import SDCoreValuesModel, SimAppYamlConfiguration
 from nfvcl.blueprints_ng.modules.sdcore_upf.sdcore_upf_blueprint import SDCORE_UPF_BLUE_TYPE
-from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_common.utils.blue_utils import rel_path
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition, GrafanaDashboard
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel
 from nfvcl_core_models.network.ipam_models import EndPointV4

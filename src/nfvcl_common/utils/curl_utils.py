@@ -2,10 +2,10 @@ import json
 import shlex
 from typing import Optional, List
 
-from nfvcl_providers.virtualization.proxmox.virtualization_provider_proxmox import ApiRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 
 
-def generate_curl_command(method: ApiRequestType, url: str, payload: Optional[dict] = None, http2prio: bool = True, as_list: bool = False) -> List[str] | str:
+def generate_curl_command(method: HttpRequestType, url: str, payload: Optional[dict] = None, http2prio: bool = True, as_list: bool = False) -> List[str] | str:
     parts = ["curl"]
 
     if http2prio:

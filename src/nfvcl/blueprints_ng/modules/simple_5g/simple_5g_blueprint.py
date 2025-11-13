@@ -4,8 +4,8 @@ from pydantic import Field
 
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.managers import get_kubernetes_manager
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_core.managers.getters import get_kubernetes_manager
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.resources import NetResource, NetResourcePool
 from nfvcl_models.blueprint_ng.blueprint_ueransim_model import UeransimConfig, UeransimNetworkEndpoints, UeransimArea, UeransimUe

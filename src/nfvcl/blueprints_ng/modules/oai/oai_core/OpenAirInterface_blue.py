@@ -1,18 +1,16 @@
-from __future__ import annotations
-
 import copy
 from typing import Optional, List, Dict, Tuple
 
-from nfvcl_providers.virtualization.proxmox.virtualization_provider_proxmox import ApiRequestType
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNG, Generic5GK8sBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.modules.oai.oai_upf.OpenAirInterfaceUpf_blue import OAI_UPF_BLUE_TYPE
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.utils.curl_utils import generate_curl_command
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.curl_utils import generate_curl_command
+from nfvcl_common.utils.log import create_logger
 from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, \
     SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile, OaiCoreValuesModel
@@ -195,7 +193,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         )
 
         output = generate_curl_command(
-            method=ApiRequestType.PUT,
+            method=HttpRequestType.PUT,
             url=f"{self.state.base_udr_url}/{new_subscriber.imsi}/authentication-data/authentication-subscription",
             payload=payload_ue.model_dump(by_alias=True),
             as_list=True
@@ -215,7 +213,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         """
         output = generate_curl_command(
-            method=ApiRequestType.DELETE,
+            method=HttpRequestType.DELETE,
             url=f"{self.state.base_udr_url}/{imsi}/authentication-data/authentication-subscription",
             as_list=True
         )
@@ -268,7 +266,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         # TODO This block may be called inside the dnn loop above
         output = generate_curl_command(
-            method=ApiRequestType.PUT,
+            method=HttpRequestType.PUT,
             url=f"{self.state.base_udr_url}/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data",
             payload=payload_sms.model_dump(by_alias=True),
             as_list=True
@@ -290,7 +288,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         for sms in self.state.ue_dict[imsi]:
             # if sms.sd == sd:
             output = generate_curl_command(
-                method=ApiRequestType.DELETE,
+                method=HttpRequestType.DELETE,
                 url=f"{self.state.base_udr_url}/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data",
                 as_list=True
             )

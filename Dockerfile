@@ -11,7 +11,7 @@ RUN apt-get update && \
 RUN apt-add-repository --yes ppa:ansible/ansible && \
     add-apt-repository --yes ppa:deadsnakes/ppa && \
     apt-get update && apt install -y ansible && \
-    apt-get install -y python3.12 python3.12-dev python3.12-venv uvicorn build-essential && \
+    apt-get install -y python3.14 python3.14-venv python3.14-dev libffi-dev uvicorn build-essential && \
     echo "[defaults]\nhost_key_checking = False" >> /etc/ansible/ansible.cfg && \
     curl -LsSf https://astral.sh/uv/install.sh | sh
 # Installing Helm

@@ -1,10 +1,10 @@
-from __future__ import annotations
+
 
 from typing import List
 
 from pydantic import Field
 
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, AnsibleTaskDescription
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterfaceAddress
 from nfvcl_models.blueprint_ng.vyos.vyos_models import AnsibleVyOSInterface, AnsibleVyOSL3Interface
 

@@ -4,7 +4,7 @@ from typing import Callable, Any, Optional
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class NFVCLTask:
@@ -38,6 +38,6 @@ class NFVCLTaskStatusType(str, Enum):
 class NFVCLTaskStatus(NFVCLBaseModel):
     task_id: str = Field()
     status: NFVCLTaskStatusType = Field()
-    result: Optional[str] = Field(default=None)
+    result: Optional[Any] = Field(default=None)
     error: bool = Field(default=False)
     exception: Optional[str] = Field(default=None)

@@ -4,7 +4,7 @@ import paramiko
 from paramiko.client import SSHClient
 from paramiko.sftp_client import SFTPClient
 
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 logger: Logger = create_logger('SSH utils')
 

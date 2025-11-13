@@ -6,9 +6,11 @@ from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAcc
     V1DeploymentList, V1Deployment, V1RoleList
 from kubernetes.utils import FailToCreateError
 
-from nfvcl_core.managers import TopologyManager, BlueprintManager, EventManager
+from nfvcl_core.managers.blueprint_manager import BlueprintManager
+from nfvcl_core.managers.event_manager import EventManager
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_core.utils.blue_utils import yaml
+from nfvcl_common.utils.blue_utils import yaml
+from nfvcl_core.managers.topology_manager import TopologyManager
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
@@ -59,7 +61,7 @@ class KubernetesManager(GenericManager):
         """
         try:
             cluster: TopologyK8sModel = self._topology_manager.get_k8s_cluster_by_id(cluster_id)
-            helm_plugin_manager = HelmPluginManager(cluster.credentials, "K8S REST UTILS")
+            helm_plugin_manager = HelmPluginManager(cluster.credentials, cluster_id)
             return helm_plugin_manager.get_installed_plugins()
         except ValueError as val_err:
             self.logger.error(val_err)

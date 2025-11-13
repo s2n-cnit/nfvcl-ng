@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Nnetwork
 from nfvcl_models.blueprint_ng.g5.upf import DnnWithCidrModel
 

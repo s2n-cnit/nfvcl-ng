@@ -1,8 +1,9 @@
 from functools import wraps
 from typing import Dict, Optional, List, Any, Tuple, Set, Callable
 
-from nfvcl_core.managers import TopologyManager
-from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj
+from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj
+from nfvcl_core.managers.topology_manager import TopologyManager
+from nfvcl_core.managers.vim_clients_manager import VimClientsManager
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import PduType, PduModel, MultusInterface
 from nfvcl_core_models.providers.providers import BlueprintNGProviderModel, ProviderDataAggregate
@@ -44,12 +45,22 @@ def register_performance(params_to_info=None):
     return decorator
 
 
-class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface, PDUProvider, BlueprintProvider):
-    def init(self):
-        pass
-
-    def __init__(self, blueprint_id: str = None, persistence_function: Callable[[], None]=None, topology_manager: TopologyManager = None, blueprint_manager=None, pdu_manager=None, performance_manager=None, vim_clients_manager=None, provider_data_aggregate: ProviderDataAggregate=None):
-        super().__init__(-1, blueprint_id, topology_manager, blueprint_manager, pdu_manager=pdu_manager, vim_clients_manager=vim_clients_manager)
+class ProvidersAggregator:
+    def __init__(self,
+                 blueprint_id: str = None,
+                 persistence_function: Callable[[], None] = None,
+                 topology_manager: TopologyManager = None,
+                 blueprint_manager=None,
+                 pdu_manager=None,
+                 performance_manager=None,
+                 vim_clients_manager=None,
+                 provider_data_aggregate: ProviderDataAggregate = None
+                 ):
+        self.blueprint_id = blueprint_id
+        self.topology_manager = topology_manager
+        self.blueprint_manager = blueprint_manager
+        self.pdu_manager = pdu_manager
+        self.vim_clients_manager: VimClientsManager = vim_clients_manager
         self.persistence_function = persistence_function
         self.performance_manager = performance_manager
 
@@ -104,28 +115,28 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
             )
         return provider_data_aggregate
 
-    def get_virt_provider(self, area: int):
-        vim = self.topology.get_vim_by_area(area)
+    def get_virt_provider(self, area: int) -> VirtualizationProviderInterface:
+        vim = self.topology_manager.get_topology().get_vim_by_area(area)
         if area not in self.virt_providers_impl:
             ProviderClass: type[VirtualizationProviderInterface] = vim_type_to_provider_mapping[vim.vim_type]
-            self.virt_providers_impl[area] = ProviderClass(area, self.blueprint_id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.persistence_function)
+            self.virt_providers_impl[area] = ProviderClass(area, self.blueprint_id, vim_client=self.vim_clients_manager.get_vim_client(self, vim.vim_type, vim.name), persistence_function=self.persistence_function)
         return self.virt_providers_impl[area]
 
     def get_k8s_provider(self, area: int):
         if area not in self.k8s_providers_impl:
-            self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint_id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.persistence_function)
+            self.k8s_providers_impl[area] = K8SProviderNative(area, self.blueprint_id, topology_manager=self.topology_manager, persistence_function=self.persistence_function)
         return self.k8s_providers_impl[area]
 
     def get_pdu_provider(self):
         # The area is -1 because there is only one PDUProvider
         if not self.pdu_provider_impl:
-            self.pdu_provider_impl = PDUProvider(area=-1, blueprint_id=self.blueprint_id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, pdu_manager=self.pdu_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.persistence_function)
+            self.pdu_provider_impl = PDUProvider(area=-1, blueprint_id=self.blueprint_id, topology_manager=self.topology_manager, pdu_manager=self.pdu_manager, persistence_function=self.persistence_function)
         return self.pdu_provider_impl
 
     def get_blueprint_provider(self):
         # The area is -1 because there is only one BlueprintProvider
         if not self.blueprint_provider_impl:
-            self.blueprint_provider_impl = BlueprintProvider(area=-1, blueprint_id=self.blueprint_id, topology_manager=self.topology_manager, blueprint_manager=self.blueprint_manager, vim_clients_manager=self.vim_clients_manager, persistence_function=self.persistence_function)
+            self.blueprint_provider_impl = BlueprintProvider(area=-1, blueprint_id=self.blueprint_id, blueprint_manager=self.blueprint_manager, persistence_function=self.persistence_function)
         return self.blueprint_provider_impl
 
     def get_vim_info(self):
@@ -199,6 +210,12 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
     def release_k8s_multus_ip(self, area: int, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
         return self.get_k8s_provider(area).release_k8s_multus_ip(area, network_name, ip_address)
 
+    def add_pdu(self, pdu: PduModel) -> PduModel:
+        return self.get_pdu_provider().add_pdu(pdu)
+
+    def delete_pdu(self, pdu_id: str) -> None:
+        return self.get_pdu_provider().delete_pdu(pdu_id)
+
     def find_pdu(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None, name: Optional[str] = None) -> PduModel:
         return self.get_pdu_provider().find_pdu(area, pdu_type, instance_type=instance_type, name=name)
 
@@ -221,7 +238,7 @@ class ProvidersAggregator(VirtualizationProviderInterface, K8SProviderInterface,
         return self.get_pdu_provider().get_pdu_configurator(pdu_model)
 
     def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
-        return self.get_virt_provider(area).check_networks(area, networks_to_check)
+        return self.get_virt_provider(area).check_networks(networks_to_check)
 
     @register_performance(params_to_info=[(1, "blueprint_type")])
     def create_blueprint(self, path: str, msg: Any):

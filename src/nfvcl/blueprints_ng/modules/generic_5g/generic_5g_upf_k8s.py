@@ -8,7 +8,7 @@ from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel,
 from nfvcl_core_models.linux.ip import Route
 from nfvcl_models.blueprint_ng.core5g.common import Router5GNetworkInfo
 from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.network_models import MultusInterface
 from nfvcl_core_models.resources import HelmChartResource
 

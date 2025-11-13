@@ -2,9 +2,9 @@ from typing import List
 
 from pydantic import Field
 
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class NetplanNetMatch(NFVCLBaseModel):

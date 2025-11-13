@@ -18,6 +18,11 @@ redis:
   port: "6379"
 ```
 
+## REST Provider Server configuration
+The configuration is mostly the same as the NFVCL configuration, but the `nfvcl` section is renamed to `nfvcl_providers`.
+
+>:warning: The `admin_uuid` MUST be changed to a new random UUID, this can be used to perform admin operations and should not be shared to unprivileged users.
+
 # Configuration using ENV variables
 Using ENV variables every value loaded from the configuration file will be overwritten, this means that you can override
 alse a single value.

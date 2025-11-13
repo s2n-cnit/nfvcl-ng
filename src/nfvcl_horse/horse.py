@@ -1,11 +1,12 @@
 from typing import Annotated
 
+from nfvcl_common.utils.api_utils import HttpRequestType
+from nfvcl_common.utils.nfvcl_public_utils import NFVCLPublic
 from nfvcl_core.nfvcl_main import NFVCL
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core_models.resources import VmResource
-from nfvcl_core.nfvcl_main import NFVCLPublic, NFVCLPublicMethod
+from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_common.ansible_utils import run_ansible_playbook
 from nfvcl_core.plugins.plugin import NFVCLPlugin
-from nfvcl_providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl_core_models.resources import VmResource
 
 
 class AnsibleRestAnswer(NFVCLBaseModel):
@@ -21,9 +22,9 @@ class NFVCLHorsePlugin(NFVCLPlugin):
     def load(self):
         print(f"Loading {self.name}")
 
-    @NFVCLPublic(path="/ansible/run_playbook", section=NFVCL.UTILS_SECTION, method=NFVCLPublicMethod.POST)
+    @NFVCLPublic(path="/ansible/run_playbook", section=NFVCL.UTILS_SECTION, method=HttpRequestType.POST)
     def run_ansible_playbook(self, host: str, username: str, password: str, payload: Annotated[str, "application/yaml"], callback=None) -> AnsibleRestAnswer:
-        from nfvcl_providers.configurators.ansible_utils import run_ansible_playbook
+        from nfvcl_common.ansible_utils import run_ansible_playbook
         self.nfvcl_context.add_task(run_ansible_playbook, host, username, password, payload, callback=callback)
         return AnsibleRestAnswer()
 
@@ -50,6 +51,6 @@ class NFVCLHorsePlugin(NFVCLPlugin):
                 raise Exception("Execution of Playbook failed. See NFVCL DEBUG log for more info.")
             return AnsibleRestAnswer(description="Playbook applied", status="success")
 
-    @NFVCLPublic(path="/ansible/rtr_request", section=NFVCL.UTILS_SECTION, method=NFVCLPublicMethod.POST, sync=True, doc_by=rtr_request)
+    @NFVCLPublic(path="/ansible/rtr_request", section=NFVCL.UTILS_SECTION, method=HttpRequestType.POST, sync=True, doc_by=rtr_request)
     def run_playbook(self, target: str, service: str, actionType: str, actionID: str, payload: Annotated[str, "application/yaml"], callback=None) -> AnsibleRestAnswer:
         return self.nfvcl_context.add_task(self.rtr_request, target, service, actionType, actionID, payload, callback=callback)

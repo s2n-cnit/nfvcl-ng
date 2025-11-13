@@ -4,7 +4,7 @@ from typing import Optional
 import paramiko
 
 from models.config_unitest import ConfigUniteTest
-from nfvcl_core.utils.blue_utils import get_yaml_parser
+from nfvcl_common.utils.blue_utils import get_yaml_parser
 
 unittest_config: Optional[ConfigUniteTest] = None
 

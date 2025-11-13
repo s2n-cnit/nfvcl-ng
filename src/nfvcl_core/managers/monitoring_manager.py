@@ -3,10 +3,10 @@ from typing import Dict
 from grafana_client import GrafanaApi
 from grafana_client.client import GrafanaClientError
 
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
-from nfvcl_core.managers import TopologyManager
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl_common.ansible_utils import run_ansible_playbook
+from nfvcl_core.managers.topology_manager import TopologyManager
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.monitoring.grafana_model import GrafanaFolderModel, GrafanaDashboardModel
 

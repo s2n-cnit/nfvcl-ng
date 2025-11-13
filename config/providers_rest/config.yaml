@@ -1,0 +1,14 @@
+---
+log_level: "20" # 20 is info, 10 is debug, 5 is trace
+nfvcl_providers:
+  port: "5003"
+  ip: "0.0.0.0"
+  workers: 10
+  admin_uuid: "admin" # CHANGE THIS!
+mongodb:
+  host: "127.0.0.1"
+  port: "27017"
+  db: "nfvcl-providers"
+# username: "admin"
+# password: "password"
+

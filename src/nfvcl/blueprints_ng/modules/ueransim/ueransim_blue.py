@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 from typing import List, Optional, Dict
 
 from pydantic import Field
 
 from nfvcl_models.blueprint_ng.g5.ue import UESim
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl_core_models.linux.ip import Route
@@ -13,13 +11,13 @@ from nfvcl_core_models.network.network_models import PduType
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
     UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_models.blueprint_ng.blueprint_ueransim_model import UeransimUe
-from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_common.utils.blue_utils import rel_path
 
 UERANSIM_BLUE_TYPE = "ueransim"
 

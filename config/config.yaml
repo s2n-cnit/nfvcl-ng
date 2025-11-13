@@ -1,9 +1,10 @@
 ---
-log_level: "20" # 20 is info, 10 is debug
+log_level: "20" # 20 is info, 10 is debug, 5 is trace
 nfvcl:
   port: "5002"
   ip: "0.0.0.0"
   authentication: False
+  workers: 4
 mongodb:
   host: "127.0.0.1"
   port: "27017"

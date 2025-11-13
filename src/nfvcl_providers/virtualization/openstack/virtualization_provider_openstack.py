@@ -12,10 +12,9 @@ from openstack.network.v2.port import Port
 from openstack.network.v2.subnet import Subnet
 from pydantic import Field
 
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
-from nfvcl_core.blueprints.cloudinit_builder import CloudInit
-from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
-    NetplanInterface
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
+from nfvcl_common.cloudinit_builder import CloudInit
+from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, NetplanInterface
 from nfvcl_providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
 from nfvcl_providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
@@ -59,19 +58,14 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
 
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     vim: VimModel
-    os_client: OpenStackVimClient
+    vim_client: OpenStackVimClient
     conn: Connection
     vim_need_floating_ip: bool
 
     def init(self):
         self.data: VirtualizationProviderDataOpenstack = VirtualizationProviderDataOpenstack()
-        self.vim = self.topology.get_vim_by_area(self.area)
-        self.os_client = self.vim_clients_manager.get_openstack_client(self, self.vim.name)
-        self.conn = self.os_client.client
+        self.conn = self.vim_client.client
         self.vim_need_floating_ip = self.vim.config.use_floating_ip
-
-    def get_vim_info(self):
-        return self.vim
 
     def __create_image_from_url(self, vm_image: VmResourceImage):
         image_attrs = {
@@ -100,7 +94,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         Returns: True if everything is as expected, False otherwise
         """
         for net in vm_resource.get_all_connected_network_names():
-            if self.os_client.get_network(net) is None:
+            if self.vim_client.get_network(net) is None:
                 raise VirtualizationProviderOpenstackException(f"Network >{net}< not found on vim")
 
     def __get_checksum(self, vm_image: VmResourceImage) -> str:
@@ -158,6 +152,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def create_vm(self, vm_resource: VmResource, check_image_hash: bool = False):
         self.logger.info(f"Creating VM {vm_resource.name}")
 
+        self.logger.debug(vm_resource.model_dump_json(indent=2))
+
         self._pre_creation_checks(vm_resource)
 
         image = self.__prepare_image(vm_resource.image)
@@ -197,7 +193,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             auto_ip=auto_ip,
             nat_destination=vm_resource.management_network,
             ip_pool=floating_ip_net,
-            network=self.os_client.network_names_to_ids(vm_resource.get_all_connected_network_names()),
+            network=self.vim_client.network_names_to_ids(vm_resource.get_all_connected_network_names()),
             userdata=cloudin,
             meta={"part_of_blueprint": self.blueprint_id, "deployed_by": "NFVCL"},
             timeout=request_timeout
@@ -333,7 +329,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
 
         for net in to_attach:
             # Get the OS SDK network object
-            network = self.os_client.get_network(net)
+            network = self.vim_client.get_network(net)
             # Connect the network to the instance
             new_server_interface: ServerInterface = self.conn.compute.create_server_interface(self.data.os_dict[vm_resource.id], net_id=network.id)
             self.logger.debug(f"OS network '{net}' attached to VM {vm_resource.name}")
@@ -359,9 +355,9 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def create_net(self, net_resource: NetResource):
         self.logger.info(f"Creating NET {net_resource.name}")
 
-        if self.os_client.get_network(net_resource.name):
+        if self.vim_client.get_network(net_resource.name):
             raise VirtualizationProviderOpenstackException(f"Network {net_resource.name} already exist")
-        if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name, "project_id": self.os_client.project_id}):
+        if self.conn.list_subnets(filters={"cidr": net_resource.cidr, "name": net_resource.name, "project_id": self.vim_client.project_id}):
             raise VirtualizationProviderOpenstackException(f"Subnet with cidr {net_resource.cidr} already exist")
 
         allocation_pools = None
@@ -410,12 +406,12 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         else:
             flavor_name = f"Flavor_{vm_name}"
             # If present in local flavor list -> Already created
+            flavor: Flavor = self.conn.get_flavor(flavor_name)
             if flavor_name in self.data.flavors:
-                flavor: Flavor = self.conn.get_flavor(flavor_name)
                 if flavor is None:
                     raise VirtualizationProviderOpenstackException(f"Flavor '{flavor_name}' should be present but is None")
             # Otherwise, creates the flavor
-            else:
+            if not flavor:
                 flavor: Flavor = self.conn.create_flavor(
                     flavor_name,
                     requested_flavor.memory_mb,
@@ -423,7 +419,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
                     requested_flavor.storage_gb,
                     is_public=False
                 )
-                self.conn.add_flavor_access(flavor.id, self.os_client.project_id)
+                self.conn.add_flavor_access(flavor.id, self.vim_client.project_id)
                 self.data.flavors.append(flavor_name)
             return flavor
 
@@ -515,15 +511,15 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             network_names: The network names
 
         Returns:
-            A list containing the details of every FIRST subnet of the netowrk
+            A list containing the details of every FIRST subnet of the network
         """
         subnet_detail_list = {}
         for network_name in network_names:
-            network_detail: Network = self.os_client.get_network(network_name)
+            network_detail: Network = self.vim_client.get_network(network_name)
             subnet_detail_list[network_name] = self.conn.get_subnet(network_detail.subnet_ids[0])
         return subnet_detail_list
 
-    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
-        networks_tmp = self.os_client.get_available_networks()
+    def check_networks(self, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+        networks_tmp = self.vim_client.get_available_networks()
         networks = set(networks_tmp.keys())
         return networks_to_check.issubset(networks), networks_to_check.difference(networks)

@@ -6,7 +6,7 @@ import kubernetes.utils
 from kubernetes import config
 from kubernetes.client import Configuration
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 logger: Logger = create_logger("K8S UTILS")
 

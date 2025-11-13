@@ -6,9 +6,9 @@ from typing import List, Any, Dict, Optional, Union
 from pydantic import Field
 from ruamel.yaml.scalarstring import LiteralScalarString
 
-from nfvcl_core.utils.file_utils import render_file_from_template_to_file
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core.utils.blue_utils import get_yaml_parser
+from nfvcl_common.utils.file_utils import render_file_from_template_to_file
+from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_common.utils.blue_utils import get_yaml_parser
 
 
 def LS(s):

@@ -1,6 +1,4 @@
-from typing import Any
-
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 
 

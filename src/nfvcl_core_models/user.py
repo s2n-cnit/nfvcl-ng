@@ -6,7 +6,7 @@ from typing import Optional
 
 from pydantic import Field, field_validator, EmailStr
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 # DB_TOKEN_HASH_ALGORITHM is the algorithm used for hashing the tokens (generated with USER_TOKEN_HASH_ALGORITHM)  stored in the database.
 USER_PASSWORD_HASH_ALGORITHM = 'sha256'

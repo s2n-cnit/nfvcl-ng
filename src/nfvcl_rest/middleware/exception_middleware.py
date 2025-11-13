@@ -1,6 +1,6 @@
 from verboselogs import VerboseLogger
 
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response

@@ -7,8 +7,22 @@ from typing import List
 
 from jinja2 import Environment, FileSystemLoader
 
-from nfvcl_core import global_ref
+_nfvcl_tmp_folder: str = "/tmp/nfvcl"
+_nfvcl_mounted_folder = "/tmp/nfvcl/mounted"
 
+def set_nfvcl_tmp_folder(path: str):
+    global _nfvcl_tmp_folder
+    _nfvcl_tmp_folder = path
+
+def get_nfvcl_tmp_folder() -> str:
+    return _nfvcl_tmp_folder
+
+def set_nfvcl_mounted_folder(path: str):
+    global _nfvcl_mounted_folder
+    _nfvcl_mounted_folder = path
+
+def get_nfvcl_mounted_folder() -> str:
+    return _nfvcl_mounted_folder
 
 def create_tmp_file(filename: str, sub_folder: str = None, file_can_exist: bool = False) -> Path:
     """
@@ -23,8 +37,7 @@ def create_tmp_file(filename: str, sub_folder: str = None, file_can_exist: bool 
     Returns:
         The Path to the created file (e.g. PosixPath('/tmp/sub_folder/sub_sub_folder/file.json'))
     """
-    tmp_base_folder = global_ref.nfvcl_config.nfvcl.tmp_folder
-    return create_file(tmp_base_folder, filename, sub_folder, file_can_exist)
+    return create_file(_nfvcl_tmp_folder, filename, sub_folder, file_can_exist)
 
 
 def create_tmp_folder(sub_folder: str = None) -> Path:
@@ -37,7 +50,7 @@ def create_tmp_folder(sub_folder: str = None) -> Path:
     Returns:
         The Path of the created tmp folder
     """
-    return create_folder(global_ref.nfvcl_config.nfvcl.tmp_folder, sub_folder)
+    return create_folder(_nfvcl_tmp_folder, sub_folder)
 
 
 def create_accessible_file(filename: str, sub_folder: str = None, file_can_exist: bool = False) -> Path:
@@ -54,7 +67,7 @@ def create_accessible_file(filename: str, sub_folder: str = None, file_can_exist
     Returns:
         The Path to the created file (e.g. PosixPath('mounted_folder/sub_folder/sub_sub_folder/file.json'))
     """
-    return create_file(global_ref.nfvcl_config.nfvcl.mounted_folder, filename, sub_folder,file_can_exist)
+    return create_file(_nfvcl_mounted_folder, filename, sub_folder, file_can_exist)
 
 
 def create_accessible_folder(sub_folder: str = None) -> Path:
@@ -67,7 +80,7 @@ def create_accessible_folder(sub_folder: str = None) -> Path:
     Returns:
         The Path of the created accessible folder
     """
-    return create_folder(global_ref.nfvcl_config.nfvcl.mounted_folder, sub_folder)
+    return create_folder(_nfvcl_mounted_folder, sub_folder)
 
 
 def create_folder(base_folder_path: str, sub_folder: str = None) -> Path:

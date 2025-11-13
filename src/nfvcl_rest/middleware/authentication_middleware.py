@@ -9,7 +9,7 @@ from verboselogs import VerboseLogger
 from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config
 from nfvcl_core.managers.user_manager import UserManager
 from nfvcl_core_models.user import TokenStatus
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 from nfvcl_rest.models.auth import OAuth2PasswordAndRefreshRequestForm, OAuth2Response, Oauth2Errors, \
     Oauth2CustomException
 

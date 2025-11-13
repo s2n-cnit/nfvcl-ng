@@ -1,14 +1,13 @@
-from __future__ import annotations
+
 
 from enum import Enum
 from typing import List, Optional
 from typing import Literal
 
 from pydantic import Field, field_validator
-from pydantic_extra_types.mac_address import MacAddress
 
 from nfvcl_models.blueprint_ng.g5.custom_types_5g import SDType, SSTType, BitrateStringType, DNNType, OPCType, KEYType, IMSIType, PLMNType
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.custom_types import AreaIDType
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 

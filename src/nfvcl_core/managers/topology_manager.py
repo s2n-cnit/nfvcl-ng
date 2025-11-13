@@ -1,7 +1,7 @@
 from typing import Optional, List, Union, Callable
 
 from nfvcl_core.database.topology_repository import TopologyRepository
-from nfvcl_core.managers import GenericManager
+from nfvcl_core.managers.generic_manager import GenericManager
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.monitoring.grafana_model import GrafanaServerModel, GrafanaDashboardModel, GrafanaFolderModel
 from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring

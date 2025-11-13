@@ -5,7 +5,7 @@ from pydantic import Field, field_validator
 from nfvcl_core_models.custom_types import AreaIDType
 from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPoint, NetworkEndPointWithType
 from nfvcl_models.blueprint_ng.g5.ue import UESim
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class UeransimNetworkEndpoints(NFVCLBaseModel):

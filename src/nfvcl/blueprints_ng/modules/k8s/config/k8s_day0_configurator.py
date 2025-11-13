@@ -2,11 +2,11 @@ import textwrap
 
 from ruamel.yaml.scalarstring import LiteralScalarString
 
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Network
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import KarmadaInstallModel
-from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_common.utils.blue_utils import rel_path
 
 
 class VmK8sDay0Configurator(VmResourceAnsibleConfiguration):

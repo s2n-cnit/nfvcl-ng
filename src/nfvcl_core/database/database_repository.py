@@ -3,8 +3,8 @@ from typing import TypeVar, List
 from pydantic import BaseModel
 from typing_extensions import Generic
 
-from nfvcl_core.managers import PersistenceManager
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
+from nfvcl_core.managers.persistence_manager import PersistenceManager
 
 T = TypeVar('T', bound=BaseModel)
 

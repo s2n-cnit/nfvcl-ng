@@ -1,11 +1,17 @@
-from typing import Any
+from typing import Any, Optional, Callable, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from nfvcl_core.managers.blueprint_manager import BlueprintManager
 from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 from nfvcl_core_models.providers.blueprint import BlueprintProviderData
 
 
 class BlueprintProvider(BlueprintNGProviderInterface):
     data: BlueprintProviderData
+
+    def __init__(self, area: int, blueprint_id: str, blueprint_manager: BlueprintManager, persistence_function: Optional[Callable] = None):
+        super().__init__(area, blueprint_id, persistence_function)
+        self.blueprint_manager = blueprint_manager
 
     def init(self):
         self.data: BlueprintProviderData = BlueprintProviderData()

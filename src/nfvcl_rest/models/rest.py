@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class RestAnswer202(BaseModel):

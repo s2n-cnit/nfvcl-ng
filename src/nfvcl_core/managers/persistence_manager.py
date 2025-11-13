@@ -14,7 +14,7 @@ from nfvcl_core.managers.generic_manager import GenericManager
 
 
 class PersistenceManager(GenericManager):
-    def __init__(self, host: str, port: int, db: str, username: str = None, password: str = None):
+    def __init__(self, host: str, port: int, db: str, username: str = None, password: str = None, migration_base_class: Optional[type] = Migration):
         super().__init__()
 
         if username is not None and password is not None:
@@ -23,7 +23,9 @@ class PersistenceManager(GenericManager):
             uri = f"mongodb://{host}:{port}/"
         self.mongo_client: MongoClient = MongoClient(uri)
         self.mongo_database: Database = self.mongo_client[db]
-        self.run_migrations()
+        if migration_base_class:
+            self.migration_base_class = migration_base_class
+            self.run_migrations()
 
     def get_database(self) -> Database:
         return self.mongo_database
@@ -42,7 +44,7 @@ class PersistenceManager(GenericManager):
         applied_migrations = set(migration['name'] for migration in migrations_collection.find())
 
         migration_files = sorted(
-            f for f in os.listdir(os.path.dirname(Path(sys.modules[Migration.__module__].__file__))) if f.startswith('migration_') and f.endswith('.py')
+            f for f in os.listdir(os.path.dirname(Path(sys.modules[self.migration_base_class.__module__].__file__))) if f.startswith('migration_') and f.endswith('.py')
         )
 
         for migration_file in migration_files:

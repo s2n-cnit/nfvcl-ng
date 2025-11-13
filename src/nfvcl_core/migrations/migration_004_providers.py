@@ -1,7 +1,7 @@
 from pymongo.synchronous.database import Database
 
 from nfvcl_core.migrations.base_class_migration import Migration
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 
 class Migration004Providers(Migration):

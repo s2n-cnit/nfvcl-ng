@@ -8,9 +8,9 @@ from keystoneauth1.exceptions import Unauthorized
 from nfvcl_core.database.blueprint_repository import BlueprintRepository
 from nfvcl_core.database.provider_repository import ProviderDataRepository
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
-from nfvcl_core.managers import GenericManager, EventManager
-from nfvcl_core.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
+from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_core.managers.generic_manager import GenericManager
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGBaseModel
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
@@ -19,7 +19,11 @@ from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_cal
 from nfvcl_core_models.providers.providers import ProviderDataAggregate
 
 if TYPE_CHECKING:
-    from nfvcl_core.managers import TopologyManager, PDUManager, PerformanceManager, VimClientsManager
+    from nfvcl_core.managers.topology_manager import TopologyManager
+    from nfvcl_core.managers.pdu_manager import PDUManager
+    from nfvcl_core.managers.performance_manager import PerformanceManager
+    from nfvcl_core.managers.vim_clients_manager import VimClientsManager
+    from nfvcl_core.managers.event_manager import EventManager
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus, RegisteredBlueprintCall, FunctionType
@@ -27,7 +31,7 @@ from nfvcl_core_models.resources import VmResource
 from nfvcl_core_models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
 from nfvcl_core.blueprints.provider_aggregator import ProvidersAggregator
-from nfvcl_core.utils.util import generate_blueprint_id
+from nfvcl_common.utils.util import generate_blueprint_id
 
 BLUEPRINTS_MODULE_FOLDER: str = "nfvcl.blueprints_ng.modules"
 
@@ -82,6 +86,7 @@ class BlueprintManager(GenericManager):
         """
         self.blueprint_dict.pop(blueprint.id)
         self._blueprint_repository.delete_blueprint(blueprint.id)
+        self._provider_repository.delete_by_blueprint_id(blueprint.id)
 
     def get_blueprint_instance(self, blueprint_id: str) -> Optional[BlueprintNG]:
         """
@@ -338,12 +343,14 @@ class BlueprintManager(GenericManager):
                 blueprint_instance.destroy()
                 self.blueprint_dict.pop(blueprint_id)
                 self._blueprint_repository.delete_blueprint(blueprint_id)
+                self._provider_repository.delete_by_blueprint_id(blueprint_id)
             except Exception as e:
                 if force_deletion:
                     self.logger.warning("Force deletion is enabled! Blue will be destroyed without ensuring that resources are deleted from remote VIMs or K8S Clusters")
                     self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
                     self.blueprint_dict.pop(blueprint_id)
                     self._blueprint_repository.delete_blueprint(blueprint_id)
+                    self._provider_repository.delete_by_blueprint_id(blueprint_id)
                 else:
                     self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
                     self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))

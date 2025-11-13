@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring
 from nfvcl_core_models.monitoring.loki_model import LokiServerModel
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel

@@ -1,16 +1,14 @@
-from __future__ import annotations
-
 from typing import Optional, List, Dict, Literal
 
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUPFVMBlueprintNGState, Generic5GUPFVMBlueprintNG
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
-from nfvcl_core.utils.blue_utils import rel_path
-from nfvcl_core_models.base_model import NFVCLBaseModel
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.blue_utils import rel_path
+from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition, GrafanaDashboard
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address, EndPointV4

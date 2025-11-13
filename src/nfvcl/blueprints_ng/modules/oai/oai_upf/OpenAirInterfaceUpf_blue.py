@@ -6,16 +6,16 @@ import yaml
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_vm import Generic5GUPFVMBlueprintNG, Generic5GUPFVMBlueprintNGState
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.oai import oai_default_upf_config
 from nfvcl.blueprints_ng.modules.oai import oai_utils
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 from nfvcl_core_models.resources import VmResourceImage, VmResourceFlavor, VmResource, VmResourceAnsibleConfiguration
-from nfvcl_models.blueprint_ng.core5g.OAI_Models import Upfconfig, Snssai, DnnItem, AvailableSmf
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import Upfconfig, Snssai, DnnItem
 from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
-from nfvcl_core.utils.blue_utils import rel_path
+from nfvcl_common.utils.blue_utils import rel_path
 
 OAI_UPF_BLUE_TYPE = "oai_upf"
 

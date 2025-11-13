@@ -1,13 +1,7 @@
-import textwrap
 from typing import List
 
-from ruamel.yaml.scalarstring import LiteralScalarString
-
-from nfvcl_core.blueprints.ansible_builder import AnsiblePlaybookBuilder, ServiceState
-from nfvcl_core_models.network.ipam_models import SerializableIPv4Network
+from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration
-from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import KarmadaInstallModel
-from nfvcl_core.utils.blue_utils import rel_path
 from nfvcl_models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuAptModel
 
 

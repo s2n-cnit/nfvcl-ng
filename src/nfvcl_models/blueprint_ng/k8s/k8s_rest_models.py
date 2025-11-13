@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 from enum import Enum
 from typing import List, Optional
@@ -8,7 +8,7 @@ from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core_models.resources import VmResourceFlavor
 from pydantic import Field, field_validator, PositiveInt
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class K8sAreaDeployment(NFVCLBaseModel):

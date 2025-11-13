@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import HttpUrl, Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.monitoring.grafana_model import GrafanaServerModel
 from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring

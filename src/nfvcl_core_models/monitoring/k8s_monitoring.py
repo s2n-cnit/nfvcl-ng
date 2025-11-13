@@ -1,11 +1,11 @@
-from __future__ import annotations
+
 
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 
 
 class DestinationType(str, Enum):

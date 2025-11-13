@@ -1,6 +1,6 @@
 from typing import List
 
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 from nfvcl_core_models.vim.vim_models import VimModel
 
 

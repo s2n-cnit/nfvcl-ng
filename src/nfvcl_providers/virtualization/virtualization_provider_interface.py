@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 import abc
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Optional, Callable
 
-from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, NetResource, VmStatus
+from nfvcl_core_models.vim.vim_models import VimModel
+from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface, BlueprintNGProviderData
+from nfvcl_providers.vim_clients.vim_client import VimClient
 
 
 class VirtualizationProviderData(BlueprintNGProviderData):
@@ -17,10 +17,16 @@ class VirtualizationProviderException(Exception):
 
 class VirtualizationProviderInterface(BlueprintNGProviderInterface):
     data: VirtualizationProviderData
+    vim_client: VimClient
+    vim: VimModel
 
-    @abc.abstractmethod
+    def __init__(self, area: int, blueprint_id: str, vim_client: VimClient, persistence_function: Optional[Callable] = None):
+        self.vim_client = vim_client
+        self.vim = vim_client.vim
+        super().__init__(area, blueprint_id, persistence_function)
+
     def get_vim_info(self):
-        pass
+        return self.vim
 
     @abc.abstractmethod
     def create_vm(self, vm_resource: VmResource):
@@ -33,7 +39,7 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
         return {}
 
     @abc.abstractmethod
-    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+    def check_networks(self, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
         pass
 
     @abc.abstractmethod

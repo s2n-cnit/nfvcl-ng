@@ -1,5 +1,5 @@
 from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUConfigurator
-from nfvcl_providers.configurators.ansible_utils import run_ansible_playbook
+from nfvcl_common.ansible_utils import run_ansible_playbook
 
 
 class GenericLinuxPDUConfigurator(PDUConfigurator):

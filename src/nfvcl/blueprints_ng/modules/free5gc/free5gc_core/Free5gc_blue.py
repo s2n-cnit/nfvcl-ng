@@ -4,7 +4,6 @@ import string
 from typing import Optional, Dict, List, Tuple
 
 import httpx
-from anyio import sleep
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_core_config, free5gc_subscriber_config
@@ -15,7 +14,7 @@ from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Free5gcCoreConfig, Sns
 from nfvcl_models.blueprint_ng.g5.core import Core5GDelTacModel, Core5GAddTacModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GDelSubscriberModel, Core5GAddSubscriberModel, NF5GType, Core5GAddDnnModel, Core5GDelDnnModel
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core_models.resources import HelmChartResource
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 FREE5GC_CORE_BLUE_TYPE = "free5gc"
 free5gc_credentials = {"username": "admin", "password": "free5gc"}

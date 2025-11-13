@@ -2,9 +2,9 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from nfvcl_core.utils.blue_utils import yaml
-from nfvcl_core.utils.file_utils import create_tmp_file
-from nfvcl_core.utils.util import generate_id
+from nfvcl_common.utils.blue_utils import yaml
+from nfvcl_common.utils.file_utils import create_tmp_file
+from nfvcl_common.utils.util import generate_id
 from nfvcl_core_models.network.ipam_models import EndPointV4
 
 

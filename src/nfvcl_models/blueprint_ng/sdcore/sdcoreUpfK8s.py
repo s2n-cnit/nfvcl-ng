@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.network_models import MultusInterface
 
 

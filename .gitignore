@@ -15,4 +15,4 @@ helm_charts/index.yaml
 /docs/build/*
 *.drawio*.bkp
 config_unitest_dev.yaml
-/config_dev.yaml
+config_dev.yaml

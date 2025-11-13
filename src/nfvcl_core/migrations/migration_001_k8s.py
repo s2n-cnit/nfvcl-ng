@@ -4,7 +4,7 @@ from pymongo.synchronous.database import Database
 
 from nfvcl_core_models.topology_k8s_model import K8sNetworkInfo
 from nfvcl_core.migrations.base_class_migration import Migration
-from nfvcl_core.utils.log import create_logger
+from nfvcl_common.utils.log import create_logger
 
 
 class Migration003K8s(Migration):

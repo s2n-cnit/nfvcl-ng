@@ -3,7 +3,7 @@ from typing import Optional, List
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
 from nfvcl_core_models.custom_types import AreaIDType
 from nfvcl_core_models.linux.ip import Route

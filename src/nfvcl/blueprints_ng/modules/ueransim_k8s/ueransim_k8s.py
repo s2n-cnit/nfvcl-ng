@@ -7,7 +7,7 @@ from nfvcl.blueprints_ng.modules.ueransim_k8s import ueransim_k8s_default_config
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGException
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.network.network_models import PduModel, PduType
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
 from nfvcl_core_models.resources import HelmChartResource

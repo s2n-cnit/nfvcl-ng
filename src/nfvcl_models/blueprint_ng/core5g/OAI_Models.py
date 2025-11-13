@@ -1,10 +1,10 @@
-from __future__ import annotations
+
 
 from typing import Optional, Dict, Any, Literal, List
 
 from pydantic import Field
 
-from nfvcl_core_models.base_model import NFVCLBaseModel
+from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.network_models import MultusInterface
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, MultusRoute
 from nfvcl_models.blueprint_ng.g5.common5g import Slice5G

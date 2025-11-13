@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import sys
+import time
 import typing
 from contextlib import asynccontextmanager
 from functools import partial
@@ -20,14 +21,15 @@ from starlette.responses import RedirectResponse, PlainTextResponse, Response, J
 from starlette.staticfiles import StaticFiles
 from verboselogs import VerboseLogger
 
+from nfvcl_common.utils.nfvcl_public_utils import NFVCLPublicModel
 from nfvcl_core_models.custom_types import NFVCLCoreException # Order 1
-from nfvcl_core_models.http_models import HttpRequestType # Order 1
+from nfvcl_common.utils.api_utils import HttpRequestType # Order 1
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus # Order 1
 from nfvcl_core_models.task import NFVCLTaskResult # Order 1
 from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config # Order 1
 from nfvcl_core.global_ref import get_nfvcl_config # Order 1
-from nfvcl_core.utils.file_utils import create_folder # Order 1
-from nfvcl_core.utils.log import mod_logger, create_logger, LOG_FILE_PATH, set_log_level # Order 1
+from nfvcl_common.utils.file_utils import create_folder # Order 1
+from nfvcl_common.utils.log import mod_logger, create_logger, LOG_FILE_PATH, set_log_level # Order 1
 
 #### BEFORE IMPORTING ANYTHING FROM NFVCL() main file ####
 nfvcl_rest_config: NFVCLConfigModel
@@ -48,7 +50,6 @@ def load_configuration():
 nfvcl_rest_config = load_configuration()
 set_log_level(nfvcl_rest_config.log_level)
 
-from nfvcl_core.nfvcl_main import NFVCLPublicModel # Order 2 (After logger modding)
 from nfvcl_core.nfvcl_main import configure_injection, NFVCL, global_ref # Order 2 (After logger modding)
 from nfvcl_rest.middleware.authentication_middleware import token, control_token, set_user_manager, logout # Order 2 (After logger modding)
 from nfvcl_rest.middleware.exception_middleware import ExceptionMiddleware # Order 2 (After logger modding)
@@ -323,6 +324,7 @@ def setup_main_routes():
 
 
 if __name__ == "__main__":
+    start_time = time.perf_counter_ns()
     check_py_version()
 
     configure_injection(nfvcl_rest_config)
@@ -454,4 +456,6 @@ if __name__ == "__main__":
     for router in routers_dict.values():
         app.include_router(router)
 
+    end_time = time.perf_counter_ns()
+    logger.success(f"NFVCL init finished in {str((end_time - start_time) / 1000000000)} sec")
     uvicorn.run(app, host=nfvcl_rest_config.nfvcl.ip, port=nfvcl_rest_config.nfvcl.port)

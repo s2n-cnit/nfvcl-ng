@@ -13,7 +13,7 @@ from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_fu
 from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition, GrafanaDashboard
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel, PrometheusServerModel
@@ -567,6 +567,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         Destroy the blueprints. Calls super destroy that destroy VMs and configurators.
         Then release all the reserved resources in the topology.
         """
+        super().destroy()
         if self.state.topology_onboarded:
             try:
                 # Clean up reserved ranges belonging to this blueprint from the topology
@@ -594,7 +595,6 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             except TopoK8SHasBlueprintException as e:
                 self.logger.error(f"Blueprint {self.id} will not be destroyed")
                 raise e
-        super().destroy()
 
     def to_dict(self, detailed: bool, include_childrens: bool = False) -> dict:
         """

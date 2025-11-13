@@ -1,56 +1,188 @@
+import copy
 import inspect
 import logging
 import os
-import threading
 import time
 from contextlib import asynccontextmanager
-from functools import partial
 from pathlib import Path
-from typing import List, Optional, Callable, Dict
+from typing import Callable, Dict, Any
 
 import uvicorn
-from fastapi import FastAPI, APIRouter
-
-from nfvcl_core_models.vim.vim_models import VimModel
-from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
-from pydantic import Field
+from fastapi import FastAPI, APIRouter, Body, HTTPException
 from starlette import status
 from starlette.requests import Request
 from starlette.responses import Response
 from verboselogs import VerboseLogger
 
 from nfvcl_common.utils.log import mod_logger, create_logger, set_log_level  # Order 1
-from nfvcl_common.base_model import NFVCLBaseModel
-from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config  # Order 1
-from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
-from nfvcl_core_models.pre_work import PreWorkCallbackResponse
-from nfvcl_core_models.resources import VmResource, NetResourcePool, NetResource
-from nfvcl_core_models.response_model import OssCompliantResponse
-from nfvcl_core_models.task import NFVCLTask, NFVCLTaskResult, NFVCLTaskStatus, NFVCLTaskStatusType
-from nfvcl_providers.virtualization.openstack.virtualization_provider_openstack import VirtualizationProviderOpenstack
+from nfvcl_common.utils.nfvcl_public_utils import NFVCLPublicModel
+from nfvcl_core_models.custom_types import NFVCLCoreException
+from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.task import NFVCLTaskResult
+from nfvcl_providers_rest.config import NFVCLProvidersConfigModel, load_nfvcl_providers_config
 
 #### BEFORE IMPORTING ANYTHING FROM NFVCL() main file ####
-nfvcl_rest_config: NFVCLConfigModel
+nfvcl_rest_config: NFVCLProvidersConfigModel
 
 def load_configuration():
     config_path = os.getenv("NFVCL_CONFIG_PATH")
     if config_path:
         if Path(config_path).is_file():
-            config = load_nfvcl_config(config_path)
+            config = load_nfvcl_providers_config(config_path)
         else:
             logger.error(f"NFVCL_CONFIG_PATH is set to {config_path} but the file does not exist, loading from default location.")
-            config = load_nfvcl_config()
+            config = load_nfvcl_providers_config()
     else:
-        config = load_nfvcl_config()
+        config = load_nfvcl_providers_config()
 
     return config
 
 nfvcl_rest_config = load_configuration()
 set_log_level(nfvcl_rest_config.log_level)
 
+from nfvcl_providers_rest.nfvcl_providers_main import configure_injection, NFVCLProviders
+
 ########### VARS ############
 app: FastAPI
 logger: VerboseLogger = create_logger("NFVCL_PROVIDERS")
+
+
+def dummy_callback(result: NFVCLTaskResult):
+    """
+    Dummy callback function to be used when the callback is not specified. DO NOT REMOVE
+    """
+    pass
+
+
+def generate_function_signature(function: Callable, sync=False, override_name=None, override_args=None, override_args_type: Dict[str, Any] = None, override_return_type=None, override_doc=None):
+    """
+    This function it's used to generate a new function with the correct signature for FastAPI.
+
+    Args:
+        function: The original function that will be called by the new function.
+        sync: True if the function is sync, False if it is async.
+        override_name: Override the name of the function.
+        override_args: Override the arguments of the function.
+        override_args_type: Override the type of the arguments of the function.
+        override_return_type: Override the return type of the function.
+        override_doc: Override the docstring of the function.
+
+    Returns: The new function with the correct signature for FastAPI.
+    """
+
+    # Take all the argument of the function and remove the callback argument
+    args = {param.name: param for param in inspect.signature(function).parameters.values() if param.name != 'callback'}
+
+    # If there are arguments to be overridden, we remove them from the original arguments
+    if override_args:
+        for arg in copy.deepcopy(args):
+            if arg in override_args:
+                del args[arg]
+
+    # This is the actual function that will be called by FastAPI
+    def new_fn(request: Request, response: Response, **kwargs):
+        # Override the arguments value if needed
+        if override_args:
+            for override_arg in override_args:
+                kwargs[override_arg] = override_args[override_arg]
+
+        # Check if the function is sync or async
+        if sync:
+            response.status_code = status.HTTP_200_OK
+            try:
+                function_result = function(**kwargs)
+                return function_result
+            except NFVCLCoreException as caught_except:
+                raise HTTPException(status_code=caught_except.http_equivalent_code, detail=caught_except.message)
+            except Exception as caught_except:
+                raise caught_except
+        else:
+            response.status_code = status.HTTP_202_ACCEPTED
+            # We need to set a dummy callback function for the function to be executed async
+            function_return = function(**kwargs, callback=dummy_callback)
+            if isinstance(function_return, OssCompliantResponse):
+                function_return: OssCompliantResponse
+                if function_return.status == OssStatus.failed:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+            return function_return
+
+    # Since we need to manipulate the function signature we need to create a new one
+    params = []
+
+    # We add the request parameter as the first of the function signature, this contains information about the REST request
+    # it is automatically injected by FastAPI
+    params.append(inspect.Parameter(
+        "request",
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        annotation=Request)
+    )
+    params.append(inspect.Parameter(
+        "response",
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        annotation=Response)
+    )
+
+    # If a parameter is of type Annotated[type, "application/yaml"] or other media types it need to be treated as Body by FastAPI
+    # Also handle header parameters
+    from fastapi import Header
+    for param_name, param in args.items():
+        if hasattr(param.annotation, '__metadata__') and len(param.annotation.__metadata__) > 0:
+            metadata = param.annotation.__metadata__[0]
+            if isinstance(metadata, str):
+                if metadata == "application/yaml" or metadata == "text/plain":
+                    param.annotation.__metadata__ = (Body(media_type=metadata),)
+                elif metadata.startswith("header/"):
+                    # For header parameters, replace with FastAPI Header dependency
+                    header_name = metadata.split("header/", 1)[1]
+                    # Get the base type (e.g., str from Annotated[str, "header/..."])
+                    base_type = param.annotation.__origin__ if hasattr(param.annotation, '__origin__') else str
+                    # Update the args dict with modified parameter
+                    args[param_name] = inspect.Parameter(
+                        param_name,
+                        param.kind,
+                        annotation=base_type,
+                        default=Header(..., alias=header_name)
+                    )
+
+    # We re-add the original parameters to the new function signature altering the type if needed
+    params_original = []
+    for param_name, param in args.items():
+        # A param with override_args_type None is not added to the signature, useful for day2 without parameters
+        if override_args_type and param.name in override_args_type and override_args_type[param_name] is None:
+            continue
+        params_original.append(inspect.Parameter(
+            param_name,
+            param.kind,
+            annotation=override_args_type[param_name] if override_args_type and param.name in override_args_type else param.annotation,
+            default=param.default
+        ))
+
+    params.extend(params_original)
+
+    # Override the return type if needed
+    if override_return_type:
+        return_type = override_return_type
+    else:
+        return_type = inspect.signature(function).return_annotation
+        # If the return type is not specified we set it to OssCompliantResponse
+        if return_type == inspect.Signature.empty:
+            return_type = OssCompliantResponse
+
+    # Set the new function signature
+    new_fn.__signature__ = inspect.Signature(params, return_annotation=return_type)
+    new_fn.__annotations__ = {arg: args[arg].annotation for arg in args}
+
+    # Override the docstring and the name of the function if needed
+    if override_doc:
+        new_fn.__doc__ = override_doc
+    else:
+        new_fn.__doc__ = function.__doc__
+    if override_name:
+        new_fn.__name__ = override_name
+    else:
+        new_fn.__name__ = function.__name__
+    return new_fn
+
 
 
 @asynccontextmanager
@@ -74,239 +206,12 @@ def readiness():
     return Response(status_code=status.HTTP_200_OK)
 
 
-class VmResourceAnsibleConfigurationSerialized(NFVCLBaseModel):
-    access_ip: SerializableIPv4Address = Field()
-    username: str = Field()
-    password: str = Field()
-    ansible_playbook: str = Field()
-
-class NetPayload(NFVCLBaseModel):
-    net_name: str = Field()
-    cidr: str = Field()
-    allocation_pool: Optional[NetResourcePool] = Field(default=None, description="Allocation Pool for the network, used to allocate IPs from the network")
-
-class AttachNetPayload(NFVCLBaseModel):
-    net_name: str = Field()
-
-def callback_function(event: threading.Event, namespace: Dict, msg: NFVCLTaskResult):
-    namespace["msg"] = msg
-    event.set()
-
-
-def pre_work_callback_function(event: threading.Event, namespace: Dict, msg: PreWorkCallbackResponse):
-    namespace["msg"] = msg
-    event.set()
-
-def testtttt(vm_id: str) -> str:
-    time.sleep(20)
-    return "test" + vm_id
-
-
-
-class NFVCLProviderResourceGroup(NFVCLBaseModel):
-    id: str = Field()
-    vms: Dict[str, VmResource] = Field()
-    nets: Dict[str, NetResource] = Field()
-
-
-class NFVCLProviderAgent(NFVCLBaseModel):
-    uuid: str = Field()
-    resource_groups: Dict[str, str] = Field()
-
-class NFVCLProviderDatabase(NFVCLBaseModel):
-    agents: Dict[str, NFVCLProviderAgent] = Field(default_factory=dict)
-
-
-
-class VirtualizationProviderApiRouter:
-    def __init__(self, name: str):
-        self.name = name
-        self.router = APIRouter(prefix=f"/{name}/virtualization")
-        self.vms_router = APIRouter(prefix="/vms")
-        self.resource_group_router = APIRouter(prefix="/rg")
-        self.net_router = APIRouter(prefix="/nets")
-        self.task_router = APIRouter(prefix="/tasks")
-
-        self.vms_router.add_api_route("/", self.create_vm, methods=["POST"])
-        self.vms_router.add_api_route("/", self.list_vms, methods=["GET"])
-        self.vms_router.add_api_route("/{vm_id}", self.vm_info, methods=["GET"])
-        self.vms_router.add_api_route("/{vm_id}", self.destroy_vm, methods=["DELETE"])
-        self.vms_router.add_api_route("/{vm_id}/configure", self.configure_vm, methods=["PUT"])
-        self.vms_router.add_api_route("/{vm_id}/reboot", self.reboot_vm, methods=["PUT"])
-
-        self.vms_router.add_api_route("/{vm_id}/net", self.attach_net, methods=["POST"])
-        self.vms_router.add_api_route("/{vm_id}/net", self.list_attached_nets, methods=["GET"])
-        self.vms_router.add_api_route("/{vm_id}/net/{net_name}", self.detach_net, methods=["DELETE"])
-
-        self.net_router.add_api_route("/", self.create_net, methods=["POST"])
-        self.net_router.add_api_route("/", self.list_nets, methods=["GET"])
-        self.net_router.add_api_route("/{net_name}", self.net_info, methods=["GET"])
-        self.net_router.add_api_route("/{net_name}", self.destroy_net, methods=["DELETE"])
-
-        self.task_router.add_api_route("/{task_id}", self.get_task_status, methods=["GET"])
-
-        self.resource_group_router.add_api_route("/{rg_id}", self.get_rg, methods=["GET"])
-        self.resource_group_router.add_api_route("/{rg_id}", self.delete_rg, methods=["DELETE"])
-
-        self.router.include_router(self.resource_group_router)
-        self.router.include_router(self.vms_router)
-        self.router.include_router(self.net_router)
-        self.router.include_router(self.task_router)
-
-        def dummy_persistence_function():
-            pass
-
-        self.provider = VirtualizationProviderOpenstack(1, "TEST", vim_client=OpenStackVimClient(VimModel.model_validate_json(
-            """
-            {
-      "name": "oslab",
-      "vim_type": "openstack",
-      "vim_url": "http://os-lab.maas:5000/v3",
-      "vim_user": "alderico",
-      "vim_password": "pippo00",
-      "vim_timeout": null,
-      "ssh_keys": [
-        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCoLpF23Q517q0aHM3KRVsZuzcPqM9gsymvZNUWoaI0Xi01lG5xDL5fJlfJXJKl8rkAe/L1RV/1lj4nFFcClKX84uVlhBO4TMLrLbZCC4JJeMPofnMGNqiK4HanbUPzzmuYowbnPXmard9UNsyyHnTUxy7q6rPblFe0ZsFiLTz/CBBXdL0oID1miCd42jNqaMqiMMyFhIob6CyzBPTW5YEI4vd0/eTWO9IyHN4YuYnnM+ESDs1yTQjQHS4b5LdQ04dWJRWZWwP4QoJapge6kqV5vvZl3HaGyiN4Zn/rNGSAtJs8f5OxvDNixE+9yWOELyIfYCH/lib9Yxw6jUkrelE6h8ovrdFfm0HGjctspoCf9ZncWP5jZqQOeBg7WBicPHulE9fFI8b81csbK1gN2/WK4hftTy4U40Ki/DKf6Bh+uEykXa9xJgpJFW+EAoGMrtT6i20Ho6lx6Xz2cEE8phTVFF6B7mjF5q6A0dlyypHJcBN/R6FgXO/AevKQ6uvlPQU= alderico@DESKTOP-2I40FIJ"
-      ],
-      "vim_openstack_parameters": {
-        "region_name": "RegionOne",
-        "project_name": "alderico",
-        "user_domain_name": "Default",
-        "project_domain_name": "Default"
-      },
-      "vim_proxmox_parameters": {
-        "proxmox_realm": "pam",
-        "proxmox_node": null,
-        "proxmox_images_volume": "local",
-        "proxmox_vm_volume": "local-lvm",
-        "proxmox_token_name": "",
-        "proxmox_token_value": "",
-        "proxmox_otp_code": "",
-        "proxmox_privilege_escalation": "none"
-      },
-      "config": {
-        "insecure": true,
-        "APIversion": "v3.3",
-        "use_floating_ip": false
-      },
-      "networks": [
-        "dmz-internal",
-        "alderico-net"
-      ],
-      "routers": [],
-      "areas": [
-        0,
-        1,
-        2,
-        3,
-        4,
-        1001,
-        1002,
-        1003,
-        1004
-      ]
-    }
-            """
-        )), persistence_function=dummy_persistence_function)
-
-    def _add_task_sync(self, function: Callable, *args, **kwargs):
-        event = threading.Event()
-        # used to receive the return data from the function
-        namespace = {}
-        self.task_manager.add_task(NFVCLTask(function, partial(callback_function, event, namespace), *args, **kwargs))
-        event.wait()
-        task_result: NFVCLTaskResult = namespace["msg"]
-        if task_result.error:
-            raise task_result.exception
-        return namespace["msg"]
-
-    def _add_task_async(self, function: Callable, *args, **kwargs) -> OssCompliantResponse:
-        callback: Optional[Callable] = kwargs.pop("callback", None)
-        # check if the callable function has a pre_work_callback parameter
-        function_args = inspect.getfullargspec(function).args
-        event: Optional[threading.Event] = None
-        namespace = {}
-
-        if "pre_work_callback" in function_args:
-            event = threading.Event()
-            kwargs["pre_work_callback"] = partial(pre_work_callback_function, event, namespace)
-
-        task_id = self.task_manager.add_task(NFVCLTask(function, callback, *args, **kwargs))
-
-        async_response: OssCompliantResponse
-
-        if "pre_work_callback" in function_args and event:
-            event.wait()
-            pre_work_callback_response: PreWorkCallbackResponse = namespace["msg"]
-            async_response = pre_work_callback_response.async_return
-        else:
-            async_response = OssCompliantResponse(detail="Operation submitted")
-
-        async_response.task_id = task_id
-
-        return async_response
-
-    def get_task_status(self, task_id: str, request: Request) -> NFVCLTaskStatus:
-        if task_id not in self.task_manager.task_history:
-            raise Exception(f"Task {task_id} not found")
-        task = self.task_manager.task_history[task_id]
-        if task.result is None:
-            return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.RUNNING)
-        else:
-            return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.DONE, result=task.result.result, error=task.result.error, exception=str(task.result.exception) if task.result.exception else None)
-
-    def get_rg(self, rg_id: str, request: Request):
-        pass
-
-    def delete_rg(self, rg_id: str, request: Request):
-        pass
-
-    def create_vm(self, vm_resource: VmResource, request: Request):
-        return self.provider.create_vm(vm_resource)
-
-
-    def list_vms(self, request: Request):
-        pass
-
-    def vm_info(self, vm_id: str, request: Request):
-        return self._add_task_sync(testtttt, vm_id=vm_id)
-
-    def destroy_vm(self, vm_id: str, request: Request):
-        return self.provider.destroy_vm(vm_id)
-
-    def configure_vm(self, vm_id: str, vm_resource_configuration: VmResourceAnsibleConfigurationSerialized, request: Request) -> dict:
-        return {"aa": vm_id}
-
-    def reboot_vm(self, vm_id: str, request: Request, hard: bool = False):
-        pass
-
-    def attach_net(self, vm_id: str, body: AttachNetPayload, request: Request):
-        pass
-
-    def list_attached_nets(self, vm_id: str, request: Request) -> List[NetPayload]:
-        pass
-
-    def detach_net(self, vm_id: str, net_name: str, request: Request):
-        pass
-
-    def create_net(self, net_resource: NetPayload, request: Request):
-        pass
-
-    def list_nets(self, request: Request) -> List[NetPayload]:
-        pass
-
-    def net_info(self, net_name: str, request: Request) -> NetPayload:
-        pass
-
-    def destroy_net(self, net_name: str, request: Request):
-        pass
-
-    def final_cleanup(self, request: Request):
-        pass
-
 if __name__ == "__main__":
+    start_time = time.perf_counter_ns()
 
-    hello = VirtualizationProviderApiRouter("os-lab")
+    configure_injection(nfvcl_rest_config)
+
+    nfvcl_provider = NFVCLProviders()
     app = FastAPI(
         title="NFVCL Provider Server",
         description="CNIT/UniGe S2N Lab NFVCL Provider Server",
@@ -323,6 +228,31 @@ if __name__ == "__main__":
         openapi_url="/openapi.json"
     )
     # app.add_middleware(ExceptionMiddleware)
-    app.include_router(hello.router)
 
-    uvicorn.run(app, host=nfvcl_rest_config.nfvcl.ip, port=nfvcl_rest_config.nfvcl.port)
+    routers_dict: Dict[str, APIRouter] = {}
+
+    for method_callable in nfvcl_provider.get_ordered_public_methods():
+        if hasattr(method_callable, "nfvcl_public"):
+            nfvcl_public: NFVCLPublicModel = method_callable.nfvcl_public
+            if nfvcl_public.section.name in routers_dict:
+                router = routers_dict[nfvcl_public.section.name]
+            else:
+                router = APIRouter(
+                    prefix=nfvcl_public.section.path,
+                    tags=[nfvcl_public.section.name],
+                    responses={404: {"description": "Not found"}},
+                )
+                routers_dict[nfvcl_public.section.name] = router
+            router.add_api_route(
+                nfvcl_public.path,
+                generate_function_signature(method_callable, sync=nfvcl_public.sync),
+                methods=[nfvcl_public.method],
+                summary=nfvcl_public.summary,
+                status_code=status.HTTP_200_OK if nfvcl_public.sync else status.HTTP_202_ACCEPTED,
+            )
+    for router in routers_dict.values():
+        app.include_router(router)
+
+    end_time = time.perf_counter_ns()
+    logger.success(f"NFVCL Providers init finished in {str((end_time - start_time) / 1000000000)} sec")
+    uvicorn.run(app, host=nfvcl_rest_config.nfvcl_providers.ip, port=nfvcl_rest_config.nfvcl_providers.port)

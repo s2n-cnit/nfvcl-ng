@@ -20,3 +20,6 @@ class ProviderDataRepository(DatabaseRepository[ProviderDataAggregate]):
             return self.find_one({'blueprint_id': blueprint_id})
         except Exception as e:
             return None
+
+    def delete_by_blueprint_id(self, blueprint_id: str):
+        return self.collection.delete_one({'blueprint_id': blueprint_id})

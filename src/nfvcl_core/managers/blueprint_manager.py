@@ -86,6 +86,7 @@ class BlueprintManager(GenericManager):
         """
         self.blueprint_dict.pop(blueprint.id)
         self._blueprint_repository.delete_blueprint(blueprint.id)
+        self._provider_repository.delete_by_blueprint_id(blueprint.id)
 
     def get_blueprint_instance(self, blueprint_id: str) -> Optional[BlueprintNG]:
         """
@@ -342,12 +343,14 @@ class BlueprintManager(GenericManager):
                 blueprint_instance.destroy()
                 self.blueprint_dict.pop(blueprint_id)
                 self._blueprint_repository.delete_blueprint(blueprint_id)
+                self._provider_repository.delete_by_blueprint_id(blueprint_id)
             except Exception as e:
                 if force_deletion:
                     self.logger.warning("Force deletion is enabled! Blue will be destroyed without ensuring that resources are deleted from remote VIMs or K8S Clusters")
                     self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
                     self.blueprint_dict.pop(blueprint_id)
                     self._blueprint_repository.delete_blueprint(blueprint_id)
+                    self._provider_repository.delete_by_blueprint_id(blueprint_id)
                 else:
                     self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
                     self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))

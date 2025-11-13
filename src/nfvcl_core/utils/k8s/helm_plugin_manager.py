@@ -11,9 +11,9 @@ from pyhelm3 import Client
 from verboselogs import VerboseLogger
 
 from nfvcl_common.utils.file_utils import render_file_from_template_to_file, create_tmp_file
+from nfvcl_common.utils.log import create_logger
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
-from nfvcl_common.utils.log import create_logger
 from nfvcl_core_models.monitoring.k8s_monitoring import K8sMonitoring, DestinationType
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginAdditionalData
 from nfvcl_core_models.resources import HelmChartResource
@@ -73,7 +73,7 @@ class HelmPluginManager:
         self.k8s_credential_file = k8s_credential_file
         self.k8s_config = get_k8s_config_from_file_content(k8s_credential_file)
         self.kube_utils = KubeApiUtils(self.k8s_config)
-        self.helm_client = build_helm_client_from_credential_file_content(k8s_credential_file, create_tmp_file("k8s", "k8s_helm_client_credentials", True))
+        self.helm_client = build_helm_client_from_credential_file_content(k8s_credential_file, create_tmp_file(f"k8s_{context_name}.yaml", "k8s_helm_client_credentials", True))
         self.context_name = context_name
         self.logger: VerboseLogger = create_logger(self.__class__.__name__, blueprintid=context_name)
 

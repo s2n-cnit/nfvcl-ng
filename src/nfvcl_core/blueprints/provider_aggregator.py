@@ -1,9 +1,9 @@
 from functools import wraps
-from typing import Dict, Optional, List, Any, Tuple, Set, Callable, TYPE_CHECKING
+from typing import Dict, Optional, List, Any, Tuple, Set, Callable
 
-if TYPE_CHECKING:
-    from nfvcl_core.managers import TopologyManager, VimClientsManager
 from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj
+from nfvcl_core.managers.topology_manager import TopologyManager
+from nfvcl_core.managers.vim_clients_manager import VimClientsManager
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import PduType, PduModel, MultusInterface
 from nfvcl_core_models.providers.providers import BlueprintNGProviderModel, ProviderDataAggregate
@@ -115,7 +115,7 @@ class ProvidersAggregator:
             )
         return provider_data_aggregate
 
-    def get_virt_provider(self, area: int):
+    def get_virt_provider(self, area: int) -> VirtualizationProviderInterface:
         vim = self.topology_manager.get_topology().get_vim_by_area(area)
         if area not in self.virt_providers_impl:
             ProviderClass: type[VirtualizationProviderInterface] = vim_type_to_provider_mapping[vim.vim_type]
@@ -210,6 +210,12 @@ class ProvidersAggregator:
     def release_k8s_multus_ip(self, area: int, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
         return self.get_k8s_provider(area).release_k8s_multus_ip(area, network_name, ip_address)
 
+    def add_pdu(self, pdu: PduModel) -> PduModel:
+        return self.get_pdu_provider().add_pdu(pdu)
+
+    def delete_pdu(self, pdu_id: str) -> None:
+        return self.get_pdu_provider().delete_pdu(pdu_id)
+
     def find_pdu(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None, name: Optional[str] = None) -> PduModel:
         return self.get_pdu_provider().find_pdu(area, pdu_type, instance_type=instance_type, name=name)
 
@@ -232,7 +238,7 @@ class ProvidersAggregator:
         return self.get_pdu_provider().get_pdu_configurator(pdu_model)
 
     def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
-        return self.get_virt_provider(area).check_networks(area, networks_to_check)
+        return self.get_virt_provider(area).check_networks(networks_to_check)
 
     @register_performance(params_to_info=[(1, "blueprint_type")])
     def create_blueprint(self, path: str, msg: Any):

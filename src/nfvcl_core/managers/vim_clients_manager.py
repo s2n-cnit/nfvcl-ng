@@ -1,7 +1,7 @@
 from typing import Dict, cast
 
-from nfvcl_core.managers import TopologyManager
 from nfvcl_core.managers.generic_manager import GenericManager
+from nfvcl_core.managers.topology_manager import TopologyManager
 from nfvcl_core_models.vim.vim_models import VimTypeEnum
 from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient

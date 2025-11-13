@@ -1,5 +1,3 @@
-
-
 from typing import List, Optional, Dict
 
 from pydantic import Field
@@ -16,7 +14,7 @@ from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceF
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance, UeransimBlueprintRequestAddDelGNB, UeransimBlueprintRequestAddUE, \
     UeransimBlueprintRequestDelUE, UeransimBlueprintRequestAddSim, UeransimBlueprintRequestDelSim
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_models.blueprint_ng.blueprint_ueransim_model import UeransimUe
 from nfvcl_common.utils.blue_utils import rel_path

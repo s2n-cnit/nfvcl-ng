@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TypeVar, Generic, Optional, List
 
+from nfvcl_common.utils.api_utils import HttpRequestType
 from pydantic import ValidationError
 
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
@@ -14,11 +15,10 @@ from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj, get_class
 from nfvcl_common.utils.log import create_logger
 from nfvcl_core.utils.metrics.grafana_utils import replace_all_datasources, update_queries_in_panels
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest, RestartVmRequest, RestartAllVmsRequest
-from nfvcl_core_models.http_models import BlueprintNotFoundException, HttpRequestType
+from nfvcl_core_models.http_models import BlueprintNotFoundException
 from nfvcl_core_models.monitoring.grafana_model import GrafanaFolderModel
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition
-from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, \
-    HelmChartResource, VmStatus
+from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource, VmStatus
 
 StateTypeVar = TypeVar("StateTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
@@ -399,7 +399,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             self.provider.topology_manager.add_grafana_folder(grafana_id, GrafanaFolderModel(name=f"{self.id} - {self.blueprint_type}", blueprint_id=self.id), parent_by_blue_id=self.base_model.parent_blue_id)
 
         # TODO maybe we should move this in the provider?
-        from nfvcl_core.managers import get_monitoring_manager
+        from nfvcl_core.managers.getters import get_monitoring_manager
         get_monitoring_manager().sync_prometheus_targets_to_server(prometheus_id)
 
         if grafana_id:
@@ -444,7 +444,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 self.provider.topology_manager.delete_prometheus_targets(prometheus_server.id, self.base_model.monitoring_state.prometheus_targets)
             except ValueError as e:
                 self.logger.error(f"Could not remove targets from prometheus server {prometheus_server.id}: {e}")
-            from nfvcl_core.managers import get_monitoring_manager
+            from nfvcl_core.managers.getters import get_monitoring_manager
             get_monitoring_manager().sync_prometheus_targets_to_server(prometheus_server.id)
 
             if self.base_model.monitoring_state.grafana_server_id and self.base_model.parent_blue_id is None:

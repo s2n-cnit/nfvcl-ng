@@ -5,8 +5,8 @@ import blinker
 from pydantic import ValidationError
 from redis import Redis
 
-from nfvcl_core.managers import TaskManager
 from nfvcl_core.managers.generic_manager import GenericManager
+from nfvcl_core.managers.task_manager import TaskManager
 from nfvcl_core_models.event import Event
 from nfvcl_core_models.event_types import NFVCLEventTopics, NFVCLEventType
 from nfvcl_core_models.task import NFVCLTask

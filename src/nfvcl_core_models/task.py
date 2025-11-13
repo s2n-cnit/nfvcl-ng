@@ -38,6 +38,6 @@ class NFVCLTaskStatusType(str, Enum):
 class NFVCLTaskStatus(NFVCLBaseModel):
     task_id: str = Field()
     status: NFVCLTaskStatusType = Field()
-    result: Optional[str] = Field(default=None)
+    result: Optional[Any] = Field(default=None)
     error: bool = Field(default=False)
     exception: Optional[str] = Field(default=None)

@@ -1,7 +1,7 @@
 import abc
 from typing import Any, Dict, Optional, List, Callable
 
-from nfvcl_core.managers import TopologyManager
+from nfvcl_core.managers.topology_manager import TopologyManager
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
 from nfvcl_core_models.network.network_models import MultusInterface

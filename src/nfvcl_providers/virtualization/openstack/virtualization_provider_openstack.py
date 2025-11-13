@@ -67,9 +67,6 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.conn = self.vim_client.client
         self.vim_need_floating_ip = self.vim.config.use_floating_ip
 
-    def get_vim_info(self):
-        return self.vim
-
     def __create_image_from_url(self, vm_image: VmResourceImage):
         image_attrs = {
             'name': vm_image.name,
@@ -522,7 +519,7 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             subnet_detail_list[network_name] = self.conn.get_subnet(network_detail.subnet_ids[0])
         return subnet_detail_list
 
-    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+    def check_networks(self, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
         networks_tmp = self.vim_client.get_available_networks()
         networks = set(networks_tmp.keys())
         return networks_to_check.issubset(networks), networks_to_check.difference(networks)

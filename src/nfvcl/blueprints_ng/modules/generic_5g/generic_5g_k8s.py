@@ -9,7 +9,7 @@ from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, NetworkEndPointType
 from nfvcl_models.blueprint_ng.g5.core import NF5GType, NetworkFunctionScaling
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_models.k8s.cadvisor import cadvisor_exposed_metrics
 from nfvcl_models.k8s.k8s_objects import K8sService, K8sDeployment
 from nfvcl_core.utils.metrics.prometheus_utils import create_prometheus_query

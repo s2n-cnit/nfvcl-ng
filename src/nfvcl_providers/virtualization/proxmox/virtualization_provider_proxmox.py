@@ -2,11 +2,12 @@ import ipaddress
 import math
 import re
 import time
-from enum import Enum
 from time import sleep
 from typing import Dict, List, Tuple, Set
 
 import proxmoxer
+
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient
 from pydantic import Field, TypeAdapter
 
@@ -58,18 +59,15 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             else:
                 self.data.proxmox_node_name = self.get_node_by_ip()
 
-    def get_vim_info(self):
-        return self.vim
-
     def get_node_by_ip(self):
         response = self.__execute_proxmox_request(
             url="nodes",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         ta = TypeAdapter(List[ProxmoxNode])
         nodes = ta.validate_python(response)
         for node in nodes:
-            node_details = self.__execute_proxmox_request(url=f"nodes/{node.node}/network", r_type=ApiRequestType.GET)
+            node_details = self.__execute_proxmox_request(url=f"nodes/{node.node}/network", r_type=HttpRequestType.GET)
             for interface in node_details:
                 if "address" in interface and interface["address"] == self.vim.vim_url:
                     return node.node
@@ -78,7 +76,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __pre_creation_check(self, networks: List[str]):
         response = self.__execute_proxmox_request(
             url=f"cluster/sdn/vnets",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         ta = TypeAdapter(List[Vnet])
         vnets = ta.validate_python(response)
@@ -88,7 +86,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             if vnet.vnet in networks:
                 response = self.__execute_proxmox_request(
                     url=f"cluster/sdn/vnets/{vnet.vnet}/subnets",
-                    r_type=ApiRequestType.GET
+                    r_type=HttpRequestType.GET
                 )
                 ta = TypeAdapter(List[Subnet])
                 subnets = ta.validate_python(response)
@@ -151,7 +149,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__execute_proxmox_request(
             url=f"nodes/{self.data.proxmox_node_name}/qemu",
             parameters=vm_to_create,
-            r_type=ApiRequestType.POST,
+            r_type=HttpRequestType.POST,
             node_name=self.data.proxmox_node_name
         )
         self.resize_disk(vmid, int(vm_resource.flavor.storage_gb), "scsi0")
@@ -172,7 +170,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__execute_proxmox_request(
             url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/start",
             node_name=self.data.proxmox_node_name,
-            r_type=ApiRequestType.POST
+            r_type=HttpRequestType.POST
         )
 
         # Loop until qemu-agent is ready
@@ -200,14 +198,14 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                 self.__execute_proxmox_request(
                     url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/reset",
                     node_name=self.data.proxmox_node_name,
-                    r_type=ApiRequestType.POST
+                    r_type=HttpRequestType.POST
                 )
             else:
                 self.logger.debug(f"Soft restarting VM {vmid}")
                 self.__execute_proxmox_request(
                     url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/reboot",
                     node_name=self.data.proxmox_node_name,
-                    r_type=ApiRequestType.POST
+                    r_type=HttpRequestType.POST
                 )
             self.logger.success(f"VM {vmid} restarted")
         else:
@@ -232,7 +230,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         # Get VM status from Proxmox
         vm_status_response = self.__execute_proxmox_request(
             url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/current",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
 
         proxmox_status = vm_status_response["status"]
@@ -290,14 +288,14 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             self.__execute_proxmox_request(
                 url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/stop",
                 node_name=self.data.proxmox_node_name,
-                r_type=ApiRequestType.POST
+                r_type=HttpRequestType.POST
             )
             self.logger.debug(f"Destroying VM {vmid}")
             self.__execute_proxmox_request(
                 url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}",
                 parameters={"purge": 1},
                 node_name=self.data.proxmox_node_name,
-                r_type=ApiRequestType.DELETE
+                r_type=HttpRequestType.DELETE
             )
             self.__execute_ssh_command(f"rm {self.path}/snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml")
             self.__execute_ssh_command(f"rm {self.path}/snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml")
@@ -324,7 +322,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             self.__execute_proxmox_request(
                 url=f'nodes/{self.data.proxmox_node_name}/qemu/{vmid}/config',
                 parameters={f"{interface}": f"virtio,bridge={self.data.proxmox_vnet[net]},firewall=0"},
-                r_type=ApiRequestType.PUT)
+                r_type=HttpRequestType.PUT)
 
         self.__get_macs(int(vmid))
 
@@ -358,7 +356,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         vms = self.__execute_proxmox_request(
             url="cluster/resources",
             parameters={"type": "vm"},
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         for item in vms:
             if item['vmid'] in nfvcl_vmid:
@@ -368,7 +366,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __get_storage_path(self, storage_id: str):
         storages = self.__execute_proxmox_request(
             url="storage",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         for item in storages:
             if item['storage'] == storage_id and 'iso' in item['content']:
@@ -390,7 +388,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__execute_ssh_command(f"echo '{cloud_init}' > {cloud_init_path}")
 
     def __download_cloud_image(self, image_url, image_name):
-        # TODO when supported
+        # TODO seems to be supported on 9.x: https://bugzilla.proxmox.com/show_bug.cgi?id=2424
         # response = httpx.get(f"{image_url}.SHA256SUM")
         # checksum = response.content.split()[0]
         # download_args = {"url": image_url, "content": "import", "filename": f"{image_name}.img", "checksum": checksum, "checksum-algorithm": "sha256"}
@@ -400,7 +398,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __get_macs(self, vmid: int):
         config = self.__execute_proxmox_request(
             url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/config",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         for key in config.keys():
             if re.match("^net[0-9]+$", key):
@@ -419,7 +417,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __parse_proxmox_addresses(self, vm_resource: VmResource, vmid):
         net_informations = self.__execute_proxmox_request(
             url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         self.__get_macs(vmid)
         for interface in net_informations["result"]:
@@ -460,7 +458,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         """
         config = self.__execute_proxmox_request(
             url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/config",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         disks = list(filter(lambda x: re.match('scsi[0-9]+', x), config.keys()))
         if disks is not None:
@@ -493,7 +491,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                             "size": f"+{size_to_add}M"
                         },
                         node_name=self.data.proxmox_node_name,
-                        r_type=ApiRequestType.PUT
+                        r_type=HttpRequestType.PUT
                     )
                 else:
                     self.logger.warning(f"Disk of VM: {vmid}, is already larger than the desired size")
@@ -506,7 +504,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             try:
                 response = self.__execute_proxmox_request(
                     url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/agent/ping",
-                    r_type=ApiRequestType.POST
+                    r_type=HttpRequestType.POST
                 )
                 if response is not None:
                     exit_status = 0
@@ -518,7 +516,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
     def __execute_ssh_command(self, command: str):
         if self.vim.proxmox_parameters().proxmox_privilege_escalation == ProxmoxPrivilegeEscalationTypeEnum.SUDO_WITHOUT_PASSWORD:
-            # Needed to escape single quote: https://stackoverflow.com/a/1250279
+            # Needed to escape single quotes: https://stackoverflow.com/a/1250279
             command = command.replace("'", """'"'"'""")
             command = f"sudo sh -c '{command}'"
         stdin, stdout, stderr = self.vim_client.exec_command(command)
@@ -528,19 +526,19 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         else:
             return stdout
 
-    def __execute_proxmox_request(self, url: str, r_type: ApiRequestType, node_name=None, parameters=None):
+    def __execute_proxmox_request(self, url: str, r_type: HttpRequestType, node_name=None, parameters=None):
         connection_attempts = 0
         max_retries = 5
         while connection_attempts < max_retries:
             try:
                 match r_type:
-                    case ApiRequestType.GET:
+                    case HttpRequestType.GET:
                         response = self.vim_client.proxmoxer(url).get(**parameters if parameters else {})
-                    case ApiRequestType.POST:
+                    case HttpRequestType.POST:
                         response = self.vim_client.proxmoxer(url).post(**parameters if parameters else {})
-                    case ApiRequestType.PUT:
+                    case HttpRequestType.PUT:
                         response = self.vim_client.proxmoxer(url).put(**parameters if parameters else {})
-                    case ApiRequestType.DELETE:
+                    case HttpRequestType.DELETE:
                         response = self.vim_client.proxmoxer(url).delete(**parameters if parameters else {})
                     case _:
                         raise VirtualizationProviderProxmoxException("Api request type not supported")
@@ -569,7 +567,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __get_nfvcl_sdn_zone(self) -> ProxmoxZone:
         response = self.__execute_proxmox_request(
             url="cluster/sdn/zones",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         ta = TypeAdapter(List[ProxmoxZone])
         zones = ta.validate_python(response)
@@ -587,7 +585,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.__execute_proxmox_request(
             url="cluster/sdn",
             node_name=self.data.proxmox_node_name,
-            r_type=ApiRequestType.PUT
+            r_type=HttpRequestType.PUT
         )
 
     # def __create_sdn_zone(self, zone: NetResource):
@@ -603,7 +601,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         try:
             self.__execute_proxmox_request(
                 url=f'cluster/sdn/vnets',
-                r_type=ApiRequestType.POST,
+                r_type=HttpRequestType.POST,
                 parameters={'vnet': f'{identifier}', 'zone': f'{nfvcl_zone.zone}', 'alias': f'{vnet.name}'}
             )
         except Exception as e:
@@ -613,7 +611,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.data.proxmox_vnet[vnet.name] = identifier
 
     # def __get_sdn_vnet(self, vnet_name: str):
-    #     response = self.__execute_rest_request(f'cluster/sdn/vnets/{vnet_name}', {}, ApiRequestType.GET)
+    #     response = self.__execute_rest_request(f'cluster/sdn/vnets/{vnet_name}', {}, HttpRequestType.GET)
     #     data = response.json()
     #     if data['data'] is not None:
     #         raise VirtualizationProviderProxmoxException(f"Vnet {vnet_name} already exists")
@@ -622,7 +620,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.logger.info(f"Deleting Vnet: {vnet}")
         tmp = self.__execute_proxmox_request(
             url=f"cluster/sdn/vnets/{self.data.proxmox_vnet[vnet]}/subnets",
-            r_type=ApiRequestType.GET
+            r_type=HttpRequestType.GET
         )
         ta = TypeAdapter(List[Subnet])
         subnets = ta.validate_python(tmp)
@@ -631,7 +629,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             self.__delete_sdn_subnet(subnet)
         self.__execute_proxmox_request(
             url=f"/cluster/sdn/vnets/{self.data.proxmox_vnet[vnet]}",
-            r_type=ApiRequestType.DELETE
+            r_type=HttpRequestType.DELETE
         )
         self.__apply_sdn()
         del self.data.proxmox_vnet[vnet]
@@ -646,7 +644,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         try:
             self.__execute_proxmox_request(
                 url=f"cluster/sdn/vnets/{self.data.proxmox_vnet[vnet.name]}/subnets",
-                r_type=ApiRequestType.POST,
+                r_type=HttpRequestType.POST,
                 parameters={
                     'subnet': f'{vnet.cidr}',
                     'type': 'subnet',
@@ -661,7 +659,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
     # def __get_sdn_subnet(self, vnet: NetResource):
     #     subnet_id = f"nfvcl-{vnet.cidr.replace('/', '-')}"
-    #     response = self.__execute_rest_request(f'cluster/sdn/vnets/{vnet.name}/subnets/{subnet_id}', {}, ApiRequestType.GET)
+    #     response = self.__execute_rest_request(f'cluster/sdn/vnets/{vnet.name}/subnets/{subnet_id}', {}, HttpRequestType.GET)
     #     data = response.json()
     #     if data['data'] is not None:
     #         raise VirtualizationProviderProxmoxException(f"Subent {subnet_id} in Vnet {vnet.name} already exists")
@@ -669,16 +667,16 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
     def __delete_sdn_subnet(self, subnet: Subnet):
         self.__execute_proxmox_request(
             url=f'/cluster/sdn/vnets/{subnet.vnet}/subnets/{subnet.id}',
-            r_type=ApiRequestType.DELETE
+            r_type=HttpRequestType.DELETE
         )
         self.__apply_sdn()
         self.logger.success(f"Subnet {subnet.id} deleted")
 
-    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+    def check_networks(self, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
         networks = set()
         network_tmp = self.__execute_proxmox_request(
             url=f'nodes/{self.data.proxmox_node_name}/network',
-            r_type=ApiRequestType.GET,
+            r_type=HttpRequestType.GET,
         )
         ta = TypeAdapter(List[Network])
         networks_tmp = ta.validate_python(network_tmp)
@@ -688,7 +686,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         vnet_tmp = self.__execute_proxmox_request(
             url=f'/cluster/sdn/vnets',
-            r_type=ApiRequestType.GET,
+            r_type=HttpRequestType.GET,
         )
         ta = TypeAdapter(List[Vnet])
         vnets = ta.validate_python(vnet_tmp)

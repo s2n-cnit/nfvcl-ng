@@ -1,7 +1,7 @@
 from typing import Any, Optional, Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from nfvcl_core.managers import BlueprintManager
+    from nfvcl_core.managers.blueprint_manager import BlueprintManager
 from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
 from nfvcl_core_models.providers.blueprint import BlueprintProviderData
 

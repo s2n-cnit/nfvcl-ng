@@ -1,5 +1,3 @@
-
-
 from typing import Optional
 
 from pydantic import Field
@@ -12,7 +10,7 @@ from nfvcl.blueprints_ng.modules.vyos.config.vyos_nat_conf import VmVyOSNatConfi
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor
 from nfvcl_models.blueprint_ng.vyos.vyos_models import VyOSNetworkNotConnectedToVM, VyOSInterfaceNotExisting
 from nfvcl_models.blueprint_ng.vyos.vyos_rest_models import VyOSCreateModel
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 
 # Use a global variable to define the blueprint type, this will be used in the decorator for the requests supported
 # by this blueprint

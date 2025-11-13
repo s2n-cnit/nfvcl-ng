@@ -2,8 +2,10 @@ import importlib
 from inspect import signature
 from typing import List, Callable, Any
 
+from nfvcl_common.utils.api_utils import HttpRequestType
+
 from nfvcl_common.base_model import NFVCLBaseModel
-from nfvcl_core_models.http_models import BlueprintTypeNotDeclared, HttpRequestType
+from nfvcl_core_models.http_models import BlueprintTypeNotDeclared
 from nfvcl_common.utils.log import create_logger
 
 logger = create_logger("BlueTypeManager")

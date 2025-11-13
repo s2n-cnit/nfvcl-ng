@@ -1,5 +1,3 @@
-
-
 from typing import List, Optional
 
 from pydantic import Field
@@ -11,7 +9,7 @@ from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel, Bluep
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     HelmChartResource
 from nfvcl_common.base_model import NFVCLBaseModel
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_common.utils.blue_utils import rel_path
 
 

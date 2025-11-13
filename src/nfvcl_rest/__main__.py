@@ -21,8 +21,9 @@ from starlette.responses import RedirectResponse, PlainTextResponse, Response, J
 from starlette.staticfiles import StaticFiles
 from verboselogs import VerboseLogger
 
+from nfvcl_common.utils.nfvcl_public_utils import NFVCLPublicModel
 from nfvcl_core_models.custom_types import NFVCLCoreException # Order 1
-from nfvcl_core_models.http_models import HttpRequestType # Order 1
+from nfvcl_common.utils.api_utils import HttpRequestType # Order 1
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus # Order 1
 from nfvcl_core_models.task import NFVCLTaskResult # Order 1
 from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config # Order 1
@@ -49,7 +50,6 @@ def load_configuration():
 nfvcl_rest_config = load_configuration()
 set_log_level(nfvcl_rest_config.log_level)
 
-from nfvcl_core.nfvcl_main import NFVCLPublicModel # Order 2 (After logger modding)
 from nfvcl_core.nfvcl_main import configure_injection, NFVCL, global_ref # Order 2 (After logger modding)
 from nfvcl_rest.middleware.authentication_middleware import token, control_token, set_user_manager, logout # Order 2 (After logger modding)
 from nfvcl_rest.middleware.exception_middleware import ExceptionMiddleware # Order 2 (After logger modding)

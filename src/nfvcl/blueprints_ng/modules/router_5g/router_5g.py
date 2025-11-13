@@ -1,5 +1,3 @@
-
-
 from typing import Optional, List
 
 from pydantic import Field, field_validator
@@ -13,7 +11,7 @@ from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, Seria
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_models.blueprint_ng.core5g.common import Router5GNetworkInfo, NetworkEndPoint, NetworkEndPointWithType
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_common.utils.blue_utils import rel_path
 
 

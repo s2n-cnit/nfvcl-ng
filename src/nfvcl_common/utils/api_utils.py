@@ -1,7 +1,8 @@
 from enum import Enum
 
-class ApiRequestType(Enum):
+class HttpRequestType(str, Enum):
+    GET = "GET"
     POST = "POST"
     PUT = "PUT"
-    GET = "GET"
+    PATCH = "PATCH"
     DELETE = "DELETE"

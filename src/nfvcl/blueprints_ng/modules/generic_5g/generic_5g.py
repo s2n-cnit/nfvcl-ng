@@ -9,7 +9,7 @@ from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNB
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
 from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_common.base_model import NFVCLBaseModel
-from nfvcl_core_models.http_models import HttpRequestType
+from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.linux.ip import Route
 from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network

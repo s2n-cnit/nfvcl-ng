@@ -1,8 +1,6 @@
-
-
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 
 from nfvcl_core.database.blueprint_repository import BlueprintRepository
 from nfvcl_core.database.performance_repository import PerformanceRepository
@@ -127,7 +125,7 @@ class PerformanceManager(GenericManager):
         else:
             self.logger.warning("Skipping operation performance for unknown blueprint")
 
-    def _find_operation(self, operation_id: str) -> (BlueprintPerformanceOperation, str):
+    def _find_operation(self, operation_id: str) -> Tuple[BlueprintPerformanceOperation, str]:
         for blueprint_performance in self.performance_dict.values():
             for blueprint_operation in blueprint_performance.operations:
                 if blueprint_operation.id == operation_id:

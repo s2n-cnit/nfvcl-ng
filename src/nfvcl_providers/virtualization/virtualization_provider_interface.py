@@ -25,9 +25,8 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
         self.vim = vim_client.vim
         super().__init__(area, blueprint_id, persistence_function)
 
-    @abc.abstractmethod
     def get_vim_info(self):
-        pass
+        return self.vim
 
     @abc.abstractmethod
     def create_vm(self, vm_resource: VmResource):
@@ -40,7 +39,7 @@ class VirtualizationProviderInterface(BlueprintNGProviderInterface):
         return {}
 
     @abc.abstractmethod
-    def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+    def check_networks(self, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
         pass
 
     @abc.abstractmethod

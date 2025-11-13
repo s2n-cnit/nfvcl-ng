@@ -10,3 +10,18 @@ class NFVCLBaseModel(BaseModel):
         validate_default=True,
         validate_assignment=True
     )
+
+    def update(self, data: dict) -> NFVCLBaseModel:
+        """
+        Update the model with the provided data, the data is validated against the model before the update
+        This does not return a new model instance, it updates the one on which the method is called.
+        Args:
+            data: A dictionary with the data to update the model with
+
+        Returns: A reference to the updated model (should be the same as self)
+        """
+        update = self.model_dump()
+        update.update(data)
+        for k, v in self.model_validate(update).model_dump(exclude_defaults=True).items():
+            setattr(self, k, v)
+        return self

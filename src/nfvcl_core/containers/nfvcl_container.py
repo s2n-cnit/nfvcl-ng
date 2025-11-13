@@ -2,13 +2,19 @@ from dependency_injector import containers, providers
 
 from nfvcl_core.database.provider_repository import ProviderDataRepository
 from nfvcl_core.database.snapshot_repository import SnapshotRepository
+from nfvcl_core.managers.blueprint_manager import BlueprintManager
+from nfvcl_core.managers.event_manager import EventManager
 from nfvcl_core.managers.monitoring_manager import MonitoringManager
+from nfvcl_core.managers.performance_manager import PerformanceManager
+from nfvcl_core.managers.persistence_manager import PersistenceManager
+from nfvcl_core.managers.task_manager import TaskManager
+from nfvcl_core.managers.topology_manager import TopologyManager
+from nfvcl_core.managers.vim_clients_manager import VimClientsManager
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core.database.topology_repository import TopologyRepository
 from nfvcl_core.database.blueprint_repository import BlueprintRepository
 from nfvcl_core.database.performance_repository import PerformanceRepository
 from nfvcl_core.database.user_repository import  UserRepository
-from nfvcl_core.managers import PersistenceManager, TopologyManager, BlueprintManager, TaskManager, PerformanceManager, EventManager, VimClientsManager
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
 from nfvcl_core.managers.user_manager import UserManager

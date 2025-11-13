@@ -7,7 +7,7 @@ from pydantic import Field
 from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNGState, BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core.managers import get_monitoring_manager
+from nfvcl_core.managers.getters import get_monitoring_manager
 from nfvcl_core_models.monitoring.grafana_model import GrafanaServerModel
 from nfvcl_core_models.monitoring.loki_model import LokiServerModel
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel

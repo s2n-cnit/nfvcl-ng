@@ -5,6 +5,7 @@ from nfvcl_core.managers.topology_manager import TopologyManager
 from nfvcl_core_models.vim.vim_models import VimTypeEnum
 from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient
+from nfvcl_providers.vim_clients.rest_vim_client import RESTVimClient
 from nfvcl_providers.vim_clients.vim_client import VimClient
 
 
@@ -19,6 +20,8 @@ class VimClientsManager(GenericManager):
             return self.get_proxmox_client(requester, vim_name)
         elif vim_type == VimTypeEnum.OPENSTACK:
             return self.get_openstack_client(requester, vim_name)
+        elif vim_type == VimTypeEnum.EXTERNAL_REST:
+            return self.get_rest_client(requester, vim_name)
         else:
             raise ValueError(f"Unknown VIM type {vim_type}")
 
@@ -27,6 +30,9 @@ class VimClientsManager(GenericManager):
 
     def get_openstack_client(self, requester: object, vim_name: str) -> OpenStackVimClient:
         return cast(OpenStackVimClient, self._get_client(requester, vim_name, OpenStackVimClient))
+
+    def get_rest_client(self, requester: object, vim_name: str) -> RESTVimClient:
+        return cast(RESTVimClient, self._get_client(requester, vim_name, RESTVimClient))
 
     def _get_client(self, requester: object, vim_name: str, vim_type: type) -> VimClient:
         self.logger.spam(f"Getting {vim_type.__name__} for requester {requester.__class__.__name__} and VIM {vim_name}")

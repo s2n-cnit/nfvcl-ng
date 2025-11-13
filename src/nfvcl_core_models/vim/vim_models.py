@@ -35,6 +35,9 @@ class ProxmoxParameters(NFVCLBaseModel):
     proxmox_otp_code: Optional[str] = Field(default='')
     proxmox_privilege_escalation: Optional[ProxmoxPrivilegeEscalationTypeEnum] = Field(default=ProxmoxPrivilegeEscalationTypeEnum.NONE)
 
+class RESTParameters(NFVCLBaseModel):
+    remote_vim_name: Optional[str] = Field(default="default")
+    local_agent_uuid: Optional[str] = Field(default="default")
 
 class VimModel(NFVCLBaseModel):
     """
@@ -54,6 +57,7 @@ class VimModel(NFVCLBaseModel):
 
     vim_openstack_parameters: Optional[OpenstackParameters] = Field(default=None)
     vim_proxmox_parameters: Optional[ProxmoxParameters] = Field(default=None)
+    vim_rest_parameters: Optional[RESTParameters] = Field(default=None)
 
     config: VimConfigModel = Field(default=VimConfigModel())
     networks: List[str] = Field(default_factory=list)
@@ -69,6 +73,11 @@ class VimModel(NFVCLBaseModel):
         if self.vim_openstack_parameters is None:
             self.vim_openstack_parameters = OpenstackParameters()
         return self.vim_openstack_parameters
+
+    def rest_parameters(self) -> RESTParameters:
+        if self.vim_rest_parameters is None:
+            self.vim_rest_parameters = RESTParameters()
+        return self.vim_rest_parameters
 
     def __eq__(self, other):
         """

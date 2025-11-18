@@ -545,15 +545,21 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
                 if node_name:
                     data = {"status": ""}
+                    exit_status = ""
                     while data["status"] != "stopped":
                         output = f"{response.split(':')[5]}, VMid {response.split(':')[6]}" if response.split(':')[6] else f"{response.split(':')[5]}"
                         self.logger.debug(f"Waiting for task: {output}")
                         data = self.vim_client.proxmoxer(f"nodes/{node_name}/tasks/{response}/status").get()
+                        if data["status"] == "stopped":
+                            exit_status = data["exitstatus"]
                         sleep(3)
+                    if exit_status != "OK":
+                        raise Exception(f"{exit_status}")
                 return response
-            except (proxmoxer.core.AuthenticationError, proxmoxer.core.ResourceException) as e: # TODO add other possible exceptions
+            except (proxmoxer.core.AuthenticationError, proxmoxer.core.ResourceException) as e:  # TODO add other possible exceptions
                 if isinstance(e, proxmoxer.core.ResourceException) and not e.status_code == 401:
                     # If the error is not an authentication error, we raise it immediately
+                    self.logger.error(f"{e}")
                     raise e
                 connection_attempts += 1
                 self.logger.error(f"Error executing Proxmox request: {e}, attempt {connection_attempts}/{max_retries}")
@@ -598,15 +604,11 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         identifier = f'N{vnet.name.split("_")[1]}'
         self.logger.info(f"Creating Vnet {vnet.name}")
         nfvcl_zone = self.__get_nfvcl_sdn_zone()
-        try:
-            self.__execute_proxmox_request(
-                url=f'cluster/sdn/vnets',
-                r_type=HttpRequestType.POST,
-                parameters={'vnet': f'{identifier}', 'zone': f'{nfvcl_zone.zone}', 'alias': f'{vnet.name}'}
-            )
-        except Exception as e:
-            self.logger.error(f"Failed to create Vnet {vnet.name} for {e}")
-            return
+        self.__execute_proxmox_request(
+            url=f'cluster/sdn/vnets',
+            r_type=HttpRequestType.POST,
+            parameters={'vnet': f'{identifier}', 'zone': f'{nfvcl_zone.zone}', 'alias': f'{vnet.name}'}
+        )
         self.__apply_sdn()
         self.data.proxmox_vnet[vnet.name] = identifier
 
@@ -641,20 +643,16 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         if vnet.allocation_pool:
             start_dhcp = vnet.allocation_pool.start.exploded
             end_dhcp = vnet.allocation_pool.end.exploded
-        try:
-            self.__execute_proxmox_request(
-                url=f"cluster/sdn/vnets/{self.data.proxmox_vnet[vnet.name]}/subnets",
-                r_type=HttpRequestType.POST,
-                parameters={
-                    'subnet': f'{vnet.cidr}',
-                    'type': 'subnet',
-                    'gateway': f'{gateway}',
-                    'dhcp-range': f'start-address={start_dhcp},end-address={end_dhcp}'
-                }
-            )
-        except Exception as e:
-            self.logger.error(f"Failed to create Vnet Subnet {vnet.name} for {e}")
-            return
+        self.__execute_proxmox_request(
+            url=f"cluster/sdn/vnets/{self.data.proxmox_vnet[vnet.name]}/subnets",
+            r_type=HttpRequestType.POST,
+            parameters={
+                'subnet': f'{vnet.cidr}',
+                'type': 'subnet',
+                'gateway': f'{gateway}',
+                'dhcp-range': f'start-address={start_dhcp},end-address={end_dhcp}'
+            }
+        )
         self.__apply_sdn()
 
     # def __get_sdn_subnet(self, vnet: NetResource):

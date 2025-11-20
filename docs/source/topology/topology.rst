@@ -24,6 +24,8 @@ and 2 Workers for a total of 3 VMs).
 We can have a list of VIMs associated to an area, in this way, the user can select in witch area the Blueprint will be deployed.
 In case of multiple VIM for the same area, the first one is used.
 
+You can find more information about VIMs and their configuration here :doc:`topology_vim`.
+
 K8S list
 ########
 This is a list containing all the K8S cluster that can be used to deploy Helm Chart by Blueprints. As for the VIM list,

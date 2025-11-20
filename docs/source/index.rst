@@ -119,7 +119,6 @@ For more details you can go to :doc:`prometheus/prometheus`
    blueprints/k8s/k8s_blue_index
    blueprints/ueransim/ueransim_blue_index
    blueprints/5gcores/5gcore_blue_index
-   blueprints/vyos/vyos_blue_index
 
 .. toctree::
    :caption: K8s Management
@@ -127,6 +126,13 @@ For more details you can go to :doc:`prometheus/prometheus`
    :hidden:
 
    kubernetes/k8s_man_index
+
+.. toctree::
+   :caption: Providers REST Server
+   :maxdepth: 4
+   :hidden:
+
+   provider_rest_server/provider_rest_server
 
 .. toctree::
    :caption: Data Analytics

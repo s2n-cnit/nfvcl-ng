@@ -6,6 +6,6 @@ nfvcl_providers:
   workers: 10
   admin_uuid: "admin" # CHANGE THIS!
 mongodb:
-  host: "127.0.0.1"
+  host: "mongo"
   port: "27017"
-  db: "nfvcl-providers"
+  db: "nfvcl-providers-rest"

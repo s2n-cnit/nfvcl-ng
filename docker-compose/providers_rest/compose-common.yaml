@@ -1,0 +1,22 @@
+services:
+  nfvcl_providers_rest:
+    depends_on:
+      - mongo
+    restart: always
+    command: ["/root/.local/bin/uv", "run", "python", "-m", "nfvcl_providers_rest"]
+    environment:
+      NFVCL_CONFIG_PATH: "/app/nfvcl-ng/config/config.yaml"
+    ports:
+      - "5003:5003"
+    volumes:
+      - ../../config/providers_rest/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
+      - ../../logs_providers_rest/:/app/nfvcl-ng/logs/
+      - ../../tmp/:/tmp/nfvcl/
+
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db

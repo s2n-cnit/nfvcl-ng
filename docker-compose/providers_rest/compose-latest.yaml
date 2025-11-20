@@ -1,0 +1,23 @@
+services:
+  nfvcl_providers_rest:
+    extends:
+      service: nfvcl_providers_rest
+      file: compose-common.yaml
+    image: registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
+
+  mongo:
+    extends:
+      service: mongo
+      file: compose-common.yaml
+
+volumes:
+  mongo_data:
+
+networks:
+  default:
+    name: nfvcl-providers-net
+    ipam:
+      driver: default
+      config:
+        - subnet: "10.224.53.0/24"
+

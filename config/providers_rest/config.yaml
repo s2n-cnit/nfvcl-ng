@@ -8,7 +8,7 @@ nfvcl_providers:
 mongodb:
   host: "127.0.0.1"
   port: "27017"
-  db: "nfvcl-providers"
+  db: "nfvcl-providers-rest"
 # username: "admin"
 # password: "password"
 

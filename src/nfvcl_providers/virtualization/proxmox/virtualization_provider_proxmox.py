@@ -131,7 +131,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             "cores": vm_resource.flavor.vcpu_count,
             "sockets": 1,
             "cpu": vm_resource.flavor.vcpu_type,
-            "scsihw": "virtio-scsi-pci",
+            "scsihw": "virtio-scsi-single",
             "tags": "nfvcl",  # If you want add more tags, you have to separate them with ";"
             "agent": 1,
             "scsi0": f"file={vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters().proxmox_vm_volume}:0,import-from=local:0/{vm_resource.image.name}.qcow2,iothread=on",

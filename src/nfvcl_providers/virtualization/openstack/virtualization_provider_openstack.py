@@ -152,8 +152,6 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     def create_vm(self, vm_resource: VmResource, check_image_hash: bool = False):
         self.logger.info(f"Creating VM {vm_resource.name}")
 
-        self.logger.debug(vm_resource.model_dump_json(indent=2))
-
         self._pre_creation_checks(vm_resource)
 
         image = self.__prepare_image(vm_resource.image)

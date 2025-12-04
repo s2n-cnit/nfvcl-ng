@@ -7,7 +7,7 @@ echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gp
 
 echo "Adding Python 3.14 and ansible repo"
 sudo add-apt-repository -y ppa:deadsnakes/ppa
-sudo apt-add-repository --yes --update ppa:ansible/ansible
+#sudo apt-add-repository --yes --update ppa:ansible/ansible
 sudo apt update
 
 echo "Installing python3.14"
@@ -29,7 +29,7 @@ fi
 echo "Installing Helm"
 sudo apt-get install apt-transport-https --yes
 curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-echo echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
 sudo apt-get update
 sudo apt-get install helm
 

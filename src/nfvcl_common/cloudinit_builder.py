@@ -1,5 +1,8 @@
+import hashlib
+import io
 from typing import List, Optional, Dict
 
+from pycdlib import PyCdlib
 from pydantic import Field, field_validator
 
 from nfvcl_common.base_model import NFVCLBaseModel
@@ -37,6 +40,7 @@ class CloudInit(NFVCLBaseModel):
         if v is None:
             return None
         return v.lower().replace(" ", "-").replace("_", "-")
+
 
 class CloudInitDhcpOverride(NFVCLBaseModel):
     # hostname: Optional[str] = Field()
@@ -88,3 +92,30 @@ class CloudInitNetworkRoot(NFVCLBaseModel):
 
     def build_cloud_config(self) -> str:
         return get_yaml_parser().dump(self.model_dump(exclude_none=True, by_alias=True))
+
+
+def create_cloud_init_iso(meta_data="", user_data="", vendor_data="", network_config=""):
+    iso = PyCdlib()
+    iso.new(interchange_level=4, vol_ident='cidata', joliet=3)
+
+    def add_cloudinit_file(content, filename):
+        if content:
+            iso.add_fp(
+                io.BytesIO(content.encode("utf-8")),
+                length=len(content.encode("utf-8")),
+                joliet_path=f'/{filename}'
+            )
+
+    add_cloudinit_file(meta_data, "meta-data")
+    add_cloudinit_file(user_data, "user-data")
+    add_cloudinit_file(vendor_data, "vendor-data")
+    add_cloudinit_file(network_config, "network-config")
+
+    buf = io.BytesIO()
+    iso.write_fp(buf)
+    iso.close()
+
+    iso_bytes = buf.getvalue()
+    sha256sum = hashlib.sha256(iso_bytes).hexdigest()
+
+    return io.BytesIO(iso_bytes), sha256sum

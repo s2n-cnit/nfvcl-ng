@@ -39,11 +39,14 @@ dependencies = [
     "python-jose>=3.5.0",
     "python-multipart>=0.0.20,<0.0.21",
     "blinker>=1.9.0,<2",
-    "proxmoxer>=2.2.0,<3",
+    "proxmoxer",
     "grafana-client>=5.0.1",
     "pydantic-extra-types>=2.10.6",
     "pyhelm3",
-    "pip"
+    "pip",
+    "semantic-version>=2.10.0",
+    "pycdlib>=1.14.0",
+    "requests-toolbelt>=1.0.0",
 ]
 
 [dependency-groups]
@@ -63,6 +66,7 @@ docs = [
 
 [tool.uv.sources]
 pyhelm3 = { git = "https://github.com/s2n-cnit/pyhelm3.git", rev = "5c25193" }
+proxmoxer = { git = "https://github.com/s2n-cnit/proxmoxer.git", rev = "2862ef8" }
 
 [tool.hatch.build.targets.sdist]
 include = [

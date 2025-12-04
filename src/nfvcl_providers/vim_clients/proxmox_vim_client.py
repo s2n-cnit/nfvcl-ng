@@ -2,19 +2,23 @@ import time
 from typing import Optional
 
 import paramiko
+import semantic_version
 from proxmoxer import ProxmoxAPI
 
 from nfvcl_providers.vim_clients.vim_client import VimClient
 from nfvcl_core_models.vim.vim_models import VimModel
 
 DEFAULT_PROXMOX_TIMEOUT = 180
+IMPORT_URL_VERSION = semantic_version.Version("9.0.17")
 
 class ProxmoxVimClient(VimClient):
     def __init__(self, vim: VimModel):
         super().__init__(vim)
         self.proxmoxer: Optional[ProxmoxAPI] = None
-        self._connect_ssh()
+        self.version = None
         self.connect_proxmoxer()
+        if self.version < IMPORT_URL_VERSION:
+            self._connect_ssh()
 
     def _connect_ssh(self):
         """Establish SSH connection to Proxmox"""
@@ -55,7 +59,8 @@ class ProxmoxVimClient(VimClient):
                         timeout=DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout
                     )
                 version = self.proxmoxer("version").get()
-                self.logger.debug(f"Connected to Proxmox API version: {version['version']}")
+                self.version = semantic_version.Version(version['version'])
+                self.logger.debug(f"Connected to Proxmox API version: {self.version}")
                 break
             except Exception as e:
                 connection_attempts += 1

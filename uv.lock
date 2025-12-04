@@ -792,6 +792,7 @@ dependencies = [
     { name = "paramiko" },
     { name = "pip" },
     { name = "proxmoxer" },
+    { name = "pycdlib" },
     { name = "pydantic", extra = ["email"] },
     { name = "pydantic-extra-types" },
     { name = "pydantic-settings" },
@@ -802,8 +803,10 @@ dependencies = [
     { name = "python-multipart" },
     { name = "redis" },
     { name = "requests" },
+    { name = "requests-toolbelt" },
     { name = "ruamel-yaml" },
     { name = "ruamel-yaml-jinja2" },
+    { name = "semantic-version" },
     { name = "uvicorn" },
     { name = "verboselogs" },
 ]
@@ -840,7 +843,8 @@ requires-dist = [
     { name = "openstacksdk", specifier = ">=4.7.1" },
     { name = "paramiko", specifier = ">=4.0.0" },
     { name = "pip" },
-    { name = "proxmoxer", specifier = ">=2.2.0,<3" },
+    { name = "proxmoxer", git = "https://github.com/s2n-cnit/proxmoxer.git?rev=2862ef8" },
+    { name = "pycdlib", specifier = ">=1.14.0" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.12.3" },
     { name = "pydantic-extra-types", specifier = ">=2.10.6" },
     { name = "pydantic-settings", specifier = ">=2.11.0" },
@@ -851,8 +855,10 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.20,<0.0.21" },
     { name = "redis", specifier = ">=7.0.0" },
     { name = "requests", specifier = ">=2.32.5" },
+    { name = "requests-toolbelt", specifier = ">=1.0.0" },
     { name = "ruamel-yaml", specifier = ">=0.18.16" },
     { name = "ruamel-yaml-jinja2", specifier = ">=0.2.7,<0.3" },
+    { name = "semantic-version", specifier = ">=2.10.0" },
     { name = "uvicorn", specifier = ">=0.38.0" },
     { name = "verboselogs", specifier = "~=1.7" },
 ]
@@ -1017,11 +1023,7 @@ wheels = [
 [[package]]
 name = "proxmoxer"
 version = "2.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6a/54/dc2919eed681ca31220a9021e35935a3995335069b520279b4d55b9df822/proxmoxer-2.2.0.tar.gz", hash = "sha256:3ed63a58e5c0822841afdb3801f9d913a4996955c1c54f7319b5842ba2615006", size = 29666, upload-time = "2024-12-15T02:08:36.351Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/9a/0c3570e2ccce07d304c8a25f7238accc5174c234f5eddb3b666e20777898/proxmoxer-2.2.0-py3-none-any.whl", hash = "sha256:7e4431fd38e1a9321eedf6d860ddc373fc2b29ce1845fa8b072d7580d99f6b90", size = 19217, upload-time = "2024-12-15T02:08:34.047Z" },
-]
+source = { git = "https://github.com/s2n-cnit/proxmoxer.git?rev=2862ef8#2862ef8c8364fc73d46dd1addbf45d6918e30e3c" }
 
 [[package]]
 name = "psutil"
@@ -1066,6 +1068,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e9/e6/78ebbb10a8c8e4b61a59249394a4a594c1a7af95593dc933a349c8d00964/pyasn1_modules-0.4.2.tar.gz", hash = "sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6", size = 307892, upload-time = "2025-03-28T02:41:22.17Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/47/8d/d529b5d697919ba8c11ad626e835d4039be708a35b0d22de83a269a6682c/pyasn1_modules-0.4.2-py3-none-any.whl", hash = "sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a", size = 181259, upload-time = "2025-03-28T02:41:19.028Z" },
+]
+
+[[package]]
+name = "pycdlib"
+version = "1.14.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/62/d3/52b8dd7a862aec7cc4043a520490bfc9b408179dc374d0e3416fb0614a86/pycdlib-1.14.0.tar.gz", hash = "sha256:8ec306b31d9c850f28c5fda52438d904edd1e8fcf862c5ffd756272efac9f422", size = 287166, upload-time = "2023-01-14T16:39:31.339Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/dd/95557c0e3bad0e8ba10c0f17d9deffb139b106eda528a744e544799cbbfb/pycdlib-1.14.0-py2.py3-none-any.whl", hash = "sha256:a905827335f0066af3fd416c5cf9b1f29dffaf4d0914b714555213d1809f38d4", size = 213201, upload-time = "2023-01-14T16:39:29.13Z" },
 ]
 
 [[package]]
@@ -1392,6 +1403,18 @@ wheels = [
 ]
 
 [[package]]
+name = "requests-toolbelt"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f3/61/d7545dafb7ac2230c70d38d31cbfe4cc64f7144dc41f6e4e4b78ecd9f5bb/requests-toolbelt-1.0.0.tar.gz", hash = "sha256:7681a0a3d047012b5bdc0ee37d7f8f07ebe76ab08caeccfc3921ce23c88d5bc6", size = 206888, upload-time = "2023-05-01T04:11:33.229Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/51/d4db610ef29373b879047326cbf6fa98b6c1969d6f6dc423279de2b1be2c/requests_toolbelt-1.0.0-py2.py3-none-any.whl", hash = "sha256:cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06", size = 54481, upload-time = "2023-05-01T04:11:28.427Z" },
+]
+
+[[package]]
 name = "requestsexceptions"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1449,6 +1472,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/91/e0/ad199ab894f773551fc352541ce3305b9e7c366a4ae8c44ab1bc9ca3abff/ruamel.yaml.jinja2-0.2.7.tar.gz", hash = "sha256:8449be29d9a157fa92d1648adc161d718e469f0d38a6b21e0eabb76fd5b3e663", size = 14505, upload-time = "2021-09-23T15:11:49.366Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/ef/6281be4ef86a6a0e6f06004c2e4526de3d880f4eaf4210a07a269ad330b3/ruamel.yaml.jinja2-0.2.7-py2.py3-none-any.whl", hash = "sha256:eb36abd4d308794e9a497e48f98cbd2b921d2cd2946bbc9f1bea42c9b142a241", size = 5519, upload-time = "2021-09-23T15:11:51.737Z" },
+]
+
+[[package]]
+name = "semantic-version"
+version = "2.10.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/31/f2289ce78b9b473d582568c234e104d2a342fd658cc288a7553d83bb8595/semantic_version-2.10.0.tar.gz", hash = "sha256:bdabb6d336998cbb378d4b9db3a4b56a1e3235701dc05ea2690d9a997ed5041c", size = 52289, upload-time = "2022-05-26T13:35:23.454Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/23/8146aad7d88f4fcb3a6218f41a60f6c2d4e3a72de72da1825dc7c8f7877c/semantic_version-2.10.0-py2.py3-none-any.whl", hash = "sha256:de78a3b8e0feda74cabc54aab2da702113e33ac9d9eb9d2389bcf1f58b7d9177", size = 15552, upload-time = "2022-05-26T13:35:21.206Z" },
 ]
 
 [[package]]

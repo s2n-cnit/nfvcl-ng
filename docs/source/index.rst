@@ -96,6 +96,7 @@ For more details you can go to :doc:`prometheus/prometheus`
    :maxdepth: 4
    :hidden:
 
+   quick_start
    helm
    docker
 

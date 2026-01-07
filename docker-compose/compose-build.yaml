@@ -1,19 +1,35 @@
 services:
+
   nfvcl:
-    extends:
-      service: nfvcl
-      file: compose-common.yaml
     build: ..
+    depends_on:
+      - mongo
+      - redis
+    restart: always
+    environment:
+      NFVCL_CONFIG_PATH: "/app/nfvcl-ng/config/config.yaml"
+    ports:
+      - 5002:5002
+    volumes:
+      - ../config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
+      - ../logs/:/app/nfvcl-ng/logs/
+      - ../tmp/:/tmp/nfvcl/
 
   redis:
-    extends:
-      service: redis
-      file: compose-common.yaml
+    image: redis:alpine
+    restart: always
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
 
   mongo:
-    extends:
-      service: mongo
-      file: compose-common.yaml
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_data:/data/db
 
 volumes:
   mongo_data:

@@ -228,8 +228,8 @@ class NFVCL:
         return self.add_task(self.topology_manager.create_topology, topology, callback=callback)
 
     @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=HttpRequestType.DELETE, sync=True)
-    def delete_topology(self, callback=None):
-        return self.add_task(self.topology_manager.delete_topology, callback=callback)
+    def delete_topology(self):
+        return self.add_task(self.topology_manager.delete_topology)
 
     @NFVCLPublic(path="/vim/{vim_id}", section=TOPOLOGY_SECTION, method=HttpRequestType.GET, sync=True)
     def get_vim(self, vim_id: str, callback=None) -> VimModel:
@@ -280,8 +280,8 @@ class NFVCL:
         return self.add_task(self.topology_manager.delete_network, network_id, callback=callback)
 
     @NFVCLPublic(path="/router/{router_id}", section=TOPOLOGY_SECTION, method=HttpRequestType.GET, sync=True)
-    def get_router(self, network_id: str, callback=None) -> RouterModel:
-        return self.add_task(self.topology_manager.get_router, network_id, callback=callback)
+    def get_router(self, router_id: str, callback=None) -> RouterModel:
+        return self.add_task(self.topology_manager.get_router, router_id, callback=callback)
 
     @NFVCLPublic(path="/router", section=TOPOLOGY_SECTION, method=HttpRequestType.POST, sync=True)
     def create_router(self, router: RouterModel, callback=None) -> RouterModel:

@@ -88,6 +88,7 @@ class K8SProviderNative(K8SProviderInterface):
                 namespace=helm_chart_resource.namespace.lower(),
                 atomic=True,
                 wait=True,
+                debug=True,
                 create_namespace=False
             ))
         except pyhelm3.errors.Error as helmError:

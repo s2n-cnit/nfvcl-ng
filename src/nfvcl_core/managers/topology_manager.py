@@ -1,4 +1,5 @@
 from typing import Optional, List, Union, Callable
+from functools import wraps
 
 from nfvcl_core.database.topology_repository import TopologyRepository
 from nfvcl_core.managers.generic_manager import GenericManager
@@ -17,6 +18,16 @@ from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.vim.vim_models import VimModel
 
 
+def require_topology(func):
+    """Decorator to ensure topology is initialized before method execution"""
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self._topology is None:
+            raise NFVCLCoreException("Topology has not been initialized yet.", http_equivalent_code=404)
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
 class TopologyManager(GenericManager):
     def __init__(self, topology_repository: TopologyRepository):
         super().__init__()
@@ -29,7 +40,7 @@ class TopologyManager(GenericManager):
     def get_topology(self) -> TopologyModel:
         if self._topology:
             return self._topology
-        raise NFVCLCoreException("No topology found")
+        raise NFVCLCoreException("Topology has not been initialized yet.", http_equivalent_code=404)
 
     def create_topology(self, topology: TopologyModel) -> TopologyModel:
         self.logger.debug(topology)
@@ -37,19 +48,26 @@ class TopologyManager(GenericManager):
         self._topology_repository.save_topology(topology)
         return topology
 
-    def delete_topology(self) -> None:
+    @require_topology
+    def delete_topology(self) -> TopologyModel:
+        old_topology = self._topology
         self._topology_repository.delete_all()
         self._topology = None
+        return old_topology
 
+    @require_topology
     def get_vim(self, vim_id: str) -> VimModel:
         return self._topology.get_vim(vim_id)
 
+    @require_topology
     def get_vim_name_from_area_id(self, area_id: int) -> str:
         return self._topology.get_vim_name_by_area(area_id)
 
+    @require_topology
     def get_vim_from_area_id_model(self, area: int) -> VimModel:
         return self._topology.get_vim_by_area(area)
 
+    @require_topology
     def create_vim(self, vim: VimModel) -> VimModel:
         for vim_already_present in self._topology.vims:
             # Check if vim with the same name already exists
@@ -64,10 +82,12 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return vim
 
+    @require_topology
     def delete_vim(self, vim_id: str) -> None:
         self._topology.del_vim(vim_id)
         self.save_to_db()
 
+    @require_topology
     def update_vim(self, vim: VimModel) -> VimModel:
         self._topology.upd_vim(vim)
         self.save_to_db()
@@ -75,19 +95,23 @@ class TopologyManager(GenericManager):
 
     ############################ Network ########################################
 
+    @require_topology
     def get_network(self, network_id: str) -> NetworkModel:
         return self._topology.get_network(network_id)
 
+    @require_topology
     def create_network(self, network: NetworkModel) -> NetworkModel:
         self._topology.add_network(network)
         self.save_to_db()
         return network
 
+    @require_topology
     def update_network(self, network: NetworkModel) -> NetworkModel:
         self._topology.upd_network(network)
         self.save_to_db()
         return network
 
+    @require_topology
     def add_allocation_pool_to_network(self, network_id: str, allocation_pool: IPv4Pool) -> IPv4Pool:
         """
         Add an allocation pool to the network. The allocation pool represent a range of IPs that can be assigned to entities from NFVCL.
@@ -108,6 +132,7 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return added_pool
 
+    @require_topology
     def remove_allocation_pool_from_network(self, network_id: str, allocation_pool_name: str) -> IPv4Pool:
         """
         Remove an allocation pool from the network. The allocation pool represent a range of IPs that can be assigned to entities from NFVCL.
@@ -198,20 +223,24 @@ class TopologyManager(GenericManager):
 
     ############################ Router ########################################
 
+    @require_topology
     def get_router(self, router_id: str) -> RouterModel:
         return self._topology.get_router(router_id)
 
+    @require_topology
     def create_router(self, router: RouterModel) -> RouterModel:
         self._topology.add_router(router)
         self.save_to_db()
         return router
 
+    @require_topology
     def delete_router(self, router_id: str) -> None:
         self._topology.delete_router(router_id)
         self.save_to_db()
 
     ############################ PDUs ########################################
 
+    @require_topology
     def get_pdu(self, pdu_id: str) -> PduModel:
         """
         Return the desired PDU given the ID
@@ -224,6 +253,7 @@ class TopologyManager(GenericManager):
         """
         return self._topology.get_pdu(pdu_id)
 
+    @require_topology
     def create_pdu(self, pdu: PduModel) -> PduModel:
         """
         Add a PDU to the topology
@@ -235,6 +265,7 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return pdu
 
+    @require_topology
     def delete_pdu(self, pdu_id: str) -> None:
         """
         Remove a PDU from the topology
@@ -248,6 +279,7 @@ class TopologyManager(GenericManager):
         self._topology.del_pdu(pdu_id)
         self.save_to_db()
 
+    @require_topology
     def get_pdus(self) -> List[PduModel]:
         """
         Return the list of PDUs in the topology
@@ -259,15 +291,19 @@ class TopologyManager(GenericManager):
 
     ############################ Kubernetes ########################################
 
+    @require_topology
     def get_kubernetes_list(self) -> List[TopologyK8sModel]:
         return self._topology.kubernetes
 
+    @require_topology
     def get_k8s_cluster_by_id(self, cluster_id: str) -> TopologyK8sModel:
         return self._topology.get_k8s_cluster(cluster_id)
 
+    @require_topology
     def get_k8s_cluster_monitoring_metrics_config(self, cluster_id: str) -> K8sMonitoring:
         return self._topology.get_monitoring_metrics_config(cluster_id)
 
+    @require_topology
     def add_edit_k8s_cluster_monitoring_metrics(self, cluster_id: str, config: K8sMonitoring):
         self._topology.add_edit_monitoring_metrics(cluster_id, config)
         self.save_to_db()
@@ -276,6 +312,7 @@ class TopologyManager(GenericManager):
         self._topology.delete_monitoring_metrics(cluster_id)
         self.save_to_db()
 
+    @require_topology
     def add_kubernetes(self, k8s: TopologyK8sModel) -> TopologyK8sModel:
         self._topology.add_k8s_cluster(k8s)
         self.save_to_db()
@@ -291,11 +328,13 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return cluster
 
+    @require_topology
     def delete_kubernetes(self, k8s_id: str, force_deletion: bool = False) -> TopologyK8sModel:
         deleted_cluster = self._topology.del_k8s_cluster(k8s_id, force_deletion=force_deletion)
         self.save_to_db()
         return deleted_cluster
 
+    @require_topology
     def get_k8s_cluster_by_area(self, area_id: int) -> TopologyK8sModel:
         """
         Get the k8s cluster from the topology. This method could be duplicated but in this case handle HTTP exceptions
@@ -371,17 +410,21 @@ class TopologyManager(GenericManager):
 
     ############################ Prometheus ########################################
 
+    @require_topology
     def get_prometheus_list(self) -> List[PrometheusServerModel]:
         return self._topology.prometheus_srv
 
+    @require_topology
     def get_prometheus(self, prometheus_id: str) -> PrometheusServerModel:
         return self._topology.find_prom_srv(prometheus_id)
 
+    @require_topology
     def add_prometheus(self, prometheus: PrometheusServerModel) -> PrometheusServerModel:
         self._topology.add_prometheus_srv(prometheus)
         self.save_to_db()
         return prometheus
 
+    @require_topology
     def update_prometheus(self, prometheus: PrometheusServerModel) -> PrometheusServerModel:
         self._topology.upd_prometheus_srv(prometheus)
         self.save_to_db()
@@ -391,6 +434,7 @@ class TopologyManager(GenericManager):
         self._topology.del_prometheus_srv(prometheus_id, force)
         self.save_to_db()
 
+    @require_topology
     def add_prometheus_target(self, prometheus_id: str, target: PrometheusTargetModel) -> PrometheusServerModel:
         """
         Add a new target to the specified Prometheus server.
@@ -407,6 +451,7 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return prom_server
 
+    @require_topology
     def delete_prometheus_target(self, prometheus_id: str, target: PrometheusTargetModel) -> PrometheusServerModel:
         """
         Remove a target from the specified Prometheus server.
@@ -423,6 +468,7 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return prom_server
 
+    @require_topology
     def delete_prometheus_targets(self, prometheus_id: str, targets: List[PrometheusTargetModel]) -> PrometheusServerModel:
         """
         Remove a list of targets from the specified Prometheus server.
@@ -441,26 +487,32 @@ class TopologyManager(GenericManager):
 
     ############################ Grafana ########################################
 
+    @require_topology
     def get_grafana_list(self) -> List[GrafanaServerModel]:
         return self._topology.grafana_srv
 
+    @require_topology
     def get_grafana(self, grafana_id: str) -> GrafanaServerModel:
         return self._topology.find_grafana_srv(grafana_id)
 
+    @require_topology
     def add_grafana(self, grafana: GrafanaServerModel) -> GrafanaServerModel:
         self._topology.add_grafana_srv(grafana)
         self.save_to_db()
         return grafana
 
+    @require_topology
     def update_grafana(self, grafana: GrafanaServerModel) -> GrafanaServerModel:
         self._topology.upd_grafana_srv(grafana)
         self.save_to_db()
         return grafana
 
+    @require_topology
     def delete_grafana(self, grafana_id: str):
         self._topology.del_grafana_srv(grafana_id, False)
         self.save_to_db()
 
+    @require_topology
     def add_grafana_folder(self, grafana_id: str, folder: GrafanaFolderModel, parent_folder_uid: Optional[str] = None, parent_by_blue_id: Optional[str] = None) -> GrafanaServerModel:
         """
         Add a new folder to the specified Grafana server.
@@ -481,6 +533,7 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return grafana_server
 
+    @require_topology
     def delete_grafana_folder(self, grafana_id: str, folder_uid: str) -> GrafanaServerModel:
         """
         Remove a folder from the specified Grafana server.
@@ -497,6 +550,7 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return grafana_server
 
+    @require_topology
     def add_grafana_dashboard(self, grafana_id: str, dashboard: GrafanaDashboardModel, parent_folder_uid: Optional[str] = None) -> GrafanaServerModel:
         """
         Add a new dashboard to the specified Grafana server.
@@ -513,6 +567,7 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return grafana_server
 
+    @require_topology
     def delete_grafana_dashboard(self, grafana_id: str, dashboard: GrafanaDashboardModel) -> GrafanaServerModel:
         """
         Remove a dashboard from the specified Grafana server.
@@ -529,6 +584,7 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return grafana_server
 
+    @require_topology
     def delete_grafana_dashboards(self, grafana_id: str, dashboards: List[GrafanaDashboardModel]) -> GrafanaServerModel:
         """
         Remove a list of dashboards from the specified Grafana server.
@@ -548,22 +604,27 @@ class TopologyManager(GenericManager):
 
     ############################ Loki ########################################
 
+    @require_topology
     def get_loki_list(self) -> List[LokiServerModel]:
         return self._topology.loki_srv
 
+    @require_topology
     def get_loki(self, loki_id: str) -> LokiServerModel:
         return self._topology.find_loki_srv(loki_id)
 
+    @require_topology
     def add_loki(self, loki: LokiServerModel) -> LokiServerModel:
         self._topology.add_loki_srv(loki)
         self.save_to_db()
         return loki
 
+    @require_topology
     def update_loki(self, loki: LokiServerModel) -> LokiServerModel:
         self._topology.upd_loki_srv(loki)
         self.save_to_db()
         return loki
 
+    @require_topology
     def delete_loki(self, loki_id: str):
         self._topology.del_loki_srv(loki_id)
         self.save_to_db()
@@ -572,6 +633,7 @@ class TopologyManager(GenericManager):
     #    PDUs     #
     ###############
 
+    @require_topology
     def update_pdu(self, pdu: PduModel):
         """
         Update an existing pdu

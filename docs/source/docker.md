@@ -1,12 +1,25 @@
 # Docker
 
+<!-- TOC -->
+* [Docker](#docker)
+  * [Requirements](#requirements)
+  * [Running alone mounting configuration files](#running-alone-mounting-configuration-files)
+  * [Running alone using environment variables](#running-alone-using-environment-variables)
+  * [Running with Docker compose](#running-with-docker-compose)
+    * [Docker Compose files](#docker-compose-files)
+    * [Running](#running)
+    * [Build the application locally](#build-the-application-locally)
+  * [Swagger / APIs list](#swagger--apis-list)
+<!-- TOC -->
+
 ## Requirements
 - Have Docker installed and running
 
-## Running alone
-Using the Docker compose as reference:
+## Running alone mounting configuration files
+Using the Docker compose file as a reference:
 
-```
+``` yaml
+...
   nfvcl:
     image: registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
     depends_on:
@@ -18,24 +31,58 @@ Using the Docker compose as reference:
     volumes:
       - ./config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
       - ./logs/:/app/nfvcl-ng/logs/
+...
 ```
+Then we can start the container with:
+
+> **Note:** You should change values in the config_compose.yaml file to match your environment.
+
+``` bash
+docker run -d \
+  --name nfvcl \
+  --restart always \
+  -p 5002:5002 \
+  -v ./config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml \
+  -v ./logs/:/app/nfvcl-ng/logs/ \
+  registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:latest
+```
+
+## Running alone using environment variables
 
 Usually you will need to mount the configuration file and the logs to keep track of the activities.
 It is also possible to use environment variables to overwrite the default configuration or the mounted one.
 ENV parameters, with values examples, that can be used are:
 
 ```
-MONGO_IP=127.0.0.1
-MONGO_PORT=27017
-MONGO_PWD=password
-MONGO_USR=admin
-NFVCL_PORT=6589
-NFVCL_IP=0.0.0.0
-REDIS_IP=127.0.0.1
-REDIS_PORT=6379
+docker run -d \  
+  --name nfvcl \
+  --restart always \
+  -p 6589:6589 \
+  -e MONGO_IP=192.168.255.100 \
+  -e MONGO_PORT=27017 \
+  -e MONGO_PWD=password \
+  -e MONGO_USR=admin \
+  -e NFVCL_PORT=6589 \
+  -e NFVCL_IP=0.0.0.0 \
+  -e REDIS_IP=192.168.255.100 \
+  -e REDIS_PORT=6379 \
+  -e REDIS_PASSWORD=password \
+  -v ./logs/:/app/nfvcl-ng/logs/ \
+  registry.tnt-lab.unige.it/nfvcl/nfvcl-ng:dev
 ```
 
+
+
 ## Running with Docker compose
+### Docker Compose files
+- The `stable` one (`compose-stable.yaml`), updated less frequently but should not include unstable features.
+- The `master` (`compose.yaml`) is updated as soon as a cycle of improvements has been made and partially tested
+- The `latest` (`compose-latest.yaml`) branch is the one updated as soon as new features/fix are implemented. 
+- The `latest` (`compose-dev.yaml`) It is the branch used for development.
+- The `build` (`compose-build.yaml`) is the one used to build the application locally on the branch you have downloaded.
+
+### Running
+
 ```{image} ../images/NVFCL-diagrams-DockerCompose.drawio.svg
 :alt: Docker topology
 :width: 400px
@@ -81,6 +128,23 @@ INFO:     Waiting for application startup.
 2024-06-25 09:37:46 [uvicorn.error       ][MainThread] [    INFO] [SYSTEM] Uvicorn running on http://10.224.52.4:5002 (Press CTRL+C to quit)
 ```
 
+### Build the container locally
+```bash
+git clone https://github.com/s2n-cnit/nfvcl-ng.git
+# OPTIONAL change to the desired branch
+cd nfvcl-ng
+cd docker-compose
+docker compose -f compose-build.yaml up -d
+```
+To update the local application, run the following command:
+```bash
+git pull
+docker compose -f compose-build.yaml down
+docker compose -f compose-build.yaml build --no-cache
+docker compose -f compose-build.yaml up
+```
+
 ## Swagger / APIs list
-Suppose that the server on which containers are running as an IP that is `192.168.254.12`
-To access and try APIs, you can use the Swagger that contains a list of available APIs: http://192.168.254.11:5002/docs
+Suppose that the server on which containers are running as an IP that is `IP.OF.VM_OR.PC`
+To access and try APIs, you can use the Swagger that contains a list of available APIs: http://IP.OF.VM_OR.PC:5002/docs (replace IP.OF.VM_OR.PC with the IP of the server)
+

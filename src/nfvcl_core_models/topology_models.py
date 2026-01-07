@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import List, Optional
 
 from pydantic import HttpUrl, Field
@@ -44,7 +45,7 @@ class TopologyModel(NFVCLBaseModel):
         # The if is working because the __eq__ function has been overwritten in the PrometheusServerModel (on the id).
         if prom_srv in self.prometheus_srv:
             msg_err = "In the topology is already present a Prometheus server with id ->{}<-".format(prom_srv.id)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
         else:
             self.prometheus_srv.append(prom_srv)
 
@@ -55,7 +56,7 @@ class TopologyModel(NFVCLBaseModel):
         if len(prom_srv_to_del.targets) > 0 and not force:
             msg_err = ("The prometheus instance to be deleted has configured jobs. You have to remove active "
                        "jobs or force the deletion in the request.")
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
 
         return self.prometheus_srv.pop(index)
 
@@ -81,7 +82,7 @@ class TopologyModel(NFVCLBaseModel):
         # The if is working because the __eq__ function has been overwritten in the GrafanaServerModel (on the id).
         if grafana_srv in self.grafana_srv:
             msg_err = "In the topology is already present a Grafana server with id ->{}<-".format(grafana_srv.id)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
         else:
             self.grafana_srv.append(grafana_srv)
 
@@ -93,7 +94,7 @@ class TopologyModel(NFVCLBaseModel):
         if hasattr(grafana_srv_to_del, "dashboards") and len(grafana_srv_to_del.dashboards) > 0 and not force:
             msg_err = ("The Grafana instance to be deleted has configured dashboards. You have to remove active "
                        "dashboards or force the deletion in the request.")
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
 
         return self.grafana_srv.pop(index)
 
@@ -119,7 +120,7 @@ class TopologyModel(NFVCLBaseModel):
         # The if is working because the __eq__ function has been overwritten in the GrafanaServerModel (on the id).
         if loki_srv in self.loki_srv:
             msg_err = "In the topology is already present a Loki server with id ->{}<-".format(loki_srv.id)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
         else:
             self.loki_srv.append(loki_srv)
 
@@ -202,7 +203,7 @@ class TopologyModel(NFVCLBaseModel):
         """
         found_cluster = next((cluster for cluster in self.kubernetes if cluster.name == cluster_id), None)
         if found_cluster is None:
-            raise NFVCLCoreException(f"K8s cluster with name {cluster_id} not found in the topology", http_equivalent_code=404)
+            raise NFVCLCoreException(f"K8s cluster with name {cluster_id} not found in the topology", http_equivalent_code=HTTPStatus.NOT_FOUND)
         return found_cluster
 
     def add_k8s_cluster(self, k8s_cluster: TopologyK8sModel):
@@ -213,7 +214,7 @@ class TopologyModel(NFVCLBaseModel):
         """
         if k8s_cluster in self.kubernetes:
             msg_err = 'Kubernetes cluster with name >{}< already exists in the topology'.format(k8s_cluster.name)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
 
         self.kubernetes.append(k8s_cluster)
 
@@ -255,7 +256,7 @@ class TopologyModel(NFVCLBaseModel):
         """
         if pdu in self.pdus:
             msg_err = 'PDU with name >{}< already exists in the topology'.format(pdu.name)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
 
         self.pdus.append(pdu)
         return pdu
@@ -316,7 +317,7 @@ class TopologyModel(NFVCLBaseModel):
         """
         if vim in self.vims:
             msg_err = "The VIM >{}< is already present in the topology.".format(vim.name)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
         else:
             self.vims.append(vim)
             return vim
@@ -363,7 +364,7 @@ class TopologyModel(NFVCLBaseModel):
         vim = next((item for item in self.vims if area_id in item.areas), None)
         if vim is None:
             msg_err = "The VIM of area ->{}<- was not found in the topology.".format(area_id)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
 
         return vim
 
@@ -378,7 +379,7 @@ class TopologyModel(NFVCLBaseModel):
         vim_list = [item for item in self.vims if area_id in item.areas]
         if 0 >= len(vim_list):
             msg_err = "The VIM of area ->{}<- was not found in the topology.".format(area_id)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
 
         return vim_list
 
@@ -409,7 +410,7 @@ class TopologyModel(NFVCLBaseModel):
         """
         if network in self.networks:
             msg_err = "The network >{}< is already present in the topology.".format(network.name)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
         else:
             self.networks.append(network)
             return network
@@ -465,7 +466,7 @@ class TopologyModel(NFVCLBaseModel):
         """
         if router in self.routers:
             msg_err = "Router >{}< is already present in the topology.".format(router.name)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
         self.routers.append(router)
         return router
 
@@ -526,7 +527,7 @@ class TopologyModel(NFVCLBaseModel):
             prom_svr_index = self.prometheus_srv.index(prom_svr_to_search)
         except ValueError:
             msg_err = "The prometheus server ->{}<- has not been found".format(prom_srv_id)
-            raise NFVCLCoreException(msg_err, http_equivalent_code=404)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.NOT_FOUND)
 
         return prom_svr_index
 
@@ -557,7 +558,7 @@ class TopologyModel(NFVCLBaseModel):
             grafana_srv_index = self.grafana_srv.index(grafana_srv_to_search)
         except ValueError:
             msg_err = "The Grafana server ->{}<- has not been found".format(grafana_srv_id)
-            raise NFVCLCoreException(msg_err, http_equivalent_code=404)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.NOT_FOUND)
 
         return grafana_srv_index
 
@@ -588,7 +589,7 @@ class TopologyModel(NFVCLBaseModel):
             loki_svr_index = self.loki_srv.index(loki_svr_to_search)
         except ValueError:
             msg_err = "The Loki server ->{}<- has not been found".format(loki_srv_id)
-            raise NFVCLCoreException(msg_err, http_equivalent_code=404)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.NOT_FOUND)
 
         return loki_svr_index
 
@@ -671,7 +672,7 @@ class TopologyModel(NFVCLBaseModel):
         net_index = next((index for index, item in enumerate(self.networks) if item.name == net_name), -1)
         if net_index < 0:
             msg_err = "The network ->{}<- was not found in the topology.".format(net_name)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.NOT_FOUND)
 
         return net_index
 
@@ -687,7 +688,7 @@ class TopologyModel(NFVCLBaseModel):
         vim_index = next((index for index, item in enumerate(self.vims) if item.name == vim_name), -1)
         if vim_index < 0:
             msg_err = "The VIM ->{}<- was not found in the topology.".format(vim_name)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.NOT_FOUND)
 
         return vim_index
 
@@ -703,7 +704,7 @@ class TopologyModel(NFVCLBaseModel):
         router_index = next((index for index, item in enumerate(self.vims) if item.name == router_name), -1)
         if router_index < 0:
             msg_err = "The router ->{}<- was not found in the topology.".format(router_name)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.NOT_FOUND)
 
         return router_index
 
@@ -722,6 +723,6 @@ class TopologyModel(NFVCLBaseModel):
         pdu_index = next((index for index, item in enumerate(self.pdus) if item.name == pdu_name), -1)
         if pdu_index < 0:
             msg_err = "The PDU ->{}<- was not found in the topology.".format(pdu_index)
-            raise ValueError(msg_err)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.NOT_FOUND)
 
         return pdu_index

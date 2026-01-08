@@ -39,7 +39,7 @@ Initialize the topology by sending a POST request to `/v1/topology` with the fol
       "vim_user": "nfvcl",
       "vim_password": "vim_user_password",
       "ssh_keys": [
-        "ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAogiavjN9Ylox1d866n4t1oVrhlzKhS5cDGX/At5R/IeXiaPnISveerq7dg2dyyt9XKoGyh7svwzyM/Psp+q/ONxQkfSdqKtlIHxtfbppp/whSYF6u6KOr1WuuBVakUlvPEVy3J1Z6ez8jDWaUNd518pi50qlX/DPgkP7S6qSBPeRFRgQL7Nskd5peFtDan0rDaYvayhmQdku5ZyahdrNlZrk9pv7XN1QwHaqBREYsj5YOP8DT1diDT9B/kO/SNC3+ldjmQnwXA8MruMYL5fckabp0mvE6xWg7D7Y3hzeb1pEotDZe6o9SKbf+KTtUdM/nRwWz/JvD0+AQQyZ4hxrtw== paolo-pub-key"
+        "ssh-rsa your-pub-key your-pub-key-name"
       ],
       "vim_openstack_parameters": {
         "project_name": "nfvcl_test"
@@ -96,7 +96,39 @@ Initialize the topology by sending a POST request to `/v1/topology` with the fol
       "areas": [
         4
       ]
-    }
+}
+```
+
+For Proxmox VIMs:
+```json
+{
+  "name": "proxmoxtest",
+  "vim_type": "proxmox",
+  "vim_url": "192.168.17.68",
+  "vim_user": "root",
+  "vim_password": "password",
+  "vim_timeout": null,
+  "ssh_keys": [
+    "ssh-rsa your-pub-key your-pub-key-name"
+  ],
+  "vim_proxmox_parameters": {
+    "proxmox_realm": "pam",
+    "proxmox_node": null,
+    "proxmox_images_volume": "local",
+    "proxmox_vm_volume": "local-lvm",
+    "proxmox_token_name": "",
+    "proxmox_token_value": "",
+    "proxmox_otp_code": "",
+    "proxmox_privilege_escalation": "none",
+    "proxmox_resource_pool": null
+  },
+  "vim_rest_parameters": null,
+  "networks": [],
+  "routers": [],
+  "areas": [
+    100
+  ]
+}
 ```
 
 ## Create a K8S cluster to be added to the topology
@@ -106,7 +138,7 @@ Using the dedicated Blueprint, it is possible to create a K8S cluster and add it
 
 Post request to `/nfvcl/v2/api/blue/k8s` with the following body:
 
-``` json
+```json
 {
   "cni": "flannel",
   "topology_onboard": true,

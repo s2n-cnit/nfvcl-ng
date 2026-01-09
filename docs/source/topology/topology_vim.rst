@@ -147,20 +147,48 @@ For Proxmox there is field ``vim_proxmox_parameters`` :
         ..
             - ``sudo_with_password``: Use sudo and provide password
         - ``sudo_without_password``: Use sudo without password (requires proper sudoers configuration)
-
+    - ``proxmox_resource_pool``: Name of the resource pool where you want to deploy the resources
 Limitations
 ###########
-- Currently Proxmox VIM require that NFVCL has SSH access to the Proxmox host, this is needed to perform some operations that are not available through the Proxmox API.
+Proxmox VE < 9.0.17
+
+- Proxmox VIM require that NFVCL has SSH access to the Proxmox host, this is needed to perform some operations that are not available through the Proxmox API.
   Therefore the ``vim_user`` must be a valid user for SSH access.
 - The SSH user must be root or a user with sudo privileges without password.
 - Only the ``pam`` authentication realm is supported since we need SSH access.
 
 This limitations is due to the lack of qcow2 and cloud-init custom script upload from the Proxmox API, see the following issues:
-- https://bugzilla.proxmox.com/show_bug.cgi?id=2424
-- https://bugzilla.proxmox.com/show_bug.cgi?id=2208
+    - https://bugzilla.proxmox.com/show_bug.cgi?id=2424
+    - https://bugzilla.proxmox.com/show_bug.cgi?id=2208
 
-As of Proxmox VE 9.x, the qcow2 upload has been added and a workaround for the cloud-init has been found.
-We'll add support for these new features in future NFVCL releases to remove the need for SSH access.
+Features
+###########
+
+In Proxmox VE >= 9.0.17, the qcow2 and file upload has been added. NFVCL does not need anymore SSH access to the Proxmox host, this also allow the ``pve`` authentication realm.
+It's now possible to use a non-administrator user. However, certain permissions must be assigned for NFVCL to work.
+NFVCL automatically determines which version of Proxmox it's connecting to. This way, it knows whether it can use the new features or not.
+
+PVE auth
+###########
+The roles with associated privileges required by NFVCL:
+    - ``NFVCL_Datastore``: Datastore.AllocateSpace, Datastore.Allocate, Datastore.AllocateTemplate, Datastore.Audit
+    - ``NFVCL_Sdn``: SDN.Audit, SDN.Use, SDN.Allocate
+    - ``NFVCL_Sys``: Sys.AccessNetwork
+    - ``NFVCL_Sys2``: Sys.Modify, Sys.Audit
+    - ``NFVCL_Group``: Group.Allocate OPTIONAL
+
+
+The path with associated role required by NFVCL:
+    - ``/storage/YOUR_STORAGE`` -> ``NFVCL_Datastore``
+    - ``/sdn`` -> ``NFVCL_Sdn``
+    - ``/pool/YOUR_POOL`` -> ``Administrator``
+    - ``/nodes/YOUR_NODES`` -> ``NFVCL_Sys``
+    - ``/`` -> ``NFVCL_Sys2``
+    - ``/access/group`` -> ``NFVCL_Group`` OPTIONAL
+
+Permissions can be associated with a user.
+Alternatively, they can be assigned to a group and added to it all users.
+If you choose the second option, you must define the role and permissions marked as optional above.
 
 External REST VIM
 *****************

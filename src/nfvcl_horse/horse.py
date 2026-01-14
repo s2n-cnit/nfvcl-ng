@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
-from typing import Annotated, Union, Dict, Any, Optional
+from typing import Annotated, Union, Dict, Any, Optional, List
 
 import httpx
 from fastapi import HTTPException, Query
@@ -38,7 +38,7 @@ class MitigationActionModel(NFVCLBaseModel):
     intent_type: str = Field(..., examples=["mitigation"])
     intent_id: str = Field(..., examples=["ABC124"])  # Made intent_id required (not optional)
     threat: str = Field(default="", examples=["ddos"])
-    target_domain: str = Field(default="", examples=["example.com"])
+    target_domain: Union[str, List[str]] = Field(default="", examples=["example.com", ["example.com", "example2.com"]])
     # Changed to Union[str, Dict[str, Any]] to accept either a string or a structured object
     action: Union[str, Dict[str, Any]] = Field(..., examples=[
         "Can use a string like 'rate limit DNS server at ip 10.10.2.1 at port 123, for 20 requests per second' "

@@ -32,7 +32,8 @@ RUN ansible-galaxy collection install vyos.vyos && \
 COPY . /app/nfvcl-ng
 
 WORKDIR /app/nfvcl-ng
-RUN /root/.local/bin/poetry install && \
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 && \
+    /root/.local/bin/poetry install && \
     rm -rf /root/.cache/pypoetry/cache && \
     rm -rf /root/.cache/pypoetry/artifacts && \
     rm -rf /root/.cache/pip

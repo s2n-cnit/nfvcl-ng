@@ -8,7 +8,7 @@ services:
     environment:
       NFVCL_CONFIG_PATH: "/app/nfvcl-ng/config/config.yaml"
     ports:
-      - 5002:5002
+      - "5002:5002"
     volumes:
       - ../config/config_compose.yaml:/app/nfvcl-ng/config/config.yaml
       - ../logs/:/app/nfvcl-ng/logs/
@@ -18,7 +18,7 @@ services:
     image: redis:alpine
     restart: always
     ports:
-      - 6379:6379
+      - "6379:6379"
     volumes:
       - redis_data:/data
 
@@ -26,7 +26,7 @@ services:
     image: mongo
     restart: always
     ports:
-      - 27017:27017
+      - "27017:27017"
     volumes:
       - mongo_data:/data/db
 

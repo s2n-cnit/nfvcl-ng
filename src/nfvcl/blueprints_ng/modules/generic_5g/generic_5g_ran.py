@@ -1,6 +1,6 @@
 import copy
 from abc import abstractmethod
-from typing import Optional, TypeVar, Generic, final, List
+from typing import Optional, TypeVar, Generic, final
 
 from pydantic import Field
 

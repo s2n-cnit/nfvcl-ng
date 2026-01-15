@@ -7,9 +7,9 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'NFVCL-NG'
-copyright = '2025, CNIT'
+copyright = '2026, CNIT'
 author = 'CNIT'
-release = '0.3.2'
+release = '0.4.1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

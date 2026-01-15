@@ -150,4 +150,5 @@ For more details you can go to :doc:`prometheus/prometheus`
    :hidden:
 
    contacts
+   credits
 

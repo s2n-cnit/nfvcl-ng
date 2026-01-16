@@ -26,6 +26,12 @@ RUN apt-get clean all -y && \
 COPY . /app/nfvcl-ng
 
 WORKDIR /app/nfvcl-ng
+
+# Verify _version.py exists (must be generated before docker build)
+# For local builds: run ./scripts/build_docker.sh
+# For CI/CD: version file is generated in pipeline before docker build
+RUN test -f src/nfvcl/_version.py || (echo "ERROR: src/nfvcl/_version.py not found. Run: python3 scripts/generate_version.py" && exit 1)
+
 RUN /root/.local/bin/uv sync && \
     /root/.local/bin/uv cache clean && \
     rm -rf /root/.cache/pip

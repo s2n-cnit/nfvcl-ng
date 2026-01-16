@@ -128,20 +128,108 @@ INFO:     Waiting for application startup.
 2024-06-25 09:37:46 [uvicorn.error       ][MainThread] [    INFO] [SYSTEM] Uvicorn running on http://10.224.52.4:5002 (Press CTRL+C to quit)
 ```
 
-### Build the container locally
+### Build the application locally
+
+> **Important:** Building from source requires generating a version file before the Docker build, since the `.git` folder is excluded from Docker images. Use the provided helper scripts to automate this process.
+
+#### Using the Helper Script (Recommended)
+
+The easiest way to build locally is using the provided helper script:
+
 ```bash
 git clone https://github.com/s2n-cnit/nfvcl-ng.git
-# OPTIONAL change to the desired branch
 cd nfvcl-ng
-cd docker-compose
-docker compose -f compose-build.yaml up -d
+# OPTIONAL: change to the desired branch
+git checkout <branch-name>
+
+# Build and start with docker-compose
+./scripts/compose_build.sh docker-compose/compose-build.yaml up --build -d
 ```
-To update the local application, run the following command:
+
+The script automatically:
+1. Generates the version file from git tags
+2. Builds the Docker image
+3. Starts the containers
+
+#### Manual Build (Two-Step Process)
+
+If you prefer to build manually:
+
+```bash
+git clone https://github.com/s2n-cnit/nfvcl-ng.git
+cd nfvcl-ng
+
+# Step 1: Generate version file from git tags
+python3 scripts/generate_version.py
+
+# Step 2: Build and start with docker-compose
+docker compose -f docker-compose/compose-build.yaml up --build -d
+```
+
+#### Updating the Local Application
+
+To update and rebuild the application:
+
 ```bash
 git pull
-docker compose -f compose-build.yaml down
-docker compose -f compose-build.yaml build --no-cache
-docker compose -f compose-build.yaml up
+
+# Regenerate version file (in case tags changed)
+python3 scripts/generate_version.py
+
+# Rebuild and restart
+docker compose -f docker-compose/compose-build.yaml down
+docker compose -f docker-compose/compose-build.yaml build --no-cache
+docker compose -f docker-compose/compose-build.yaml up -d
+```
+
+Or use the helper script:
+
+```bash
+git pull
+./scripts/compose_build.sh docker-compose/compose-build.yaml up --build -d
+```
+
+#### Building Direct Docker Image (Without Compose)
+
+To build a standalone Docker image:
+
+```bash
+# Using the build script (recommended)
+./scripts/build_docker.sh nfvcl-local
+
+# Or manually
+python3 scripts/generate_version.py
+docker build -t nfvcl-local .
+```
+
+#### Version Management
+
+This project uses git tags as the single source of truth for versioning. The version is automatically derived from git tags using `hatch-vcs`.
+
+- When building locally, a version file (`src/nfvcl/_version.py`) must be generated before the Docker build
+- The version file is created from the latest git tag (e.g., `v0.4.1`)
+- If you're between tags, the version includes development metadata (e.g., `0.4.1.dev5+g1234abc`)
+
+For more details on version management, see `scripts/README.md`.
+
+#### Troubleshooting
+
+**Error: "src/nfvcl/_version.py not found"**
+
+This means you tried to build without generating the version file first.
+
+Solution:
+```bash
+python3 scripts/generate_version.py
+```
+
+Then retry the build.
+
+**Error: "git describe failed"**
+
+You don't have any git tags in your repository. Create one:
+```bash
+git tag v0.4.1
 ```
 
 ## Swagger / APIs list

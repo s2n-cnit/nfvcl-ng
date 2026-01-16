@@ -16,3 +16,4 @@ helm_charts/index.yaml
 *.drawio*.bkp
 config_unitest_dev.yaml
 config_dev.yaml
+src/nfvcl/_version.py

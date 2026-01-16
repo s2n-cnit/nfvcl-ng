@@ -15,3 +15,6 @@ https://nephele-project.eu/
 
 ### MARE
 https://mare6g.eu/
+
+### 6GREEN
+https://www.6green.eu/

@@ -169,6 +169,9 @@ https://nephele-project.eu/
 ### MARE
 https://mare6g.eu/
 
+### 6GREEN
+https://www.6green.eu/
+
 <!-- SUPPORT -->
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

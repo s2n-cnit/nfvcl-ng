@@ -9,7 +9,7 @@ from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_fu
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGException
 from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.network.network_models import PduModel, PduType
-from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
 from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_models.blueprint_ng.blueprint_ueransim_model import UeransimArea, UeransimUe
 from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPointType
@@ -195,6 +195,7 @@ class UeransimK8sBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBluep
     @day2_function("/configure_gnb", [HttpRequestType.POST])
     def configure_gnb(self, model: GNBPDUConfigure):
         area_id = str(model.area)
+        self.state.ueransim_config_values[area_id].gnb.replica_count = 1
         self.state.ueransim_config_values[area_id].gnb.amf.n2if.ipAddress = model.amf_ip
         self.state.ueransim_config_values[area_id].gnb.configuration = GNBConfiguration(
             mcc=model.plmn[0:3],
@@ -212,6 +213,12 @@ class UeransimK8sBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBluep
         self.state.ueransim_config_values[area_id].gnb.additional_routes.extend(additional_route_list)
         self.update_ueransim(area_id)
         self.restart_ran(area_id)
+
+    @day2_function("/detach_gnb", [HttpRequestType.POST])
+    def detach_gnb(self, model: GNBPDUDetach):
+        area_id = str(model.area)
+        self.state.ueransim_config_values[area_id].gnb.replica_count = 0
+        self.update_ueransim(area_id)
 
     @day2_function("/add_ue", [HttpRequestType.POST])
     def add_ue(self, model: UeransimBlueprintRequestAddUE):

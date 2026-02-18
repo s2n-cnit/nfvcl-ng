@@ -30,6 +30,7 @@ ueransimk8s_default_config: UeransimK8sModel = UeransimK8sModel.model_validate({
     },
     "gnb": {
         "additional_routes": [],
+        "replica_count": 1,
         "enabled": True,
         "name": "gnb",
         "n2if": {

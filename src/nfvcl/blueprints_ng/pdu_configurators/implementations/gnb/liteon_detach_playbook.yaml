@@ -1,0 +1,11 @@
+---
+- hosts: all
+  become: true
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: s2n_cnit.nfvcl.liteon
+  tasks:
+  - name: Stop the gNB
+    cli_command:
+      command: gnb stop
+...

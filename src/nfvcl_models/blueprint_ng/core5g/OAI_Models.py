@@ -628,6 +628,7 @@ class Resources(NFVCLBaseModel):
 
 
 class CU(NFVCLBaseModel):
+    replica_count: int = Field(default=1, alias='replicaCount')
     multus: Optional[CUMultus] = None
     config: Optional[CUConfig] = None
 
@@ -664,6 +665,7 @@ class CUCPStart(NFVCLBaseModel):
 
 
 class CUCP(NFVCLBaseModel):
+    replica_count: int = Field(default=1, alias='replicaCount')
     kubernetes_distribution: Optional[str] = Field(None, alias='kubernetesDistribution')
     nfimage: Optional[Nfimage] = None
     image_pull_secrets: Optional[List[ImagePullSecret]] = Field(None, alias='imagePullSecrets')
@@ -719,6 +721,7 @@ class CUUPStart(NFVCLBaseModel):
 
 
 class CUUP(NFVCLBaseModel):
+    replica_count: int = Field(default=1, alias='replicaCount')
     kubernetes_distribution: Optional[str] = Field(None, alias='kubernetesDistribution')
     nfimage: Optional[Nfimage] = None
     image_pull_secrets: Optional[List[ImagePullSecret]] = Field(None, alias='imagePullSecrets')
@@ -770,6 +773,7 @@ class DUStart(NFVCLBaseModel):
 
 
 class DU(NFVCLBaseModel):
+    replica_count: int = Field(default=1, alias='replicaCount')
     multus: Optional[DUMultus] = None
     config: Optional[DUConfig] = None
 
@@ -807,6 +811,7 @@ class GNBStart(NFVCLBaseModel):
 
 
 class GNB(NFVCLBaseModel):
+    replica_count: int = Field(default=1, alias='replicaCount')
     multus: Optional[GNBMultus] = None
     config: Optional[GNBConfig] = None
 

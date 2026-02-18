@@ -21,3 +21,7 @@ class GNBPDUConfigure(NFVCLBaseModel):
     nssai: List[Slice5G] = Field()
 
     additional_routes: Optional[List[Route]] = Field(default_factory=list)
+
+
+class GNBPDUDetach(NFVCLBaseModel):
+    area: int = Field()

@@ -14,12 +14,13 @@ from nfvcl_core_models.linux.ip import Route
 from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core_models.network.network_models import PduType, MultusInterface
-from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
     SubDataNets, NetworkEndPointWithType
 from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GAddSliceModel, \
-    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel
+    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
+    Core5GAttachGnbModel, Core5GDetachGnbModel
 from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, BlueCreateModelNetworks, Slice5GWithDNNs
 
 
@@ -123,7 +124,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         #         if net.gateway_ip is None:
         #             raise BlueprintNGException(f"To use multus on N6, you must provide a gateway ip for {net.name}")
 
-    def extract_unique_net_names(self, model: Create5gModel) -> {}:
+    def extract_unique_net_names(self, model: Create5gModel) -> Dict[str, Set[str]]:
         core_net_names = set()
 
         ne_core = model.config.network_endpoints
@@ -348,7 +349,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         for area in self.state.current_config.areas:
             if area.gnb.configure:
-                if not area.gnb.pduList:
+                if area.gnb.pduList is None:
                     pdu_models.extend(self.provider.find_pdus(area.id, PduType.GNB))
                 else:
                     for pdu_name in area.gnb.pduList:
@@ -405,19 +406,59 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             if pdu.name not in self.state.ran_areas[str(pdu.area)].pdu_names:
                 self.state.ran_areas[str(pdu.area)].pdu_names.append(pdu.name)
 
-        # Unlock PDUs for removed areas
+        # Detach and unlock PDUs for removed areas
         currently_existing_areas: Set[str] = set(map(lambda x: str(x.id), self.state.current_config.areas))
         currently_deployed_ran_areas = set(self.state.ran_areas.keys())
         areas_to_delete = currently_deployed_ran_areas - currently_existing_areas
         for ran_area_id in areas_to_delete:
             # Get information about the area that need to be deleted
             ran_area_info = self.state.ran_areas[ran_area_id]
-            for pdu in ran_area_info.pdu_names:
-                self.provider.unlock_pdu(self.provider.find_by_name(pdu))
-                del self.state.gnb_ids[pdu]
+            for pdu_name in ran_area_info.pdu_names:
+                try:
+                    pdu = self.provider.find_pdu(int(ran_area_id), PduType.GNB, name=pdu_name)
+                    configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+                    configurator_instance.detach(GNBPDUDetach(area=int(ran_area_id)))
+                    self.provider.unlock_pdu(pdu)
+                    if pdu_name in self.state.gnb_ids:
+                        del self.state.gnb_ids[pdu_name]
+                except Exception as e:
+                    self.logger.exception(f"Error detaching gNB {pdu_name} for area {ran_area_id}", exc_info=True)
 
             # Delete edge area from state
             del self.state.ran_areas[ran_area_id]
+
+        # Find PDUs that were removed from the list, detach and unlock them
+        current_gnb_pdus = self.get_gnb_pdus()
+        current_pdu_names_by_area: Dict[str, Set[str]] = {}
+        for pdu in current_gnb_pdus:
+            area_key = str(pdu.area)
+            if area_key not in current_pdu_names_by_area:
+                current_pdu_names_by_area[area_key] = set()
+            current_pdu_names_by_area[area_key].add(pdu.name)
+
+        # Check each deployed area for PDUs that should be removed
+        for ran_area_id, ran_area_info in self.state.ran_areas.items():
+            # Get the set of PDUs that should be in this area
+            expected_pdus = current_pdu_names_by_area.get(ran_area_id, set())
+            # Get the set of currently deployed PDUs in this area
+            deployed_pdus = set(ran_area_info.pdu_names)
+            # Find PDUs that are deployed but not expected
+            pdus_to_remove = deployed_pdus - expected_pdus
+
+            for pdu_name in pdus_to_remove:
+                try:
+                    pdu = self.provider.find_pdu(int(ran_area_id), PduType.GNB, name=pdu_name)
+                    configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+                    configurator_instance.detach(GNBPDUDetach(area=int(ran_area_id)))
+                    self.provider.unlock_pdu(pdu)
+                    if pdu_name in self.state.gnb_ids:
+                        del self.state.gnb_ids[pdu_name]
+                    # Remove from ran_area_info.pdu_names
+                    ran_area_info.pdu_names.remove(pdu_name)
+                    self.logger.info(f"Detached and unlocked gNB {pdu_name} from area {ran_area_id}")
+                except Exception as e:
+                    self.logger.exception(f"Error detaching gNB {pdu_name} from area {ran_area_id}", exc_info=True)
+
 
     ################################################################
     ####                    END RAN SECTION                     ####
@@ -737,6 +778,86 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             raise e
 
         self.logger.success(f"Deleted Area with ID: {del_area_model.areaId}")
+
+    def attach_gnb(self, attach_gnb_model: Core5GAttachGnbModel):
+        self.update_gnb_config()
+
+    @day2_function("/attach_gnb", [HttpRequestType.PUT])
+    def day2_attach_gnb(self, attach_gnb_model: Core5GAttachGnbModel):
+        """
+        Add a new GNB to the core
+        Args:
+            attach_gnb_model: Model of the GNB to add
+        """
+        self.logger.info(f"Attaching GNB: {attach_gnb_model.pdu_name} to area {attach_gnb_model.area_id}")
+
+        backup_config = copy.deepcopy(self.state.current_config)
+
+        # Check if area exists
+        area = self.state.current_config.get_area(attach_gnb_model.area_id)
+        if not area:
+            raise BlueprintNGException(f"Area {attach_gnb_model.area_id} not found")
+
+        # Check if PDU exists
+        try:
+            pdu = self.provider.find_pdu(attach_gnb_model.area_id, PduType.GNB, name=attach_gnb_model.pdu_name)
+        except Exception:
+            raise BlueprintNGException(f"PDU {attach_gnb_model.pdu_name} not found in area {attach_gnb_model.area_id}")
+
+        # Check if PDU is already locked
+        if self.provider.is_pdu_locked(pdu):
+            raise BlueprintNGException(f"GNB PDU {attach_gnb_model.pdu_name} is already locked")
+
+        # Add PDU to area's pduList if not already present
+        if area.gnb.pduList is None:
+            area.gnb.pduList = []
+
+        if attach_gnb_model.pdu_name not in area.gnb.pduList:
+            area.gnb.pduList.append(attach_gnb_model.pdu_name)
+
+        try:
+            self.attach_gnb(attach_gnb_model)
+        except Exception as e:
+            self.logger.exception(f"Error attaching GNB: {attach_gnb_model.pdu_name}", exc_info=e)
+            self.state.current_config = backup_config
+            raise e
+
+        self.logger.success(f"Attached GNB: {attach_gnb_model.pdu_name} to area {attach_gnb_model.area_id}")
+
+    def detach_gnb(self, detach_gnb_model: Core5GDetachGnbModel):
+        self.update_gnb_config()
+
+    @day2_function("/detach_gnb", [HttpRequestType.PUT])
+    def day2_detach_gnb(self, detach_gnb_model: Core5GDetachGnbModel):
+        """
+        Delete a GNB from the core
+        Args:
+            detach_gnb_model: Model of the GNB to be deleted
+        """
+        self.logger.info(f"Detaching GNB: {detach_gnb_model.pdu_name} from area {detach_gnb_model.area_id}")
+
+        backup_config = copy.deepcopy(self.state.current_config)
+
+        # Check if area exists
+        area = self.state.current_config.get_area(detach_gnb_model.area_id)
+        if not area:
+            raise BlueprintNGException(f"Area {detach_gnb_model.area_id} not found")
+
+        # Check if PDU exists in the area's pduList
+        if area.gnb.pduList is None or detach_gnb_model.pdu_name not in area.gnb.pduList:
+            raise BlueprintNGException(f"GNB {detach_gnb_model.pdu_name} not found in area {detach_gnb_model.area_id}")
+
+        # Remove PDU from area's pduList
+        area.gnb.pduList.remove(detach_gnb_model.pdu_name)
+
+        try:
+            self.detach_gnb(detach_gnb_model)
+        except Exception as e:
+            self.logger.exception(f"Error detaching GNB: {detach_gnb_model.pdu_name}", exc_info=e)
+            self.state.current_config = backup_config
+            raise e
+
+        self.logger.success(f"Detached GNB: {detach_gnb_model.pdu_name} from area {detach_gnb_model.area_id}")
 
     ################################################################
     ####                    END DAY2 SECTION                    ####

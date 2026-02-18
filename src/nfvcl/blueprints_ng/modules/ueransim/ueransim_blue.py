@@ -8,7 +8,7 @@ from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, Bl
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type, day2_function
 from nfvcl_core_models.linux.ip import Route
 from nfvcl_core_models.network.network_models import PduType
-from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration, \
     NetResource
 from nfvcl_common.base_model import NFVCLBaseModel
@@ -69,6 +69,13 @@ class UeransimGNBConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.add_service_task("config-network", ServiceState.RESTARTED, True)
         ansible_builder.add_service_task("ueransim-gnb", ServiceState.RESTARTED, True)
 
+        return ansible_builder.build()
+
+class UeransimGNBConfiguratorDetach(VmResourceAnsibleConfiguration):
+    def dump_playbook(self) -> str:
+        ansible_builder = AnsiblePlaybookBuilder("Playbook UeransimGNBConfigurator")
+        #TODO change the AMF ip in the config to prevent accidental reconnection
+        ansible_builder.add_service_task("ueransim-gnb", ServiceState.STOPPED, False)
         return ansible_builder.build()
 
 
@@ -304,6 +311,14 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
 
         self.register_resource(area.vm_gnb_configurator)
         self.provider.configure_vm(area.vm_gnb_configurator)
+
+    @day2_function("/detach_gnb", [HttpRequestType.POST])
+    def detach_gnb(self, model: GNBPDUDetach):
+        area = self.state.areas[str(model.area)]
+        vm_gnb_configurator = UeransimGNBConfiguratorDetach(
+            vm_resource=area.vm_gnb,
+        )
+        self.provider.configure_vm(vm_gnb_configurator)
 
     @day2_function("/del_gnb", [HttpRequestType.DELETE])
     def del_gnb(self, model: UeransimBlueprintRequestAddDelGNB):

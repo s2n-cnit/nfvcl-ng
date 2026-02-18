@@ -30,5 +30,3 @@ class OpenAirInterfaceRan(Generic5GRANBlueprintNG[OAIRanBlueprintNGState, RANBlu
 
     def update_ran(self):
         pass
-
-

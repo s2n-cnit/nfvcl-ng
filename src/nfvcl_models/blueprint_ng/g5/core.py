@@ -39,6 +39,14 @@ class Core5GAddDnnModel(SubDataNets):
 class Core5GDelDnnModel(NFVCLBaseModel):
     dnn: DNNType = Field()
 
+class Core5GAttachGnbModel(NFVCLBaseModel):
+    area_id: AreaIDType = Field()
+    pdu_name: str = Field()
+
+class Core5GDetachGnbModel(NFVCLBaseModel):
+    area_id: AreaIDType = Field()
+    pdu_name: str = Field()
+
 class NF5GType(str, Enum):
     AMF = 'AMF'
     SMF = 'SMF'

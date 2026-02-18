@@ -166,8 +166,8 @@ class SubAreaUPF(NFVCLBaseModel):
     external: Optional[bool] = Field(default=False)
 
 class SubAreaGNB(NFVCLBaseModel):
-    configure: bool = Field(default=True)
-    pduList: Optional[List[str]] = Field(default=None)
+    configure: bool = Field(default=True, description="True to configure the gNBs, False to not configure")
+    pduList: Optional[List[str]] = Field(default=None, description="List of gNB PDU to attach to the core, if not present all the gNB in the area will be attached")
 
 class SubArea(NFVCLBaseModel):
     id: AreaIDType = Field(description="ID of the area")

@@ -70,6 +70,7 @@ class GnbService(NFVCLBaseModel):
 
 class Gnb(NFVCLBaseModel):
     additional_routes: List[str] = Field(default=[])
+    replica_count: int = Field(default=1, alias='replicaCount')
     enabled: bool
     name: str
     n2if: N2if

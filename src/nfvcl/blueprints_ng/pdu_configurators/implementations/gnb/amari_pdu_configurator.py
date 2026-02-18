@@ -6,7 +6,7 @@ from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUException
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
 from nfvcl_core_models.resources import PDUResourceAnsibleConfiguration
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_common.ansible_utils import run_ansible_playbook
@@ -53,6 +53,11 @@ class AmariAnsibleConfigurator(PDUResourceAnsibleConfiguration):
         ansible_builder.set_vars_from_fields(self.vars)
         return ansible_builder.build()
 
+class AmariDetachAnsibleConfigurator(PDUResourceAnsibleConfiguration):
+    def dump_playbook(self) -> str:
+        ansible_builder = AnsiblePlaybookBuilder("Playbook AmariDetachAnsibleConfigurator")
+        ansible_builder.add_service_task("lte", ServiceState.STOPPED)
+        return ansible_builder.build()
 
 class AmariPDUConfigurator(GNBPDUConfigurator):
     def configure(self, config: GNBPDUConfigure):
@@ -74,6 +79,18 @@ class AmariPDUConfigurator(GNBPDUConfigurator):
             password=self.pdu_model.password,
             become_password=self.pdu_model.become_password,
             playbook=AmariAnsibleConfigurator(vars=amari_config_vars, pdu_config=amari_pdu_config).dump_playbook()
+        )
+
+        if ansible_runner_result.status == "failed":
+            raise PDUException("Error configuring Amarisoft GNB")
+
+    def detach(self, config: GNBPDUDetach):
+        ansible_runner_result, fact_cache = run_ansible_playbook(
+            host=self.pdu_model.get_mgmt_ip(),
+            username=self.pdu_model.username,
+            password=self.pdu_model.password,
+            become_password=self.pdu_model.become_password,
+            playbook=AmariDetachAnsibleConfigurator().dump_playbook()
         )
 
         if ansible_runner_result.status == "failed":

@@ -31,6 +31,7 @@ class RANBlueCreateModelGeneric(BlueprintNGCreateModel):
     area_id: AreaIDType = Field(alias='area_id')
     gnb_id: Optional[int] = Field(default=1, alias='gnb_id')
     additional_routes: Optional[List[Route]] = Field(default_factory=list, alias='additional_routes')
+    replica_count: Optional[int] = Field(default=1, description="Number of replicas to create for this resource, USED INTERNALLY", le=1, ge=0)
 
 
 ################################ CU ###############################################

@@ -12,7 +12,7 @@ from nfvcl_core_models.blueprints.blueprint import BlueprintNGState
 from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_core_models.network.network_models import PduType
-from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
 
 
 class Generic5GRANBlueprintNGState(BlueprintNGState):
@@ -193,6 +193,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
         model.area_id = self.state.current_config.area_id
         model.gnb_id = self.state.current_config.gnb_id
         model.additional_routes = self.state.current_config.additional_routes
+        model.replica_count = self.state.current_config.replica_count
 
     @final
     def update(self, create_model: RANBlueCreateModel):
@@ -241,6 +242,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
 
     @day2_function("/configure_gnb", [HttpRequestType.POST])
     def configure_gnb(self, model: GNBPDUConfigure):
+        self.state.current_config.replica_count = 1
         self.state.current_config.mcc = model.plmn[:3]
         self.state.current_config.mnc = model.plmn[3:]
         self.state.current_config.snssai_list = model.nssai
@@ -276,6 +278,30 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
                 self.state.gnb_model.amf = model.amf_ip
                 self.provider.call_blueprint_function(self.state.gnb_blue_id, "update", self.state.gnb_model)
                 self.provider.call_blueprint_function(self.state.gnb_blue_id, "restart_gnb")
+
+    @day2_function("/detach_gnb", [HttpRequestType.POST])
+    def detach_gnb(self, model: GNBPDUDetach):
+        self.state.current_config.replica_count = 0
+        match self.state.current_config.split:
+            case Split.CU_DU | Split.CP_UP_DU:
+                match self.state.current_config.split:
+                    case Split.CU_DU:
+                        self.update_common_values(self.state.cu_model)
+                        self.provider.call_blueprint_function(self.state.cu_blue_id, "update", self.state.cu_model)
+
+                    case _: #CUCP-CUUP
+                        self.update_common_values(self.state.cucp_model)
+                        self.provider.call_blueprint_function(self.state.cu_cp_blue_id, "update", self.state.cucp_model)
+
+                        self.update_common_values(self.state.cuup_model)
+                        self.provider.call_blueprint_function(self.state.cu_up_blue_id, "update", self.state.cuup_model)
+
+                self.update_common_values(self.state.du_model)
+                self.provider.call_blueprint_function(self.state.du_blue_id, "update", self.state.du_model)
+
+            case _: #GNB
+                self.update_common_values(self.state.gnb_model)
+                self.provider.call_blueprint_function(self.state.gnb_blue_id, "update", self.state.gnb_model)
 
     def del_gnb_from_topology(self):
         try:

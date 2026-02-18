@@ -73,6 +73,7 @@ class OpenAirInterfaceGnb(Generic5GGNBK8sBlueprintNG[OAIGnbBlueprintNGState, GNB
         )
 
     def update_gnb_values(self):
+        self.state.oai_gnb_config_values.replica_count = self.state.current_config.replica_count
         self.state.oai_gnb_config_values.config.mcc = self.state.current_config.mcc
         self.state.oai_gnb_config_values.config.mnc = self.state.current_config.mnc
         self.state.oai_gnb_config_values.config.tac = str(self.state.current_config.tac)
@@ -101,8 +102,6 @@ class OpenAirInterfaceGnb(Generic5GGNBK8sBlueprintNG[OAIGnbBlueprintNGState, GNB
             self.state.gnb_helm_chart,
             self.state.oai_gnb_config_values.model_dump(exclude_none=True, by_alias=True)
         )
-        self.logger.info("Restarting GNB")
-        self.provider.restart_all_deployments(self.state.gnb_helm_chart, self.id)
 
     def restart_gnb(self):
         self.logger.info("Restarting GNB")

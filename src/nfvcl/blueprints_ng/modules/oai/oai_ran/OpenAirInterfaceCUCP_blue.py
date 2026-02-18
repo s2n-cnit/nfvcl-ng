@@ -72,6 +72,7 @@ class OpenAirInterfaceCucp(Generic5GCUCPK8sBlueprintNG[OAICucpBlueprintNGState, 
         )
 
     def update_cucp_values(self):
+        self.state.oai_cucp_config_values.replica_count = self.state.current_config.replica_count
         self.state.oai_cucp_config_values.config.mcc = self.state.current_config.mcc
         self.state.oai_cucp_config_values.config.mnc = self.state.current_config.mnc
         self.state.oai_cucp_config_values.config.tac = str(self.state.current_config.tac)

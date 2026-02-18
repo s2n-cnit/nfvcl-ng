@@ -2,7 +2,7 @@ from pydantic import Field
 
 from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
 from nfvcl_core_models.resources import PDUResourceAnsibleConfiguration
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_common.ansible_utils import run_ansible_playbook
@@ -32,6 +32,13 @@ class LiteonAIOAnsibleConfigurator(PDUResourceAnsibleConfiguration):
         ansible_builder.set_vars_from_fields(self.vars)
         return ansible_builder.build()
 
+class LiteonAIODetachAnsibleConfigurator(PDUResourceAnsibleConfiguration):
+    def dump_playbook(self) -> str:
+        ansible_builder = AnsiblePlaybookBuilder("Playbook LiteonAIOAnsibleConfigurator", connection="ansible.netcommon.network_cli")
+        ansible_builder.set_var("ansible_network_os", "s2n_cnit.nfvcl.liteon")
+        ansible_builder.add_tasks_from_file(rel_path("liteon_detach_playbook.yaml"))
+        return ansible_builder.build()
+
 class LiteonAIOPDUConfigurator(GNBPDUConfigurator):
     def configure(self, config: GNBPDUConfigure):
 
@@ -58,4 +65,13 @@ class LiteonAIOPDUConfigurator(GNBPDUConfigurator):
             password=self.pdu_model.password,
             become_password=self.pdu_model.become_password,
             playbook=LiteonAIOAnsibleConfigurator(vars=liteon_config_vars).dump_playbook()
+        )
+
+    def detach(self, config: GNBPDUDetach):
+        run_ansible_playbook(
+            host=self.pdu_model.get_mgmt_ip(),
+            username=self.pdu_model.username,
+            password=self.pdu_model.password,
+            become_password=self.pdu_model.become_password,
+            playbook=LiteonAIODetachAnsibleConfigurator().dump_playbook()
         )

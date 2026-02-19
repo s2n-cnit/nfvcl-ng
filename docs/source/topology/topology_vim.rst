@@ -148,6 +148,7 @@ For Proxmox there is field ``vim_proxmox_parameters`` :
             - ``sudo_with_password``: Use sudo and provide password
         - ``sudo_without_password``: Use sudo without password (requires proper sudoers configuration)
     - ``proxmox_resource_pool``: Name of the resource pool where you want to deploy the resources
+    - ``proxmox_sdn_zone``: Name of the sdn zone where the vnets needed to deploy the VMs are located. If not specified, NFVCL assumes there is one called ``nfvcl``.
 Limitations
 ###########
 Proxmox VE < 9.0.17
@@ -171,24 +172,42 @@ NFVCL automatically determines which version of Proxmox it's connecting to. This
 PVE auth
 ###########
 The roles with associated privileges required by NFVCL:
+    - ``NFVCL_VM``: VM.Allocate, VM.Audit, VM.Backup, VM.Config.CDROM, VM.Config.CPU, VM.Config.Cloudinit, VM.Config.Disk, VM.Config.HWType, VM.Config.Memory, VM.Config.Network, VM.Config.Options, VM.GuestAgent.Audit, VM.GuestAgent.FileRead, VM.GuestAgent.FileSystemMgmt, VM.GuestAgent.FileWrite, VM.GuestAgent.Unrestricted, VM.PowerMgmt
     - ``NFVCL_Datastore``: Datastore.AllocateSpace, Datastore.Allocate, Datastore.AllocateTemplate, Datastore.Audit
     - ``NFVCL_Sdn``: SDN.Audit, SDN.Use, SDN.Allocate
-    - ``NFVCL_Sys``: Sys.AccessNetwork
-    - ``NFVCL_Sys2``: Sys.Modify, Sys.Audit
-    - ``NFVCL_Group``: Group.Allocate OPTIONAL
-
+    - ``NFVCL_Sys``: Sys.AccessNetwork or Sys.Modify, Sys.Audit
 
 The path with associated role required by NFVCL:
+    - ``/vms`` -> ``NFVCL_VM``
     - ``/storage/YOUR_STORAGE`` -> ``NFVCL_Datastore``
     - ``/sdn`` -> ``NFVCL_Sdn``
-    - ``/pool/YOUR_POOL`` -> ``Administrator``
-    - ``/nodes/YOUR_NODES`` -> ``NFVCL_Sys``
-    - ``/`` -> ``NFVCL_Sys2``
-    - ``/access/group`` -> ``NFVCL_Group`` OPTIONAL
+    - ``/nodes/YOUR_NODES`` -> ``NFVCL_Sys`` if Sys.AccessNetwork
+    - ``/`` -> ``NFVCL_Sys`` if Sys.Modify, Sys.Audit
 
-Permissions can be associated with a user.
-Alternatively, they can be assigned to a group and added to it all users.
-If you choose the second option, you must define the role and permissions marked as optional above.
+To limit permissions and isolate user environments, you can use Resource Pools. Each user or user group can be associated with a resource pool, where they are the administrator. Users will not be able to see VMs in pools that don't belong to them.
+The permissions required by NFVCL on storage do not allow for separation of environments between users. However, there are several systems that prevent users from accessing resources on storage that do not belong to them.
+The first method is to create storage in directory mode.
+The second, however, is only possible if you have Ceph available, because it allows you to create a pool for each user.
+Roles and paths with this system change as follows.
+NFVCL in two blueprints: UERanSim and Simple5G if they are not specified in the payload, it creates them. To limit permissions it is recommended to already provide all the networks in the creation payload.
+
+NFVCL creates them in two blueprints: UERanSim and Simple5G. If they aren't specified in the payload, it creates them. To limit permissions, it's recommended to pre-provided all networks in the creation payload.
+It's recommended to create an SDN zone per user or user group and create the necessary networks in each. Then, set that as the SDN zone to use in the topology.
+
+The roles:
+    - ``NFVCL_Datastore``: Datastore.AllocateSpace, Datastore.Allocate, Datastore.AllocateTemplate, Datastore.Audit
+    - ``NFVCL_Sdn``: SDN.Audit, SDN.Use, SDN.Allocate
+    - ``NFVCL_Sdn_USE``: SDN.Use
+    - ``NFVCL_Sys``: Sys.AccessNetwork
+    - ``NFVCL_Group``: Group.Allocate
+
+The path :
+    - ``/storage/YOUR_STORAGE`` -> ``NFVCL_Datastore``
+    - ``/node/YOUR_NODE`` -> ``NFVCL_Sys``
+    - ``/sdn/zone/YOUR_ZONE`` -> ``NFVCL_Sdn``
+    - ``/sdn/localnetwork`` -> ``NFVCL_Sdn_USE``
+    - ``/pool/YOUR_POOL`` -> ``Administrator``
+    - ``/access/group`` -> ``NFVCL_Group``
 
 External REST VIM
 *****************

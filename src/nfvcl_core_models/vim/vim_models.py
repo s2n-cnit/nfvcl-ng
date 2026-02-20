@@ -35,6 +35,7 @@ class ProxmoxParameters(NFVCLBaseModel):
     proxmox_otp_code: Optional[str] = Field(default='')
     proxmox_privilege_escalation: Optional[ProxmoxPrivilegeEscalationTypeEnum] = Field(default=ProxmoxPrivilegeEscalationTypeEnum.NONE)
     proxmox_resource_pool: Optional[str] = Field(default=None)
+    proxmox_sdn_zone: Optional[str] = Field(default="nfvcl")
 
 class RESTParameters(NFVCLBaseModel):
     remote_vim_name: Optional[str] = Field(default="default")

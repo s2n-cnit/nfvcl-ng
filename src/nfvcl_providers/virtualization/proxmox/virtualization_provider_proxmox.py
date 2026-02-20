@@ -718,8 +718,11 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         ta = TypeAdapter(List[ProxmoxZone])
         zones = ta.validate_python(response)
         for zone in zones:
-            if zone.zone.lower() == "nfvcl":
+            if zone.zone == self.vim.proxmox_parameters().proxmox_sdn_zone:
                 return zone
+        # for zone in zones:
+        #     if zone.zone == "nfvcl":
+        #         return zone
         raise VirtualizationProviderProxmoxException("NFVCL sdn zone not found, you must create a zone called 'nfvcl' with DHCP enabled (case sensitive)")
 
     def __get_ips_for_subnets(self, cidr: str) -> Tuple[str, str, str]:
@@ -830,7 +833,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         vnets = ta.validate_python(vnet_tmp)
 
         for vnet in vnets:
-            if vnet.zone == "nfvcl":
+            if vnet.zone == self.vim.proxmox_parameters().proxmox_sdn_zone:
                 networks.add(vnet.vnet)
 
         return networks_to_check.issubset(networks), networks_to_check.difference(networks)

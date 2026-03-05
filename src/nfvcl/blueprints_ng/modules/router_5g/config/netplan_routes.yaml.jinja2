@@ -1,0 +1,16 @@
+network:
+  version: 2
+  ethernets:
+{% if additional_routes is defined and additional_routes | length > 0 %}
+    {{ n6_if }}:
+      routes:
+{% for route in additional_routes %}
+        - to: {{ route.network_cidr }}
+          via: {{ route.next_hop }}
+{% endfor %}
+{% else %}
+    {{ n6_if }}: {}
+{% endif %}
+
+
+

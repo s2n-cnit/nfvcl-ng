@@ -1,0 +1,27 @@
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy accept;
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy accept;
+        iifname "{{ n6_if }}" oifname "{{ internet_if }}" accept
+        iifname "{{ internet_if }}" oifname "{{ n6_if }}" ct state related,established accept
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority 100; policy accept;
+        oifname "{{ internet_if }}" masquerade
+    }
+}
+

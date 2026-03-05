@@ -58,16 +58,29 @@ class RouterConfigurator(VmResourceAnsibleConfiguration):
     def dump_playbook(self) -> str:
         ansible_builder = AnsiblePlaybookBuilder(f"Playbook RouterConfigurator")
 
+        n6_if = self.vm_resource.network_interfaces[self.n6_net_name][0].fixed.interface_name
+        internet_if = self.vm_resource.network_interfaces[self.mgt_net_name][0].fixed.interface_name
+
+        ansible_builder.set_var("n6_if", n6_if)
+        ansible_builder.set_var("internet_if", internet_if)
+
+        # Persistent IP forwarding via sysctl
+        ansible_builder.add_copy_task(rel_path("config/sysctl_ipforward.conf"), "/etc/sysctl.d/99-ip-forward.conf")
+        ansible_builder.add_shell_task("sysctl --system")
+
+        # Persistent firewall rules via nftables
+        ansible_builder.add_template_task(rel_path("config/nftables_rules.conf.jinja2"), "/etc/nftables.conf")
+        ansible_builder.add_service_task("nftables", ServiceState.RESTARTED, True)
+
+        # Persistent routes via netplan
+        if self.additional_routes and len(self.additional_routes) > 0:
+            ansible_builder.set_var("additional_routes", [route.model_dump() for route in self.additional_routes])
+        ansible_builder.add_template_task(rel_path("config/netplan_routes.yaml.jinja2"), "/etc/netplan/90-router-routes.yaml")
+        ansible_builder.add_shell_task("netplan apply")
+
+        # Ethtool offload via systemd service
         ansible_builder.add_template_task(rel_path("config/router.sh.jinja2"), "/opt/router.sh")
         ansible_builder.add_template_task(rel_path("config/router.service.jinja2"), "/etc/systemd/system/router.service")
-        ansible_builder.set_var("n6_if", self.vm_resource.network_interfaces[self.n6_net_name][0].fixed.interface_name)
-        ansible_builder.set_var("internet_if", self.vm_resource.network_interfaces[self.mgt_net_name][0].fixed.interface_name)
-
-        if self.additional_routes and len(self.additional_routes) > 0:
-            additional_routes_str: List[str] = []
-            for route in self.additional_routes:
-                additional_routes_str.append(route.as_linux_replace_command())
-            ansible_builder.set_var("additional_routes", additional_routes_str)
 
         ansible_builder.add_shell_task("systemctl daemon-reload")
 
@@ -78,7 +91,7 @@ class RouterConfigurator(VmResourceAnsibleConfiguration):
 
 @blueprint_type("router_5g")
 class Router5GBlueprintNG(BlueprintNG[Router5GBlueprintNGState, Router5GCreateModel]):
-    router_image = VmResourceImage(name="ubuntu-lab-v0.1.4-ubuntu2204", url="https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.4-ubuntu2204.qcow2")
+    router_image = VmResourceImage(name="ubuntu-lab-v0.1.5-ubuntu2404", url="https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.5-ubuntu2404.qcow2")
     router_flavor = VmResourceFlavor(vcpu_count='1', memory_mb='1024', storage_gb='15')
 
     def __init__(self, blueprint_id: str, state_type: type[BlueprintNGState] = Router5GBlueprintNGState):

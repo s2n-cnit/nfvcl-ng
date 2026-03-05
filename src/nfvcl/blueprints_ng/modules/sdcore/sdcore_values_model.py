@@ -167,7 +167,7 @@ class Global(NFVCLBaseModel):
 
 class Field5gControlPlane(NFVCLBaseModel):
     enable5_g: bool = Field(..., alias='enable5G')
-    images: Images
+    # images: Images
     kafka: Kafka
     mongodb: Mongodb
     resources: Resources
@@ -467,7 +467,7 @@ class OmecSubProvisionConfig(NFVCLBaseModel):
 
 class OmecSubProvision(NFVCLBaseModel):
     enable: bool
-    images: Images1
+    # images: Images1
     config: OmecSubProvisionConfig
 
 

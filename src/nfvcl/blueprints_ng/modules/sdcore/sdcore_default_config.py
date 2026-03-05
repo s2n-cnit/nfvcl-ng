@@ -3,9 +3,6 @@ from nfvcl.blueprints_ng.modules.sdcore.sdcore_values_model import SDCoreValuesM
 default_config: SDCoreValuesModel = SDCoreValuesModel.model_validate({
     "5g-control-plane": {
         "enable5G": True,
-        "images": {
-            "repository": "registry.opennetworking.org/docker.io/"
-        },
         "kafka": {
             "deploy": True
         },
@@ -118,9 +115,6 @@ default_config: SDCoreValuesModel = SDCoreValuesModel.model_validate({
     },
     "omec-sub-provision": {
         "enable": True,
-        "images": {
-            "repository": "registry.opennetworking.org/docker.io/"
-        },
         "config": {
             "simapp": {
                 "cfgFiles": {

@@ -53,8 +53,8 @@ class OAIBlueprintNGState(Generic5GK8sBlueprintNGState):
 
 @blueprint_type(OAI_CORE_BLUE_TYPE)
 class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
-
     default_upf_implementation = OAI_UPF_BLUE_TYPE
+    REQUIRE_UPF_NRF_REGISTRATION = True
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = OAIBlueprintNGState):
         """
@@ -140,8 +140,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         for sub_area in self.state.current_config.areas:
             # TODO this work only for oai UPF, with the sdcore one multiple UPFs may be deployed for a single area
             deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
-            oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, deployed_upf_info.network_info.n4_ip.exploded)
-            oai_utils.add_available_upf(self.state.oai_config_values.global_.coreconfig, sub_area.id)
+            oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, deployed_upf_info.network_info.n4_ip.exploded, deployed_upf_info.fqdn)
+            oai_utils.add_available_upf(self.state.oai_config_values.global_.coreconfig, sub_area.id, deployed_upf_info.fqdn)
 
             for _slice in sub_area.slices:
                 new_snssai = oai_utils.add_snssai(self.state.oai_config_values.global_.coreconfig, _slice.sliceId, _slice.sliceType)

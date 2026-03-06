@@ -32,6 +32,7 @@ class UPFBlueCreateModel(BlueprintNGCreateModel):
     area_id: AreaIDType = Field()
     networks: BlueCreateModelNetworks = Field()
     nrf_ip: Optional[SerializableIPv4Address] = Field(default=None)
+    fqdn: Optional[str] = Field(default=None, description="FQDN for the UPF, used for NRF registration")
     smf_ip: Optional[SerializableIPv4Address] = Field(default=None)
     slices: List[Slice5GWithDNNs] = Field(default_factory=list)
     start: Optional[bool] = Field(default=True)

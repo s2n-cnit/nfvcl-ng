@@ -71,6 +71,7 @@ CreateConfigTypeVar5G = TypeVar("CreateConfigTypeVar5G")
 
 class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel], Generic[StateTypeVar5G, CreateConfigTypeVar5G]):
     default_upf_implementation: Optional[str] = None
+    REQUIRE_UPF_NRF_REGISTRATION = False
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GBlueprintNGState] = StateTypeVar5G):
         super().__init__(blueprint_id, state_type)
@@ -261,7 +262,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             ),
             slices=slices,
             start=True,
-            nrf_ip=SerializableIPv4Address(self.get_nrf_ip()) if self.state.core_deployed else None,
+            nrf_ip=SerializableIPv4Address(self.get_nrf_ip()) if self.state.core_deployed and self.REQUIRE_UPF_NRF_REGISTRATION else None,
             smf_ip=SerializableIPv4Address(self.get_smf_ip()) if self.state.core_deployed else None,
             external_router=self.state.current_config.get_area(area_id).networks.external_router
         )

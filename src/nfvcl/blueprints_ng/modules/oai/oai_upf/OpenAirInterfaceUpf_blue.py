@@ -148,6 +148,7 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
             served_slices=self.state.current_config.slices,
             vm_resource_id=upf_vm.id,
             vm_configurator_id=self.state.upf_vm_configurator.id,
+            fqdn=f"oai-upf{self.state.current_config.area_id}",
             network_info=UPFNetworkInfo(
                 n4_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.cidr),
                 n3_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.cidr),

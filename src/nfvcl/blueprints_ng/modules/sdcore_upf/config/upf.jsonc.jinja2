@@ -159,21 +159,30 @@
         "dnn": "{{ dnn }}",
         "http_port": "8080",
         "enable_ue_ip_alloc": false,
-        // "use_fqdn": "true",
-        // "hostname": "upf-0",
+        "use_fqdn": true,
+        "hostname": "{{ n4_ip }}",
         "ue_ip_pool": "{{ ue_ip_pool_cidr }}"
     },
 
-    // p4rtc interface settings,
-    "p4rtciface": {
-        "access_ip": "172.17.0.1/32",
-        "p4rtc_server": "onos",
-        "p4rtc_port": "51001",
-        // [Optional] Set the UP4 slice identifier that this PFCP Agent instance belongs to. Default: 0
-        "slice_id": 0,
-        // [Optional] Default TC is ELASTIC
-        "default_tc": 3,
-        // [Optional] Whether to wipe out PFCP state from UP4 datapath on UP4 restart. Default: false
-        "clear_state_on_restart": false
-    }
+    // NRF registration (Needed for OAI core)
+    "nrf": {
+            "enable": {{ nrf.enable | lower }},
+            "nrf_ip": "{{ nrf.nrf_ip }}",
+            "nf_instance_id": "{{ nrf.nf_instance_id }}",
+            "nf_instance_name": "{{ nrf.nf_instance_name }}",
+            "fqdn": "{{ nrf.fqdn }}",
+            "ipv4_addresses": [{% for addr in nrf.ipv4_addresses %}"{{ addr }}"{% if not loop.last %}, {% endif %}{% endfor %}],
+            "priority": 1,
+            "capacity": 100,
+            "heartbeat_timer": 50,
+            "heartbeat_interval": "10s",
+            "snssais": [
+                {% for snssai in nrf.snssais %}
+                {
+                    "sst": {{ snssai.sst }},
+                    "sd": "{{ snssai.sd }}"
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ]
+        }
 }

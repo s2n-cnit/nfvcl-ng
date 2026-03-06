@@ -1,5 +1,6 @@
 from typing import Optional
 
+from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl_models.blueprint_ng.core5g.OAI_Models import Snssai, Baseconfig, Dnn, Upfconfig, \
     SNssaiUpfInfoListItem, DnnItem, Coreconfig, ServedGuamiListItem, UpfAvailable, \
     LocalSubscriptionInfo, QosProfile, SNssaiSmfInfoListItem, PlmnSupportListItem, OaiSmf, SMFHostAliases
@@ -154,7 +155,7 @@ def del_served_guami_list_item(config: Coreconfig, mcc: str, mnc: str) -> bool:
             return True
     return False
 
-def add_host_aliases(config: OaiSmf, area_id: int, ip_upf: str) -> SMFHostAliases:
+def add_host_aliases(config: OaiSmf, area_id: int, ip_upf: str, hostname: str) -> SMFHostAliases:
     """
     Add new "host alias" to OAI SMF configuration.
     :param config: config to add host alias to.
@@ -163,7 +164,7 @@ def add_host_aliases(config: OaiSmf, area_id: int, ip_upf: str) -> SMFHostAliase
     """
     new_hostalias = SMFHostAliases(
         ip=ip_upf,
-        hostnames=f"oai-upf{area_id}"
+        hostnames=hostname
     )
     if new_hostalias not in config.hostAliases:
         config.hostAliases.append(new_hostalias)
@@ -185,7 +186,7 @@ def add_host_aliases(config: OaiSmf, area_id: int, ip_upf: str) -> SMFHostAliase
 #     raise ValueError(f"Delete failed, oai-upf{area_id} doesnt exist")
 
 
-def add_available_upf(config: Coreconfig, area_id: int) -> Optional[UpfAvailable]:
+def add_available_upf(config: Coreconfig, area_id: int, upf_fqdn: str) -> Optional[UpfAvailable]:
     """
     Add "available upf" to OAI values configuration.
     :param config: config to add available upf to.
@@ -193,7 +194,7 @@ def add_available_upf(config: Coreconfig, area_id: int) -> Optional[UpfAvailable
     :return: new available upf, otherwise None.
     """
     new_upf_supported = UpfAvailable(
-        host=f"oai-upf{area_id}"
+        host=upf_fqdn
     )
     if new_upf_supported not in config.smf.upfs:
         config.smf.upfs.append(new_upf_supported)

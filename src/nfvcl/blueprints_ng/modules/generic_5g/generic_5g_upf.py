@@ -19,6 +19,7 @@ class DeployedUPFInfo(NFVCLBaseModel):
     network_info: Optional[UPFNetworkInfo] = Field(default=None)
     vm_resource_id: Optional[str] = Field(default=None)
     vm_configurator_id: Optional[str] = Field(default=None)
+    fqdn: Optional[str] = Field(default=None)
     helm_chart_resource_id: Optional[str] = Field(default=None)
     router_gnb_ip: Optional[SerializableIPv4Address] = Field(default=None)
 

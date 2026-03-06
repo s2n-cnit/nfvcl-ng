@@ -1,3 +1,4 @@
+import uuid
 from typing import Optional, List, Dict, Literal
 
 from pydantic import Field
@@ -23,6 +24,21 @@ class SdCoreUPFBlueprintNGState(Generic5GUPFVMBlueprintNGState):
     currently_deployed_dnns: Dict[str, DeployedUPFInfo] = Field(default_factory=dict)
     currently_enabled_green_modules: Optional[Dict[str, str]] = Field(default_factory=dict)
 
+class SDCoreUPFNRFSnssai(NFVCLBaseModel):
+    sst: int = Field()
+    sd: str = Field()
+
+
+class SDCoreUPFNRFRegistration(NFVCLBaseModel):
+    enable: bool = Field(default=False)
+    nrf_ip: str = Field(default="")
+    nf_instance_id: str = Field(default="")
+    nf_instance_name: str = Field(default="BESS-UPF")
+    fqdn: str = Field(default="")
+    ipv4_addresses: List[str] = Field(default_factory=list)
+    snssais: List[SDCoreUPFNRFSnssai] = Field(default_factory=list)
+
+
 class SDCoreUPFConfiguration(NFVCLBaseModel):
     upf_mode: str = Field()
 
@@ -45,6 +61,14 @@ class SDCoreUPFConfiguration(NFVCLBaseModel):
 
     dnn: str = Field()
     ue_ip_pool_cidr: str = Field()
+
+    n4_ip: str = Field()
+
+    # Cached next-hop MAC addresses (resolved via arping on first deploy, reused on reconfigure)
+    n3_nh_mac: Optional[str] = Field(default=None)
+    n6_nh_mac: Optional[str] = Field(default=None)
+
+    nrf: SDCoreUPFNRFRegistration = Field(default_factory=SDCoreUPFNRFRegistration)
 
 
 class SDCoreUPFGreenQueueConfiguration(NFVCLBaseModel):
@@ -78,9 +102,14 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
         upf_config_path = "/opt/upf/upf.jsonc"
         run_upf_config_path = "/opt/upf/run_upf.env"
 
-        # Get the n3 and n6 gateways mac addresses using ARP
-        ansible_builder.add_run_command_and_gather_output_tasks(f"sudo arping -r -c 1 -I {self.configuration.n3_nic_name} {self.configuration.n3_nh_ip}", "n3_nh_mac")
-        ansible_builder.add_run_command_and_gather_output_tasks(f"sudo arping -r -c 1 -I {self.configuration.n6_nic_name} {self.configuration.n6_nh_ip}", "n6_nh_mac")
+        if self.configuration.n3_nh_mac and self.configuration.n6_nh_mac:
+            # Use cached MAC addresses (interfaces are taken by DPDK after first deploy)
+            ansible_builder.set_var("n3_nh_mac", self.configuration.n3_nh_mac)
+            ansible_builder.set_var("n6_nh_mac", self.configuration.n6_nh_mac)
+        else:
+            # First deploy: resolve MAC addresses via arping
+            ansible_builder.add_run_command_and_gather_output_tasks(f"sudo arping -r -c 1 -I {self.configuration.n3_nic_name} {self.configuration.n3_nh_ip}", "n3_nh_mac")
+            ansible_builder.add_run_command_and_gather_output_tasks(f"sudo arping -r -c 1 -I {self.configuration.n6_nic_name} {self.configuration.n6_nh_ip}", "n6_nh_mac")
 
         ansible_builder.add_template_task(rel_path("config/upf.jsonc.jinja2"), upf_config_path)
         ansible_builder.add_template_task(rel_path("config/run_upf.env.jinja2"), run_upf_config_path)
@@ -143,8 +172,8 @@ class SDCoreUPFGreenQueueRemoveConfigurator(VmResourceAnsibleConfiguration):
 
         return ansible_builder.build()
 
-UPF_IMAGE_NAME = "sd-core-upf-v2.0.2-s2n-6"
-UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.0.2-s2n-6-ubuntu2404.qcow2"
+UPF_IMAGE_NAME = "sd-core-upf-v2.2.1-dev-s2n-1"
+UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.2.1-dev-s2n-1-ubuntu2404.qcow2"
 
 
 @blueprint_type(SDCORE_UPF_BLUE_TYPE)
@@ -175,11 +204,37 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
                 deployed_info = self.deploy_upf_vm(dnn)
                 self.state.upf_list.append(deployed_info)
                 self.state.currently_deployed_dnns[dnn] = deployed_info
+            else:
+                # Reconfigure existing VMs (e.g. when nrf_ip is provided in a subsequent update)
+                self.reconfigure_upf_vm(dnn)
         dnn_to_undeploy = set(self.state.currently_deployed_dnns) - set(dnns_to_deploy)
         for dnn in set(dnn_to_undeploy):
             deployed_info = self.undeploy_upf_vm(dnn)
             self.state.upf_list.remove(deployed_info)
             del self.state.currently_deployed_dnns[dnn]
+
+    def _build_nrf_registration(self, dnn: str, n4_ip: str) -> SDCoreUPFNRFRegistration:
+        """
+        Build the NRF registration config for a given DNN.
+        Returns a disabled registration if nrf_ip is not set.
+        """
+        if not self.state.current_config.nrf_ip:
+            return SDCoreUPFNRFRegistration()
+
+        upf_fqdn = self.state.current_config.fqdn if self.state.current_config.fqdn else f"upf-{self.state.current_config.area_id}-{dnn}"
+        snssais = [
+            SDCoreUPFNRFSnssai(sst=int(s.sst), sd=s.sd)
+            for s in self.get_slices_for_dnn(dnn)
+        ]
+        return SDCoreUPFNRFRegistration(
+            enable=True,
+            nrf_ip=self.state.current_config.nrf_ip.exploded,
+            nf_instance_id=str(uuid.uuid4()),
+            nf_instance_name=upf_fqdn,
+            fqdn=upf_fqdn,
+            ipv4_addresses=[n4_ip],
+            snssais=snssais,
+        )
 
     def deploy_upf_vm(self, dnn: str) -> DeployedUPFInfo:
         upf_vm = VmResource(
@@ -196,6 +251,10 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)
 
+        n4_ip = upf_vm.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.ip
+        nrf_registration = self._build_nrf_registration(dnn, n4_ip)
+        upf_fqdn = nrf_registration.fqdn if nrf_registration.enable else (self.state.current_config.fqdn if self.state.current_config.fqdn else f"upf-{self.state.current_config.area_id}-{dnn}")
+
         upf_vm_configurator = SDCoreUPFConfigurator(vm_resource=upf_vm, configuration=SDCoreUPFConfiguration(
             upf_mode="dpdk",
             n3_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n3.net_name][0].fixed.interface_name,
@@ -210,10 +269,18 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             n6_route="0.0.0.0/0",
             start=self.state.current_config.start,
             dnn=dnn,
-            ue_ip_pool_cidr=self.get_dnn_ip_pool(dnn)
+            n4_ip=n4_ip,
+            ue_ip_pool_cidr=self.get_dnn_ip_pool(dnn),
+            nrf=nrf_registration,
         ))
         self.register_resource(upf_vm_configurator)
-        self.provider.configure_vm(upf_vm_configurator)
+        fact_cache = self.provider.configure_vm(upf_vm_configurator)
+
+        # Save the resolved MAC addresses so they can be reused on subsequent reconfigurations
+        # (after DPDK takes over the interfaces, arping will no longer work)
+        if fact_cache.get("n3_nh_mac") and fact_cache.get("n6_nh_mac"):
+            upf_vm_configurator.configuration.n3_nh_mac = fact_cache["n3_nh_mac"]
+            upf_vm_configurator.configuration.n6_nh_mac = fact_cache["n6_nh_mac"]
 
         self.state.vm_resources[upf_vm.id] = upf_vm
         self.state.vm_configurators[upf_vm_configurator.id] = upf_vm_configurator
@@ -223,6 +290,7 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             served_slices=self.get_slices_for_dnn(dnn),
             vm_resource_id=upf_vm.id,
             vm_configurator_id=upf_vm_configurator.id,
+            fqdn=upf_fqdn,
             network_info=UPFNetworkInfo(
                 n4_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.create_config.networks.n4.net_name][0].fixed.cidr),
                 n3_cidr=SerializableIPv4Network(upf_vm.network_interfaces[self.create_config.networks.n3.net_name][0].fixed.cidr),
@@ -232,6 +300,28 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
                 n6_ip=SerializableIPv4Address(upf_vm.network_interfaces[self.create_config.networks.n6.net_name][0].fixed.ip)
             )
         )
+
+    def reconfigure_upf_vm(self, dnn: str):
+        """
+        Reconfigure an already deployed UPF VM, updating the NRF registration and other settings.
+        This is called during updates when the DNN already has a deployed VM.
+        """
+        upf_info = self.state.currently_deployed_dnns[dnn]
+        upf_vm = self.state.vm_resources[upf_info.vm_resource_id]
+        upf_vm_configurator = self.state.vm_configurators[upf_info.vm_configurator_id]
+
+        n4_ip = upf_vm.network_interfaces[self.state.current_config.networks.n4.net_name][0].fixed.ip
+        nrf_registration = self._build_nrf_registration(dnn, n4_ip)
+        upf_fqdn = nrf_registration.fqdn if nrf_registration.enable else (self.state.current_config.fqdn if self.state.current_config.fqdn else f"upf-{self.state.current_config.area_id}-{dnn}")
+
+        upf_vm_configurator.configuration.nrf = nrf_registration
+        upf_vm_configurator.configuration.ue_ip_pool_cidr = self.get_dnn_ip_pool(dnn)
+        upf_vm_configurator.configuration.start = self.state.current_config.start
+        self.provider.configure_vm(upf_vm_configurator)
+
+        # Update the deployed info
+        upf_info.served_slices = self.get_slices_for_dnn(dnn)
+        upf_info.fqdn = upf_fqdn
 
     def undeploy_upf_vm(self, dnn: str):
         upf_info = self.state.currently_deployed_dnns[dnn]

@@ -557,6 +557,18 @@ class NFVCL:
     def k8s_apply_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota, callback=None) -> OssCompliantResponse:
         return self.add_task(self.kubernetes_manager.apply_resource_quota_namespace, cluster_id, namespace, quota_name, quota, callback=callback)
 
+    @NFVCLPublic(path="/{cluster_id}/quota/{namespace}", section=K8S_SECTION, method=HttpRequestType.GET, sync=True, doc_by=KubernetesManager.list_resource_quotas_namespace)
+    def k8s_list_resource_quotas_namespace(self, cluster_id: str, namespace: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.list_resource_quotas_namespace, cluster_id, namespace, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/quota/{namespace}/{quota_name}", section=K8S_SECTION, method=HttpRequestType.DELETE, sync=True, doc_by=KubernetesManager.delete_resource_quota_namespace)
+    def k8s_delete_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.delete_resource_quota_namespace, cluster_id, namespace, quota_name, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/quota/{namespace}/{quota_name}", section=K8S_SECTION, method=HttpRequestType.PUT, sync=True, doc_by=KubernetesManager.update_resource_quota_namespace)
+    def k8s_update_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota, callback=None) -> OssCompliantResponse:
+        return self.add_task(self.kubernetes_manager.update_resource_quota_namespace, cluster_id, namespace, quota_name, quota, callback=callback)
+
     @NFVCLPublic(path="/{cluster_id}/nodes", section=K8S_SECTION, method=HttpRequestType.GET, sync=True, doc_by=KubernetesManager.get_nodes)
     def k8s_get_nodes(self, cluster_id: str, detailed: bool = False, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.get_nodes, cluster_id, detailed, callback=callback)

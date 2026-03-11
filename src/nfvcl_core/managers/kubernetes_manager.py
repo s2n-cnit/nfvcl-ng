@@ -2,8 +2,8 @@ from time import sleep
 from typing import List
 
 from kubernetes.client import V1PodList, V1Namespace, ApiException, V1ServiceAccountList, V1NamespaceList, \
-    V1RoleBinding, V1ClusterRoleBinding, V1ServiceAccount, V1Secret, V1SecretList, V1ResourceQuota, V1NodeList, V1Node, \
-    V1DeploymentList, V1Deployment, V1RoleList
+    V1RoleBinding, V1ClusterRoleBinding, V1ServiceAccount, V1Secret, V1SecretList, V1ResourceQuota, \
+    V1ResourceQuotaList, V1NodeList, V1Node, V1DeploymentList, V1Deployment, V1RoleList
 from kubernetes.utils import FailToCreateError
 
 from nfvcl_core.managers.blueprint_manager import BlueprintManager
@@ -680,6 +680,76 @@ class KubernetesManager(GenericManager):
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
         resp = OssCompliantResponse(status=OssStatus.ready, detail="Quota created", result=quota_resp.to_dict())
+        return resp
+
+    def list_resource_quotas_namespace(self, cluster_id: str, namespace: str) -> OssCompliantResponse:
+        """
+        List all resource quotas in a namespace.
+        Args:
+            cluster_id: The cluster on which the quotas reside
+
+            namespace: The namespace to list quotas from
+
+        Returns:
+            A list of resource quotas.
+        """
+        try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            quota_list: V1ResourceQuotaList = k8s_api.list_quotas_in_namespace(namespace_name=namespace)
+        except (ValueError, ApiException) as val_err:
+            self.logger.error(val_err)
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
+
+        resp = OssCompliantResponse(status=OssStatus.ready, detail="Quota list retrieved", result=quota_list.to_dict())
+        return resp
+
+    def delete_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str) -> OssCompliantResponse:
+        """
+        Delete a resource quota from a namespace.
+        Args:
+            cluster_id: The cluster on which the quota resides
+
+            namespace: The namespace from which the quota is deleted
+
+            quota_name: The name of the quota to delete
+
+        Returns:
+            The deleted quota.
+        """
+        try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            deleted_quota = k8s_api.delete_quota_from_namespace(namespace_name=namespace, quota_name=quota_name)
+        except (ValueError, ApiException) as val_err:
+            self.logger.error(val_err)
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
+
+        resp = OssCompliantResponse(status=OssStatus.ready, detail=f"Quota '{quota_name}' deleted", result={})
+        return resp
+
+    def update_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota) -> OssCompliantResponse:
+        """
+        Update (replace) a resource quota in a namespace.
+        Args:
+            cluster_id: The cluster on which the quota resides
+
+            namespace: The namespace target of the quota
+
+            quota_name: The name of the quota to update
+
+            quota: The new quantities to be set
+
+        Returns:
+            The updated quota.
+        """
+        try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            updated_quota: V1ResourceQuota = k8s_api.update_quota_in_namespace(
+                namespace_name=namespace, quota_name=quota_name, quota=quota)
+        except (ValueError, ApiException) as val_err:
+            self.logger.error(val_err)
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
+
+        resp = OssCompliantResponse(status=OssStatus.ready, detail=f"Quota '{quota_name}' updated", result=updated_quota.to_dict())
         return resp
 
     def get_nodes(self, cluster_id: str, detailed: bool = False):

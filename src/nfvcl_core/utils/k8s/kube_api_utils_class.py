@@ -11,9 +11,9 @@ from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccou
     V1ObjectMeta, V1RoleBinding, RbacV1Subject, V1RoleRef, V1Secret, V1SecretList, \
     V1CertificateSigningRequest, V1CertificateSigningRequestSpec, V1CertificateSigningRequestStatus, \
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1ClusterRoleBinding, V1ResourceQuota, \
-    V1ResourceQuotaSpec, V1Deployment, V1DeploymentSpec, V1NodeList, V1Node, V1Container, V1DaemonSetList, \
-    V1StorageClassList, V1PodList, V1ServiceList, V1DeploymentList, V1ConfigMap, VersionInfo, V1StorageClass, \
-    V1CustomResourceDefinitionList, V1RoleList
+    V1ResourceQuotaSpec, V1ResourceQuotaList, V1Deployment, V1DeploymentSpec, V1NodeList, V1Node, V1Container, \
+    V1DaemonSetList, V1StorageClassList, V1PodList, V1ServiceList, V1DeploymentList, V1ConfigMap, VersionInfo, \
+    V1StorageClass, V1CustomResourceDefinitionList, V1RoleList
 from kubernetes.stream import stream
 
 from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
@@ -518,6 +518,65 @@ class KubeApiUtils:
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>add_quota_to_namespace: {error}", http_equivalent_code=error.status)
 
         return created_quota
+
+    def list_quotas_in_namespace(self, namespace_name: str) -> V1ResourceQuotaList:
+        """
+        List all resource quotas in a namespace.
+
+        Args:
+            namespace_name: The namespace from which to list quotas
+
+        Returns:
+            The list of resource quotas in the namespace.
+        """
+        try:
+            quota_list = self.core_v1_api.list_namespaced_resource_quota(namespace=namespace_name)
+        except ApiException as error:
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>list_quotas_in_namespace: {error}", http_equivalent_code=error.status)
+
+        return quota_list
+
+    def delete_quota_from_namespace(self, namespace_name: str, quota_name: str) -> V1ResourceQuota:
+        """
+        Delete a resource quota from a namespace.
+
+        Args:
+            namespace_name: The namespace from which to delete the quota
+            quota_name: The name of the quota to delete
+
+        Returns:
+            The deleted quota.
+        """
+        try:
+            deleted_quota = self.core_v1_api.delete_namespaced_resource_quota(name=quota_name, namespace=namespace_name)
+        except ApiException as error:
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>delete_quota_from_namespace: {error}", http_equivalent_code=error.status)
+
+        return deleted_quota
+
+    def update_quota_in_namespace(self, namespace_name: str, quota_name: str, quota: K8sQuota) -> V1ResourceQuota:
+        """
+        Update (replace) a resource quota in a namespace.
+
+        Args:
+            namespace_name: The namespace on which the quota is applied
+            quota_name: The name of the quota to update
+            quota: The new quantities to be set
+
+        Returns:
+            The updated quota.
+        """
+        try:
+            spec = quota.model_dump(by_alias=True, exclude_none=True)
+            res_spec = V1ResourceQuotaSpec(hard=spec)
+            metadata = V1ObjectMeta(name=quota_name)
+            res_quota = V1ResourceQuota(metadata=metadata, spec=res_spec)
+
+            updated_quota = self.core_v1_api.replace_namespaced_resource_quota(name=quota_name, namespace=namespace_name, body=res_quota)
+        except ApiException as error:
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>update_quota_in_namespace: {error}", http_equivalent_code=error.status)
+
+        return updated_quota
 
     def add_container_to_namespaced_deployment(self, namespace_name: str, deployment_name: str, container: V1Container) -> V1Deployment:
         """

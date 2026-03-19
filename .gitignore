@@ -17,3 +17,4 @@ helm_charts/index.yaml
 config_unitest_dev.yaml
 config_dev.yaml
 src/nfvcl/_version.py
+.venv/*

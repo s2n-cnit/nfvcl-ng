@@ -1,5 +1,3 @@
-
-
 from typing import List
 
 from pydantic import Field
@@ -12,7 +10,6 @@ class Pfcp(NFVCLBaseModel):
     node_id: str = Field(..., alias='nodeID')
     retrans_timeout: str = Field(..., alias='retransTimeout')
     max_retrans: int = Field(..., alias='maxRetrans')
-
 
 class IfListItem(NFVCLBaseModel):
     addr: str
@@ -35,6 +32,10 @@ class Logger(NFVCLBaseModel):
     report_caller: bool = Field(..., alias='reportCaller')
 
 
+class GrpcServer(NFVCLBaseModel):
+    enable: bool
+    addr: str
+
 class Free5gcUpfConfig(NFVCLBaseModel):
     version: str
     description: str
@@ -42,3 +43,4 @@ class Free5gcUpfConfig(NFVCLBaseModel):
     gtpu: Gtpu
     dnn_list: List[DnnListItem] = Field(..., alias='dnnList')
     logger: Logger
+    grpc_server: GrpcServer = Field(alias='grpcServer')

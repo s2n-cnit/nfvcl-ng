@@ -58,6 +58,7 @@ class SDCoreUPFConfiguration(NFVCLBaseModel):
     n6_route: str = Field()
 
     start: bool = Field()
+    only_datapath: bool = Field(default=False)
 
     dnn: str = Field()
     ue_ip_pool_cidr: str = Field()
@@ -117,7 +118,12 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.set_vars_from_fields(self.configuration)
 
         if self.configuration.start:
-            ansible_builder.add_service_task("sdcore-upf", ServiceState.RESTARTED, True)
+            if self.configuration.only_datapath:
+                ansible_builder.add_service_task("sdcore-upf", ServiceState.STOPPED, False)
+                ansible_builder.add_service_task("bess-datapath", ServiceState.RESTARTED, True)
+            else:
+                ansible_builder.add_service_task("bess-datapath", ServiceState.STOPPED, False)
+                ansible_builder.add_service_task("sdcore-upf", ServiceState.RESTARTED, True)
 
         return ansible_builder.build()
 
@@ -172,8 +178,8 @@ class SDCoreUPFGreenQueueRemoveConfigurator(VmResourceAnsibleConfiguration):
 
         return ansible_builder.build()
 
-UPF_IMAGE_NAME = "sd-core-upf-v2.2.1-dev-s2n-1"
-UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.2.1-dev-s2n-1-ubuntu2404.qcow2"
+UPF_IMAGE_NAME = "sd-core-upf-v2.2.1-dev-s2n-6"
+UPF_IMAGE_URL = "https://images.tnt-lab.unige.it/sd-core-upf/sd-core-upf-v2.2.1-dev-s2n-6-ubuntu2404.qcow2"
 
 
 @blueprint_type(SDCORE_UPF_BLUE_TYPE)
@@ -268,6 +274,7 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             n3_route=self.state.current_config.gnb_cidr.exploded,
             n6_route="0.0.0.0/0",
             start=self.state.current_config.start,
+            only_datapath=self.state.current_config.only_datapath,
             dnn=dnn,
             n4_ip=n4_ip,
             ue_ip_pool_cidr=self.get_dnn_ip_pool(dnn),

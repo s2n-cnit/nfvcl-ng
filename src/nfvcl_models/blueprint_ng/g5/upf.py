@@ -36,6 +36,7 @@ class UPFBlueCreateModel(BlueprintNGCreateModel):
     smf_ip: Optional[SerializableIPv4Address] = Field(default=None)
     slices: List[Slice5GWithDNNs] = Field(default_factory=list)
     start: Optional[bool] = Field(default=True)
+    only_datapath: Optional[bool] = Field(default=False)
     # Optional because if the UPF is a PDU the routing is fixed
     n3_gateway_ip: Optional[SerializableIPv4Address] = Field(default=None)
     n6_gateway_ip: Optional[SerializableIPv4Address] = Field(default=None)

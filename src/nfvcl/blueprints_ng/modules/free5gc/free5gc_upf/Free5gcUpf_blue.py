@@ -54,7 +54,7 @@ class Free5gcUpfConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.set_var("upf_id", self.upf_id)
         ansible_builder.set_var("upf_conf", self.upf_conf)
         ansible_builder.set_var("n6", self.n6)
-        ansible_builder.set_var("n6_gateway", self.n6)
+        ansible_builder.set_var("n6_gateway", self.n6_gateway)
         ansible_builder.set_var("n3_gateway", self.n3_gateway)
         ansible_builder.set_var("gnb_cidr", self.gnb_cidr)
 
@@ -94,12 +94,13 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
         upf_vm = VmResource(
             area=self.state.current_config.area_id,
             name=f"{self.id}_FREE5GC_UPF_{self.state.current_config.area_id}",
-            image=VmResourceImage(name="Free5GC_UPF_4.0.0", url="https://images.tnt-lab.unige.it/free5gcupf/free5gcupf-v4.0.0-ubuntu2204.qcow2"),
+            image=VmResourceImage(name="Free5GC_UPF_v1.2.8-s2n-3", url="https://images.tnt-lab.unige.it/free5gcupf/free5gcupf-v1.2.8-s2n-3-ubuntu2404.qcow2"),
             flavor=VmResourceFlavor(),
             username="ubuntu",
             password="ubuntu",
             management_network=self.state.current_config.networks.mgt.net_name,
-            additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name]
+            additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name],
+            require_port_security_disabled=True
         )
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)
@@ -142,6 +143,8 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
                 )
                 if dnn_item not in self.state.upf_conf.dnn_list:
                     self.state.upf_conf.dnn_list.append(dnn_item)
+
+        self.state.upf_conf.grpc_server.enable = self.state.current_config.only_datapath
 
         upf_conf_yaml = yaml.dump(json.loads(self.state.upf_conf.model_dump_json(by_alias=True)))
 

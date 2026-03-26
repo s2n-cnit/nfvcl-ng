@@ -22,3 +22,5 @@ from .vyos import *
 from .athonet import *
 from .monitoring import *
 from .simple_5g import *
+from .router import *
+from .multipath_upf import *

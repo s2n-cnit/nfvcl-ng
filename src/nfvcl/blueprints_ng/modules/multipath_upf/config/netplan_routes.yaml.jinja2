@@ -1,0 +1,15 @@
+network:
+  version: 2
+  ethernets:
+{% if routes_by_interface is defined and routes_by_interface | length > 0 %}
+{% for interface, routes in routes_by_interface.items() %}
+    {{ interface }}:
+      routes:
+{% for route in routes %}
+        - to: {{ route.destination }}
+          via: {{ route.next_hop }}
+{% endfor %}
+{% endfor %}
+{% else %}
+    lo: {}
+{% endif %}

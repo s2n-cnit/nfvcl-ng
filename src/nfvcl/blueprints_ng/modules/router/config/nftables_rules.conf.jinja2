@@ -1,0 +1,18 @@
+#!/usr/sbin/nft -f
+
+flush ruleset
+{% if nftables_tables is defined %}
+{% for table in nftables_tables %}
+
+table {{ table.family }} {{ table.name }} {
+{% for chain in table.chains %}
+    chain {{ chain.name }} {
+        type {{ chain.type }} hook {{ chain.hook }} priority {{ chain.priority }}; policy {{ chain.policy }};
+{% for rule in chain.rules %}
+        {{ rule }}
+{% endfor %}
+    }
+{% endfor %}
+}
+{% endfor %}
+{% endif %}

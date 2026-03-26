@@ -1,0 +1,88 @@
+// SPDX-FileCopyrightText: 2025-present Open Networking Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Example configuration for multi-datapath UPF with lifecycle management
+// This demonstrates how to configure SSH-based lifecycle management for datapaths
+{
+    // Multi-datapath configuration with lifecycle management
+    "datapaths": [
+      {
+        "name": "datapath_bess",
+        "type": "bess",
+        "grpc_addr": "{{ bess_dp.mgmt_ip }}:10514",
+        "access_ip": "{{ bess_dp.n3_ip }}",
+        "core_ip": "{{ bess_dp.n6_ip }}",
+        "mode": "dpdk",
+        // Optional lifecycle management configuration
+        "lifecycle_management": {
+          // SSH connection details for remote datapath control
+          "ssh": {
+            "host": "{{ bess_dp.mgmt_ip }}",
+            "port": 22,
+            "user": "ubuntu",
+            // Use either password or private_key for authentication
+            "password": "ubuntu",
+            // "private_key": "/path/to/private/key",
+            "timeout": "10s"
+          },
+          // Command to start the datapath (will be executed via SSH)
+          "start_command": "cd /opt/upf && sudo /opt/upf/run_upf.sh --datapath-only",
+          // Command to stop the datapath (will be executed via SSH)
+          "stop_command": "cd /opt/upf && sudo /opt/upf/stop_upf.sh",
+          // Optional: command to check if datapath is ready (uses exit code: 0 = ready)
+          // This will be polled every 1 second for up to 30 seconds after start
+          "ready_check_cmd": "sudo /opt/upf/check.sh"
+        }
+      },
+      {
+        "name": "datapath_free",
+        "type": "free5gc",
+        "grpc_addr": "{{ free5gc_dp.mgmt_ip }}:10514",
+        "access_ip": "{{ free5gc_dp.n3_ip }}",
+        "core_ip": "{{ free5gc_dp.n6_ip }}"
+        // This datapath has no lifecycle_management, so it's assumed to be always running
+        // When switching away from this datapath, rules will be deleted instead of stopping it
+      }
+    ],
+    // [Optional] Router configuration for automatic static route management
+    // When configured, the router's static route will be updated during datapath switching
+    // to direct UE traffic to the active datapath's core IP
+    "router": {
+      "ssh": {
+        "host": "{{ router_internet.mgmt_ip }}",
+        "port": 22,
+        "user": "ubuntu",
+        "password": "ubuntu",
+        //       "private_key": "/home/user/.ssh/id_rsa",
+        "timeout": "10s"
+      },
+      "n6_interface": "{{ router_internet.n6_interface }}"
+    },
+    "access": {
+      "ifname": "{{ n3_nic_name }}"
+    },
+    "core": {
+      "ifname": "{{ n6_nic_name }}"
+    },
+    "cpiface": {
+        "dnn": "{{ dnn }}",
+        "http_port": "8080",
+        "enable_ue_ip_alloc": false,
+        "use_fqdn": true,
+        "hostname": "{{ n4_ip }}",
+        "ue_ip_pool": "{{ ue_ip_pool_cidr }}"
+    },
+    "enable_end_marker": false,
+    "enable_notify_bess": false,
+    "enable_gtpu_path_monitoring": false,
+    "measure_flow": false,
+    "log_level": "debug",
+    "max_req_retries": 5,
+    "resp_timeout": "2s",
+    "read_timeout": 15,
+    "enable_hbTimer": true,
+    "heart_beat_interval": "5s",
+    "nrf": {
+      "enable": false
+    }
+  }

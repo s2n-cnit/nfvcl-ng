@@ -1,0 +1,6 @@
+#!/bin/bash
+{% if offload_interfaces is defined %}
+{% for iface in offload_interfaces %}
+ethtool --offload {{ iface }} rx off tx off
+{% endfor %}
+{% endif %}

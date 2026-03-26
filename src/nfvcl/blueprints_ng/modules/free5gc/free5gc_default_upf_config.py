@@ -32,5 +32,9 @@ default_upf_config: Free5gcUpfConfig = Free5gcUpfConfig.model_validate({
         "enable": True,
         "level": "info",
         "reportCaller": True
+    },
+    "grpcServer": {
+        "enable": False,
+        "addr": "0.0.0.0:10514"
     }
 })

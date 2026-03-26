@@ -7,6 +7,3 @@ done
 ip r replace {{ gnb_cidr }} via {{ n3_gateway }}
 ip r replace default via {{ n6_gateway }} table 1000
 ip rule add iif upfgtp lookup 1000
-iptables -t nat -C POSTROUTING -o {{ n6 }} -j MASQUERADE || iptables -t nat -A POSTROUTING -o {{ n6 }} -j MASQUERADE
-iptables -C FORWARD -i upfgtp -o {{ n6 }} -j ACCEPT || iptables -A FORWARD -i upfgtp -o {{ n6 }} -j ACCEPT
-iptables -C FORWARD -i {{ n6 }} -o upfgtp -m state --state RELATED,ESTABLISHED -j ACCEPT || iptables -A FORWARD -i {{ n6 }} -o upfgtp -m state --state RELATED,ESTABLISHED -j ACCEPT

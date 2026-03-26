@@ -124,7 +124,8 @@ def configure_vm_ansible(vm_resource_configuration: VmResourceAnsibleConfigurati
         vm_resource_configuration.vm_resource.username,
         vm_resource_configuration.vm_resource.password,
         playbook_str,
-        logger
+        logger,
+        become_password=vm_resource_configuration.vm_resource.become_password
     )
 
     return fact_cache

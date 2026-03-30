@@ -132,7 +132,7 @@ class Generic5GRICBlueprintNG(BlueprintNG[Generic5GRICBlueprintNGState, RICBlueC
         pass
 
     @final
-    def get_connected_gnbs(self):
+    def get_connected_gnbs(self) -> List[tuple[str, str]]:
         return list(self.state.gnb_ids.items())
 
     @day2_function("/update", [HttpRequestType.PUT])
@@ -155,7 +155,7 @@ class Generic5GRICBlueprintNG(BlueprintNG[Generic5GRICBlueprintNGState, RICBlueC
         self.run_xapp(xapp)
 
     @day2_function("/get_xapps", [HttpRequestType.GET])
-    def day2_get_xapps(self):
+    def day2_get_xapps(self) -> List[str]:
         return self.get_xapps()
 
     @day2_function("/delete_xapp", [HttpRequestType.PUT])
@@ -163,5 +163,5 @@ class Generic5GRICBlueprintNG(BlueprintNG[Generic5GRICBlueprintNGState, RICBlueC
         self.delete_xapp(xapp)
 
     @day2_function("/connected_gnbs", [HttpRequestType.GET])
-    def day2_connected_gnbs(self):
+    def day2_connected_gnbs(self) -> List[tuple[str, str]]:
         self.get_connected_gnbs()

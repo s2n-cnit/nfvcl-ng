@@ -11,7 +11,7 @@ from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_common.utils.api_utils import HttpRequestType
 from nfvcl_core_models.linux.ip import Route
-from nfvcl_core_models.network.network_models import PduModel
+from nfvcl_core_models.network.network_models import PduModel, PduLockType
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_core_models.network.network_models import PduType, MultusInterface
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
@@ -117,7 +117,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         This method should raise an exception if the prerequisites are not met
         """
         for pdu_model in self.get_gnb_pdus():
-            if self.provider.is_pdu_locked(pdu_model):
+            if self.provider.is_pdu_locked(pdu_model, PduLockType.CORE):
                 raise BlueprintNGException(f"GNB PDU {pdu_model.name} is already locked")
         # for area in self.state.current_config.areas:
         #     if area.networks.n6.type == NetworkEndPointType.MULTUS:
@@ -379,10 +379,10 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         Update the GNBs config
         """
         for pdu in self.get_gnb_pdus():
-            if not self.provider.is_pdu_locked_by_current_blueprint(pdu):
-                self.provider.lock_pdu(pdu)
+            if not self.provider.is_pdu_locked_by_current_blueprint(pdu, PduLockType.CORE):
+                self.provider.lock_pdu(pdu, PduLockType.CORE)
                 self.set_gnb_id(pdu.name)
-            configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+            configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu, PduLockType.CORE)
 
             # TODO nci is calculated with tac, is this correct?
             slices = []
@@ -417,9 +417,9 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             for pdu_name in ran_area_info.pdu_names:
                 try:
                     pdu = self.provider.find_pdu(int(ran_area_id), PduType.GNB, name=pdu_name)
-                    configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+                    configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu, PduLockType.CORE)
                     configurator_instance.detach(GNBPDUDetach(area=int(ran_area_id)))
-                    self.provider.unlock_pdu(pdu)
+                    self.provider.unlock_pdu(pdu, PduLockType.CORE)
                     if pdu_name in self.state.gnb_ids:
                         del self.state.gnb_ids[pdu_name]
                 except Exception as e:
@@ -449,9 +449,9 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             for pdu_name in pdus_to_remove:
                 try:
                     pdu = self.provider.find_pdu(int(ran_area_id), PduType.GNB, name=pdu_name)
-                    configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+                    configurator_instance: GNBPDUConfigurator = self.provider.get_pdu_configurator(pdu, PduLockType.CORE)
                     configurator_instance.detach(GNBPDUDetach(area=int(ran_area_id)))
-                    self.provider.unlock_pdu(pdu)
+                    self.provider.unlock_pdu(pdu, PduLockType.CORE)
                     if pdu_name in self.state.gnb_ids:
                         del self.state.gnb_ids[pdu_name]
                     # Remove from ran_area_info.pdu_names
@@ -806,7 +806,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             raise BlueprintNGException(f"PDU {attach_gnb_model.pdu_name} not found in area {attach_gnb_model.area_id}")
 
         # Check if PDU is already locked
-        if self.provider.is_pdu_locked(pdu):
+        if self.provider.is_pdu_locked(pdu, PduLockType.CORE):
             raise BlueprintNGException(f"GNB PDU {attach_gnb_model.pdu_name} is already locked")
 
         # Add PDU to area's pduList if not already present

@@ -22,6 +22,7 @@ from .vyos import *
 from .athonet import *
 from .monitoring import *
 from .simple_5g import *
+from .ric.oran_sc import *
 from .loadcore_agent import *
 from .router import *
 from .multipath_upf import *

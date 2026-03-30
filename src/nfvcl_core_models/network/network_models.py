@@ -8,6 +8,7 @@ from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
 from nfvcl_common.utils.util import generate_id
 
+
 # TODO remove but do a transaction in the DB for NetworkModel (see below)
 class NetworkTypeEnum(str, Enum):
     vlan: str = 'vlan'
@@ -20,7 +21,6 @@ class IPv4Pool(NFVCLBaseModel):
     name: str = Field(default_factory=generate_id)
     start: SerializableIPv4Address
     end: SerializableIPv4Address
-
 
     def __eq__(self, other):
         """
@@ -78,13 +78,16 @@ class IPv4Pool(NFVCLBaseModel):
         """
         return self.start <= ip <= self.end
 
+
 class PoolAssignation(str, Enum):
     K8S_CLUSTER: str = 'K8S_CLUSTER'
     MANUAL: str = 'MANUAL'
 
+
 class IPv4ReservedRangeRequest(NFVCLBaseModel):
     k8s_cluster_id: str = Field(description="The ID of the Kubernetes cluster to which the reserved range belongs")
     length: PositiveInt = Field(description="The length of the reserved range")
+
 
 class IPv4ReservedRange(IPv4Pool):
     """
@@ -347,6 +350,7 @@ class NetworkModel(BaseModel):
                 return reserved_range
         raise ValueError(f"Reserved range containing IP >{reserved_ip}< is not present in the network.")
 
+
 class RouterPortModel(BaseModel):
     net: str
     ip_addr: SerializableIPv4Address
@@ -379,6 +383,7 @@ class NetworkInterfaceModel(NFVCLBaseModel):
     network: Optional[SerializableIPv4Network] = Field(default=None, description="The network attached to the network interface")
     gateway: Optional[SerializableIPv4Address] = Field(default=None, description="The IPv4 address of the gateway on the network attached")
 
+
 class MultusInterface(NFVCLBaseModel):
     ip_address: SerializableIPv4Address = Field(description="The IP address assigned to the multus interface")
     gateway_ip: Optional[SerializableIPv4Address] = Field(default=None, description="The IP address of the gateway for the multus interface")
@@ -387,6 +392,7 @@ class MultusInterface(NFVCLBaseModel):
     prefixlen: int = Field(description="The prefix length of the IP address assigned to the multus interface")
     network_name: str = Field(description="The name of the network to which the multus interface is attached")
 
+
 class PduType(str, Enum):
     LINUX: str = 'LINUX'
     GNB: str = 'GNB'
@@ -394,6 +400,17 @@ class PduType(str, Enum):
     RU: str = 'RU'
     CUDU: str = 'CUDU'
     CORE5G: str = 'CORE5G'
+
+
+class PduLockType(str, Enum):
+    CORE: str = 'CORE'
+    RIC: str = 'RIC'
+    GENERIC: str = 'GENERIC'
+
+
+class PduLock(BaseModel):
+    type: PduLockType = Field(description="The type of lock that is applied to the PDU")
+    blueprint_id: str = Field(description="The id of the blueprint who locked the PDU")
 
 
 class PduModel(BaseModel):
@@ -413,7 +430,7 @@ class PduModel(BaseModel):
 
     config: dict = Field(default={}, description="Additional configuration parameters needed by the PDU to be accessed/configured")
 
-    locked_by: Optional[str] = Field(default=None, description="The id of the blueprint who locked the PDU")
+    locked_list_by: Optional[List[PduLock]] = Field(default_factory=list, description="The list of locks applied to the PDU")
 
     # last_applied_config: dict = Field(default={}, description="The last configuration used by the configurator to set up the device")
 

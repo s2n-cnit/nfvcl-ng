@@ -1,0 +1,17 @@
+[Unit]
+Description=XAPP {{ xapp_name }}
+After=network.target
+After=docker.service
+BindsTo=docker.service
+ReloadPropagatedFrom=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/oran/xapp-runner/
+ExecStart=/root/oran/xapp-runner/start_{{ xapp_name }}.sh
+RemainAfterExit=true
+ExecStop=/root/oran/xapp-runner/stop_{{ xapp_name }}.sh
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

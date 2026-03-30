@@ -1,0 +1,35 @@
+---
+- hosts: all
+  become: true
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: s2n_cnit.nfvcl.liteon
+  tasks:
+  - name: Enter config mode
+    cli_command:
+      command: configure terminal
+
+  - name: Get MCC-MNC
+    cli_command:
+      command: mcc-mnc
+    register: mcc_mnc_output
+
+  - name: Set mcc_mnc as fact
+    ansible.builtin.set_fact:
+      cacheable: true
+      mcc_mnc: "{{ mcc_mnc_output.stdout }}"
+
+  - name: Get gNBId
+    cli_command:
+      command: gnbid
+    register: gnbid_output
+
+  - name: Set gnbid as fact
+    ansible.builtin.set_fact:
+      cacheable: true
+      gnbid: "{{ gnbid_output.stdout }}"
+
+  - name: Exit configuration mode
+    cli_command:
+      command: exit
+...

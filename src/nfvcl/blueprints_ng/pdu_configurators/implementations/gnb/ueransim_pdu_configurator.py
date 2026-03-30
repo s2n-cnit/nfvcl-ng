@@ -1,6 +1,6 @@
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
 from nfvcl_core.managers.getters import get_blueprint_manager
-from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach, GNBPDURic
 
 
 class UERANSIMPDUConfigurator(GNBPDUConfigurator):
@@ -9,3 +9,9 @@ class UERANSIMPDUConfigurator(GNBPDUConfigurator):
 
     def detach(self, config: GNBPDUDetach):
         get_blueprint_manager().call_function(self.pdu_model.config["blue_id"], "detach_gnb", config)
+
+    def configure_ric(self, config: GNBPDURic):
+        raise NotImplementedError("Not supported by UERANSIM PDU")
+
+    def get_gnb_id(self):
+        raise NotImplementedError("Not implemented yet")

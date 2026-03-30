@@ -8,7 +8,7 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprint
 from nfvcl_models.blueprint_ng.athonet.core import ProvisionedDataInfo,AthonetApplicationCoreConfig
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubSubscribers, SubArea, SubSnssai, SubDataNets
 from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GAddDnnModel, Core5GDelDnnModel
-from nfvcl_core_models.network.network_models import PduType
+from nfvcl_core_models.network.network_models import PduType, PduLockType
 
 ATHONET_BLUE_TYPE = "athonet"
 
@@ -41,8 +41,8 @@ class AthonetCore(Generic5GBlueprintNG[AthonetCoreBlueprintNGState, Create5gMode
             raise Exception("Athonet does not support multiple areas yet")
 
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        self.provider.lock_pdu(pdu)
-        configurator = self.provider.get_pdu_configurator(pdu)
+        self.provider.lock_pdu(pdu, PduLockType.GENERIC)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
 
         if len(configurator.dnnvrfmapping.dnns) < len(create_model.config.network_endpoints.data_nets):
             raise Exception(f"Error, maximum number of supported dnn is {len(configurator.dnnvrfmapping.dnns)}")
@@ -59,7 +59,7 @@ class AthonetCore(Generic5GBlueprintNG[AthonetCoreBlueprintNGState, Create5gMode
 
     def destroy(self):
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.restore_base_config(self.state.backup_config)
         super().destroy()
 
@@ -85,50 +85,50 @@ class AthonetCore(Generic5GBlueprintNG[AthonetCoreBlueprintNGState, Create5gMode
 
     def add_ues(self, subscriber_model: Core5GAddSubscriberModel):
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         addiotional_infos = self.ues_additional_infos(subscriber_model.snssai)
         super().add_ues(subscriber_model)
         configurator.add_user(subscriber_model, addiotional_infos)
 
     def del_ues(self, subscriber_model: Core5GDelSubscriberModel):
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.del_user(f"imsi-{subscriber_model.imsi}")
         super().del_ues(subscriber_model)
 
     def add_slice(self, add_slice_model: Core5GAddSliceModel, oss: bool):
         super().add_slice(add_slice_model, oss)
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.configure(self.state.current_config)
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
         super().del_slice(del_slice_model)
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.configure(self.state.current_config)
 
     def update_core(self):
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.configure(self.state.current_config)
 
     def get_amf_ip(self) -> str:
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         return configurator.get_amf_ip()
 
     def del_dnn(self, del_dnn_model: Core5GDelDnnModel):
         super().del_dnn(del_dnn_model)
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.configure(self.state.current_config)
         self.update_edge_areas()
 
     def add_dnn(self, dnn_model: Core5GAddDnnModel):
         super().add_dnn(dnn_model)
         pdu = self.provider.find_pdu(self.state.current_config.areas[0].id, PduType.CORE5G, 'AthonetCore')
-        configurator = self.provider.get_pdu_configurator(pdu)
+        configurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.configure(self.state.current_config)
         self.update_edge_areas()
 

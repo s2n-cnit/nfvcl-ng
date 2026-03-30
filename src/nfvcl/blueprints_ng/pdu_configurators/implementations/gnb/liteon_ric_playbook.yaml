@@ -1,0 +1,27 @@
+---
+- hosts: all
+  become: true
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: s2n_cnit.nfvcl.liteon
+  tasks:
+  - name: Enter config mode
+    cli_command:
+      command: configure terminal
+
+  - name: Set Ric IP address
+    cli_command:
+      command: ric-remote-ip {{ remote_ip }}
+
+  - name: Set Ric Port
+    cli_command:
+      command: ric-remote-port {{ remote_port }}
+
+  - name: Commit changes
+    cli_command:
+      command: commit
+
+  - name: Exit configuration mode
+    cli_command:
+      command: exit
+...

@@ -6,7 +6,7 @@ from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder, ServiceState
 from nfvcl.blueprints_ng.pdu_configurators.pdu_configurator import PDUException
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
+from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach, GNBPDURic
 from nfvcl_core_models.resources import PDUResourceAnsibleConfiguration
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_common.ansible_utils import run_ansible_playbook
@@ -95,3 +95,11 @@ class AmariPDUConfigurator(GNBPDUConfigurator):
 
         if ansible_runner_result.status == "failed":
             raise PDUException("Error configuring Amarisoft GNB")
+
+    def configure_ric(self, config: GNBPDURic):
+        raise NotImplementedError("Not supported by Amarisoft PDU")
+
+    def get_gnb_id(self):
+        raise NotImplementedError("Not implemented yet")
+
+

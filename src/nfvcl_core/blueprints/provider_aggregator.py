@@ -5,7 +5,7 @@ from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj
 from nfvcl_core.managers.topology_manager import TopologyManager
 from nfvcl_core.managers.vim_clients_manager import VimClientsManager
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
-from nfvcl_core_models.network.network_models import PduType, PduModel, MultusInterface
+from nfvcl_core_models.network.network_models import PduType, PduModel, MultusInterface, PduLockType
 from nfvcl_core_models.providers.providers import BlueprintNGProviderModel, ProviderDataAggregate
 from nfvcl_core_models.resources import VmResource, NetResource, VmResourceConfiguration, HelmChartResource, VmStatus
 from nfvcl_providers.blueprint.blueprint_provider import BlueprintProvider
@@ -222,20 +222,20 @@ class ProvidersAggregator:
     def find_pdus(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None) -> List[PduModel]:
         return self.get_pdu_provider().find_pdus(area, pdu_type, instance_type)
 
-    def is_pdu_locked(self, pdu_model: PduModel) -> bool:
-        return self.get_pdu_provider().is_pdu_locked(pdu_model)
+    def is_pdu_locked(self, pdu_model: PduModel, lock_type: PduLockType) -> bool:
+        return self.get_pdu_provider().is_pdu_locked(pdu_model, lock_type)
 
-    def is_pdu_locked_by_current_blueprint(self, pdu_model: PduModel) -> bool:
-        return self.get_pdu_provider().is_pdu_locked_by_current_blueprint(pdu_model)
+    def is_pdu_locked_by_current_blueprint(self, pdu_model: PduModel, lock_type: PduLockType) -> bool:
+        return self.get_pdu_provider().is_pdu_locked_by_current_blueprint(pdu_model, lock_type)
 
-    def lock_pdu(self, pdu_model: PduModel) -> PduModel:
-        return self.get_pdu_provider().lock_pdu(pdu_model)
+    def lock_pdu(self, pdu_model: PduModel, lock_type: PduLockType) -> PduModel:
+        return self.get_pdu_provider().lock_pdu(pdu_model, lock_type)
 
-    def unlock_pdu(self, pdu_model: PduModel) -> PduModel:
-        return self.get_pdu_provider().unlock_pdu(pdu_model)
+    def unlock_pdu(self, pdu_model: PduModel, lock_type: PduLockType) -> PduModel:
+        return self.get_pdu_provider().unlock_pdu(pdu_model, lock_type)
 
-    def get_pdu_configurator(self, pdu_model: PduModel) -> Any:
-        return self.get_pdu_provider().get_pdu_configurator(pdu_model)
+    def get_pdu_configurator(self, pdu_model: PduModel, lock_type: PduLockType) -> Any:
+        return self.get_pdu_provider().get_pdu_configurator(pdu_model, lock_type)
 
     def check_networks(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
         return self.get_virt_provider(area).check_networks(networks_to_check)

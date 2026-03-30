@@ -7,6 +7,7 @@ from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.pdu_configurators.implementations.generic_linux_pdu_configurator import GenericLinuxPDUConfigurator
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGCreateModel
+from nfvcl_core_models.network.network_models import PduLockType
 from nfvcl_core_models.resources import PDUResourceAnsibleConfiguration
 
 
@@ -53,9 +54,9 @@ class ExamplePDUBlueprintNG(BlueprintNG[ExamplePDUBlueprintNGState, ExamplePDUCr
         # Find the PDU
         pdu = self.provider.find_by_name(create_model.pdu_name)
         # Lock the PDU to this blueprint
-        self.provider.lock_pdu(pdu)
+        self.provider.lock_pdu(pdu, PduLockType.CORE)
         # Get the configurator
-        configurator: GenericLinuxPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+        configurator: GenericLinuxPDUConfigurator = self.provider.get_pdu_configurator(pdu, PduLockType.CORE)
         # Run a configurator function
         configurator.run_ansible(ExamplePDUConfigurator().dump_playbook())
 

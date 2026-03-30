@@ -1,0 +1,40 @@
+version: '3.9'
+
+services:
+  python_xapp_runner:
+    container_name: python_xapp_runner
+    hostname: python_xapp_runner
+    image: docker-registry.tnt-lab.unige.it/ric-ran/python_xapp_runner:${SC_RIC_VERSION}
+    build:
+      context: ./ric/images/ric-plt-xapp-frame-py
+      dockerfile: ./Dockerfile
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=0
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+      - RMR_SEED_RT=/opt/ric/config/uta-rtg.rt
+      - RMR_SRC_ID=${XAPP_PY_RUNNER_IP}
+      - RMR_RTG_SVC # leave empty, so RMR works correctly with RT Manager Simulator
+{#    stdin_open: true#}
+{#    tty: true#}
+    command: python3 /opt/xApps/{{ xapp_name }} {{ command }}
+    volumes:
+      - type: bind
+        source: ./ric/configs/routes.rtg
+        target: /opt/ric/config/uta-rtg.rt
+      - type: bind
+        source: ./xApps/python
+        target: /opt/xApps
+      # Uncomment if you want to use your local ric-plt-xapp-frame-py copy inside the container
+      #- type: bind
+      #  source: ./Path/to/your/local/ric-plt-xapp-frame-py
+      #  target: /opt/ric-plt-xapp-frame-py
+    networks:
+      ric_network:
+        ipv4_address: ${XAPP_PY_RUNNER_IP:-10.0.2.20}
+
+networks:
+  ric_network:
+    external: true
+    name: ric-base_ric_network

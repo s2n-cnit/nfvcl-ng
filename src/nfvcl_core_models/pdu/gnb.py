@@ -25,3 +25,7 @@ class GNBPDUConfigure(NFVCLBaseModel):
 
 class GNBPDUDetach(NFVCLBaseModel):
     area: int = Field()
+
+class GNBPDURic(NFVCLBaseModel):
+    remote_ip: str = Field()
+    remote_port: int = Field()

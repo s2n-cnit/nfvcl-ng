@@ -1,0 +1,12 @@
+---
+- hosts: all
+  tasks:
+  - name: Get logs
+    ansible.builtin.shell: "docker logs" {{ container_name }}
+    register: logs
+
+  - name: Set config as fact
+    ansible.builtin.set_fact:
+      cacheable: true
+      ric_rtmgr_logs: "{{ logs.stdout }}"
+...

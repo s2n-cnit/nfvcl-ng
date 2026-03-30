@@ -273,8 +273,8 @@ class TopologyManager(GenericManager):
         Args:
             pdu_id: The name of PDU to be removed
         """
-        if self._topology.get_pdu(pdu_id).locked_by:
-            raise NFVCLCoreException(f"PDU {pdu_id} is locked by {self._topology.get_pdu(pdu_id).locked_by}")
+        if len(self._topology.get_pdu(pdu_id).locked_list_by) > 0:
+            raise NFVCLCoreException(f"PDU {pdu_id} is locked by {self._topology.get_pdu(pdu_id).locked_list_by}")
 
         self._topology.del_pdu(pdu_id)
         self.save_to_db()

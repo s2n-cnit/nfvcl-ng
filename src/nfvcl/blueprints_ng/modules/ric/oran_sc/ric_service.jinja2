@@ -1,0 +1,17 @@
+[Unit]
+Description=RIC
+After=network.target
+After=docker.service
+BindsTo=docker.service
+ReloadPropagatedFrom=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/oran/ric-base/
+ExecStart=/root/oran/ric-base/start.sh
+RemainAfterExit=true
+ExecStop=/root/oran/ric-base/stop.sh
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

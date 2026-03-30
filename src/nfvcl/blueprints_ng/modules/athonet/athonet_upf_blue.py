@@ -8,7 +8,7 @@ from nfvcl.blueprints_ng.pdu_configurators.implementations.core_5g.athonet.athon
 from nfvcl_models.blueprint_ng.athonet.upf import AthonetApplicationUpfConfig
 from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
-from nfvcl_core_models.network.network_models import PduType
+from nfvcl_core_models.network.network_models import PduType, PduLockType
 
 ATHONET_UPF_BLUE_TYPE = "athonet_upf"
 
@@ -39,20 +39,20 @@ class AthonetUPF(Generic5GUPFBlueprintNG[AthonetUPFBlueprintNGState, UPFBlueCrea
 
     def create_upf(self):
         pdu = self.provider.find_pdu(self.state.current_config.area_id, PduType.CORE5G, 'AthonetUPF')
-        self.provider.lock_pdu(pdu)
-        configurator: AthonetUPFPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+        self.provider.lock_pdu(pdu, PduLockType.GENERIC)
+        configurator: AthonetUPFPDUConfigurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         self.state.backup_config = configurator.get_upf_application_config()
         configurator.configure(self.state.current_config)
         self.update_upf_info()
 
     def update_upf(self):
         pdu = self.provider.find_pdu(self.state.current_config.area_id, PduType.CORE5G, 'AthonetUPF')
-        configurator: AthonetUPFPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+        configurator: AthonetUPFPDUConfigurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.configure(self.state.current_config)
 
     def update_upf_info(self):
         pdu = self.provider.find_pdu(self.state.current_config.area_id, PduType.CORE5G, 'AthonetUPF')
-        configurator: AthonetUPFPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+        configurator: AthonetUPFPDUConfigurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         n3_ip, n3_cidr, n4_ip, n4_cidr = configurator.get_n_interfaces_ip()
         deployed_upf_info = DeployedUPFInfo(
             area=self.state.current_config.area_id,
@@ -71,7 +71,7 @@ class AthonetUPF(Generic5GUPFBlueprintNG[AthonetUPFBlueprintNGState, UPFBlueCrea
 
     def destroy(self):
         pdu = self.provider.find_pdu(self.state.current_config.area_id, PduType.CORE5G, 'AthonetUPF')
-        configurator: AthonetUPFPDUConfigurator = self.provider.get_pdu_configurator(pdu)
+        configurator: AthonetUPFPDUConfigurator = self.provider.get_pdu_configurator(pdu, PduLockType.GENERIC)
         configurator.restore_base_config(self.state.backup_config)
         super().destroy()
 

@@ -115,6 +115,7 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
             served_slices=self.state.current_config.slices,
             vm_resource_id=None,
             vm_configurator_id=None,
+            fqdn=f"oai-upf{self.state.current_config.area_id}",
             network_info=UPFNetworkInfo(
                 n4_cidr=self.state.multus_network_info.n4.network_cidr if self.state.multus_network_info.n4 else SerializableIPv4Network("1.1.1.1/32"),
                 n3_cidr=self.state.multus_network_info.n3.network_cidr if self.state.multus_network_info.n3 else SerializableIPv4Network("1.1.1.1/32"),

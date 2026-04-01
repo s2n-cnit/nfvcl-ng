@@ -613,7 +613,7 @@ class KubeApiUtils:
     def get_nodes(self, detailed: bool = False) -> V1NodeList | List[str]:
         """
         Return a list of nodes
-self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='metadata.name=admin')
+
         Args:
             detailed: if true, return all nodes details
 
@@ -648,6 +648,7 @@ self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='
             The patched node
         """
         try:
+            # Check if node exists
             node: V1Node = self.core_v1_api.read_node(name=node_name)
 
             metadata: V1ObjectMeta = node.metadata
@@ -657,6 +658,34 @@ self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='
             patched_node = self.core_v1_api.patch_node(node_name, node)
         except ApiException as error:
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>add_label_to_k8s_node: {error}", http_equivalent_code=error.status)
+
+        return patched_node
+
+    def delete_label_from_k8s_node(self, node_name: str, labels: Labels) -> V1Node:
+        """
+        Delete labels from a node
+
+        Args:
+            node_name: The name of the node from which labels will be deleted
+            labels: labels to be removed from the node (keys specified in labels.labels)
+
+        Returns:
+            The patched node
+        """
+        try:
+            # Check if node exists
+            node: V1Node = self.core_v1_api.read_node(name=node_name)
+
+            metadata: V1ObjectMeta = node.metadata
+            existing_labels: dict[str, object] = metadata.labels
+
+            # Remove specified labels
+            for label_key in labels.labels.keys():
+                existing_labels[label_key] = None
+
+            patched_node = self.core_v1_api.patch_node(node_name, node)
+        except ApiException as error:
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api>delete_label_from_k8s_node: {error}", http_equivalent_code=error.status)
 
         return patched_node
 
@@ -700,6 +729,7 @@ self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='
         apps_v1_api = kubernetes.client.AppsV1Api(self.api_client)
 
         try:
+            # Check if deployment exists
             deployment: V1Deployment = apps_v1_api.read_namespaced_deployment(
                 namespace=namespace, name=deployment_name)
 
@@ -711,6 +741,38 @@ self.rbac_auth_v1_api.list_namespaced_role(namespace=namespace, field_selector='
                 namespace=namespace, name=deployment_name, body=deployment)
         except ApiException as error:
             raise NFVCLCoreException(f"Exception when calling AppsV1Api>add_label_to_k8s_deployment: {error}", http_equivalent_code=error.status)
+        return patched_deployment
+
+    def delete_label_from_k8s_deployment(self, namespace: str, deployment_name: str, labels: Labels) -> V1Deployment:
+        """
+        Delete labels from a deployment
+
+        Args:
+            namespace: The namespace in which the deployment resides
+            deployment_name: The name of the deployment from which labels will be deleted
+            labels: labels to be removed from the deployment (keys specified in labels.labels)
+
+        Returns:
+            The patched deployment
+        """
+        apps_v1_api = kubernetes.client.AppsV1Api(self.api_client)
+
+        try:
+            # Check if deployment exists
+            deployment: V1Deployment = apps_v1_api.read_namespaced_deployment(
+                namespace=namespace, name=deployment_name)
+
+            metadata: V1ObjectMeta = deployment.metadata
+            existing_labels: dict[str, str] = metadata.labels
+
+            # Remove specified labels
+            for label_key in labels.labels.keys():
+                existing_labels.pop(label_key, None)
+
+            patched_deployment = apps_v1_api.patch_namespaced_deployment(
+                namespace=namespace, name=deployment_name, body=deployment)
+        except ApiException as error:
+            raise NFVCLCoreException(f"Exception when calling AppsV1Api>delete_label_from_k8s_deployment: {error}", http_equivalent_code=error.status)
         return patched_deployment
 
     def scale_k8s_deployment(self, namespace: str, deployment_name: str, replica_num: int) -> V1Deployment:

@@ -573,9 +573,13 @@ class NFVCL:
     def k8s_get_nodes(self, cluster_id: str, detailed: bool = False, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.get_nodes, cluster_id, detailed, callback=callback)
 
-    @NFVCLPublic(path="/{cluster_id}/node/{node_name}", section=K8S_SECTION, method=HttpRequestType.POST, sync=True, doc_by=KubernetesManager.add_label_to_k8s_node)
+    @NFVCLPublic(path="/{cluster_id}/node/{node_name}/label", section=K8S_SECTION, method=HttpRequestType.POST, sync=True, doc_by=KubernetesManager.add_label_to_k8s_node)
     def k8s_add_label_to_node(self, cluster_id: str, node_name: str, labels: Labels, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.add_label_to_k8s_node, cluster_id, node_name, labels, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/node/{node_name}/label", section=K8S_SECTION, method=HttpRequestType.DELETE, sync=True, doc_by=KubernetesManager.delete_label_from_k8s_node)
+    def k8s_delete_label_from_node(self, cluster_id: str, node_name: str, labels: Labels, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.delete_label_from_k8s_node, cluster_id, node_name, labels, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/deployments", section=K8S_SECTION, method=HttpRequestType.GET, sync=True, doc_by=KubernetesManager.get_deployment)
     def k8s_get_deployment(self, cluster_id: str, namespace: str, detailed: bool = False, callback=None) -> dict:
@@ -584,6 +588,10 @@ class NFVCL:
     @NFVCLPublic(path="/{cluster_id}/deployment/label", section=K8S_SECTION, method=HttpRequestType.POST, sync=True, doc_by=KubernetesManager.add_label_to_k8s_deployment)
     def k8s_add_label_to_deployment(self, cluster_id: str, namespace: str, deployment_name: str, labels: Labels, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.add_label_to_k8s_deployment, cluster_id, namespace, deployment_name, labels, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/deployment/{namespace}/{deployment_name}/label", section=K8S_SECTION, method=HttpRequestType.DELETE, sync=True, doc_by=KubernetesManager.delete_label_from_k8s_deployment)
+    def k8s_delete_label_from_deployment(self, cluster_id: str, namespace: str, deployment_name: str, labels: Labels, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.delete_label_from_k8s_deployment, cluster_id, namespace, deployment_name, labels, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/deployment/scale", section=K8S_SECTION, method=HttpRequestType.POST, sync=True, doc_by=KubernetesManager.scale_k8s_deployment)
     def k8s_scale_deployment(self, cluster_id: str, namespace: str, deployment_name: str, replica_number: int, callback=None) -> dict:

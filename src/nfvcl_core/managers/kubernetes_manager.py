@@ -320,7 +320,6 @@ class KubernetesManager(GenericManager):
 
         return pod_list.to_dict()
 
-    # TODO doesn't work because of labels
     def create_k8s_namespace(self, cluster_id: str, name: str, labels: dict) -> OssCompliantResponse:
         """
         Create a namespace on the target k8s cluster.
@@ -801,6 +800,29 @@ class KubernetesManager(GenericManager):
             self.logger.error(api_exp)
             raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
 
+    def delete_label_from_k8s_node(self, cluster_id: str, node_name: str, labels: Labels):
+        """
+        Delete labels from a k8s node
+
+        Args:
+
+            cluster_id: The K8s cluster (from the topology) on witch the node resides
+
+            node_name: the name of the node from witch labels will be deleted
+
+            labels: The labels to be deleted (keys specified in labels.labels)
+
+        Returns:
+            The updated node V1Node in dict form
+        """
+        try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            node: V1Node = k8s_api.delete_label_from_k8s_node(node_name=node_name, labels=labels)
+            return node.to_dict()
+        except ApiException as api_exp:
+            self.logger.error(api_exp)
+            raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
+
     def get_deployment(self, cluster_id: str, namespace: str, detailed: bool = False):
         """
         Returns a list of deployments belonging to a k8s cluster
@@ -845,6 +867,28 @@ class KubernetesManager(GenericManager):
         try:
             k8s_api = self.get_k8s_api_utils(cluster_id)
             deployment: V1Deployment = k8s_api.add_label_to_k8s_deployment(
+                namespace=namespace, deployment_name=deployment_name, labels=labels)
+            return deployment.to_dict()
+        except ApiException as api_exp:
+            self.logger.error(api_exp)
+            raise NFVCLCoreException(message=str(api_exp), http_equivalent_code=500)
+
+    def delete_label_from_k8s_deployment(self, cluster_id: str, namespace: str, deployment_name: str, labels: Labels):
+        """
+        Delete labels from a k8s deployment
+
+        Args:
+            cluster_id: The K8s cluster (from the topology) on witch the deployment resides
+            namespace: The namespace in which the deployment resides
+            deployment_name: the name of the deployment from witch labels will be deleted
+            labels: The labels to be deleted (keys specified in labels.labels)
+
+        Returns:
+            The updated deployment V1Deployment in dict form
+        """
+        try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            deployment: V1Deployment = k8s_api.delete_label_from_k8s_deployment(
                 namespace=namespace, deployment_name=deployment_name, labels=labels)
             return deployment.to_dict()
         except ApiException as api_exp:

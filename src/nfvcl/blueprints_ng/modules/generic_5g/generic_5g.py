@@ -350,8 +350,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         for area in self.state.current_config.areas:
             if area.gnb.configure:
-                if area.gnb.pduList is None:
-                    pdu_models.extend(self.provider.find_pdus(area.id, PduType.GNB))
+                if len(area.gnb.pduList) == 0:
+                    continue
                 else:
                     for pdu_name in area.gnb.pduList:
                         pdu_models.append(self.provider.find_pdu(area.id, PduType.GNB, name=pdu_name))
@@ -702,14 +702,18 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
         backup_config = copy.deepcopy(self.state.current_config)
 
+        # If slice is used by some subscriber, raise an exception
+        subscribers = self.state.current_config.get_subscribers_for_slice(del_slice_model.sliceId)
+        imsi_list = [subscriber.imsi for subscriber in subscribers]
+        if len(subscribers) > 0:
+            raise BlueprintNGException(f"Slice {del_slice_model.sliceId} is used by imsi: {imsi_list}")
+
         # Delete slice from areas
         for area in self.state.current_config.areas:
             area.slices = list(filter(lambda x: x.sliceId != del_slice_model.sliceId, area.slices))
 
         # Delete slice from profiles
         self.state.current_config.config.sliceProfiles = list(filter(lambda x: x.sliceId != del_slice_model.sliceId, self.state.current_config.config.sliceProfiles))
-
-        # TODO what about subscribers on this slice?
 
         try:
             self.del_slice(del_slice_model)

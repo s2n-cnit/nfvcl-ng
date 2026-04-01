@@ -37,7 +37,7 @@ class Core5GAddDnnModel(SubDataNets):
     pass
 
 class Core5GDelDnnModel(NFVCLBaseModel):
-    dnn: DNNType = Field()
+    dnn: DNNType = Field(examples=["internet"])
 
 class Core5GAttachGnbModel(NFVCLBaseModel):
     area_id: AreaIDType = Field()

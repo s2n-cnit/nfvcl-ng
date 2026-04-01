@@ -18,7 +18,7 @@ class Pool(NFVCLBaseModel):
 
 class SubDataNets(NFVCLBaseModel):
     net_name: str = Field(description="Name of the network, currently unused")
-    dnn: DNNType = Field(description="Name of the DNN")
+    dnn: DNNType = Field(description="Name of the DNN", examples=["internet"])
     dns: str = Field(description="DNS server IP address")
     pools: List[Pool] = Field(default_factory=list, description="List of IP pools for the DNN")
     uplinkAmbr: Optional[BitrateStringType] = Field(default=None, description="Uplink Aggregate Maximum Bit Rate")
@@ -167,7 +167,7 @@ class SubAreaUPF(NFVCLBaseModel):
 
 class SubAreaGNB(NFVCLBaseModel):
     configure: bool = Field(default=True, description="True to configure the gNBs, False to not configure")
-    pduList: Optional[List[str]] = Field(default=None, description="List of gNB PDU to attach to the core, if not present all the gNB in the area will be attached")
+    pduList: Optional[List[str]] = Field(default_factory=list, description="List of gNB PDU to attach to the core, if not present all the gNB in the area will be attached")
 
 class SubArea(NFVCLBaseModel):
     id: AreaIDType = Field(description="ID of the area")
@@ -201,6 +201,11 @@ class Create5gModel(NFVCLBaseModel):
                 return slice
         return None
 
+    def get_dnn(self, dnn_name: str) -> Optional[SubDataNets]:
+        for dnn in self.config.network_endpoints.data_nets:
+            if dnn.dnn == dnn_name:
+                return dnn
+
     def get_slices_profiles_for_area(self, area_id: int) -> List[SubSliceProfiles]:
         slice_profiles: List[SubSliceProfiles] = []
         for area in self.areas:
@@ -208,5 +213,19 @@ class Create5gModel(NFVCLBaseModel):
                 for slice in area.slices:
                     slice_profiles.append(self.get_slice_profile(slice.sliceId))
         return slice_profiles
+
+    def get_subscriber(self, imsi: str) -> Optional[SubSubscribers]:
+        for subscriber in self.config.subscribers:
+            if subscriber.imsi == imsi:
+                return subscriber
+        return None
+
+    def get_subscribers_for_slice(self, slice_id: str) -> List[SubSubscribers]:
+        subscribers: List[SubSubscribers] = []
+        for subscriber in self.config.subscribers:
+            for snssai in subscriber.snssai:
+                if snssai.sliceId == slice_id:
+                    subscribers.append(subscriber)
+        return subscribers
 
 # =========================================== End of main section =====================================================

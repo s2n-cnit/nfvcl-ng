@@ -369,6 +369,18 @@ class BlueprintManager(GenericManager):
 
         blueprints = list(self.blueprint_dict.keys())
         for blue_id in blueprints:
+            blueprint_instance = self.get_blueprint_instance(blue_id)
+            if blueprint_instance is None:
+                self.logger.warning(f"Blueprint {blue_id} has been deleted in the meantime, skipping...")
+                continue
+            if not blueprint_instance.base_model:
+                self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped cause it is not well loaded, or creating...")
+            if blueprint_instance.base_model.parent_blue_id is not None:
+                # Blueprint is a child, skip it. It will be deleted when the parent is deleted
+                continue
+            if blueprint_instance.base_model.protected:
+                self.logger.warning(f"Blueprint {blue_id} is protected, skipping deletion...")
+                continue
             try:
                 self.delete_blueprint(blue_id)
             except BlueprintProtectedException:

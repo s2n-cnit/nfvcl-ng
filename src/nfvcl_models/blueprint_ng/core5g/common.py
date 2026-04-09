@@ -66,7 +66,6 @@ class NetworkEndPoints(NFVCLBaseModel):
             return NetworkEndPointWithType(net_name=v)
         return v
 
-
 class SubFlows(NFVCLBaseModel):
     flowId: str = Field(description="ID of the flow")
     ipAddrFilter: Optional[str] = Field(default=None, description="IP address filter to match this flow")
@@ -134,7 +133,8 @@ class SubConfig(NFVCLBaseModel):
     sliceProfiles: Optional[List[SubSliceProfiles]] = Field(default=None, description="Slices for this core")
     subscribers: List[SubSubscribers] = Field(default_factory=list, description="List of subscribers")
     persistence: Optional[SubPersistence] = Field(default_factory=SubPersistence, description="Persistence configuration for the core")
-
+    licence_server: Optional[SerializableIPv4Address] = Field(default=None, description="URL of the licence server for the core. (Used for Amarisoft core)")
+    default_password: Optional[str] = Field(default="UbUnTu", description="Default password for the core. (Used for Amarisoft core)")
 
 # =================================================== End of Config class =============================================
 # ====================================================sub area SubClasses =============================================

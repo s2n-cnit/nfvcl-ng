@@ -1,0 +1,15 @@
+ue_db: [
+{% for subscriber in subscribers %}
+    {
+    sim_algo:  "milenage",
+    imsi:  "{{ subscriber.imsi }}",
+    opc:  "{{ subscriber.opc }}",
+    amf:  0x8000,
+    sqn:  "000000000001",
+    K:  "{{ subscriber.k }}",
+    impu:  ["{{ subscriber.imsi }}"],
+    impi: "{{ subscriber.imsi }}@ims.mnc001.mcc001.3gppnetwork.org",
+    domain: "ims.mnc001.mcc001.3gppnetwork.org",
+   },
+{% endfor %}
+]

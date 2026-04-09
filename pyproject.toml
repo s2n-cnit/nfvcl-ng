@@ -47,6 +47,7 @@ dependencies = [
     "semantic-version>=2.10.0",
     "pycdlib>=1.14.0",
     "requests-toolbelt>=1.0.0",
+    "json5"
 ]
 
 [dependency-groups]

@@ -1,0 +1,14 @@
+[Unit]
+Description=Amarisoft UPF routes
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/scripts
+ExecStart=/root/scripts/start.sh
+RemainAfterExit=true
+ExecStop=/root/scripts/stop.sh
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

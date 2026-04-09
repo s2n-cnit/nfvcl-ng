@@ -26,3 +26,4 @@ from .ric.oran_sc import *
 from .loadcore_agent import *
 from .router import *
 from .multipath_upf import *
+from .amarisoft_core import *

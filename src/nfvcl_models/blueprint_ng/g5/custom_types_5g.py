@@ -28,6 +28,15 @@ def sd_uniform(v: object) -> object:
         v = v[2:]
     return v.upper()
 
+def sd_to_int(v: object) -> int:
+    if isinstance(v, int):
+        return v
+    if not isinstance(v, str):
+        raise ValueError(f"Invalid value for sd: {v}")
+    if v.startswith("0x"):
+        v = v[2:]
+    return int(v, 16)
+
 SDType = Annotated[
     str,
     Field(pattern=r"^([A-F0-9]{6})$", examples=["000001"], description="Slice Differentiator in hex format: 000001-FFFFFF"),

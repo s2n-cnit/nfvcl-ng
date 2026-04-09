@@ -1,0 +1,36 @@
+---
+- name: Install Amarisoft Core
+  hosts: all
+  become: yes
+  vars:
+    amarisoft_url: "https://images.tnt-lab.unige.it/private/AmariSoft/amarisoft.2026-03-13.tar.gz"
+    download_path: "/root/amarisoft.2026-03-13.tar.gz"
+    extract_path: "/root"
+    install_dir: "2026-03-13"
+
+  tasks:
+    - name: Update package list
+      apt:
+        update_cache: yes
+
+    - name: Download Amarisoft tarball
+      get_url:
+        url: "{{ amarisoft_url }}"
+        dest: "{{ download_path }}"
+        mode: '0644'
+
+    - name: Extract Amarisoft tarball
+      unarchive:
+        src: "{{ download_path }}"
+        dest: "{{ extract_path }}"
+        remote_src: yes
+
+    - name: Run Amarisoft install script
+      command:
+        cmd: ./install.sh --default --www --ots --mme  --nat --ipv6-nat --no-ht --no-migrate --no-ims --no-ue --no-enb --no-mbmsgw --no-license --no-simserver
+        chdir: "{{ extract_path }}/{{ install_dir }}"
+      register: install_output
+
+    - name: Display install output
+      debug:
+        var: install_output.stdout_lines

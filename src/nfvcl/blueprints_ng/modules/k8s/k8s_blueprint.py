@@ -573,6 +573,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 # Clean up reserved ranges belonging to this blueprint from the topology
                 topology_manager = self.provider.topology_manager
                 k8s_cluster = topology_manager.get_k8s_cluster_by_id(self.id)
+                if len(k8s_cluster.deployed_blueprints) > 0:
+                    raise TopoK8SHasBlueprintException('The cluster has blueprints deployed in it. Destroy blueprints or force removal from the topology first')
 
                 # Iterate through all networks in the k8s cluster and release their IP pools
                 for network_info in k8s_cluster.networks:

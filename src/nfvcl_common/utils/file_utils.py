@@ -123,7 +123,7 @@ def create_file(base_folder_path: str, filename: str, sub_folder: str = None, fi
 
 def render_file_from_template_to_file(path: Path, render_dict: dict, prefix_to_name: str = "", extension: str = None) -> Path:
     """
-    Render a template file using the render_dict dictionary. Use the keys and their values to give a value at the
+    Render a template file jinja2 using the render_dict dictionary. Use the keys and their values to give a value at the
     variables present in the template file.
     The result of the rendering is placed in day2_files/filename.extension and the path is returned by this method.
 

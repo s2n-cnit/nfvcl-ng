@@ -28,8 +28,8 @@ class UPFInfo(NFVCLBaseModel):
     blue_id: str = Field()
     external: bool = Field()
     router_gnb_ip: Optional[SerializableIPv4Address] = Field(default=None)
-    upf_list: List[DeployedUPFInfo] = Field(default_factory=list)
-    current_config: UPFBlueCreateModel = Field()
+    upf_list: List[DeployedUPFInfo] = Field(default_factory=list, description="List of UPFs deployed for this area, in case of multiple UPFs deployed in the same area")
+    current_config: UPFBlueCreateModel = Field(description="Used to understand if UPF needs to be updated, if the config is different from the current one applied to the VM")
 
 
 class RANAreaInfo(NFVCLBaseModel):
@@ -80,7 +80,6 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
     def state(self) -> StateTypeVar5G:
         return super().state
 
-    @final
     def create(self, create_model: Create5gModel):
         super().create(create_model)
         self.state.current_config = copy.deepcopy(create_model)

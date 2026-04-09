@@ -11,7 +11,7 @@ from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_core_models.blueprints.blueprint import BlueprintNGBaseModel
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGBaseModel, CurrentOperation
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
 from nfvcl_core_models.performance import BlueprintPerformanceType
@@ -132,11 +132,16 @@ class BlueprintManager(GenericManager):
 
     def _load_all_blueprint_instances_from_db(self):
         """
-        Load all the blueprints instances from the database
+        Load all the blueprint instances from the database
         """
         for item in self._blueprint_repository.get_all_dict():
             self.logger.debug(f"Loading Blueprint instance {item['id']}")
             blueprint_instance: BlueprintNG = BlueprintNG.from_db(item)
+
+            if blueprint_instance.base_model.status.is_deploying():
+                self.logger.warning("Blueprint was deploying when NFVCL was shutdown. Changing state to error state...")
+                blueprint_instance.base_model.status.error = True
+                blueprint_instance.base_model.status.current_operation = CurrentOperation.IDLE
 
             provider_data_aggregate = self._provider_repository.find_by_blueprint_id(blueprint_instance.id)
             if provider_data_aggregate is None:
@@ -380,6 +385,9 @@ class BlueprintManager(GenericManager):
                 continue
             if blueprint_instance.base_model.protected:
                 self.logger.warning(f"Blueprint {blue_id} is protected, skipping deletion...")
+                continue
+            if blueprint_instance.base_model.status.is_deploying():
+                self.logger.warning(f"Blueprint {blue_id} is deploying, skipping deletion...")
                 continue
             try:
                 self.delete_blueprint(blue_id)

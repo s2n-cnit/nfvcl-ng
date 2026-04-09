@@ -231,7 +231,7 @@ class TopologyModel(NFVCLBaseModel):
         if not force_deletion:
             k8s_cluster = self.kubernetes[k8s_index]
             if len(k8s_cluster.deployed_blueprints) > 0:
-                raise TopoK8SHasBlueprintException('The cluster has blueprints deployed in it.')
+                raise TopoK8SHasBlueprintException('The cluster has blueprints deployed in it. Destroy blueprints or force removal from the topology first')
 
         k8s_deleted = self.kubernetes.pop(k8s_index)
 

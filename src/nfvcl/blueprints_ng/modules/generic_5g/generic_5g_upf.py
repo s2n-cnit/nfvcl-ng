@@ -21,7 +21,7 @@ class DeployedUPFInfo(NFVCLBaseModel):
     vm_configurator_id: Optional[str] = Field(default=None)
     fqdn: Optional[str] = Field(default=None)
     helm_chart_resource_id: Optional[str] = Field(default=None)
-    router_gnb_ip: Optional[SerializableIPv4Address] = Field(default=None)
+    router_gnb_ip: Optional[SerializableIPv4Address] = Field(default=None, description="The IP of the interface of the router to the gNB. The router is spawned by the UPF")
 
     def served_dnns(self) -> List[str]:
         served_dnns_list: List[str] = []

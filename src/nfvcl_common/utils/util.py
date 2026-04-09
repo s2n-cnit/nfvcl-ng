@@ -33,8 +33,11 @@ def generate_blueprint_id() -> str:
     Returns:
         The random 6-digit ID (str)
     """
-    return generate_id(6, string.ascii_uppercase + string.digits)
-
+    generated_id = generate_id(6, string.ascii_uppercase + string.digits)
+    # "000XXX" Will be the ID reserved for dummy blueprints
+    if generated_id[0:3]=="000":
+        return generate_blueprint_id()
+    return generated_id
 
 def generate_rsa_key(length: int = 2048):
     """

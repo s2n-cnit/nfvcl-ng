@@ -1,5 +1,7 @@
 from typing import Any, Optional, Callable, TYPE_CHECKING
 
+from nfvcl_core_models.http_models import BlueprintNotFoundException
+
 if TYPE_CHECKING:
     from nfvcl_core.managers.blueprint_manager import BlueprintManager
 from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderInterface
@@ -49,6 +51,8 @@ class BlueprintProvider(BlueprintNGProviderInterface):
             self.logger.warning(f"Deleting leftover deployed blueprint: {blue_id}")
             try:
                 self.blueprint_manager.delete_blueprint(blue_id)
+            except BlueprintNotFoundException:
+                pass
             except Exception as e:
                 self.logger.error(f"Error deleting leftover deployed blueprint {blue_id}: {str(e)}")
         self.data.deployed_blueprints.clear()

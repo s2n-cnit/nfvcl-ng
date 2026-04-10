@@ -14,6 +14,7 @@ class OssStatus(str, Enum):
 
 class OssCompliantResponse(BaseModel):
     status: OssStatus = Field(default=OssStatus.ready)
+    blueprint_id: Optional[str] = Field(default=None)
     detail: str = Field(default="")
     result: dict = Field(default_factory=dict)
     task_id: Optional[str] = Field(default=None)

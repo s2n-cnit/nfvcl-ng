@@ -1,5 +1,6 @@
 import copy
 import re
+from http import HTTPStatus
 from typing import Optional, List
 
 from pydantic import Field
@@ -14,6 +15,7 @@ from nfvcl_core.utils.k8s.helm_plugin_manager import HelmPluginManager
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_common.utils.api_utils import HttpRequestType
+from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition, GrafanaDashboard
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusTargetModel, PrometheusServerModel
@@ -21,7 +23,7 @@ from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, Seria
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sLoadBalancerPoolArea, K8sPluginAdditionalData
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor, VmResourceAnsibleConfiguration
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sVersion, K8sNetworkInfo, ProvidedBy
-from nfvcl_core_models.topology_models import TopoK8SHasBlueprintException, TopoK8SNotFoundException
+from nfvcl_core_models.topology_models import TopoK8SNotFoundException
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel, K8sAreaDeployment, K8sAddNodeModel, \
     KarmadaInstallModel, K8sDelNodeModel
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
@@ -567,14 +569,16 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
         Destroy the blueprints. Calls super destroy that destroy VMs and configurators.
         Then release all the reserved resources in the topology.
         """
-        super().destroy()
         if self.state.topology_onboarded:
             try:
                 # Clean up reserved ranges belonging to this blueprint from the topology
                 topology_manager = self.provider.topology_manager
                 k8s_cluster = topology_manager.get_k8s_cluster_by_id(self.id)
                 if len(k8s_cluster.deployed_blueprints) > 0:
-                    raise TopoK8SHasBlueprintException('The cluster has blueprints deployed in it. Destroy blueprints or force removal from the topology first')
+                    raise NFVCLCoreException('The cluster has blueprints deployed in it. Destroy blueprints or force removal from the topology first', HTTPStatus.CONFLICT)
+
+                #Calling the real blueprint destruction
+                super().destroy()
 
                 # Iterate through all networks in the k8s cluster and release their IP pools
                 for network_info in k8s_cluster.networks:
@@ -594,9 +598,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 topology_manager.delete_kubernetes(self.id)
             except TopoK8SNotFoundException:
                 self.logger.error(f"Could not delete K8S cluster {self.id} from topology: NOT FOUND")
-            except TopoK8SHasBlueprintException as e:
-                self.logger.error(f"Blueprint {self.id} will not be destroyed")
-                raise e
+        else:
+            super().destroy()
 
     def to_dict(self, detailed: bool, include_childrens: bool = False) -> dict:
         """

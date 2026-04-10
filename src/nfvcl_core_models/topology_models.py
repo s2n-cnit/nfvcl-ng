@@ -14,10 +14,6 @@ from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, TopologyK8sMo
 from nfvcl_core_models.vim.vim_models import VimModel
 
 
-class TopoK8SHasBlueprintException(Exception):
-    pass
-
-
 class TopoK8SNotFoundException(Exception):
     pass
 
@@ -231,7 +227,7 @@ class TopologyModel(NFVCLBaseModel):
         if not force_deletion:
             k8s_cluster = self.kubernetes[k8s_index]
             if len(k8s_cluster.deployed_blueprints) > 0:
-                raise TopoK8SHasBlueprintException('The cluster has blueprints deployed in it. Destroy blueprints or force removal from the topology first')
+                raise NFVCLCoreException('The cluster has blueprints deployed in it. Destroy blueprints or force removal from the topology first', http_equivalent_code=HTTPStatus.CONFLICT)
 
         k8s_deleted = self.kubernetes.pop(k8s_index)
 

@@ -153,7 +153,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
         for children_id in self.base_model.children_blue_ids.copy():
             try:
-                self.provider.delete_blueprint(children_id)
+                self.provider.blueprint_manager.delete_blueprint(children_id, child_deletion=True)
             except BlueprintNotFoundException:
                 self.logger.warning(f"The children blueprint {children_id} has not been found. Could be deleted before, skipping...")
             self.deregister_children(children_id)
@@ -163,7 +163,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
             self.logger.warning(f"Deleting children blueprint that was not registered in the parent, probably due to a crash in its creation: {children.id}")
             try:
                 # Here we shouldn't go through the provider, but directly to the blueprint_manager because the registration in the provider shouldn't have happened
-                self.provider.blueprint_manager.delete_blueprint(children.id)
+                self.provider.blueprint_manager.delete_blueprint(children.id, child_deletion=True)
             except BlueprintNotFoundException:
                 self.logger.warning(f"The children blueprint {children.id} has not been found. Could be deleted before, skipping...")
 

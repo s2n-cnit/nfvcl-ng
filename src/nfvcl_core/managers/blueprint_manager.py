@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from http import HTTPStatus
 from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 
 from keystoneauth1.exceptions import Unauthorized
@@ -28,7 +29,7 @@ from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus, RegisteredBlueprintCall, FunctionType
 from nfvcl_core_models.resources import VmResource
-from nfvcl_core_models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException
+from nfvcl_core_models.http_models import BlueprintAlreadyExisting, BlueprintProtectedException, BlueprintNotFoundException
 from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
 from nfvcl_core.blueprints.provider_aggregator import ProvidersAggregator
 from nfvcl_common.utils.util import generate_blueprint_id
@@ -180,10 +181,10 @@ class BlueprintManager(GenericManager):
 
         # Check that a blueprint with that ID is not existing in the DB
         if self.get_blueprint_instance(blue_id) is not None:
-            run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint with ID {blue_id} already exist, retry..."))
+            run_pre_work_callback(pre_work_callback, OssCompliantResponse(blueprint_id=blue_id, status=OssStatus.failed, detail=f"Blueprint with ID {blue_id} already exist, retry..."))
             raise BlueprintAlreadyExisting(blue_id)
         else:
-            run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.deploying, detail=f"Blueprint {blue_id} is being deployed..."))
+            run_pre_work_callback(pre_work_callback, OssCompliantResponse(blueprint_id=blue_id, status=OssStatus.deploying, detail=f"Blueprint {blue_id} is being deployed..."))
 
             # Get the class, based on the blue type.
             BlueClass = blueprint_type.get_blueprint_class(path)
@@ -318,7 +319,27 @@ class BlueprintManager(GenericManager):
             self._performance_manager.end_operation(performance_operation_id)
         return result
 
-    def delete_blueprint(self, blueprint_id: str, force_deletion: Optional[bool] = False, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> str:
+    def _validate_blueprint_for_deletion(self, blueprint_id: str, blueprint_instance: BlueprintNG, child_deletion: bool = False) -> None:
+        """
+        Validates that a blueprint can be deleted. Raises an exception if it cannot.
+
+        Args:
+            blueprint_id: The ID of the blueprint to validate
+            blueprint_instance: The blueprint instance to validate
+            child_deletion: If True, skip the parent check (used when a parent blueprint deletes its children)
+
+        Raises:
+            BlueprintProtectedException: If the blueprint is protected
+            NFVCLCoreException: If the blueprint is a child or currently deploying
+        """
+        if not child_deletion and blueprint_instance.base_model.parent_blue_id is not None:
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} is a child blueprint, it cannot be deleted directly")
+        if blueprint_instance.base_model.protected:
+            raise BlueprintProtectedException(blueprint_id)
+        if blueprint_instance.base_model.status.is_deploying():
+            raise NFVCLCoreException(f"Blueprint {blueprint_id} is currently deploying, it cannot be deleted")
+
+    def delete_blueprint(self, blueprint_id: str, force_deletion: Optional[bool] = False, child_deletion: bool = False, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> str:
         """
         Deletes the blueprint from the NFVCL if the blueprint is not protected.
 
@@ -326,6 +347,7 @@ class BlueprintManager(GenericManager):
             blueprint_id: The ID of the blueprint to be deleted.
             pre_work_callback: Callback that is called before the creation of the blueprint.
             force_deletion: Force deletion without ensuring that resources are deleted from remote VIMs or K8S Clusters
+            child_deletion: If True, skip the parent check (used when a parent blueprint deletes its children)
 
         Raises:
             BlueprintNotFoundException if blue does nor exist.
@@ -333,22 +355,24 @@ class BlueprintManager(GenericManager):
         blueprint_instance = self.get_blueprint_instance(blueprint_id)
 
         if blueprint_instance is None:
-            run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
-            raise NFVCLCoreException(f"Blueprint {blueprint_id} not found")
+            run_pre_work_callback(pre_work_callback, OssCompliantResponse(blueprint_id=blueprint_id, status=OssStatus.failed, detail=f"Blueprint {blueprint_id} not found"))
+            raise BlueprintNotFoundException(f"Blueprint {blueprint_id} not found")
 
-        run_pre_work_callback(pre_work_callback, OssCompliantResponse(status=OssStatus.processing, detail=f"Blueprint deletion message for {blueprint_id} given to the worker..."))
+        run_pre_work_callback(pre_work_callback, OssCompliantResponse(blueprint_id=blueprint_id,status=OssStatus.processing, detail=f"Blueprint deletion message for {blueprint_id} given to the worker..."))
 
         with blueprint_instance.lock:
             performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.DELETION, "delete")
             try:
-                if blueprint_instance.base_model.protected:
-                    raise BlueprintProtectedException(blueprint_id)
+                self._validate_blueprint_for_deletion(blueprint_id, blueprint_instance, child_deletion=child_deletion)
 
                 self.set_blueprint_status(blueprint_id, BlueprintNGStatus.destroying(blueprint_id))
                 blueprint_instance.destroy()
                 self.blueprint_dict.pop(blueprint_id)
                 self._blueprint_repository.delete_blueprint(blueprint_id)
                 self._provider_repository.delete_by_blueprint_id(blueprint_id)
+            except BlueprintProtectedException as e:
+                # This does NOT put Blueprint in error state!!!
+                raise e
             except Exception as e:
                 if force_deletion:
                     self.logger.warning("Force deletion is enabled! Blue will be destroyed without ensuring that resources are deleted from remote VIMs or K8S Clusters")
@@ -380,20 +404,14 @@ class BlueprintManager(GenericManager):
                 continue
             if not blueprint_instance.base_model:
                 self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped cause it is not well loaded, or creating...")
-            if blueprint_instance.base_model.parent_blue_id is not None:
-                # Blueprint is a child, skip it. It will be deleted when the parent is deleted
-                continue
-            if blueprint_instance.base_model.protected:
-                self.logger.warning(f"Blueprint {blue_id} is protected, skipping deletion...")
-                continue
-            if blueprint_instance.base_model.status.is_deploying():
-                self.logger.warning(f"Blueprint {blue_id} is deploying, skipping deletion...")
                 continue
             try:
                 self.delete_blueprint(blue_id)
             except BlueprintProtectedException:
                 self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped cause it is protected")
-            except Unauthorized: # CLient Openstack crash
+            except NFVCLCoreException as e:
+                self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped: {e}")
+            except Unauthorized:  # Client Openstack crash
                 self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped cause Openstack Client Failed")
 
     def protect_blueprint(self, blueprint_id: str, protect: bool) -> dict:

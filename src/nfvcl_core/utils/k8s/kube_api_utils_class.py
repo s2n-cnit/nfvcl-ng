@@ -225,6 +225,26 @@ class KubeApiUtils:
 
         return created_sa
 
+    def delete_service_account(self, namespace: str, username: str) -> V1ServiceAccount:
+        """
+        Delete a service account from a namespace
+
+        Args:
+            namespace: the namespace from which the service account is deleted
+            username: the name of the service account to delete
+
+        Returns:
+            The deleted service account
+        """
+        try:
+            deleted_sa: V1ServiceAccount = self.core_v1_api.delete_namespaced_service_account(name=username, namespace=namespace)
+        except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Service account '{username}' not found in namespace '{namespace}'", http_equivalent_code=404)
+            raise NFVCLCoreException(f"Exception when calling CoreV1Api in delete_service_account: {error}", http_equivalent_code=error.status)
+
+        return deleted_sa
+
     def create_admin_role(self, namespace: str) -> V1Role:
         """
         Create an admin role called 'admin' in a namespace. If it exists, it will get the admin role from the namespace.
@@ -473,6 +493,8 @@ class KubeApiUtils:
         try:
             namespace = self.core_v1_api.delete_namespace(name=namespace_name)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Namespace '{namespace_name}' not found", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>delete_namespace: {error}", http_equivalent_code=error.status)
 
         return namespace
@@ -490,6 +512,8 @@ class KubeApiUtils:
         try:
             mwc = self.admission_registration_v1_api.delete_mutating_webhook_configuration(mutating_webook_configuration_name)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"MutatingWebhookConfiguration '{mutating_webook_configuration_name}' not found", http_equivalent_code=404)
             self.logger.error(f"Exception when calling AdmissionregistrationV1Api>delete_mutating_webhook_configuration: {error}")
             raise error
 
@@ -550,6 +574,8 @@ class KubeApiUtils:
         try:
             deleted_quota = self.core_v1_api.delete_namespaced_resource_quota(name=quota_name, namespace=namespace_name)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Resource quota '{quota_name}' not found in namespace '{namespace_name}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>delete_quota_from_namespace: {error}", http_equivalent_code=error.status)
 
         return deleted_quota
@@ -574,6 +600,8 @@ class KubeApiUtils:
 
             updated_quota = self.core_v1_api.replace_namespaced_resource_quota(name=quota_name, namespace=namespace_name, body=res_quota)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Resource quota '{quota_name}' not found in namespace '{namespace_name}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>update_quota_in_namespace: {error}", http_equivalent_code=error.status)
 
         return updated_quota
@@ -606,6 +634,8 @@ class KubeApiUtils:
             patched_deployment = apps_v1_api.patch_namespaced_deployment(
                 name=deployment_name, namespace=namespace_name, body=deployment_to_be_patched)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Deployment '{deployment_name}' not found in namespace '{namespace_name}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling AppsV1Api>add_container_to_namespaced_deployment: {error}", http_equivalent_code=error.status)
 
         return patched_deployment
@@ -657,6 +687,8 @@ class KubeApiUtils:
 
             patched_node = self.core_v1_api.patch_node(node_name, node)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Node '{node_name}' not found", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>add_label_to_k8s_node: {error}", http_equivalent_code=error.status)
 
         return patched_node
@@ -685,6 +717,8 @@ class KubeApiUtils:
 
             patched_node = self.core_v1_api.patch_node(node_name, node)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Node '{node_name}' not found", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>delete_label_from_k8s_node: {error}", http_equivalent_code=error.status)
 
         return patched_node
@@ -740,6 +774,8 @@ class KubeApiUtils:
             patched_deployment = apps_v1_api.patch_namespaced_deployment(
                 namespace=namespace, name=deployment_name, body=deployment)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Deployment '{deployment_name}' not found in namespace '{namespace}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling AppsV1Api>add_label_to_k8s_deployment: {error}", http_equivalent_code=error.status)
         return patched_deployment
 
@@ -772,6 +808,8 @@ class KubeApiUtils:
             patched_deployment = apps_v1_api.patch_namespaced_deployment(
                 namespace=namespace, name=deployment_name, body=deployment)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Deployment '{deployment_name}' not found in namespace '{namespace}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling AppsV1Api>delete_label_from_k8s_deployment: {error}", http_equivalent_code=error.status)
         return patched_deployment
 
@@ -799,6 +837,8 @@ class KubeApiUtils:
             patched_deployment = apps_v1_api.patch_namespaced_deployment(
                 namespace=namespace, name=deployment_name, body=deployment)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Deployment '{deployment_name}' not found in namespace '{namespace}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling AppsV1Api>scale_k8s_deployment: {error}", http_equivalent_code=error.status)
 
         return patched_deployment
@@ -870,6 +910,8 @@ class KubeApiUtils:
                 namespace=namespace,
                 tail_lines=tail_lines)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Pod '{pod_name}' not found in namespace '{namespace}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>get_logs_for_pod: {error}", http_equivalent_code=error.status)
         return pod_log
 
@@ -963,6 +1005,8 @@ class KubeApiUtils:
         try:
             updated_deployment = apps_v1_api.patch_namespaced_deployment(name=deployment_name, namespace=namespace, body=deployment)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"Deployment '{deployment_name}' not found in namespace '{namespace}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling AppsV1Api>restart_deployment: {error}", http_equivalent_code=error.status)
 
         return updated_deployment
@@ -1079,6 +1123,8 @@ class KubeApiUtils:
         try:
             config_map: V1ConfigMap = self.core_v1_api.read_namespaced_config_map(name=config_name, namespace=namespace)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"ConfigMap '{config_name}' not found in namespace '{namespace}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>read_namespaced_config_map: {error}", http_equivalent_code=error.status)
 
         return config_map
@@ -1123,6 +1169,8 @@ class KubeApiUtils:
         try:
             storage_class = api_instance.read_storage_class(name=storage_class_name)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"StorageClass '{storage_class_name}' not found", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling StorageV1Api>read_namespaced_storage_class: {error}", http_equivalent_code=error.status)
 
         return storage_class
@@ -1141,6 +1189,8 @@ class KubeApiUtils:
         try:
             patched_storage_class = api_instance.patch_storage_class(name=storage_class.metadata.name, body=storage_class)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"StorageClass '{storage_class.metadata.name}' not found", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling StorageV1Api>patch_namespaced_storage_class: {error}", http_equivalent_code=error.status)
 
         return patched_storage_class
@@ -1158,6 +1208,8 @@ class KubeApiUtils:
         try:
             config_map = self.core_v1_api.read_namespaced_config_map(config_map_name, namespace=namespace)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"ConfigMap '{config_map_name}' not found in namespace '{namespace}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>get_config_map: {error}", http_equivalent_code=error.status)
 
         return config_map
@@ -1176,6 +1228,8 @@ class KubeApiUtils:
         try:
             config_map = self.core_v1_api.patch_namespaced_config_map(name, namespace, config_map)
         except ApiException as error:
+            if error.status == 404:
+                raise NFVCLCoreException(f"ConfigMap '{name}' not found in namespace '{namespace}'", http_equivalent_code=404)
             raise NFVCLCoreException(f"Exception when calling CoreV1Api>patch_config_map: {error}", http_equivalent_code=error.status)
 
         return config_map

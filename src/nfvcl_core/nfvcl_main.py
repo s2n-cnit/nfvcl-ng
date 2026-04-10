@@ -107,19 +107,6 @@ class NFVCL:
         for plugin in self.plugins:
             plugin.load()
 
-    # def vim_checks(self):
-    #     # TODO maybe this should be moved somewere else?
-    #     # TODO better handling if the topology is not present
-    #     try:
-    #         topology = self.topology_manager.get_topology()
-    #         vim_list = topology.get_vims()
-    #         vim_list = list(filter(lambda x: x.vim_type == "openstack", vim_list))
-    #         err_list = check_openstack_instances(topology, vim_list)
-    #         for err in err_list:
-    #             self.logger.error(f"Error checking VIM: {err.name}")
-    #     except Exception as e:
-    #         self.logger.error(f"Error checking VIMs: {e}")
-
     def get_ordered_public_methods(self) -> List[Callable]:
         """
         Get the list of all public methods that should be exposed by the NFVCL
@@ -511,6 +498,10 @@ class NFVCL:
     @NFVCLPublic(path="/{cluster_id}/sa/{namespace}/{user}", section=K8S_SECTION, method=HttpRequestType.POST, sync=True, doc_by=KubernetesManager.create_service_account)
     def k8s_create_service_account(self, cluster_id: str, namespace: str, user: str, callback=None) -> dict:
         return self.add_task(self.kubernetes_manager.create_service_account, cluster_id, namespace, user, callback=callback)
+
+    @NFVCLPublic(path="/{cluster_id}/sa/{namespace}/{user}", section=K8S_SECTION, method=HttpRequestType.DELETE, sync=True, doc_by=KubernetesManager.delete_service_account)
+    def k8s_delete_service_account(self, cluster_id: str, namespace: str, user: str, callback=None) -> dict:
+        return self.add_task(self.kubernetes_manager.delete_service_account, cluster_id, namespace, user, callback=callback)
 
     @NFVCLPublic(path="/{cluster_id}/sa/admin/{namespace}/{username}", section=K8S_SECTION, method=HttpRequestType.POST, sync=True, doc_by=KubernetesManager.create_admin_sa_for_namespace)
     def k8s_create_admin_sa_for_namespace(self, cluster_id: str, namespace: str, username: str, callback=None) -> dict:

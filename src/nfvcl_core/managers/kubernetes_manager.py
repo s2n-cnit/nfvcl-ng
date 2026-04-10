@@ -526,6 +526,29 @@ class KubernetesManager(GenericManager):
 
         return user_creation_res.to_dict()
 
+    def delete_service_account(self, cluster_id: str, namespace: str, user: str) -> dict:
+        """
+        Delete a service account from a namespace
+
+        Args:
+            cluster_id: The target cluster id
+
+            namespace: The namespace from which the user is deleted
+
+            user: The name of the user to delete
+
+        Returns:
+            The deleted user (V1ServiceAccount)
+        """
+        try:
+            k8s_api = self.get_k8s_api_utils(cluster_id)
+            user_deletion_res: V1ServiceAccount = k8s_api.delete_service_account(namespace=namespace, username=user)
+        except (ValueError, ApiException) as val_err:
+            self.logger.error(val_err)
+            raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
+
+        return user_deletion_res.to_dict()
+
     def create_admin_sa_for_namespace(self, cluster_id: str, namespace: str, username: str):
         """
         Create a Service Account with admin rights in the target namespace.

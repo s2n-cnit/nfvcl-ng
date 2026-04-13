@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Union
+from typing import Union, Optional
 from pydantic import BaseModel, Field
 
 from nfvcl_models.blueprint_ng.g5.custom_types_5g import SSTType, SDType
@@ -45,4 +45,4 @@ class PDNConfig(BaseModel):
     ip_addr_shift: int | None = 1
     dns_addr: Union[str, list[str]] | None = None
     erabs: list[ERAB] = Field(default=[ERAB()])
-    slices: list[PdnSlice] = []
+    slices: Optional[list[PdnSlice]] = Field(default=None)

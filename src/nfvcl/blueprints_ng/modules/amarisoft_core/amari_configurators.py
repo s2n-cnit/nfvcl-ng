@@ -32,9 +32,9 @@ def to_serializable(obj):
         A JSON-serialisable representation of ``obj``.
     """
     if isinstance(obj, QoSFlow):
-        return obj.model_dump(by_alias=True)
+        return obj.model_dump(by_alias=True, exclude_none=True)
     if isinstance(obj, BaseModel):
-        return {k: to_serializable(v) for k, v in obj.__iter__()}
+        return {key: to_serializable(value) for key, value in obj.__iter__() if value is not None}
     if isinstance(obj, list):
         return [to_serializable(i) for i in obj]
     return obj
@@ -186,6 +186,8 @@ class AmarisoftConfigurator(VmResourceAnsibleConfiguration):
             f"{self.config_dest_path}/{MME_FILE_NAME}"
         )
 
+        ansible_builder.add_service_task("lte", ServiceState.RESTARTED)
+
     def _build_pdn_list(self) -> list[PDNConfig]:
         """
         Constructs the list of PDNConfig objects representing the data networks
@@ -226,6 +228,8 @@ class AmarisoftConfigurator(VmResourceAnsibleConfiguration):
             # Attach a slice entry for every profile that includes this DNN
             for slice_profile in self.amarisoft_5g_state.current_config.config.sliceProfiles:
                 if data_net.dnn in slice_profile.dnnList:
+                    if pdn.slices is None:
+                        pdn.slices = []
                     snssai = SNSSAI(sst=slice_profile.sliceType, sd=sd_to_int(slice_profile.sliceId))
                     pdn.slices.append(PdnSlice(snssai=snssai, qos_flows=[QoSFlow()]))
 
@@ -276,3 +280,33 @@ class AmarisoftConfigurator(VmResourceAnsibleConfiguration):
         ansible_builder.add_template_task(rel_path("config/routes.service.jinja2"), "/etc/systemd/system/routes.service")
         ansible_builder.add_shell_task("systemctl daemon-reload")
         ansible_builder.add_service_task("routes", ServiceState.STARTED, True)
+
+
+class AmarisoftSubscriberConfigurator(VmResourceAnsibleConfiguration):
+    """
+    Ansible configurator that updates only the UE database (``ue_db-ims.cfg``).
+
+    Used for subscriber add/remove day-2 operations where ``mme.cfg`` and
+    route scripts do not need to be touched.
+    """
+    amarisoft_5g_state: Generic5GBlueprintNGState
+    """Full 5G state snapshot; read-only — used only to extract subscriber data."""
+
+    config_dest_path: str = "/root/mme/config"
+    """Remote directory where the UE-DB configuration file will be placed."""
+
+    def dump_playbook(self) -> str:
+        subscriber_conf_builder = AnsiblePlaybookBuilder("Playbook Amari Core Subscriber Update")
+
+        subscribers_data = [
+            {"imsi": s.imsi, "k": s.k, "opc": s.opc}
+            for s in self.amarisoft_5g_state.current_config.config.subscribers
+        ]
+        subscriber_conf_builder.set_var("subscribers", subscribers_data)
+        subscriber_conf_builder.add_template_task(
+            rel_path("config/ue_db-ims.cfg.jinja2"),
+            f"{self.config_dest_path}/{UE_DB_FILE_NAME}"
+        )
+        subscriber_conf_builder.add_service_task("lte", ServiceState.RESTARTED)
+
+        return subscriber_conf_builder.build()

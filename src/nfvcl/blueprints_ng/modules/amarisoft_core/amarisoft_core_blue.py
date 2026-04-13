@@ -6,14 +6,14 @@ from nfvcl.blueprints_ng.modules.router_5g.router_5g import Router5GCreateModel,
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from pydantic import Field
 
-from nfvcl.blueprints_ng.modules.amarisoft_core.amari_configurators import AmarisoftInstallator, AmarisoftConfigurator
+from nfvcl.blueprints_ng.modules.amarisoft_core.amari_configurators import AmarisoftInstallator, AmarisoftConfigurator, AmarisoftSubscriberConfigurator
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceFlavor
 
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG, Generic5GBlueprintNGState, UPFInfo, EdgeAreaInfo
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSliceProfiles, SubSubscribers, SubArea, SubDataNets, Router5GNetworkInfo
-from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GAddDnnModel, Core5GDelDnnModel
+from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel, Core5GDelSubscriberModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GAddDnnModel, Core5GDelDnnModel, Core5GAddTacModel, Core5GDelTacModel
 from nfvcl_models.blueprint_ng.g5.upf import UPFNetworkInfo, Slice5GWithDNNs, BlueCreateModelNetworks, UPFBlueCreateModel
 
 BASE_IMAGE24 = "ubuntu-lab-v0.1.6"
@@ -53,6 +53,10 @@ class AmarisoftCoreBlueprintNGState(Generic5GBlueprintNGState):
     core_vm_configurator: Optional[AmarisoftConfigurator] = Field(
         default=None,
         description="Ansible configurator that applies the running configuration to the core VM"
+    )
+    core_vm_subscriber_configurator: Optional[AmarisoftSubscriberConfigurator] = Field(
+        default=None,
+        description="Ansible configurator that updates only the UE database on the core VM"
     )
     upf_info: Optional[UPFInfo] = Field(
         default=None,
@@ -342,6 +346,13 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         self.register_resource(configurator)
         self.provider.configure_vm(configurator)
 
+        subscriber_configurator = AmarisoftSubscriberConfigurator(
+            vm_resource=virtual_machine,
+            amarisoft_5g_state=self.state,
+        )
+        self.state.core_vm_subscriber_configurator = subscriber_configurator
+        self.register_resource(subscriber_configurator)
+
     # -------------------------------------------------------------------------
     # Edge areas
     # -------------------------------------------------------------------------
@@ -382,16 +393,26 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         Adds one or more subscribers to the state and pushes the updated
         UE-DB configuration to the core VM.
         """
-        super().add_ues(subscriber_model)
-        self.provider.configure_vm(self.state.core_vm_configurator)
+        self.state.core_vm_subscriber_configurator.amarisoft_5g_state = self.state
+        self.provider.configure_vm(self.state.core_vm_subscriber_configurator)
 
     def del_ues(self, subscriber_model: Core5GDelSubscriberModel):
         """
         Removes one or more subscribers from the state and pushes the updated
         UE-DB configuration to the core VM.
         """
-        super().del_ues(subscriber_model)
-        self.provider.configure_vm(self.state.core_vm_configurator)
+        self.state.core_vm_subscriber_configurator.amarisoft_5g_state = self.state
+        self.provider.configure_vm(self.state.core_vm_subscriber_configurator)
+
+    # -------------------------------------------------------------------------
+    # Day-2: TAC
+    # -------------------------------------------------------------------------
+
+    def add_tac(self, add_area_model: Core5GAddTacModel):
+        raise NFVCLCoreException("Add TAC is not supported in the Amarisoft blueprint")
+
+    def del_tac(self, del_area_model: Core5GDelTacModel):
+        raise NFVCLCoreException("Delete TAC is not supported in the Amarisoft blueprint")
 
     # -------------------------------------------------------------------------
     # Day-2: slices
@@ -402,7 +423,7 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         Adds a slice to the state and pushes the updated MME configuration
         to the core VM.
         """
-        super().add_slice(add_slice_model, oss)
+        self.state.core_vm_configurator.amarisoft_5g_state = self.state
         self.provider.configure_vm(self.state.core_vm_configurator)
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
@@ -410,7 +431,7 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         Removes a slice from the state and pushes the updated MME configuration
         to the core VM.
         """
-        super().del_slice(del_slice_model)
+        self.state.core_vm_configurator.amarisoft_5g_state = self.state
         self.provider.configure_vm(self.state.core_vm_configurator)
 
     # -------------------------------------------------------------------------
@@ -422,7 +443,7 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         Adds a DNN to the state, pushes the updated configuration, and refreshes
         edge-area UPF info so downstream components see the new data network.
         """
-        super().add_dnn(dnn_model)
+        self.state.core_vm_configurator.amarisoft_5g_state = self.state
         self.provider.configure_vm(self.state.core_vm_configurator)
         self.update_edge_areas()
 
@@ -431,7 +452,7 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         Removes a DNN from the state, pushes the updated configuration, and
         refreshes edge-area UPF info.
         """
-        super().del_dnn(del_dnn_model)
+        self.state.core_vm_configurator.amarisoft_5g_state = self.state
         self.provider.configure_vm(self.state.core_vm_configurator)
         self.update_edge_areas()
 

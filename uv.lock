@@ -22,19 +22,19 @@ wheels = [
 
 [[package]]
 name = "ansible"
-version = "13.5.0"
+version = "11.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ansible-core" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e0/de/07e07221bb555a1cb3506135377923ce4caefe8306f5ca6431801738b74a/ansible-13.5.0.tar.gz", hash = "sha256:69b175e694d9511fec838b0a82f150bab366dd9cb7a829096c3d3a72f6046719", size = 52737499, upload-time = "2026-03-25T18:15:59.169Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0c/ce/e5a2c290c52136c03463875c3588317be18ce06fc36b5303299855d3c537/ansible-11.12.0.tar.gz", hash = "sha256:6f18de9dba19f0e6b9afc74774b6e65c5f55dadbc7ecc5ba21027cce00c806ea", size = 52944590, upload-time = "2025-11-05T19:45:28.069Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/9f/6143606b0609c4cbb5de52c2d0e64feb86d6f0376b37b5b9cb81e23b73fc/ansible-13.5.0-py3-none-any.whl", hash = "sha256:f95531354af82c3071d89dc2615d184cd8f3348f19b0c870be6ad53218b3ee48", size = 56084370, upload-time = "2026-03-25T18:15:53.865Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/22/2e29dcc92c6c2decfaabd5a1c776f530905c17f725c0ccb8bb0e320aa870/ansible-11.12.0-py3-none-any.whl", hash = "sha256:0be0e1677dfb2f86a73ee0aaf1564bfc3aa0ea3a13077a7d6e881f277c650ab3", size = 57368421, upload-time = "2025-11-05T19:45:23.425Z" },
 ]
 
 [[package]]
 name = "ansible-core"
-version = "2.20.4"
+version = "2.18.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -43,14 +43,14 @@ dependencies = [
     { name = "pyyaml" },
     { name = "resolvelib" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/11/7c/57263940ef61d7a829baef6e752556b1434f3a66ae05885c80753efbca50/ansible_core-2.20.4.tar.gz", hash = "sha256:2060c06195ada0cca0ac3128025d1167f567479da465897d818982fbe28bed1f", size = 3334074, upload-time = "2026-03-23T17:39:36.24Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/f5/44e7b06cd37f0ee8396a90e10193d8a178483174723533c69ebfd96e5881/ansible_core-2.18.11.tar.gz", hash = "sha256:e1e6611559d730e95a9456895e8e157c378e97c479d1dd8299e25a89689bfd9f", size = 3096104, upload-time = "2025-11-04T23:31:42.918Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/19/fecf85f0f677405c0d4bec0c9f304b9f906f25599a176f4b16db7fa83571/ansible_core-2.20.4-py3-none-any.whl", hash = "sha256:fb3a8f0301aab863f847f70aea9cbd47d635c6a283b441c56cec881b4aedcb04", size = 2426247, upload-time = "2026-03-23T17:39:34.669Z" },
+    { url = "https://files.pythonhosted.org/packages/50/d6/358c28339ea4ac7b57e34d7a06b886db3e31b731dab3e1ffd7da25266344/ansible_core-2.18.11-py3-none-any.whl", hash = "sha256:efd0bbac9e3493434bfb22845b5959dc6bd75a2d26b831dd8c061e8dba85df96", size = 2210692, upload-time = "2025-11-04T23:31:40.623Z" },
 ]
 
 [[package]]
 name = "ansible-runner"
-version = "2.4.3"
+version = "2.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
@@ -58,9 +58,9 @@ dependencies = [
     { name = "python-daemon" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/4f/62222b42b52cc771db51ccc77ffac19cc5f0196ff61de7c93585845a819b/ansible_runner-2.4.3.tar.gz", hash = "sha256:5f3025529bb968fdc3b627457dd8d418dbf9d53bc73735d50e69c28544d53031", size = 154148, upload-time = "2026-03-16T18:42:14.861Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/db/65b9e058807d313c495a6f4365cc11234d0391c5843659ddc27cc4bf1677/ansible_runner-2.4.2.tar.gz", hash = "sha256:331d4da8d784e5a76aa9356981c0255f4bb1ba640736efe84b0bd7c73a4ca420", size = 152047, upload-time = "2025-10-14T19:10:50.159Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e3/89/fa7f81db6134caa455c9351373ee934b5fdeed212eb939d6c42d80d683d7/ansible_runner-2.4.3-py3-none-any.whl", hash = "sha256:cdac6daa151a50084ffda710e769db23fa975fc0507796191d7708831b286e37", size = 80257, upload-time = "2026-03-16T18:42:13.72Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/da/19512e72e9cf2b8e7e6345264baa6c7ac1bb0ab128eb19c73a58407c4566/ansible_runner-2.4.2-py3-none-any.whl", hash = "sha256:0bde6cb39224770ff49ccdc6027288f6a98f4ed2ea0c64688b31217033221893", size = 79758, upload-time = "2025-10-14T19:10:48.994Z" },
 ]
 
 [[package]]
@@ -780,6 +780,7 @@ wheels = [
 
 [[package]]
 name = "nfvcl"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "ansible" },
@@ -835,8 +836,8 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ansible", specifier = "==13.5.0" },
-    { name = "ansible-runner", specifier = ">=2.4.3" },
+    { name = "ansible", specifier = "==11.12.0" },
+    { name = "ansible-runner", specifier = ">=2.4.2" },
     { name = "blinker", specifier = ">=1.9.0,<2" },
     { name = "colorama", specifier = ">=0.4.6,<0.5" },
     { name = "coloredlogs", specifier = ">=15.0.1,<16" },
@@ -848,7 +849,7 @@ requires-dist = [
     { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "jinja2-ansible-filters", specifier = ">=1.3.2,<2" },
-    { name = "json5" },
+    { name = "json5", specifier = ">=0.14.0" },
     { name = "kubernetes", specifier = "==32.0.1" },
     { name = "openstacksdk", specifier = ">=4.7.1" },
     { name = "paramiko", specifier = ">=4.0.0" },

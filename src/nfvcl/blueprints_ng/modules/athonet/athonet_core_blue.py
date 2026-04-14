@@ -73,9 +73,13 @@ class AthonetCore(Generic5GBlueprintNG[AthonetCoreBlueprintNGState, Create5gMode
         """
         addiotional_infos: List[ProvisionedDataInfo] = []
         for _slice in snssai:
-            tmp_slice = self.get_slice(_slice.sliceId)
+            tmp_slice = self.state.current_config.get_slice_profile(_slice.sliceId)
+            if tmp_slice is None:
+                raise ValueError(f'Slice {_slice.sliceId} not found.')
             for dnn in tmp_slice.dnnList:
-                tmp_dnn = self.get_dnn(dnn)
+                tmp_dnn = self.state.current_config.get_dnn(dnn)
+                if tmp_dnn is None:
+                    raise ValueError(f'DNN {dnn} not found.')
                 add_info: ProvisionedDataInfo = ProvisionedDataInfo(
                     slice=tmp_slice,
                     dnn=tmp_dnn
@@ -138,73 +142,73 @@ class AthonetCore(Generic5GBlueprintNG[AthonetCoreBlueprintNGState, Create5gMode
     def wait_core_ready(self):
         pass
 
-    def get_slice(self, slice_id: str) -> SubSliceProfiles:
-        """
-        Get SubSliceProfiles with specified slice_id from conf.
-        Args:
-            slice_id: slice id of the slice to retrieve.
+    # def get_slice(self, slice_id: str) -> SubSliceProfiles:
+    #     """
+    #     Get SubSliceProfiles with specified slice_id from conf.
+    #     Args:
+    #         slice_id: slice id of the slice to retrieve.
+    #
+    #     Returns: the slice with specified slice_id.
+    #
+    #     """
+    #     for _slice in self.state.current_config.config.sliceProfiles:
+    #         if _slice.sliceId == slice_id:
+    #             return _slice
+    #     raise ValueError(f'Slice {slice_id} not found.')
 
-        Returns: the slice with specified slice_id.
+    # def get_subscriber(self, imsi: str) -> SubSubscribers:
+    #     """
+    #     Get SubSubscribers with specified imsi from conf.
+    #     Args:
+    #         imsi: imsi of the subscriber to retrieve.
+    #
+    #     Returns: the subscriber with specified imsi.
+    #
+    #     """
+    #     for _subscriber in self.state.current_config.config.subscribers:
+    #         if _subscriber.imsi == imsi:
+    #             return _subscriber
+    #     raise ValueError(f'Subscriber with imsi: {imsi} not found.')
 
-        """
-        for _slice in self.state.current_config.config.sliceProfiles:
-            if _slice.sliceId == slice_id:
-                return _slice
-        raise ValueError(f'Slice {slice_id} not found.')
+    # def get_area(self, area_id: int) -> SubArea:
+    #     """
+    #     Get SubArea with specified area_id from conf.
+    #     Args:
+    #         area_id: area id of the area to retrieve.
+    #
+    #     Returns: the area with specified area id.
+    #
+    #     """
+    #     for area in self.state.current_config.areas:
+    #         if area_id == area.id:
+    #             return area
+    #     raise ValueError(f'Area {area_id} not found.')
 
-    def get_subscriber(self, imsi: str) -> SubSubscribers:
-        """
-        Get SubSubscribers with specified imsi from conf.
-        Args:
-            imsi: imsi of the subscriber to retrieve.
+    # def get_area_from_sliceid(self, sliceid: str) -> SubArea:
+    #     """
+    #     Get SubArea from conf, that contains the slice with specified sliceid.
+    #     Args:
+    #         sliceid: slice id of the slice.
+    #
+    #     Returns: the area with specified slice.
+    #
+    #     """
+    #     for area in self.state.current_config.areas:
+    #         for _slice in area.slices:
+    #             if _slice.sliceId == sliceid:
+    #                 return area
+    #     raise ValueError(f'Area of slice {sliceid} not found.')
 
-        Returns: the subscriber with specified imsi.
-
-        """
-        for _subscriber in self.state.current_config.config.subscribers:
-            if _subscriber.imsi == imsi:
-                return _subscriber
-        raise ValueError(f'Subscriber with imsi: {imsi} not found.')
-
-    def get_area(self, area_id: int) -> SubArea:
-        """
-        Get SubArea with specified area_id from conf.
-        Args:
-            area_id: area id of the area to retrieve.
-
-        Returns: the area with specified area id.
-
-        """
-        for area in self.state.current_config.areas:
-            if area_id == area.id:
-                return area
-        raise ValueError(f'Area {area_id} not found.')
-
-    def get_area_from_sliceid(self, sliceid: str) -> SubArea:
-        """
-        Get SubArea from conf, that contains the slice with specified sliceid.
-        Args:
-            sliceid: slice id of the slice.
-
-        Returns: the area with specified slice.
-
-        """
-        for area in self.state.current_config.areas:
-            for _slice in area.slices:
-                if _slice.sliceId == sliceid:
-                    return area
-        raise ValueError(f'Area of slice {sliceid} not found.')
-
-    def get_dnn(self, dnn_name: str) -> SubDataNets:
-        """
-        Get SubDataNets with specified dnn_name from conf.
-        Args:
-            dnn_name: dnn name of the dnn to retrieve.
-
-        Returns: the dnn with specified dnn name.
-
-        """
-        for dnn in self.state.current_config.config.network_endpoints.data_nets:
-            if dnn_name == dnn.dnn:
-                return dnn
-        raise ValueError(f'Dnn {dnn_name} not found.')
+    # def get_dnn(self, dnn_name: str) -> SubDataNets:
+    #     """
+    #     Get SubDataNets with specified dnn_name from conf.
+    #     Args:
+    #         dnn_name: dnn name of the dnn to retrieve.
+    #
+    #     Returns: the dnn with specified dnn name.
+    #
+    #     """
+    #     for dnn in self.state.current_config.config.network_endpoints.data_nets:
+    #         if dnn_name == dnn.dnn:
+    #             return dnn
+    #     raise ValueError(f'Dnn {dnn_name} not found.')

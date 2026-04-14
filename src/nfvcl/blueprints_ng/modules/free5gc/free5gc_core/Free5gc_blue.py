@@ -3,18 +3,17 @@ import random
 import string
 from typing import Optional, Dict, List, Tuple
 
-import httpx
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.free5gc import free5gc_default_core_config, free5gc_subscriber_config
 from nfvcl.blueprints_ng.modules.free5gc.free5gc_upf.Free5gcUpf_blue import FREE5GC_UPF_BLUE_TYPE
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBlueprintNGState, Generic5GK8sBlueprintNG
-from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubArea, SubSliceProfiles, SubSubscribers, SubDataNets, NetworkEndPointType
-from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Free5gcCoreConfig, Snssai, Free5gcLogin, Free5gcSubScriber
-from nfvcl_models.blueprint_ng.g5.core import Core5GDelTacModel, Core5GAddTacModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GDelSubscriberModel, Core5GAddSubscriberModel, NF5GType, Core5GAddDnnModel, Core5GDelDnnModel
+from nfvcl_common.utils.log import create_logger
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core_models.resources import HelmChartResource
-from nfvcl_common.utils.log import create_logger
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubArea, NetworkEndPointType
+from nfvcl_models.blueprint_ng.free5gc.free5gcCore import Free5gcCoreConfig, Snssai, Free5gcSubScriber
+from nfvcl_models.blueprint_ng.g5.core import Core5GDelTacModel, Core5GAddTacModel, Core5GDelSliceModel, Core5GAddSliceModel, Core5GDelSubscriberModel, Core5GAddSubscriberModel, NF5GType
 
 FREE5GC_CORE_BLUE_TYPE = "free5gc"
 free5gc_credentials = {"username": "admin", "password": "free5gc"}
@@ -50,11 +49,11 @@ class Free5gcBlueprintNGState(Generic5GK8sBlueprintNGState):
     supported_nssai_availability_nssf_id: int = Field(default=1)
 
     gpsis: List[str] = Field(default_factory=list)
+    subscribers: List[Free5gcSubScriber] = Field(default_factory=list)
 
 
 @blueprint_type(FREE5GC_CORE_BLUE_TYPE)
 class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreateModel]):
-
     default_upf_implementation = FREE5GC_UPF_BLUE_TYPE
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = Free5gcBlueprintNGState):
@@ -115,7 +114,6 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
 
         self.state.base_webui_api = f"http://{self.state.webui_ip}:5000/api"
 
-        self.update_core_values()
         self.update_core()
         # if self.state.network_endpoints.n4:
         #     self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments['smf'].name)
@@ -168,7 +166,10 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
         self.state.free5gc_config_values.add_supported_plmn_nssf(self.state.mcc, self.state.mnc)
 
         for sub_area in self.state.current_config.areas:
-            deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
+            upf_list = self.state.edge_areas[str(sub_area.id)].upf.upf_list
+            if not upf_list:
+                continue
+            deployed_upf_info = upf_list[0]
             self.state.free5gc_config_values.add_item_amf_supportTaiList(self.state.mcc, self.state.mnc, f"{sub_area.id:x}".zfill(6))
 
             for sub_slice in sub_area.slices:
@@ -184,17 +185,24 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
                 self.state.supported_nssai_availability_nssf_id = self.state.supported_nssai_availability_nssf_id + 1
                 self.state.free5gc_config_values.add_tai_supportedsnssailist_nssf_item(self.state.mcc, self.state.mnc, f"{sub_area.id:x}".zfill(6), _slice)
 
-                for dnn in self.get_slice(_slice.sd).dnnList:
-                    _dnn = self.get_dnn(dnn)
+                dnn_slice = self.state.current_config.get_slice_profile(_slice.sd)
+                if dnn_slice is None:
+                    raise ValueError(f"Slice profile not found for SD: {_slice.sd}")
+                for dnn in dnn_slice.dnnList:
+                    _dnn = self.state.current_config.get_dnn(dnn)
+                    if _dnn is None:
+                        raise ValueError(f"DNN not found for DNN: {dnn}")
                     self.state.free5gc_config_values.add_dnn_amf_item(dnn)
                     self.state.free5gc_config_values.add_dnn_info_smf_item(dnn, _dnn.dns, _slice)
-                    self.state.free5gc_config_values.add_dnnupfinfolist_smf(f"gNB{sub_area.id}", f"UPF{sub_area.id}", deployed_upf_info.network_info.n4_ip.exploded, deployed_upf_info.network_info.n3_ip.exploded, sub_slice.sliceType, sub_slice.sliceId, dnn, _dnn.pools[0].cidr)
+                    # self.state.free5gc_config_values.add_dnnupfinfolist_smf(f"gNB{sub_area.id}", f"UPF{sub_area.id}", deployed_upf_info.network_info.n4_ip.exploded, deployed_upf_info.network_info.n3_ip.exploded, sub_slice.sliceType, sub_slice.sliceId, dnn, _dnn.pools[0].cidr)
+                    self.state.free5gc_config_values.add_dnnupfinfolist_smf(f"gNB", f"UPF{sub_area.id}", deployed_upf_info.network_info.n4_ip.exploded, deployed_upf_info.network_info.n3_ip.exploded, sub_slice.sliceType, sub_slice.sliceId, dnn, _dnn.pools[0].cidr)
 
     def update_core(self):
         """
         Restart all the pods. (Use the "update_core_values", then call this function to restart pods with new values).
 
         """
+        self.update_core_values()
         self.provider.update_values_helm_chart(
             self.state.core_helm_chart,
             self.state.free5gc_config_values.model_dump(exclude_none=True, by_alias=True)
@@ -217,154 +225,52 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
                 self.state.gpsis.append(gpsi)
                 return gpsi
 
-    def get_api_token(self):
-        """
-        Get API access token
-        Returns: API access token
-
-        """
-        self.logger.info("Requesting API access token")
-        with httpx.Client(http1=True, http2=False, base_url=self.state.base_webui_api) as client:
-            api_url_ue = f"/login"
-            response = client.post(api_url_ue, json=free5gc_credentials)
-            token = Free5gcLogin.model_validate(response.json())
-            logger.info(f"Status code: {response.status_code}")
-            return token.access_token
-
     def add_ues(self, subscriber_model: Core5GAddSubscriberModel):
-        api_token = self.get_api_token()
         gpsi = self.get_gpsi()
         subscriber = copy.deepcopy(free5gc_subscriber_config.subscriber_config)
         subscriber.update_subscriber_config(subscriber_model.imsi, self.state.current_config, gpsi=gpsi)
-
-        with httpx.Client(http1=True, http2=False, base_url=self.state.base_webui_api) as client:
-            api_url_ue = f"/subscriber/{subscriber.ue_id}/{subscriber.plmn_id}"
-            response = client.post(api_url_ue, headers={'token': f'{api_token}'}, json=subscriber.model_dump(by_alias=True))
-            logger.info(f"Status code: {response.status_code}")
+        command = ["mongosh", "mongodb://mongodb/free5gc", "--eval", subscriber.to_mongosh_insert()]
+        response = self.provider.spawn_pod(
+            helm_chart_resource=self.state.core_helm_chart,
+            pod_name=f"mongosh-add-{subscriber_model.imsi}",
+            image="mongo:7",
+            command=command,
+            wait_for_completion=True
+        )
+        self.logger.info(response)
+        self.state.subscribers.append(subscriber)
 
     def del_ues(self, subscriber_model: Core5GDelSubscriberModel):
-        api_token = self.get_api_token()
-        with httpx.Client(http1=True, http2=False, base_url=self.state.base_webui_api) as client:
-            api_url_ue = f"/subscriber/imsi-{subscriber_model.imsi}/{subscriber_model.imsi[:5]}"
-            response = client.delete(api_url_ue, headers={'token': f'{api_token}'})
-            logger.info(f"Status code: {response.status_code}")
+        subscriber = self.get_subscriber(subscriber_model.imsi)
+        command = ["mongosh", "mongodb://mongodb/free5gc", "--eval", subscriber.to_mongosh_delete()]
+        response = self.provider.spawn_pod(
+            helm_chart_resource=self.state.core_helm_chart,
+            pod_name=f"mongosh-del-{subscriber_model.imsi}",
+            image="mongo:7",
+            command=command,
+            wait_for_completion=True
+        )
+        self.logger.info(response)
+        self.state.subscribers.remove(subscriber)
 
     def add_slice(self, add_slice_model: Core5GAddSliceModel, oss: bool):
+        super().add_slice(add_slice_model, oss=oss)
         self.update_edge_areas()
-        self.update_core_values()
-        self.update_core()
-        self.update_edge_areas()
-        self.update_gnb_config()
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
-        api_token = self.get_api_token()
-        with httpx.Client(http1=True, http2=False, base_url=self.state.base_webui_api) as client:
-            for subscriber in self.state.current_config.config.subscribers:
-                for _slice in subscriber.snssai:
-                    if _slice.sliceId == del_slice_model.sliceId:
-                        api_url_ue = f"/subscriber/imsi-{subscriber.imsi}/{subscriber.imsi[:5]}"
-
-                        response = client.get(api_url_ue, headers={'token': f'{api_token}'})
-                        logger.info(f"Status code: {response.status_code}")
-
-                        user = Free5gcSubScriber.model_validate(response.json())
-                        user.update_subscriber_config(subscriber.imsi, self.state.current_config)
-                        response = client.put(api_url_ue, headers={'token': f'{api_token}'}, json=user.model_dump(by_alias=True))
-                        logger.info(f"Status code: {response.status_code}")
-
+        super().del_slice(del_slice_model)
         self.update_edge_areas()
-        self.update_core_values()
-        self.update_core()
-        self.update_edge_areas()
-        self.update_gnb_config()
 
     def add_tac(self, add_area_model: Core5GAddTacModel):
+        super().add_tac(add_area_model)
         self.update_edge_areas()
-        self.update_core_values()
-        self.update_core()
-        self.update_edge_areas()
-        self.update_gnb_config()
 
     def del_tac(self, del_area_model: Core5GDelTacModel):
+        super().del_tac(del_area_model)
         self.update_edge_areas()
-        self.update_core_values()
-        self.update_core()
-        self.update_edge_areas()
-        self.update_gnb_config()
 
-    def add_dnn(self, dnn_model: Core5GAddDnnModel):
-        pass
-
-    def del_dnn(self, del_dnn_model: Core5GDelDnnModel):
-        pass
-
-    def get_slice(self, slice_id: str) -> SubSliceProfiles:
-        """
-        Get SubSliceProfiles with specified slice_id from conf.
-        Args:
-            slice_id: slice id of the slice to retrieve.
-
-        Returns: the slice with specified slice_id.
-
-        """
-        for _slice in self.state.current_config.config.sliceProfiles:
-            if _slice.sliceId == slice_id:
-                return _slice
-        raise ValueError(f'Slice {slice_id} not found.')
-
-    def get_subscriber(self, imsi: str) -> SubSubscribers:
-        """
-        Get SubSubscribers with specified imsi from conf.
-        Args:
-            imsi: imsi of the subscriber to retrieve.
-
-        Returns: the subscriber with specified imsi.
-
-        """
-        for _subscriber in self.state.current_config.config.subscribers:
-            if _subscriber.imsi == imsi:
+    def get_subscriber(self, imsi: str) -> Free5gcSubScriber:
+        for _subscriber in self.state.subscribers:
+            if _subscriber.ue_id == f"imsi-{imsi}":
                 return _subscriber
         raise ValueError(f'Subscriber with imsi: {imsi} not found.')
-
-    def get_area(self, area_id: int) -> SubArea:
-        """
-        Get SubArea with specified area_id from conf.
-        Args:
-            area_id: area id of the area to retrieve.
-
-        Returns: the area with specified area id.
-
-        """
-        for area in self.state.current_config.areas:
-            if area_id == area.id:
-                return area
-        raise ValueError(f'Area {area_id} not found.')
-
-    def get_area_from_sliceid(self, sliceid: str) -> SubArea:
-        """
-        Get SubArea from conf, that contains the slice with specified sliceid.
-        Args:
-            sliceid: slice id of the slice.
-
-        Returns: the area with specified slice.
-
-        """
-        for area in self.state.current_config.areas:
-            for slice in area.slices:
-                if slice.sliceId == sliceid:
-                    return area
-        raise ValueError(f'Area of slice {sliceid} not found.')
-
-    def get_dnn(self, dnn_name: str) -> SubDataNets:
-        """
-        Get SubDataNets with specified dnn_name from conf.
-        Args:
-            dnn_name: dnn name of the dnn to retrieve.
-
-        Returns: the dnn with specified dnn name.
-
-        """
-        for dnn in self.state.current_config.config.network_endpoints.data_nets:
-            if dnn_name == dnn.dnn:
-                return dnn
-        raise ValueError(f'Dnn {dnn_name} not found.')

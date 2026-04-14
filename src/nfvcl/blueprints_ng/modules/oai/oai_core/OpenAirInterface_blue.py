@@ -7,18 +7,16 @@ from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_k8s import Generic5GK8sBl
 from nfvcl.blueprints_ng.modules.oai import oai_default_core_config, oai_utils
 from nfvcl.blueprints_ng.modules.oai.oai_upf.OpenAirInterfaceUpf_blue import OAI_UPF_BLUE_TYPE
 from nfvcl_common.utils.api_utils import HttpRequestType
-from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
-from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_common.utils.curl_utils import generate_curl_command
 from nfvcl_common.utils.log import create_logger
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNGException
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_models.blueprint_ng.core5g.OAI_Models import DnnItem, Snssai, Ue, \
     SessionManagementSubscriptionData, DnnConfiguration, SessionAmbr, FiveQosProfile, OaiCoreValuesModel
-from nfvcl_models.blueprint_ng.core5g.common import SubArea, SubSubscribers, SubDataNets, \
-    SubSliceProfiles, Create5gModel, NetworkEndPointType
+from nfvcl_models.blueprint_ng.core5g.common import SubArea, SubSubscribers, Create5gModel, NetworkEndPointType
 from nfvcl_models.blueprint_ng.g5.core import Core5GDelSubscriberModel, Core5GAddSliceModel, \
-    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, Core5GAddDnnModel, Core5GDelDnnModel, \
-    Core5GUpdateSliceModel, NF5GType, Core5GAddSubscriberModel
+    Core5GDelSliceModel, Core5GAddTacModel, Core5GDelTacModel, NF5GType, Core5GAddSubscriberModel
 from nfvcl_models.blueprint_ng.g5.upf import DnnWithCidrModel
 
 OAI_CORE_BLUE_TYPE = "oai"
@@ -139,21 +137,28 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         for sub_area in self.state.current_config.areas:
             # TODO this work only for oai UPF, with the sdcore one multiple UPFs may be deployed for a single area
-            deployed_upf_info = self.state.edge_areas[str(sub_area.id)].upf.upf_list[0]
+            upf_list = self.state.edge_areas[str(sub_area.id)].upf.upf_list
+            if not upf_list:
+                continue
+            deployed_upf_info = upf_list[0]
             oai_utils.add_host_aliases(self.state.oai_config_values.oai_smf, sub_area.id, deployed_upf_info.network_info.n4_ip.exploded, deployed_upf_info.fqdn)
             oai_utils.add_available_upf(self.state.oai_config_values.global_.coreconfig, sub_area.id, deployed_upf_info.fqdn)
 
             for _slice in sub_area.slices:
                 new_snssai = oai_utils.add_snssai(self.state.oai_config_values.global_.coreconfig, _slice.sliceId, _slice.sliceType)
                 oai_utils.add_plmn_item(self.state.oai_config_values.global_.coreconfig, self.state.mcc, self.state.mnc, sub_area.id, new_snssai)
-                sub_slice = self.get_slice(_slice.sliceId)
+                sub_slice = self.state.current_config.get_slice_profile(_slice.sliceId)
+                if sub_slice is None:
+                    raise ValueError(f"Slice {sub_slice} not found in the current config")
                 for dnn in sub_slice.dnnList:
                     dnn_payload = DnnWithCidrModel()
 
                     dnn_item = DnnItem(
                         dnn=dnn
                     )
-                    dnn_info = self.get_dnn(dnn)
+                    dnn_info = self.state.current_config.get_dnn(dnn)
+                    if dnn_info is None:
+                        raise ValueError(f"DNN {dnn} not found in the current config")
 
                     dnn_payload.dnn = dnn_info.dnn
                     dnn_payload.cidr = dnn_info.pools[0].cidr
@@ -162,12 +167,12 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                     oai_utils.add_dnn_dnns(self.state.oai_config_values.global_.coreconfig, dnn_info.dnn, dnn_info.pools[0].cidr)
                     oai_utils.add_dnn_snssai_smf_info_list_item(self.state.oai_config_values.global_.coreconfig, new_snssai, dnn_item)
 
-
     def update_core(self):
         """
         Restart all the pods. (Use the "update_core_values", then call this function to restart pods with new values).
 
         """
+        self.update_core_values()
         self.provider.update_values_helm_chart(
             self.state.core_helm_chart,
             self.state.oai_config_values.model_dump(exclude_none=True, by_alias=True)
@@ -192,18 +197,22 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             supi=new_subscriber.imsi
         )
 
-        output = generate_curl_command(
+        command = generate_curl_command(
             method=HttpRequestType.PUT,
             url=f"{self.state.base_udr_url}/{new_subscriber.imsi}/authentication-data/authentication-subscription",
             payload=payload_ue.model_dump(by_alias=True),
             as_list=True
         )
-        response = self.provider.exec_command_in_pod(
+
+        response = self.provider.spawn_pod(
             helm_chart_resource=self.state.core_helm_chart,
-            command=output,
-            pod_name=self.state.core_helm_chart.deployments['oai-mysql'].pods[0].name,
-            container_name='oai-mysql'
+            pod_name=f"add-{new_subscriber.imsi}",
+            image="curlimages/curl:latest",
+            command=command,
+            wait_for_completion=True
         )
+        if int(response) != 201:
+            raise BlueprintNGException(f"Subscriber with imsi: {new_subscriber.imsi} not created")
 
     def del_subscriber_to_conf(self, imsi: str):
         """
@@ -211,20 +220,20 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         Args:
             imsi: the imsi of the subscriber to delete.
 
-        """
-        output = generate_curl_command(
+        # """
+        command = generate_curl_command(
             method=HttpRequestType.DELETE,
             url=f"{self.state.base_udr_url}/{imsi}/authentication-data/authentication-subscription",
             as_list=True
         )
-        response = self.provider.exec_command_in_pod(
+        response = self.provider.spawn_pod(
             helm_chart_resource=self.state.core_helm_chart,
-            command=output,
-            pod_name=self.state.core_helm_chart.deployments['oai-mysql'].pods[0].name,
-            container_name='oai-mysql'
+            pod_name=f"del-{imsi}",
+            image="curlimages/curl:latest",
+            command=command,
+            wait_for_completion=True
         )
-        if int(response) != 204:
-            raise BlueprintNGException(f"Subscriber with imsi: {imsi} not deleted")
+        self.logger.info(response)
 
     def associating_subscriber_with_slice(self, imsi: str):
         """
@@ -237,8 +246,13 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         if imsi in self.state.ue_dict.keys():
             raise BlueprintNGException(f"Subscriber with imsi: {imsi} already associated to a slice")
 
-        subscriber = self.get_subscriber(imsi)
-        sub_slice = self.get_slice(subscriber.snssai[0].sliceId)
+        subscriber = self.state.current_config.get_subscriber(imsi)
+        if subscriber is None:
+            raise ValueError(f"Subscriber with imsi: {imsi} not found in the current config")
+
+        sub_slice = self.state.current_config.get_slice_profile(subscriber.snssai[0].sliceId)
+        if sub_slice is None:
+            raise ValueError(f"Slice {subscriber.snssai[0].sliceId} not found in the current config")
 
         single_nssai = Snssai(
             sst=subscriber.snssai[0].sliceType,
@@ -251,7 +265,9 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             single_nssai=single_nssai
         )
         for dnn in sub_slice.dnnList:
-            sub_dnn = self.get_dnn(dnn)
+            sub_dnn = self.state.current_config.get_dnn(dnn)
+            if sub_dnn is None:
+                raise ValueError(f"DNN {dnn} not found in the current config")
             configuration = DnnConfiguration(
                 s_ambr=SessionAmbr(
                     uplink=sub_dnn.uplinkAmbr.replace(" ", ""),
@@ -262,20 +278,22 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                 )
             )
             payload_sms.add_configuration(dnn, configuration)
-            #TODO here
+            # TODO here
 
         # TODO This block may be called inside the dnn loop above
-        output = generate_curl_command(
+        command = generate_curl_command(
             method=HttpRequestType.PUT,
             url=f"{self.state.base_udr_url}/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data",
             payload=payload_sms.model_dump(by_alias=True),
             as_list=True
         )
-        response = self.provider.exec_command_in_pod(
+
+        self.provider.spawn_pod(
             helm_chart_resource=self.state.core_helm_chart,
-            command=output,
-            pod_name=self.state.core_helm_chart.deployments['oai-mysql'].pods[0].name,
-            container_name='oai-mysql'
+            pod_name=f"associate-{imsi}",
+            image="curlimages/curl:latest",
+            command=command,
+            wait_for_completion=True
         )
 
     def disassociating_subscriber_from_slice(self, imsi: str):
@@ -286,17 +304,18 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         """
         for sms in self.state.ue_dict[imsi]:
-            # if sms.sd == sd:
-            output = generate_curl_command(
+            command = generate_curl_command(
                 method=HttpRequestType.DELETE,
                 url=f"{self.state.base_udr_url}/{imsi}/{self.state.current_config.config.plmn}/provisioned-data/sm-data",
                 as_list=True
             )
-            response = self.provider.exec_command_in_pod(
+
+            response = self.provider.spawn_pod(
                 helm_chart_resource=self.state.core_helm_chart,
-                command=output,
-                pod_name=self.state.core_helm_chart.deployments['oai-mysql'].pods[0].name,
-                container_name='oai-mysql'
+                pod_name=f"disassociate-{imsi}",
+                image="curlimages/curl:latest",
+                command=command,
+                wait_for_completion=True
             )
 
             if int(response) == 204:
@@ -304,112 +323,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                 if len(self.state.ue_dict[imsi]) == 0:
                     del self.state.ue_dict[imsi]
 
-        self.update_core_values()
         self.update_core()
         self.update_gnb_config()
-
-    def update_slice(self, update_slice_model: Core5GUpdateSliceModel):
-        """
-        Update an existing SubSliceProfiles of the conf.
-        Args:
-            update_slice_model: SubSliceProfiles to update.
-
-        """
-        self.logger.info(f"Updating Slice with ID: {update_slice_model.sliceId}")
-        old_slice = self.get_slice(update_slice_model.sliceId)
-
-        for dnn in update_slice_model.dnnList:
-            self.get_dnn(dnn)
-
-        _subscribers: List[SubSubscribers] = []
-
-        for subscriber in self.state.current_config.config.subscribers:
-            for _slice in self.state.ue_dict[subscriber.imsi].copy():
-                if hex(int(_slice.sd))[2:].zfill(6) == update_slice_model.sliceId:
-                    _subscribers.append(subscriber)
-
-        self.state.current_config.config.sliceProfiles.remove(old_slice)
-        self.state.current_config.config.sliceProfiles.append(update_slice_model)
-
-        for subscriber in _subscribers:
-            self.disassociating_subscriber_from_slice(subscriber.imsi)
-            self.associating_subscriber_with_slice(subscriber.imsi)
-
-        self.update_core_values()
-        self.update_core()
-        self.update_edge_areas(force=True)
-        self.update_gnb_config()
-
-    def get_slice(self, slice_id: str) -> SubSliceProfiles:
-        """
-        Get SubSliceProfiles with specified slice_id from conf.
-        Args:
-            slice_id: slice id of the slice to retrieve.
-
-        Returns: the slice with specified slice_id.
-
-        """
-        for _slice in self.state.current_config.config.sliceProfiles:
-            if _slice.sliceId == slice_id:
-                return _slice
-        raise ValueError(f'Slice {slice_id} not found.')
-
-    def get_subscriber(self, imsi: str) -> SubSubscribers:
-        """
-        Get SubSubscribers with specified imsi from conf.
-        Args:
-            imsi: imsi of the subscriber to retrieve.
-
-        Returns: the subscriber with specified imsi.
-
-        """
-        for _subscriber in self.state.current_config.config.subscribers:
-            if _subscriber.imsi == imsi:
-                return _subscriber
-        raise ValueError(f'Subscriber with imsi: {imsi} not found.')
-
-    def get_area(self, area_id: int) -> SubArea:
-        """
-        Get SubArea with specified area_id from conf.
-        Args:
-            area_id: area id of the area to retrieve.
-
-        Returns: the area with specified area id.
-
-        """
-        for area in self.state.current_config.areas:
-            if area_id == area.id:
-                return area
-        raise ValueError(f'Area {area_id} not found.')
-
-    def get_area_from_sliceid(self, sliceid: str) -> SubArea:
-        """
-        Get SubArea from conf, that contains the slice with specified sliceid.
-        Args:
-            sliceid: slice id of the slice.
-
-        Returns: the area with specified slice.
-
-        """
-        for area in self.state.current_config.areas:
-            for slice in area.slices:
-                if slice.sliceId == sliceid:
-                    return area
-        raise ValueError(f'Area of slice {sliceid} not found.')
-
-    def get_dnn(self, dnn_name: str) -> SubDataNets:
-        """
-        Get SubDataNets with specified dnn_name from conf.
-        Args:
-            dnn_name: dnn name of the dnn to retrieve.
-
-        Returns: the dnn with specified dnn name.
-
-        """
-        for dnn in self.state.current_config.config.network_endpoints.data_nets:
-            if dnn_name == dnn.dnn:
-                return dnn
-        raise ValueError(f'Dnn {dnn_name} not found.')
 
     def add_ues(self, subscriber_model: Core5GAddSubscriberModel):
         """
@@ -428,16 +343,12 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             subscriber_model: SubSubscribers to remove.
 
         """
-        # for _slice in self.state.ue_dict[subscriber_model.imsi]:
         self.disassociating_subscriber_from_slice(subscriber_model.imsi)
         self.del_subscriber_to_conf(subscriber_model.imsi)
 
     def add_slice(self, add_slice_model: Core5GAddSliceModel, oss: bool):
-        self.update_edge_areas()
-        self.update_core_values()
-        self.update_core()
+        super().add_slice(add_slice_model, oss)
         self.update_edge_areas(force=True)
-        self.update_gnb_config()
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
         """
@@ -451,11 +362,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                 if del_slice_model.sliceId == ue_slice.sd:
                     self.disassociating_subscriber_from_slice(imsi)
 
-        self.update_edge_areas()
-        self.update_core_values()
-        self.update_core()
+        super().del_slice(del_slice_model)
         self.update_edge_areas(force=True)
-        self.update_gnb_config()
 
     def add_tac(self, area: Core5GAddTacModel):
         """
@@ -466,7 +374,6 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         """
 
         self.update_edge_areas()
-        self.update_core_values()
         self.update_core()
         self.update_edge_areas(force=True)
 
@@ -485,7 +392,6 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         """
 
         self.update_edge_areas()
-        self.update_core_values()
         self.update_core()
         self.update_edge_areas(force=True)
 
@@ -494,15 +400,3 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments[smf_dep].name)
 
         self.update_gnb_config()
-
-    def add_dnn(self, dnn: Core5GAddDnnModel):
-
-        self.update_core_values()
-        self.update_core()
-
-
-    def del_dnn(self, dnn: Core5GDelDnnModel):
-
-        self.update_core_values()
-        self.update_core()
-

@@ -163,7 +163,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                                     "mcc": "001",
                                     "mnc": "01"
                                 },
-                                "tac": "000000" # TAC is a 6-digit hexadecimal number
+                                "tac": "000000"  # TAC is a 6-digit hexadecimal number
                             }
                         ],
                         "plmnSupportList": [
@@ -182,8 +182,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                         ],
                         "supportDnnList": [
                             "internet"
-                        ],
-                        "locality": "area1",
+                        ]
                     },
                     "logger": {
                         "enable": True,
@@ -273,8 +272,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                                     "B": "UPF"
                                 }
                             ]
-                        },
-                        "locality": "area1"
+                        }
                     },
                     "logger": {
                         "enable": True,
@@ -375,8 +373,7 @@ default_core_config: Free5gcCoreConfig = Free5gcCoreConfig.model_validate(
                     "configuration": {
                         "pcfName": "PCF",
                         "timeFormat": "2019-01-02 15:04:05",
-                        "defaultBdtRefId": "BdtPolicyId-",
-                        "locality": "area1"
+                        "defaultBdtRefId": "BdtPolicyId-"
                     },
                     "logger": {
                         "enable": True,

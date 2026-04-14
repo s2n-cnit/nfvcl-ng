@@ -1,6 +1,7 @@
 
 
 import re
+import secrets
 from typing import Optional, List, Dict, Union, Literal, Annotated
 
 from pydantic import Field, RootModel, field_validator
@@ -778,7 +779,7 @@ class SmfConfig(NFVCLBaseModel):
     userplane_information: UserplaneInformation = Field(
         ..., alias='userplaneInformation'
     )
-    locality: str
+    locality: Optional[str] = Field(default=None)
     t3591: Optional[T3591] = Field(default=None)
     t3592: Optional[T3592] = Field(default=None)
 
@@ -796,7 +797,7 @@ class SpecificPathItem(NFVCLBaseModel):
 class Ue(NFVCLBaseModel):
     members: List[str]
     topology: List[TopologyItem]
-    specific_path: List[SpecificPathItem] = Field(..., alias='specificPath')
+    specific_path: Optional[List[SpecificPathItem]] = Field(default=None, alias='specificPath')
 
 
 class UeRoutingInfo(RootModel):
@@ -963,7 +964,7 @@ class AmfConfig(NFVCLBaseModel):
     t3560: Optional[T3560] = Field(default=None)
     t3565: Optional[T3565] = Field(default=None)
     t3570: Optional[T3570] = Field(default=None)
-    locality: str
+    locality: Optional[str] = Field(default=None)
     sctp: Optional[Sctp] = Field(default=None)
     default_ue_ctx_req: Optional[bool] = Field(default=None, alias='defaultUECtxReq')
 
@@ -1247,7 +1248,7 @@ class PcfConfiguration(NFVCLBaseModel):
     pcf_name: str = Field(..., alias='pcfName')
     time_format: str = Field(..., alias='timeFormat')
     default_bdt_ref_id: str = Field(..., alias='defaultBdtRefId')
-    locality: str
+    locality: Optional[str] = Field(default=None)
 
 
 class ConfigurationPcf(NFVCLBaseModel):
@@ -1384,7 +1385,7 @@ class Opc(NFVCLBaseModel):
 
 class AuthenticationSubscription(NFVCLBaseModel):
     authentication_method: str = Field(..., alias='authenticationMethod')
-    sequence_number: str = Field(..., alias='sequenceNumber')
+    sequence_number: str = Field(default_factory=lambda: secrets.token_hex(6), alias='sequenceNumber')
     authentication_management_field: str = Field(
         ..., alias='authenticationManagementField'
     )
@@ -1619,3 +1620,159 @@ class Free5gcSubScriber(NFVCLBaseModel):
                                         qosRef = qosRef + 1
 
                             self.session_management_subscription_data.append(smsd)
+
+    def to_mongosh_insert(self) -> str:
+        """
+        Build the mongosh commands to insert this subscriber into all Free5GC MongoDB collections.
+
+        Covers:
+          - policyData.ues.amData
+          - policyData.ues.smData
+          - subscriptionData.authenticationData.authenticationSubscription
+          - subscriptionData.authenticationData.webAuthenticationSubscription
+          - subscriptionData.identityData
+          - subscriptionData.provisionedData.amData
+          - subscriptionData.provisionedData.smData  (one doc per slice)
+          - subscriptionData.provisionedData.smfSelectionSubscriptionData
+        """
+        commands = []
+
+        # 1. policyData.ues.amData
+        subsc_cats = ', '.join(f'"{c}"' for c in self.am_policy_data.subsc_cats)
+        commands.append(
+            f'db["policyData.ues.amData"].insertOne({{ subscCats: [{subsc_cats}], ueId: "{self.ue_id}" }})'
+        )
+
+        # 2. policyData.ues.smData
+        snssai_policy_entries = []
+        for key, policy in self.sm_policy_data.sm_policy_snssai_data.root.items():
+            dnn_entries = ', '.join(
+                f'"{dnn}": {{ dnn: "{info.dnn}" }}'
+                for dnn, info in policy.sm_policy_dnn_data.root.items()
+            )
+            snssai_policy_entries.append(
+                f'"{key}": {{ snssai: {{ sd: "{policy.snssai.sd}", sst: {policy.snssai.sst} }}, smPolicyDnnData: {{ {dnn_entries} }} }}'
+            )
+        commands.append(
+            f'db["policyData.ues.smData"].insertOne({{ ueId: "{self.ue_id}", smPolicySnssaiData: {{ {", ".join(snssai_policy_entries)} }} }})'
+        )
+
+        # 3. subscriptionData.authenticationData.authenticationSubscription
+        auth = self.authentication_subscription
+        commands.append(
+            f'db["subscriptionData.authenticationData.authenticationSubscription"].insertOne({{ '
+            f'sequenceNumber: {{ sqnScheme: "GENERAL", sqn: "{auth.sequence_number}" }}, '
+            f'authenticationManagementField: "{auth.authentication_management_field}", '
+            f'encOpcKey: "{auth.opc.opc_value}", '
+            f'ueId: "{self.ue_id}", '
+            f'authenticationMethod: "{auth.authentication_method}", '
+            f'encPermanentKey: "{auth.permanent_key.permanent_key_value}" '
+            f'}})'
+        )
+
+        # 4. subscriptionData.authenticationData.webAuthenticationSubscription
+        commands.append(
+            f'db["subscriptionData.authenticationData.webAuthenticationSubscription"].insertOne({{ '
+            f'opc: {{ opcValue: "{auth.opc.opc_value}", encryptionKey: {auth.opc.encryption_key}, encryptionAlgorithm: {auth.opc.encryption_algorithm} }}, '
+            f'authenticationManagementField: "{auth.authentication_management_field}", '
+            f'ueId: "{self.ue_id}", '
+            f'authenticationMethod: "{auth.authentication_method}", '
+            f'permanentKey: {{ permanentKeyValue: "{auth.permanent_key.permanent_key_value}", encryptionKey: {auth.permanent_key.encryption_key}, encryptionAlgorithm: {auth.permanent_key.encryption_algorithm} }}, '
+            f'sequenceNumber: "{auth.sequence_number}", '
+            f'milenage: {{ op: {{ encryptionKey: {auth.milenage.op.encryption_key}, encryptionAlgorithm: {auth.milenage.op.encryption_algorithm}, opValue: "{auth.milenage.op.op_value}" }} }} '
+            f'}})'
+        )
+
+        # 5. subscriptionData.identityData (one doc per gpsi, skipping empty placeholders)
+        for gpsi in self.access_and_mobility_subscription_data.gpsis:
+            if gpsi and gpsi != "msisdn-":
+                commands.append(
+                    f'db["subscriptionData.identityData"].insertOne({{ ueId: "{self.ue_id}", gpsi: "{gpsi}" }})'
+                )
+
+        # 6. subscriptionData.provisionedData.amData
+        am = self.access_and_mobility_subscription_data
+        ambr = am.subscribed_ue_ambr
+        default_nssais = ', '.join(
+            f'{{ sst: {n.sst}, sd: "{n.sd}" }}'
+            for n in am.nssai.default_single_nssais
+        )
+        gpsis_arr = ', '.join(f'"{g}"' for g in am.gpsis if g and g != "msisdn-")
+        commands.append(
+            f'db["subscriptionData.provisionedData.amData"].insertOne({{ '
+            f'ueId: "{self.ue_id}", '
+            f'servingPlmnId: "{self.plmn_id}", '
+            f'gpsis: [{gpsis_arr}], '
+            f'subscribedUeAmbr: {{ downlink: "{ambr.downlink}", uplink: "{ambr.uplink}" }}, '
+            f'nssai: {{ defaultSingleNssais: [{default_nssais}] }} '
+            f'}})'
+        )
+
+        # 7. subscriptionData.provisionedData.smData (one doc per slice)
+        for smsd in self.session_management_subscription_data:
+            snssai = smsd.single_nssai
+            dnn_conf_entries = []
+            for dnn_name, dnn_info in smsd.dnn_configurations.root.items():
+                allowed_types = ', '.join(f'"{t}"' for t in dnn_info.pdu_session_types.allowed_session_types)
+                allowed_ssc = ', '.join(f'"{m}"' for m in dnn_info.ssc_modes.allowed_ssc_modes)
+                qos = dnn_info.field_5g_qos_profile
+                arp = qos.arp
+                s_ambr = dnn_info.session_ambr
+                dnn_conf_entries.append(
+                    f'"{dnn_name}": {{ '
+                    f'pduSessionTypes: {{ defaultSessionType: "{dnn_info.pdu_session_types.default_session_type}", allowedSessionTypes: [{allowed_types}] }}, '
+                    f'sscModes: {{ defaultSscMode: "{dnn_info.ssc_modes.default_ssc_mode}", allowedSscModes: [{allowed_ssc}] }}, '
+                    f'"5gQosProfile": {{ "5qi": {qos.field_5qi}, arp: {{ preemptVuln: "{arp.preempt_vuln}", priorityLevel: {arp.priority_level}, preemptCap: "{arp.preempt_cap}" }}, priorityLevel: {qos.priority_level} }}, '
+                    f'sessionAmbr: {{ uplink: "{s_ambr.uplink}", downlink: "{s_ambr.downlink}" }} '
+                    f'}}'
+                )
+            commands.append(
+                f'db["subscriptionData.provisionedData.smData"].insertOne({{ '
+                f'dnnConfigurations: {{ {", ".join(dnn_conf_entries)} }}, '
+                f'ueId: "{self.ue_id}", '
+                f'servingPlmnId: "{self.plmn_id}", '
+                f'singleNssai: {{ sst: {snssai.sst}, sd: "{snssai.sd}" }} '
+                f'}})'
+            )
+
+        # 8. subscriptionData.provisionedData.smfSelectionSubscriptionData
+        snssai_info_entries = []
+        for key, slice_dnn in self.smf_selection_subscription_data.subscribed_snssai_infos.root.items():
+            dnn_infos = ', '.join(f'{{ dnn: "{d.dnn}" }}' for d in slice_dnn.dnn_infos)
+            snssai_info_entries.append(f'"{key}": {{ dnnInfos: [{dnn_infos}] }}')
+        commands.append(
+            f'db["subscriptionData.provisionedData.smfSelectionSubscriptionData"].insertOne({{ '
+            f'subscribedSnssaiInfos: {{ {", ".join(snssai_info_entries)} }}, '
+            f'ueId: "{self.ue_id}", '
+            f'servingPlmnId: "{self.plmn_id}" '
+            f'}})'
+        )
+
+        return '; '.join(commands)
+
+    def to_mongosh_delete(self) -> str:
+        """
+        Build the mongosh commands to delete this subscriber from all Free5GC MongoDB collections.
+
+        Covers:
+          - policyData.ues.amData
+          - policyData.ues.smData
+          - subscriptionData.authenticationData.authenticationSubscription
+          - subscriptionData.authenticationData.webAuthenticationSubscription
+          - subscriptionData.identityData
+          - subscriptionData.provisionedData.amData
+          - subscriptionData.provisionedData.smData
+          - subscriptionData.provisionedData.smfSelectionSubscriptionData
+        """
+        commands = [
+            f'db["policyData.ues.amData"].deleteOne({{ ueId: "{self.ue_id}" }})',
+            f'db["policyData.ues.smData"].deleteOne({{ ueId: "{self.ue_id}" }})',
+            f'db["subscriptionData.authenticationData.authenticationSubscription"].deleteOne({{ ueId: "{self.ue_id}" }})',
+            f'db["subscriptionData.authenticationData.webAuthenticationSubscription"].deleteOne({{ ueId: "{self.ue_id}" }})',
+            f'db["subscriptionData.identityData"].deleteMany({{ ueId: "{self.ue_id}" }})',
+            f'db["subscriptionData.provisionedData.amData"].deleteOne({{ ueId: "{self.ue_id}", servingPlmnId: "{self.plmn_id}" }})',
+            f'db["subscriptionData.provisionedData.smData"].deleteMany({{ ueId: "{self.ue_id}", servingPlmnId: "{self.plmn_id}" }})',
+            f'db["subscriptionData.provisionedData.smfSelectionSubscriptionData"].deleteOne({{ ueId: "{self.ue_id}", servingPlmnId: "{self.plmn_id}" }})',
+        ]
+        return '; '.join(commands)
+

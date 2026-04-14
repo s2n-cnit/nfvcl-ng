@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  upf:
+    container_name: upf-{{ upf_id }}
+    image: gradiant/open5gs:2.7.6
+    user: root
+    command:
+      - open5gs-upfd
+    cap_add:
+      - all
+    network_mode: host
+    volumes:
+      - ./config/upf.yaml:/opt/open5gs/etc/open5gs/upf.yaml
+    privileged: true
+    restart: on-failure
+    environment:
+       ENABLE_NAT: "false"
+       IPV4_TUN_SUBNET: {{ ipv4_subnet }}
+       IPV4_TUN_ADDR: {{ ipv4_address }}
+    ports:
+      - 2152:2152
+

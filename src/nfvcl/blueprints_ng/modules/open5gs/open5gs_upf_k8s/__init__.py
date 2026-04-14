@@ -1,0 +1,1 @@
+from .Open5GsUpfK8s_blue import Open5GsUPFK8SBlueprintNG as Open5GsUPFK8SBlueprintNG

@@ -1,0 +1,17 @@
+[Unit]
+Description=OPEN5GS UPF
+After=network.target
+After=docker.service
+BindsTo=docker.service
+ReloadPropagatedFrom=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/Open5GS_UPF/
+ExecStart=/root/Open5GS_UPF/start.sh
+RemainAfterExit=true
+ExecStop=/root/Open5GS_UPF/stop.sh
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

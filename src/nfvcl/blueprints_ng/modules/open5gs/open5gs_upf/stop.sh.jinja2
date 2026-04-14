@@ -1,0 +1,3 @@
+#!/bin/bash
+ip rule del iif ogstun lookup 1000 || true
+docker compose down

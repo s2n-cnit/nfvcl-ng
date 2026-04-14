@@ -10,6 +10,9 @@ from .oai.oai_upf import *
 from .oai.oai_upf_k8s import *
 from .oai.oai_ran import *
 from .oai.oai_ue import *
+from .open5gs.open5gs_core import *
+from .open5gs.open5gs_upf import *
+from .open5gs.open5gs_upf_k8s import *
 from .router_5g import *
 from .router5g_k8s import *
 from .sdcore import *

@@ -297,7 +297,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         upf_deployed_info: List[DeployedUPFInfo] = self.provider.call_blueprint_function(upf_id, "get_upfs_info")
         upf_info = UPFInfo(
             blue_id=upf_id,
-            router_gnb_ip=upf_deployed_info[0].router_gnb_ip.exploded if upf_deployed_info[0].router_gnb_ip else None,
+            router_gnb_ip=upf_deployed_info[0].router_gnb_ip.exploded if upf_deployed_info and upf_deployed_info[0].router_gnb_ip else None,
             external=False,
             upf_list=upf_deployed_info,
             current_config=current_config
@@ -388,12 +388,19 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             for slice in list(filter(lambda x: x.id == pdu.area, self.state.current_config.areas))[0].slices:
                 slices.append(Slice5G(sd=slice.sliceId, sst=slice.sliceType))
 
+            if len(slices) == 0:
+                continue
+
+            upfs_for_slice = self.get_upfs_for_slice(str(slices[0].sd))
+            if not upfs_for_slice:
+                continue
+
             gnb_configuration_request = GNBPDUConfigure(
                 area=pdu.area,
                 plmn=self.state.current_config.config.plmn,
                 tac=pdu.area,
                 amf_ip=self.get_amf_ip(),
-                upf_ip=self.get_upfs_for_slice(str(slices[0].sd))[0].network_info.n3_ip.exploded,  # This is not really right, but it's needed for LiteON AIO
+                upf_ip=upfs_for_slice[0].network_info.n3_ip.exploded,  # This is not really right, but it's needed for LiteON AIO
                 amf_port=38412,
                 nssai=slices,
                 additional_routes=self._additional_routes_for_gnb(str(pdu.area)),

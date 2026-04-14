@@ -31,6 +31,7 @@ class K8SProviderNativeException(K8SProviderException):
 
 helm_client_dict: Dict[int, Client] = {}
 
+
 class K8SProviderNative(K8SProviderInterface):
     def init(self):
         self.HELM_TMP_FOLDER_PATH = create_tmp_folder('helm')
@@ -113,6 +114,7 @@ class K8SProviderNative(K8SProviderInterface):
 
         services = self.kube_utils.get_services(namespace=helm_chart_resource.namespace.lower())
         deployments = self.kube_utils.get_deployments(namespace=helm_chart_resource.namespace.lower(), detailed=True)
+        statefulsets = self.kube_utils.get_statefulsets(namespace=helm_chart_resource.namespace.lower(), detailed=True)
 
         deployments_pods: Dict[str, V1PodList] = {}
 
@@ -120,8 +122,14 @@ class K8SProviderNative(K8SProviderInterface):
             deployment_pods = self.kube_utils.get_pods_for_namespace(namespace=helm_chart_resource.namespace.lower(), label_selector=','.join([f'{k}={v}' for k, v in deployment.spec.selector.match_labels.items()]))
             deployments_pods[deployment.metadata.name] = deployment_pods
 
+        statefulsets_pods: Dict[str, V1PodList] = {}
+        for statefulset in statefulsets.items:
+            statefulset_pods = self.kube_utils.get_pods_for_namespace(namespace=helm_chart_resource.namespace.lower(), label_selector=','.join([f'{k}={v}' for k, v in statefulset.spec.selector.match_labels.items()]))
+            statefulsets_pods[statefulset.metadata.name] = statefulset_pods
+
         helm_chart_resource.set_services_from_k8s_api(services)
         helm_chart_resource.set_deployments_from_k8s_api(deployments, deployments_pods)
+        helm_chart_resource.set_statefulsets_from_k8s_api(statefulsets, statefulsets_pods)
 
         self.logger.success(f"Installing Helm chart {helm_chart_resource.name} finished")
         self.save_to_db()
@@ -222,7 +230,7 @@ class K8SProviderNative(K8SProviderInterface):
             self.logger.debug(f"Releasing reserved IP '{reserved_ip.ip_address}'")
             self.topology_manager.release_k8s_multus_ip(self.k8s_cluster.name, reserved_ip.network_name, reserved_ip.ip_address)
 
-    def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
+    def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int] = None) -> str:
         return self.kube_utils.get_logs_for_pod(helm_chart_resource.namespace.lower(), pod_name, tail_lines=tail_lines)
 
     def reserve_k8s_multus_ip(self, area: int, network_name: str) -> MultusInterface:
@@ -265,3 +273,11 @@ class K8SProviderNative(K8SProviderInterface):
     def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name=None, container_name=None):
         self.logger.debug(f"Executing command '{" ".join(command)}' in pod {pod_name} namespace '{helm_chart_resource.namespace.lower()}'")
         return self.kube_utils.exec_command_in_pod(helm_chart_resource.namespace.lower(), command, pod_name, container_name)
+
+    def spawn_ephemeral_container_in_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, container_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120):
+        self.logger.debug(f"Spawning container '{container_name}' in pod '{pod_name}' namespace '{helm_chart_resource.namespace.lower()}'")
+        return self.kube_utils.spawn_ephemeral_container_in_pod(helm_chart_resource.namespace.lower(), pod_name, container_name, image, command, args, env, wait_for_completion, timeout)
+
+    def spawn_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120) -> str:
+        self.logger.debug(f"Spawning pod '{pod_name}' in namespace '{helm_chart_resource.namespace.lower()}'")
+        return self.kube_utils.spawn_pod(helm_chart_resource.namespace.lower(), pod_name, image, command, args, env, wait_for_completion, timeout)

@@ -13,12 +13,13 @@ from kubernetes.client import V1ServiceAccountList, ApiException, V1ServiceAccou
     V1CertificateSigningRequestCondition, V1Role, V1PolicyRule, V1ClusterRoleBinding, V1ResourceQuota, \
     V1ResourceQuotaSpec, V1ResourceQuotaList, V1Deployment, V1DeploymentSpec, V1NodeList, V1Node, V1Container, \
     V1DaemonSetList, V1StorageClassList, V1PodList, V1ServiceList, V1DeploymentList, V1ConfigMap, VersionInfo, \
-    V1StorageClass, V1CustomResourceDefinitionList, V1RoleList
+    V1StorageClass, V1CustomResourceDefinitionList, V1RoleList, V1StatefulSetList, \
+    V1EphemeralContainer, V1EnvVar, V1Pod, V1PodSpec
 from kubernetes.stream import stream
 
-from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl_common.utils.log import create_logger
 from nfvcl_common.utils.util import generate_rsa_key, generate_cert_sign_req, convert_to_base64
+from nfvcl_core.utils.k8s.k8s_client_extension import create_from_yaml_custom
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.topology_k8s_model import K8sQuota, K8sVersion
@@ -748,6 +749,31 @@ class KubeApiUtils:
                 name_list.append(item.metadata.name)
             return name_list
 
+    def get_statefulsets(self, namespace: str, detailed: bool = False) -> V1StatefulSetList | List[str]:
+        """
+        Return a list of statefulsets
+
+        Args:
+            namespace: the namespace in which the statefulsets reside
+            detailed: if true, return all statefulsets details
+
+        Returns:
+            The list of statefulsets or the list of names if detailed is false.
+        """
+        apps_v1_api = kubernetes.client.AppsV1Api(self.api_client)
+
+        try:
+            statefulset_list: V1StatefulSetList = apps_v1_api.list_namespaced_stateful_set(namespace=namespace)
+        except ApiException as error:
+            raise NFVCLCoreException(f"Exception when calling AppsV1Api>get_statefulsets: {error}", http_equivalent_code=error.status)
+        if detailed:
+            return statefulset_list
+        else:
+            name_list = []
+            for item in statefulset_list.items:
+                name_list.append(item.metadata.name)
+            return name_list
+
     def add_label_to_k8s_deployment(self, namespace: str, deployment_name: str, labels: Labels) -> V1Deployment:
         """
         Add labels to a deployment
@@ -1323,6 +1349,207 @@ class KubeApiUtils:
 
         return resp
 
+    def spawn_ephemeral_container_in_pod(
+        self,
+        namespace: str,
+        pod_name: str,
+        sidecar_name: str,
+        image: str,
+        command: List[str],
+        args: Optional[List[str]] = None,
+        env: Optional[dict] = None,
+        wait_for_completion: bool = True,
+        timeout: int = 120,
+    ) -> str:
+        """
+        Spawns an ephemeral sidecar container in a running pod to execute arbitrary commands.
+
+        Ephemeral containers share the pod's network namespace, so they can reach other
+        containers in the pod via localhost. They are temporary and do not persist across
+        pod restarts. Note: Kubernetes does not allow removing ephemeral containers once
+        added — they remain in Terminated state until the pod is deleted.
+
+        Args:
+            namespace: Namespace of the target pod
+            pod_name: Name of the pod to spawn the sidecar in
+            sidecar_name: Unique name for the ephemeral container within the pod
+            image: Container image to use (e.g. "mongo:7", "busybox:latest")
+            command: Entrypoint command list (e.g. ["sh", "-c"])
+            args: Optional arguments passed to the command (e.g. ["echo hello && exit 0"])
+            env: Optional dict of environment variables {"VAR_NAME": "value"}
+            wait_for_completion: If True, block until the sidecar terminates and return its logs
+            timeout: Maximum seconds to wait for completion when wait_for_completion is True
+
+        Returns:
+            The container logs if wait_for_completion is True, otherwise an empty string
+
+        Raises:
+            NFVCLCoreException: On Kubernetes API errors or if the timeout is exceeded
+        """
+        # Verify pod exists
+        try:
+            pod = self.core_v1_api.read_namespaced_pod(name=pod_name, namespace=namespace)
+        except ApiException as error:
+            raise NFVCLCoreException(
+                f"Pod '{pod_name}' not found in namespace '{namespace}': {error}",
+                http_equivalent_code=error.status,
+            )
+
+        env_vars = [V1EnvVar(name=k, value=v) for k, v in env.items()] if env else None
+
+        ephemeral_container = V1EphemeralContainer(
+            name=sidecar_name,
+            image=image,
+            command=command,
+            args=args,
+            env=env_vars,
+        )
+
+        try:
+            existing = pod.spec.ephemeral_containers or []
+            existing.append(ephemeral_container)
+            pod.spec.ephemeral_containers = existing
+            self.core_v1_api.patch_namespaced_pod_ephemeralcontainers(name=pod_name, namespace=namespace, body=pod)
+        except ApiException as error:
+            raise NFVCLCoreException(
+                f"Exception when calling CoreV1Api>spawn_ephemeral_container_in_pod: {error}",
+                http_equivalent_code=error.status,
+            )
+
+        if not wait_for_completion:
+            return ""
+
+        deadline = time.time() + timeout
+        terminated = False
+        while time.time() < deadline:
+            pod = self.core_v1_api.read_namespaced_pod(name=pod_name, namespace=namespace)
+            for status in (pod.status.ephemeral_container_statuses or []):
+                if status.name == sidecar_name and status.state.terminated is not None:
+                    terminated = True
+                    break
+            if terminated:
+                break
+            time.sleep(2)
+
+        if not terminated:
+            raise NFVCLCoreException(
+                f"Sidecar '{sidecar_name}' in pod '{pod_name}' did not complete within {timeout}s",
+                http_equivalent_code=408,
+            )
+
+        # Read logs before cleanup
+        logs = ""
+        try:
+            logs = self.core_v1_api.read_namespaced_pod_log(
+                name=pod_name,
+                namespace=namespace,
+                container=sidecar_name,
+            )
+        except ApiException as error:
+            raise NFVCLCoreException(
+                f"Exception reading logs from sidecar '{sidecar_name}': {error}",
+                http_equivalent_code=error.status,
+            )
+
+        return logs
+
+    def spawn_pod(
+        self,
+        namespace: str,
+        pod_name: str,
+        image: str,
+        command: List[str],
+        args: Optional[List[str]] = None,
+        env: Optional[dict] = None,
+        wait_for_completion: bool = True,
+        timeout: int = 120,
+    ) -> str:
+        """
+        Creates a standalone pod, waits for it to complete, retrieves its logs, then deletes it.
+
+        Unlike ephemeral containers, standalone pods are fully deletable and can be re-created
+        with the same name after deletion. The pod uses restartPolicy=Never so it runs once.
+
+        Args:
+            namespace: Namespace in which to create the pod
+            pod_name: Name for the pod (reusable after deletion)
+            image: Container image to use (e.g. "mongo:7", "curlimages/curl:latest")
+            command: Entrypoint command list
+            args: Optional arguments passed to the command
+            env: Optional dict of environment variables {"VAR_NAME": "value"}
+            wait_for_completion: If True, block until the pod terminates and return its logs
+            timeout: Maximum seconds to wait for completion when wait_for_completion is True
+
+        Returns:
+            The container logs if wait_for_completion is True, otherwise an empty string
+
+        Raises:
+            NFVCLCoreException: On Kubernetes API errors or if the timeout is exceeded
+        """
+        env_vars = [V1EnvVar(name=k, value=v) for k, v in env.items()] if env else None
+
+        container = V1Container(
+            name="main",
+            image=image,
+            command=command,
+            args=args,
+            env=env_vars,
+        )
+        pod = V1Pod(
+            metadata=V1ObjectMeta(name=pod_name, namespace=namespace),
+            spec=V1PodSpec(
+                containers=[container],
+                restart_policy="Never",
+            ),
+        )
+
+        try:
+            self.core_v1_api.create_namespaced_pod(namespace=namespace, body=pod)
+        except ApiException as error:
+            raise NFVCLCoreException(
+                f"Exception when calling CoreV1Api>spawn_pod (create): {error}",
+                http_equivalent_code=error.status,
+            )
+
+        if not wait_for_completion:
+            return ""
+
+        deadline = time.time() + timeout
+        phase = None
+        while time.time() < deadline:
+            try:
+                pod_status = self.core_v1_api.read_namespaced_pod(name=pod_name, namespace=namespace)
+                phase = pod_status.status.phase
+                if phase in ("Succeeded", "Failed"):
+                    break
+            except ApiException as error:
+                raise NFVCLCoreException(
+                    f"Exception polling pod '{pod_name}': {error}",
+                    http_equivalent_code=error.status,
+                )
+            time.sleep(2)
+
+        if phase not in ("Succeeded", "Failed"):
+            raise NFVCLCoreException(
+                f"Pod '{pod_name}' in namespace '{namespace}' did not complete within {timeout}s",
+                http_equivalent_code=408,
+            )
+
+        logs = ""
+        try:
+            logs = self.core_v1_api.read_namespaced_pod_log(name=pod_name, namespace=namespace, container="main")
+        except ApiException as error:
+            raise NFVCLCoreException(
+                f"Exception reading logs from pod '{pod_name}': {error}",
+                http_equivalent_code=error.status,
+            )
+
+        try:
+            self.core_v1_api.delete_namespaced_pod(name=pod_name, namespace=namespace)
+        except ApiException as error:
+            self.logger.warning(f"Failed to delete pod '{pod_name}' after completion: {error}")
+
+        return logs
 
     def remove_alloy_finalizier(self, namespace: str):
         """

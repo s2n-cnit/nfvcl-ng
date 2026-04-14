@@ -329,6 +329,22 @@ class HelmChartResource(ResourceDeployable):
 
             self.deployments[deployment.name] = deployment
 
+    def set_statefulsets_from_k8s_api(self, k8s_statefulsets, statefulsets_pods: Dict[str, V1PodList] ):
+        self.statefulsets = {}
+
+        for k8s_statefulset in k8s_statefulsets.items:
+            pods = []
+
+            for pod in statefulsets_pods[k8s_statefulset.metadata.name].items:
+                pods.append(K8sPod(name=pod.metadata.name))
+
+            statefulset = K8sStatefulSet(
+                name=k8s_statefulset.metadata.name,
+                pods=pods
+            )
+
+            self.statefulsets[statefulset.name] = statefulset
+
     def get_chart_converted(self) -> Union[str, Path]:
         if self.chart_as_path:
             return Path(self.chart)

@@ -38,7 +38,7 @@ class K8SProviderInterface(BlueprintNGProviderInterface):
         pass
 
     @abc.abstractmethod
-    def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int]=None) -> str:
+    def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int] = None) -> str:
         pass
 
     @abc.abstractmethod
@@ -59,4 +59,12 @@ class K8SProviderInterface(BlueprintNGProviderInterface):
 
     @abc.abstractmethod
     def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name: str, container_name=None):
+        pass
+
+    @abc.abstractmethod
+    def spawn_ephemeral_container_in_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, container_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120):
+        pass
+
+    @abc.abstractmethod
+    def spawn_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120) -> str:
         pass

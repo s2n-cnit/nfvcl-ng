@@ -263,3 +263,12 @@ class ProvidersAggregator:
     @register_performance()
     def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name=None, container_name=None):
         return self.get_k8s_provider(helm_chart_resource.area).exec_command_in_pod(helm_chart_resource, command, pod_name, container_name)
+
+    @register_performance()
+    def spawn_ephemeral_container_in_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, container_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120):
+        return self.get_k8s_provider(helm_chart_resource.area).spawn_ephemeral_container_in_pod(helm_chart_resource, pod_name, container_name, image, command, args, env, wait_for_completion, timeout)
+
+    @register_performance()
+    def spawn_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120) -> str:
+        return self.get_k8s_provider(helm_chart_resource.area).spawn_pod(helm_chart_resource, pod_name, image, command, args, env, wait_for_completion, timeout)
+

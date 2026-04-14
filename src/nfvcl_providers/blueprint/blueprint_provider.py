@@ -25,7 +25,7 @@ class BlueprintProvider(BlueprintNGProviderInterface):
         return blue_id
 
     def delete_blueprint(self, blueprint_id: str):
-        self.blueprint_manager.delete_blueprint(blueprint_id)
+        self.blueprint_manager.delete_blueprint(blueprint_id, child_deletion=True)
         self.data.deployed_blueprints.remove(blueprint_id)
         self.save_to_db()
         return blueprint_id
@@ -50,7 +50,7 @@ class BlueprintProvider(BlueprintNGProviderInterface):
         for blue_id in self.data.deployed_blueprints:
             self.logger.warning(f"Deleting leftover deployed blueprint: {blue_id}")
             try:
-                self.blueprint_manager.delete_blueprint(blue_id)
+                self.blueprint_manager.delete_blueprint(blue_id, child_deletion=True)
             except BlueprintNotFoundException:
                 pass
             except Exception as e:

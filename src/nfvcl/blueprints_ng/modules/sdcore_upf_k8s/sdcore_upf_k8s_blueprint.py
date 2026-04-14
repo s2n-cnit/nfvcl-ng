@@ -18,7 +18,7 @@ SDCORE_UPF_K8S_BLUE_TYPE = "sdcore_upf_k8s"
 
 
 class SdCoreUPFK8sBlueprintNGState(Generic5GUPFK8SBlueprintNGState):
-    upf_values: Optional[SdcoreK8sUpfConfig] = Field(default=None)
+    upf_values: Dict[str, SdcoreK8sUpfConfig] = Field(default_factory=dict)
     currently_deployed_dnns: Dict[str, DeployedUPFInfo] = Field(default_factory=dict)
     router: Optional[Router5GInfo] = Field(default=None)
 
@@ -35,7 +35,8 @@ class SdCoreUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[SdCoreUPFK8sBlueprintNG
 
     def spawn_upf(self, dnn: str):
         self.logger.info(f"Starting creation of SdCoreK8sBlueprintNG blueprint for dnn: {dnn}")
-        self.state.upf_values = copy.deepcopy(sdcore_default_upf_k8s_config.default_sdcore_upfk8s_config)
+        if dnn not in self.state.upf_values:
+            self.state.upf_values[dnn] = copy.deepcopy(sdcore_default_upf_k8s_config.default_sdcore_upfk8s_config)
 
         upf_helm_chart = HelmChartResource(
             area=self.state.current_config.area_id,
@@ -50,22 +51,22 @@ class SdCoreUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[SdCoreUPFK8sBlueprintNG
 
         if self.state.current_config.networks.n4.type == NetworkEndPointType.MULTUS:
             self.state.multus_network_info.n4 = self.provider.reserve_k8s_multus_ip(upf_helm_chart.area, self.state.current_config.networks.n4.net_name)
-            self.state.upf_values.config.upf.n4.set_multus(self.state.multus_network_info.n4)
+            self.state.upf_values[dnn].config.upf.n4.set_multus(self.state.multus_network_info.n4)
         if self.state.current_config.networks.n3.type == NetworkEndPointType.MULTUS:
             self.state.multus_network_info.n3 = self.provider.reserve_k8s_multus_ip(upf_helm_chart.area, self.state.current_config.networks.n3.net_name)
-            self.state.upf_values.config.upf.access.set_multus(self.state.multus_network_info.n3, self.state.current_config.n3_gateway_ip.exploded)
+            self.state.upf_values[dnn].config.upf.access.set_multus(self.state.multus_network_info.n3, self.state.current_config.n3_gateway_ip.exploded)
         if self.state.current_config.networks.n6.type == NetworkEndPointType.MULTUS:
             self.state.multus_network_info.n6 = self.provider.reserve_k8s_multus_ip(upf_helm_chart.area, self.state.current_config.networks.n6.net_name)
-            self.state.upf_values.config.upf.core.set_multus(self.state.multus_network_info.n6, self.state.current_config.n6_gateway_ip.exploded)
+            self.state.upf_values[dnn].config.upf.core.set_multus(self.state.multus_network_info.n6, self.state.current_config.n6_gateway_ip.exploded)
 
-        self.state.upf_values.config.upf.cfg_files.upf_jsonc.cpiface.dnn = dnn
-        self.state.upf_values.config.upf.enb.subnet = self.state.current_config.gnb_cidr.exploded
+        self.state.upf_values[dnn].config.upf.cfg_files.upf_jsonc.cpiface.dnn = dnn
+        self.state.upf_values[dnn].config.upf.enb.subnet = self.state.current_config.gnb_cidr.exploded
         ue_ip_pool = self.get_dnn_ip_pool(dnn)
-        self.state.upf_values.config.upf.cfg_files.upf_jsonc.cpiface.ue_ip_pool = ue_ip_pool
-        # self.state.upf_values.config.upf.cfg_files.upf_jsonc.cpiface.hostname = f"upf-{self.state.current_config.area_id}-{dnn}"
+        self.state.upf_values[dnn].config.upf.cfg_files.upf_jsonc.cpiface.ue_ip_pool = ue_ip_pool
+        # self.state.upf_values[dnn].config.upf.cfg_files.upf_jsonc.cpiface.hostname = f"upf-{self.state.current_config.area_id}-{dnn}"
 
         self.add_route_to_router(ue_ip_pool, self.state.multus_network_info.n6.ip_address.exploded)
-        self.provider.install_helm_chart(upf_helm_chart, self.state.upf_values.model_dump(exclude_none=True, by_alias=True))
+        self.provider.install_helm_chart(upf_helm_chart, self.state.upf_values[dnn].model_dump(exclude_none=True, by_alias=True))
 
         return DeployedUPFInfo(
             area=self.state.current_config.area_id,

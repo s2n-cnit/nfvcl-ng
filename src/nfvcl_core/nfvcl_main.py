@@ -139,20 +139,28 @@ class NFVCL:
     def _add_task_async(self, function: Callable, *args, **kwargs) -> OssCompliantResponse:
         callback: Optional[Callable] = kwargs.pop("callback", None)
         # check if the callable function has a pre_work_callback parameter
+        # for example the `create_blueprint` function in `blueprint_manager` does
+        # `snapshot_delete` in `blueprint_manager` does not
         function_args = inspect.getfullargspec(function).args
         event: Optional[threading.Event] = None
+        # This will be filled in the `pre_work_callback_function` code which is called by `run_pre_work_callback` (`nfvcl_core_models/pre_work.py`)
         namespace = {}
 
         if "pre_work_callback" in function_args:
+            # The event is used to block this function (see below) until the `pre_work_callback_function` is called
             event = threading.Event()
+            # Here we set the `pre_work_callback` kwargs with the callback function
+            # The first two parameters are set using partial, so only the `msg` param is left to set
+            # It's set in `run_pre_work_callback` with a `PreWorkCallbackResponse` object which contains the `async_return` that should be returned by this function
             kwargs["pre_work_callback"] = partial(pre_work_callback_function, event, namespace)
 
         task_id = self.task_manager.add_task(NFVCLTask(function, callback, *args, **kwargs))
 
+        # Here the namespace dict should contain the message if a "pre_work_callback" was called
         async_response: OssCompliantResponse
 
         if "pre_work_callback" in function_args and event:
-            event.wait()
+            event.wait() # This blocks until the even.set() in `pre_work_callback_function` (to wait for msg to be present)
             pre_work_callback_response: PreWorkCallbackResponse = namespace["msg"]
             async_response = pre_work_callback_response.async_return
         else:

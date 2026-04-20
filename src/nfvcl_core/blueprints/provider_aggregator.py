@@ -272,3 +272,5 @@ class ProvidersAggregator:
     def spawn_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120) -> str:
         return self.get_k8s_provider(helm_chart_resource.area).spawn_pod(helm_chart_resource, pod_name, image, command, args, env, wait_for_completion, timeout)
 
+    def check_lb_available(self, area: int, necessary_ip: int) -> bool:
+        return self.get_k8s_provider(area).check_lb_available(necessary_ip)

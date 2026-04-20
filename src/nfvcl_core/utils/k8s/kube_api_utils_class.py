@@ -1,3 +1,4 @@
+import ipaddress
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -994,6 +995,41 @@ class KubeApiUtils:
 
         return ipaddress_pool
 
+    def get_available_lb_ips(self) -> List[str]:
+        """
+        Return the list of available LoadBalancer IP addresses from MetalLB IP pools,
+        excluding IPs already assigned to existing LoadBalancer-type services.
+
+        Supports both CIDR notation (e.g. "192.168.1.0/24") and range notation
+        (e.g. "192.168.1.100-192.168.1.200") as defined in MetalLB IPAddressPool specs.
+
+        Returns:
+            Sorted list of available IP address strings.
+        """
+        pool_ips: set = set()
+        for address_entry in self.get_ipaddress_pool():
+            if '-' in address_entry:
+                start_str, end_str = address_entry.split('-', 1)
+                start = ipaddress.IPv4Address(start_str.strip())
+                end = ipaddress.IPv4Address(end_str.strip())
+                current = start
+                while current <= end:
+                    pool_ips.add(str(current))
+                    current += 1
+            else:
+                network = ipaddress.IPv4Network(address_entry.strip(), strict=False)
+                pool_ips.update(str(ip) for ip in network.hosts())
+
+        assigned_ips: set = set()
+        service_list = self.get_services()
+        for svc in service_list.items:
+            if svc.spec.type == "LoadBalancer" and svc.status.load_balancer and svc.status.load_balancer.ingress:
+                for ingress in svc.status.load_balancer.ingress:
+                    if ingress.ip:
+                        assigned_ips.add(ingress.ip)
+
+        return sorted(pool_ips - assigned_ips, key=lambda ip: ipaddress.IPv4Address(ip))
+
     def get_storage_classes(self) -> V1StorageClassList:
         """
         Retrieve the storage classes from the storage.k8s.io/v1 API
@@ -1577,3 +1613,7 @@ class KubeApiUtils:
                         name=name,
                         body={"metadata": {"finalizers": []}}
                     )
+
+    def check_lb_available(self, necessary_ip: int) -> bool:
+        available_ip = self.get_available_lb_ips()
+        return len(available_ip) >= necessary_ip

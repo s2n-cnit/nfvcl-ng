@@ -281,3 +281,7 @@ class K8SProviderNative(K8SProviderInterface):
     def spawn_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120) -> str:
         self.logger.debug(f"Spawning pod '{pod_name}' in namespace '{helm_chart_resource.namespace.lower()}'")
         return self.kube_utils.spawn_pod(helm_chart_resource.namespace.lower(), pod_name, image, command, args, env, wait_for_completion, timeout)
+
+    def check_lb_available(self, necessary_ip: int) -> bool:
+        self.logger.debug(f"Checking if {necessary_ip} LoadBalancer IPs are available")
+        return self.kube_utils.check_lb_available(necessary_ip)

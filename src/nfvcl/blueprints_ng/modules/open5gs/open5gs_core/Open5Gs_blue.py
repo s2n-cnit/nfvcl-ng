@@ -31,6 +31,7 @@ class Open5GsBlueCreateModel(Create5gModel):
 @blueprint_type(OPEN5GS_CORE_BLUE_TYPE)
 class Open5Gs(Generic5GK8sBlueprintNG[Open5GsBlueprintNGState, Open5GsBlueCreateModel]):
     default_upf_implementation = OPEN5GS_UPF_BLUE_TYPE
+    NECESSARY_CORE_LB_IPS = 2
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = Open5GsBlueprintNGState):
         """

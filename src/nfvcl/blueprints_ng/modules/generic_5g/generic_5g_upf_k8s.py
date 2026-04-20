@@ -30,6 +30,8 @@ ROUTER_GET_INFO_FUNCTION = "get_router_info"
 ROUTER_ADD_ROUTES = "add_routes"
 
 class Generic5GUPFK8SBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFK8SBlueprintNGState, UPFBlueCreateModel], Generic[StateTypeVar5GUPFK8S, CreateConfigTypeVar5GUPFK8S]):
+    NECESSARY_UPF_LB_IPS = 1
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFK8SBlueprintNGState] = StateTypeVar5GUPFK8S):
         super().__init__(blueprint_id, state_type)
 

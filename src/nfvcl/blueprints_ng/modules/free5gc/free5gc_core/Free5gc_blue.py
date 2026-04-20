@@ -55,6 +55,7 @@ class Free5gcBlueprintNGState(Generic5GK8sBlueprintNGState):
 @blueprint_type(FREE5GC_CORE_BLUE_TYPE)
 class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreateModel]):
     default_upf_implementation = FREE5GC_UPF_BLUE_TYPE
+    NECESSARY_CORE_LB_IPS = 3
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = Free5gcBlueprintNGState):
         """

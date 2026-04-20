@@ -1,18 +1,18 @@
 import copy
 from abc import abstractmethod
-from typing import Generic, TypeVar, Optional, List, final, Dict, Set
+from typing import Generic, TypeVar, Optional, List, Dict, Set
 
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.pdu_configurators.types.gnb_pdu_configurator import GNBPDUConfigurator
-from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
-from nfvcl_core.blueprints.blueprint_type_manager import day2_function
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_common.utils.api_utils import HttpRequestType
+from nfvcl_core.blueprints.blueprint_ng import BlueprintNG, BlueprintNGState, BlueprintNGException
+from nfvcl_core.blueprints.blueprint_type_manager import day2_function, blueprint_type
 from nfvcl_core_models.linux.ip import Route
-from nfvcl_core_models.network.network_models import PduModel, PduLockType
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl_core_models.network.network_models import PduModel, PduLockType
 from nfvcl_core_models.network.network_models import PduType, MultusInterface
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure, GNBPDUDetach
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubSubscribers, SubSliceProfiles, SubSlices, \
@@ -72,6 +72,7 @@ CreateConfigTypeVar5G = TypeVar("CreateConfigTypeVar5G")
 class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel], Generic[StateTypeVar5G, CreateConfigTypeVar5G]):
     default_upf_implementation: Optional[str] = None
     REQUIRE_UPF_NRF_REGISTRATION = False
+    NECESSARY_CORE_LB_IPS = 1
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GBlueprintNGState] = StateTypeVar5G):
         super().__init__(blueprint_id, state_type)
@@ -118,6 +119,26 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         for pdu_model in self.get_gnb_pdus():
             if self.provider.is_pdu_locked(pdu_model, PduLockType.CORE):
                 raise BlueprintNGException(f"GNB PDU {pdu_model.name} is already locked")
+
+        cluster_lb_ips: Dict[str, int] = {}
+        cluster_representative_area: Dict[str, int] = {}
+        for area in self.state.current_config.areas:
+            lb_ips = 0
+            if area.core:
+                lb_ips += self.NECESSARY_CORE_LB_IPS
+            upf_type = area.upf.type if area.upf.type else self.default_upf_implementation
+            if upf_type and "k8s" in upf_type:
+                upf_class = blueprint_type.get_blueprint_class(upf_type)
+                lb_ips += getattr(upf_class, 'NECESSARY_UPF_LB_IPS', 0)
+            if lb_ips > 0:
+                cluster = self.provider.topology_manager.get_k8s_cluster_by_area(area.id)
+                cluster_lb_ips[cluster.name] = cluster_lb_ips.get(cluster.name, 0) + lb_ips
+                cluster_representative_area[cluster.name] = area.id
+
+        for cluster_name, total_lb_ips in cluster_lb_ips.items():
+            representative_area = cluster_representative_area[cluster_name]
+            if not self.provider.check_lb_available(representative_area, total_lb_ips):
+                raise BlueprintNGException(f"Not enough LB IPs available on cluster {cluster_name} (needs {total_lb_ips})")
         # for area in self.state.current_config.areas:
         #     if area.networks.n6.type == NetworkEndPointType.MULTUS:
         #         net = self.provider.topology.get_network(area.networks.n6.net_name)

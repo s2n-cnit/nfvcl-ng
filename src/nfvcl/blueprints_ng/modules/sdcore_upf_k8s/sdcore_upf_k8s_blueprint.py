@@ -25,7 +25,7 @@ class SdCoreUPFK8sBlueprintNGState(Generic5GUPFK8SBlueprintNGState):
 
 @blueprint_type(SDCORE_UPF_K8S_BLUE_TYPE)
 class SdCoreUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[SdCoreUPFK8sBlueprintNGState, UPFBlueCreateModel]):
-    router_needed = True
+    NECESSARY_UPF_LB_IPS = 0
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFK8SBlueprintNGState] = SdCoreUPFK8sBlueprintNGState):
         super().__init__(blueprint_id, state_type)

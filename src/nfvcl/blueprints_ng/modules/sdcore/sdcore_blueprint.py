@@ -29,6 +29,7 @@ class SdCoreBlueprintNGState(Generic5GK8sBlueprintNGState):
 @blueprint_type("sdcore")
 class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCoreCreateModel]):
     default_upf_implementation = SDCORE_UPF_BLUE_TYPE
+    NECESSARY_CORE_LB_IPS = 5
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = SdCoreBlueprintNGState):
         super().__init__(blueprint_id, state_type)

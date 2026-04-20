@@ -22,6 +22,7 @@ class Free5gcUpfK8sBlueprintNGState(Generic5GUPFK8SBlueprintNGState):
 
 @blueprint_type(FREE5GC_UPF_K8S_BLUE_TYPE)
 class Free5GCUpfK8s(Generic5GUPFK8SBlueprintNG[Free5gcUpfK8sBlueprintNGState, UPFBlueCreateModel]):
+    NECESSARY_UPF_LB_IPS = 0
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFK8SBlueprintNGState] = Free5gcUpfK8sBlueprintNGState):
         """

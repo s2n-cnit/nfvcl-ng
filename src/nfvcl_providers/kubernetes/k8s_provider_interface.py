@@ -68,3 +68,7 @@ class K8SProviderInterface(BlueprintNGProviderInterface):
     @abc.abstractmethod
     def spawn_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120) -> str:
         pass
+
+    @abc.abstractmethod
+    def check_lb_available(self, necessary_ip: int) -> bool:
+        pass

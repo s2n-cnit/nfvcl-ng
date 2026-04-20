@@ -24,7 +24,7 @@ class Open5GsUPFK8sBlueprintNGState(Generic5GUPFK8SBlueprintNGState):
 
 @blueprint_type(OPEN5GS_UPF_K8S_BLUE_TYPE)
 class Open5GsUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[Open5GsUPFK8sBlueprintNGState, UPFBlueCreateModel]):
-    router_needed = True
+    NECESSARY_UPF_LB_IPS = 0
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFK8SBlueprintNGState] = Open5GsUPFK8sBlueprintNGState):
         super().__init__(blueprint_id, state_type)

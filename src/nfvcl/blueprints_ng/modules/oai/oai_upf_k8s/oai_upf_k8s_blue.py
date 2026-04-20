@@ -1,18 +1,18 @@
 import copy
 from typing import Optional
 
-from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
 from pydantic import Field
 
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf import DeployedUPFInfo
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g_upf_k8s import Generic5GUPFK8SBlueprintNG, Generic5GUPFK8SBlueprintNGState
 from nfvcl.blueprints_ng.modules.oai import oai_default_upf_config
 from nfvcl.blueprints_ng.modules.oai import oai_utils
-from nfvcl_models.blueprint_ng.core5g.OAI_Models import OaiUpfValuesModel, AvailableSmf, Snssai, DnnItem
+from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Network, SerializableIPv4Address
+from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_models.blueprint_ng.core5g.OAI_Models import OaiUpfValuesModel, Snssai, DnnItem
 from nfvcl_models.blueprint_ng.core5g.common import NetworkEndPointType
 from nfvcl_models.blueprint_ng.g5.upf import UPFBlueCreateModel, UPFNetworkInfo
-from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
-from nfvcl_core_models.resources import HelmChartResource
 
 OAI_UPF_K8S_BLUE_TYPE = "oai_upf_k8s"
 
@@ -20,8 +20,11 @@ OAI_UPF_K8S_BLUE_TYPE = "oai_upf_k8s"
 class OAIUpfK8sBlueprintNGState(Generic5GUPFK8SBlueprintNGState):
     upf_values: Optional[OaiUpfValuesModel] = Field(default=None)
 
+
 @blueprint_type(OAI_UPF_K8S_BLUE_TYPE)
 class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGState, UPFBlueCreateModel]):
+    NECESSARY_UPF_LB_IPS = 1
+
     def __init__(self, blueprint_id: str, state_type: type[Generic5GUPFK8SBlueprintNGState] = OAIUpfK8sBlueprintNGState):
         super().__init__(blueprint_id, state_type)
 
@@ -82,7 +85,7 @@ class OpenAirInterfaceUpfK8s(Generic5GUPFK8SBlueprintNG[OAIUpfK8sBlueprintNGStat
         self.state.upf_values.upfconfig.nfs.upf.n6.interface_name = "n6" if self.state.multus_network_info.n6 else "eth0"
         self.state.upf_values.upfconfig.nfs.upf.n9.interface_name = "eth0"
 
-        self.state.upf_values.upfconfig.nfs.nrf.host = f"oai-nrf-svc-lb.{self.base_model.parent_blue_id}" #svc.cluster.local"
+        self.state.upf_values.upfconfig.nfs.nrf.host = f"oai-nrf-svc-lb.{self.base_model.parent_blue_id}"  # svc.cluster.local"
 
         # if self.state.current_config.smf_ip:
         #     self.state.upf_values.upfconfig.upf.smfs = [AvailableSmf(host=self.state.current_config.smf_ip.exploded)]

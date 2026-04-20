@@ -53,6 +53,7 @@ class OAIBlueprintNGState(Generic5GK8sBlueprintNGState):
 class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreateModel]):
     default_upf_implementation = OAI_UPF_BLUE_TYPE
     REQUIRE_UPF_NRF_REGISTRATION = True
+    NECESSARY_CORE_LB_IPS = 4
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GK8sBlueprintNGState] = OAIBlueprintNGState):
         """

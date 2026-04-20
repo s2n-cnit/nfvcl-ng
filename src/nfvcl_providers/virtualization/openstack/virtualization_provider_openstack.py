@@ -1,6 +1,7 @@
 import hashlib
 from typing import List, Dict, Set, Tuple
 
+import httpx
 import requests
 from openstack.compute.v2.flavor import Flavor
 from openstack.compute.v2.server import Server
@@ -14,15 +15,15 @@ from pydantic import Field
 
 from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_common.cloudinit_builder import CloudInit
+from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
+    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage, VmStatus, VmPowerStatus
+from nfvcl_core_models.vim.vim_models import VimModel
+from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
 from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, NetplanInterface
 from nfvcl_providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
 from nfvcl_providers.virtualization.virtualization_provider_interface import \
     VirtualizationProviderException, \
     VirtualizationProviderInterface, VirtualizationProviderData
-from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
-from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
-    VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmResourceFlavor, VmResourceImage, VmStatus, VmPowerStatus
-from nfvcl_core_models.vim.vim_models import VimModel
 
 DEFAULT_OPENSTACK_TIMEOUT = 180  # See openstack/cloud/_compute.py
 
@@ -80,6 +81,13 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             self.logger.warning("Cannot create public image, trying again with private")
             image_attrs['visibility'] = "private"
             image = self.conn.image.create_image(**image_attrs)
+
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                client.head(vm_image.url, follow_redirects=True).raise_for_status()
+        except httpx.HTTPError as exc:
+            self.conn.image.delete_image(image)
+            raise VirtualizationProviderOpenstackException(f"Image URL >{vm_image.url}< is not reachable: {exc}")
 
         self.conn.image.import_image(image, method="web-download", uri=vm_image.url)
         self.conn.wait_for_image(image)

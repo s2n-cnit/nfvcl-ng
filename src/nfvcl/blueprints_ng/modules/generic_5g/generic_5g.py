@@ -98,7 +98,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         # Update the UPFs with new data gathered after the core deployment (like the NRF ip)
         self.update_edge_areas()
         # Update the attached GNBs
-        self.update_gnb_config()
+        self.update_gnb_configs()
 
         self.post_creation()
         self.logger.success("5G Blueprint completely deployed")
@@ -394,11 +394,19 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             next_hop=upf.router_gnb_ip.exploded
         )]
 
-    def update_gnb_config(self):
+    def update_gnb_config(self, gnb_pdu_name: str):
+        self.logger.info(f"Updating GNB config for {gnb_pdu_name}")
+        self.update_gnb_configs([gnb_pdu_name])
+
+    def update_gnb_configs(self, gnb_pdu_names: List[str] = None):
         """
         Update the GNBs config
         """
         for pdu in self.get_gnb_pdus():
+            # Skip gnb pdu if the name is not on the list (IF LIST IS PRESENT)
+            if gnb_pdu_names is not None:
+                if pdu.name not in gnb_pdu_names:
+                    continue
             if not self.provider.is_pdu_locked_by_current_blueprint(pdu, PduLockType.CORE):
                 self.provider.lock_pdu(pdu, PduLockType.CORE)
                 self.set_gnb_id(pdu.name)
@@ -669,7 +677,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def add_slice(self, add_slice_model: SubSliceProfiles, oss: bool):
         self.update_edge_areas()
-        self.update_gnb_config()
+        self.update_gnb_configs()
         self.update_core()
 
     @day2_function("/add_slice_oss", [HttpRequestType.PUT])
@@ -715,7 +723,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
         self.update_edge_areas()
-        self.update_gnb_config()
+        self.update_gnb_configs()
         self.update_core()
 
     @day2_function("/del_slice", [HttpRequestType.PUT])
@@ -753,7 +761,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def add_tac(self, add_area_model: Core5GAddTacModel):
         self.update_edge_areas()
-        self.update_gnb_config()
+        self.update_gnb_configs()
         self.update_core()
 
     @day2_function("/add_tac", [HttpRequestType.PUT])
@@ -783,7 +791,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def del_tac(self, del_area_model: Core5GDelTacModel):
         self.update_edge_areas()
-        self.update_gnb_config()
+        self.update_gnb_configs()
         self.update_core()
 
     @day2_function("/del_tac", [HttpRequestType.PUT])
@@ -812,7 +820,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         self.logger.success(f"Deleted Area with ID: {del_area_model.areaId}")
 
     def attach_gnb(self, attach_gnb_model: Core5GAttachGnbModel):
-        self.update_gnb_config()
+        self.update_gnb_config(attach_gnb_model.pdu_name)
 
     @day2_function("/attach_gnb", [HttpRequestType.PUT])
     def day2_attach_gnb(self, attach_gnb_model: Core5GAttachGnbModel):
@@ -857,7 +865,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         self.logger.success(f"Attached GNB: {attach_gnb_model.pdu_name} to area {attach_gnb_model.area_id}")
 
     def detach_gnb(self, detach_gnb_model: Core5GDetachGnbModel):
-        self.update_gnb_config()
+        self.update_gnb_config(detach_gnb_model.pdu_name)
 
     @day2_function("/detach_gnb", [HttpRequestType.PUT])
     def day2_detach_gnb(self, detach_gnb_model: Core5GDetachGnbModel):

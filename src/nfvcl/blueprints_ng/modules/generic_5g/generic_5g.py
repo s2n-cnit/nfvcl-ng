@@ -827,7 +827,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         """
         Add a new GNB to the core
         Args:
-            attach_gnb_model: Model of the GNB to add
+            attach_gnb_model: Model of the GNB to addex
         """
         self.logger.info(f"Attaching GNB: {attach_gnb_model.pdu_name} to area {attach_gnb_model.area_id}")
 

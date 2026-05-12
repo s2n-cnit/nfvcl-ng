@@ -1,0 +1,11 @@
+[Unit]
+Description=Configuring PacketRusher Network
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/config_network.sh
+
+[Install]
+WantedBy=multi-user.target

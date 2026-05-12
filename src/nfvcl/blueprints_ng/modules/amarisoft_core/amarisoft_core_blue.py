@@ -92,6 +92,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
 
     def create(self, create_model: Create5gModel):
         """
+        We override the function to avoid calling self.update_edge_areas() before the core exists.
+
         Full day-0 creation workflow:
 
         1. Validate and store the requested configuration.
@@ -109,7 +111,7 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         self.wait_core_ready()
         # Register edge-area UPF info that was built during create_5g
         self.update_edge_areas()
-        self.update_gnb_config()
+        self.update_gnb_configs()
 
         self.post_creation()
         self.logger.success("5G Blueprint completely deployed")
@@ -131,6 +133,7 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         virtual_machine = self._create_core_vm(vm_networks)
         self._install_amarisoft(virtual_machine)
 
+        # We only have 1 area, so we can safely take the first one without searching by ID
         area_id = self.state.current_config.areas[0].id
         served_slices = [
             Slice5GWithDNNs.from_slice_profile(sp, self.state.current_config.config.network_endpoints.data_nets)
@@ -305,6 +308,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
             router_gnb_ip=router_info.gnb_ip
         )
 
+        # Blue ID is starting with 000 -> reserved, not assigned automatically to other blueprints.
+        # This is a fake ID that is used only to satisfy the UPFInfo model.
         self.state.upf_info = UPFInfo(
             blue_id="000000",
             router_gnb_ip=deployed_upf_info.router_gnb_ip.exploded if deployed_upf_info.router_gnb_ip else None,
@@ -390,6 +395,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
 
     def add_ues(self, subscriber_model: Core5GAddSubscriberModel):
         """
+        We DO NOT CALL THE PARENT METHOD HERE. We don't want to call self.update_core() as done in the parent class.
+
         Adds one or more subscribers to the state and pushes the updated
         UE-DB configuration to the core VM.
         """
@@ -398,6 +405,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
 
     def del_ues(self, subscriber_model: Core5GDelSubscriberModel):
         """
+        We DO NOT CALL THE PARENT METHOD HERE. We don't want to call self.update_core() as done in the parent class.
+
         Removes one or more subscribers from the state and pushes the updated
         UE-DB configuration to the core VM.
         """
@@ -420,6 +429,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
 
     def add_slice(self, add_slice_model: Core5GAddSliceModel, oss: bool):
         """
+        We DO NOT CALL THE PARENT METHOD HERE. We don't want to call self.update_core(),self.update_edge_areas(),self.update_gnb_config()  as done in the parent class.
+
         Adds a slice to the state and pushes the updated MME configuration
         to the core VM.
         """
@@ -428,6 +439,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
         """
+        We DO NOT CALL THE PARENT METHOD HERE. We don't want to call self.update_core(),self.update_edge_areas(),self.update_gnb_config()  as done in the parent class.
+
         Removes a slice from the state and pushes the updated MME configuration
         to the core VM.
         """

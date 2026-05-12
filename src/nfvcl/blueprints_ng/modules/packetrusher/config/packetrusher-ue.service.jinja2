@@ -1,0 +1,13 @@
+[Unit]
+Description=PacketRusher UE {{ imsi }}
+After=network.target config-network.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/PacketRusher
+ExecStart=/opt/PacketRusher/packetrusher --config {{ config_path }} ue
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

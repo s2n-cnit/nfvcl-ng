@@ -325,7 +325,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
                     del self.state.ue_dict[imsi]
 
         self.update_core()
-        self.update_gnb_config()
+        self.update_gnb_configs()
 
     def add_ues(self, subscriber_model: Core5GAddSubscriberModel):
         """
@@ -382,7 +382,7 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         smf_dep = nfs[NF5GType.SMF][0]
         self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments[smf_dep].name)
 
-        self.update_gnb_config()
+        self.update_gnb_configs()
 
     def del_tac(self, area: Core5GDelTacModel):
         """
@@ -400,4 +400,4 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
         smf_dep = nfs[NF5GType.SMF][0]
         self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments[smf_dep].name)
 
-        self.update_gnb_config()
+        self.update_gnb_configs()

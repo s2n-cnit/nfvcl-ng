@@ -1,0 +1,57 @@
+gnodeb:
+  controlif:
+    ip: "{{ n2_addr }}"
+    port: {{ controlif_port }}
+
+  dataif:
+    ip: "{{ n3_addr }}"
+    port: 2152
+
+  plmnlist:
+    mcc: "{{ mcc }}"
+    mnc: "{{ mnc }}"
+    tac: "{{ tac }}"
+    gnbid: "{{ gnb_id }}"
+
+  slicesupportlist:
+    sst: "{{ gnb_sst }}"
+    sd: "{{ gnb_sd }}"
+
+ue:
+  hplmn:
+    mcc: "{{ sim_mcc }}"
+    mnc: "{{ sim_mnc }}"
+  msin: "{{ msin }}"
+
+  routingindicator: "0000"
+  protectionScheme: 0
+  homeNetworkPublicKey: "5a8d38864820197c3394b92613b20b91633cbd897119273bf8e4a6f4eec0a650"
+  homeNetworkPublicKeyID: 1
+
+  key: "{{ ue_key }}"
+  opc: "{{ ue_opc }}"
+  amf: "{{ ue_amf }}"
+  sqn: "00000000"
+
+  dnn: "{{ dnn }}"
+  snssai:
+    sst: "{{ sim_sst }}"
+    sd: "{{ sim_sd }}"
+
+  integrity:
+    nia0: false
+    nia1: false
+    nia2: true
+    nia3: false
+  ciphering:
+    nea0: true
+    nea1: false
+    nea2: true
+    nea3: false
+
+amfif:
+  - ip: "{{ amf_ip }}"
+    port: {{ amf_port }}
+
+logs:
+  level: 4

@@ -30,10 +30,10 @@ from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import UbuntuVersion, Cni
 
 K8S_BLUE_TYPE = "k8s"
 K8S_VERSION = K8sVersion.V1_30
-BASE_IMAGE22 = "u22-k8s-base-v0.1.4"
-BASE_IMAGE22_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.4-ubuntu2204.qcow2"
-BASE_IMAGE24 = "u24-k8s-base-v0.1.4"
-BASE_IMAGE24_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.4-ubuntu2404.qcow2"
+BASE_IMAGE24 = "u24-k8s-base-v0.1.5"
+BASE_IMAGE24_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.5-ubuntu2404.qcow2"
+BASE_IMAGE26 = "u26-k8s-base-v0.1.5"
+BASE_IMAGE26_URL = "https://images.tnt-lab.unige.it/k8s/k8s-v0.1.5-ubuntu2604.qcow2"
 POD_NET_CIDR = SerializableIPv4Network("10.254.0.0/16")
 POD_SERVICE_CIDR = SerializableIPv4Network("10.200.0.0/16")
 K8S_DEFAULT_PASSWORD = "ubuntu"
@@ -52,12 +52,12 @@ class K8sBlueprintNGState(BlueprintNGState):
     cni: Cni = Field(default=Cni.flannel, description="The network plugin used by the cluster")
     pod_network_cidr: SerializableIPv4Network = Field(default=POD_NET_CIDR, description="The internal network used for PODs by the cluster")
     pod_service_cidr: SerializableIPv4Network = Field(default=POD_SERVICE_CIDR, description="The internal network used for Services by the cluster")
-    containerd_mirrors: Optional[dict[str, str]] = Field(default=None, description="List of containerd mirrors (cache) to be added to the configuration of containerd to avoid limitations from docker.io or other public repositories")
+    containerd_mirrors: Optional[dict[str, str]] = Field(default=None, description="List of containerd mirrors (cache).")
     cadvisor_node_port: int = Field(default=30080, description="The node port on which the cadvisor service is exposed")
 
     password: str = Field(default=K8S_DEFAULT_PASSWORD, description="The password set in master and workers node")
-    base_image_name: str = Field(default=BASE_IMAGE24)
-    base_image_url: str = Field(default=BASE_IMAGE24_URL)
+    base_image_name: str = Field(default=BASE_IMAGE26)
+    base_image_url: str = Field(default=BASE_IMAGE26_URL)
     require_port_security_disabled: Optional[bool] = Field(default=True, description="Indicates if the blueprint will require port security disabled (on openstack)")
     topology_onboarded: bool = Field(default=False, description="If the blueprint cluster has to be added to the topology")
     prometheus_server_reference: Optional[PrometheusServerModel]= Field(default=None, description="A copy of the prometheus server, containing only targets from this blueprint")
@@ -271,12 +271,12 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
 
     def set_base_image(self, version: UbuntuVersion):
         match version:
-            case UbuntuVersion.UBU24.value:
+            case UbuntuVersion.UBU26.value:
+                self.state.base_image_url = BASE_IMAGE26_URL
+                self.state.base_image_name = BASE_IMAGE26
+            case _:
                 self.state.base_image_url = BASE_IMAGE24_URL
                 self.state.base_image_name = BASE_IMAGE24
-            case UbuntuVersion.UBU22.value:
-                self.state.base_image_url = BASE_IMAGE22_URL
-                self.state.base_image_name = BASE_IMAGE22
 
     def deploy_master_node(self, area: K8sAreaDeployment, master_flavors: VmResourceFlavor):
         # Defining Master node. Should be executed only once.

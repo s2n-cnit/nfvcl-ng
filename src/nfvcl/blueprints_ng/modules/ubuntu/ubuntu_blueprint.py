@@ -11,10 +11,12 @@ from nfvcl_models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuCreateMode
 from nfvcl_models.blueprint_ng.ubuntu.ubuntu_rest_models import UbuntuVersion
 
 UBUNTU_BLUE_TYPE = "ubuntu"
-UBU22_IMAGE_NAME = "ubuntu-lab-22-v0.1.6"
-UBU24_IMAGE_NAME = "ubuntu-lab-24-v0.1.6"
-UBU22_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.6-ubuntu2204.qcow2"
-UBU24_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.6-ubuntu2404.qcow2"
+UBU22_IMAGE_NAME = "ubuntu-lab-22-v0.1.8"
+UBU24_IMAGE_NAME = "ubuntu-lab-24-v0.1.8"
+UBU26_IMAGE_NAME = "ubuntu-lab-26-v0.1.8"
+UBU22_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.8-ubuntu2204.qcow2"
+UBU24_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.8-ubuntu2404.qcow2"
+UBU26_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/ubuntu-lab/ubuntu-lab-v0.1.8-ubuntu2604.qcow2"
 UBUNTU_DEFAULT_PASSWORD = "ubuntu"
 
 class UbuntuBlueprintNGState(BlueprintNGState):
@@ -50,9 +52,12 @@ class UbuntuBlueprint(BlueprintNG[UbuntuBlueprintNGState, UbuntuCreateModel]):
             case UbuntuVersion.UBU22.value:
                 image_name = UBU22_IMAGE_NAME
                 image_url = UBU22_BASE_IMAGE_URL
+            case UbuntuVersion.UBU26.value:
+                image_name = UBU26_IMAGE_NAME
+                image_url = UBU26_BASE_IMAGE_URL
             case _:
-                image_name = UBU24_IMAGE_NAME
-                image_url = UBU24_BASE_IMAGE_URL
+                image_name = UBU26_IMAGE_NAME
+                image_url = UBU26_BASE_IMAGE_URL
 
 
         self.state.vm = VmResource(

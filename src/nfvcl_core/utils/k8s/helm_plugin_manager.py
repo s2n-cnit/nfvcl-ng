@@ -4,13 +4,14 @@ import traceback
 from pathlib import Path
 from typing import List
 
+import pyhelm3
 import yaml
 from kubernetes.client import V1DaemonSet
 from kubernetes.utils import FailToCreateError
 from pyhelm3 import Client
 from verboselogs import VerboseLogger
 
-from nfvcl_common.utils.file_utils import render_file_from_template_to_file, create_tmp_file
+from nfvcl_common.utils.file_utils import render_file_from_template_to_file, create_tmp_file, create_tmp_folder
 from nfvcl_common.utils.log import create_logger
 from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
@@ -106,14 +107,40 @@ class HelmPluginManager:
         ))
 
         self.logger.info(f"Installing chart {chart} in {namespace}")
-        asyncio.run(helm_client.install_or_upgrade_release(
-            helm_chart_res.name.lower(),
-            chart,
-            values if values else {},
-            namespace=helm_chart_res.namespace.lower(),
-            atomic=True,
-            wait=True
-        ))
+
+        try:
+            asyncio.run(helm_client.install_or_upgrade_release(
+                helm_chart_res.name.lower(),
+                chart,
+                values if values else {},
+                namespace=helm_chart_res.namespace.lower(),
+                atomic=True,
+                wait=True
+            ))
+        except pyhelm3.errors.Error as helmError:
+            self.logger.error(f"Helm chart deployment failed. You can debug installation in this way from nfvcl folder:\n{self._generate_debug_cmd_cli(helm_chart_res, values, chart.metadata.version)}")
+            raise helmError
+
+    def _generate_debug_cmd_cli(self, helm_chart_resource, values, version):
+        """
+        TODO duplicate in k8s_provider_native
+        Generates a shell cmd to reproduce and debug the helm chart installation on NFVCL machine
+        Args:
+            helm_chart_resource: the chart
+            values: helm chart values
+            version: The version of the chart
+
+        Returns:
+            The command to be executed in the NFVCL folder
+        """
+        tmp_folder = create_tmp_folder('helm')
+        values_path = tmp_folder / f"{helm_chart_resource.namespace.lower()}_{helm_chart_resource.name}.yaml"
+        yaml_content = yaml.dump(values)
+        values_path.write_text(yaml_content)
+        tmp_cred_file = create_tmp_file("k8s_cred_debug")
+        tmp_cred_file.write_text(self.k8s_credential_file)
+        return f"helm upgrade {helm_chart_resource.name} {helm_chart_resource.get_chart_converted()} --history-max 10 --install --output json --timeout 5m --values '{values_path.absolute()}' --debug --atomic --create-namespace --namespace {helm_chart_resource.namespace.lower()} --version {version} --wait --wait-for-jobs --kubeconfig {tmp_cred_file}"
+
 
     def uninstall_plugin(self, namespace: str, wait=True):
         """
@@ -178,15 +205,29 @@ class HelmPluginManager:
         None
 
         """
-        openebs_chart_path = PLUGIN_PATH / 'openebs-4.1.1.tgz'
-        values_disable_replication = {"engines": {"replicated": {"mayastor": {"enabled": False}}}}
+        openebs_chart_path = PLUGIN_PATH / 'openebs-4.4.0.tgz'
+        values_disable_replication = {
+            "engines": {
+                "local": {
+                    "hostpath": {"enabled": True},
+                    "zfs": {"enabled": False}
+                },
+                "replicated": {
+                    "mayastor": {"enabled": False},
+                    "cstor": {"enabled": False}
+                }
+            },
+            "loki": {"enabled": False},
+            "alloy": {"enabled": False}
+        }
         self.install_plugin(
             name=K8sPluginName.OPEN_EBS,
             chart_name=str(openebs_chart_path),
-            version="4.1.1",
+            version="4.4.0",
             namespace="openebs",
             values=values_disable_replication
         )
+
         # Get the storage class to make it default
         storage_class = self.kube_utils.read_namespaced_storage_class("openebs-hostpath")
         # Set it the default sc
@@ -198,12 +239,12 @@ class HelmPluginManager:
         Args:
             plugin_data: K8sPluginAdditionalData object containing additional data needed to install the Flannel plugin
         """
-        flannel_chart_path = PLUGIN_PATH / 'flannel-0.26.0.tgz'
+        flannel_chart_path = PLUGIN_PATH / 'flannel-0.28.4.tgz'
         values = {"podCidr": plugin_data.pod_network_cidr if plugin_data.pod_network_cidr else "10.254.0.0/16"}
         self.install_plugin(
             name=K8sPluginName.FLANNEL,
             chart_name=str(flannel_chart_path),
-            version="0.26.0",
+            version="0.28.4",
             namespace="flannel",
             values=values
         )
@@ -312,11 +353,11 @@ class HelmPluginManager:
         Args:
             plugin_data: K8sPluginAdditionalData used to fill values inside helm charts (i.e. the cidr of pods in flannel and calico)
         """
-        metallb_chart_path = PLUGIN_PATH / 'metallb-0.14.8.tgz'
+        metallb_chart_path = PLUGIN_PATH / 'metallb-0.15.3.tgz'
         self.install_plugin(
             name=K8sPluginName.METALLB,
             chart_name=str(metallb_chart_path),
-            version="0.26.0",
+            version="0.15.3",
             namespace="metallb",
             values={}
         )
@@ -378,14 +419,15 @@ class HelmPluginManager:
         Args:
             plugin_data: K8sPluginAdditionalData instance containing additional data relevant to the plugin installation process.
         """
-        calico_chart_path = PLUGIN_PATH / 'tigera-operator-v3.31.0.tgz'
+        calico_chart_path = PLUGIN_PATH / 'tigera-operator-v3.32.0.tgz'
         with open(PLUGIN_VALUE_PATH / 'calico.yaml', 'r') as calico_values_file:
             calico_values = yaml.safe_load(calico_values_file)
         calico_values["installation"]["calicoNetwork"]["ipPools"][0]['cidr'] = plugin_data.pod_network_cidr if plugin_data.pod_network_cidr else "10.254.0.0/16"
+        self.__apply_yaml_file_to_cluster(K8sPluginName.CALICO, PLUGIN_PATH / 'crd' / "calico_custom_resource_def.yml")
         self.install_plugin(
             name=K8sPluginName.CALICO,
             chart_name=str(calico_chart_path),
-            version="3.31.0",
+            version="3.32.0",
             namespace="tigera-operator",
             values=calico_values
         )

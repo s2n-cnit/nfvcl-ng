@@ -3,16 +3,34 @@
   become: yes
   gather_facts: no
   tasks:
-{% for key in confvar.k8s_mirrors.keys() %}
-   - name: Set K8S mirrors 1 {{ key }}
-     lineinfile:
-       path: /etc/containerd/config.toml
-       line: '          endpoint = ["{{ confvar.k8s_mirrors[key] }}"]'
-       insertafter: '\[plugins\."io\.containerd\.grpc\.v1\.cri"\.registry\.mirrors\]'
-   - name: Set K8S mirrors 2 {{ key }}
-     lineinfile:
-       path: /etc/containerd/config.toml
-       line: '        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."{{ key }}"]'
-       insertafter: '\[plugins\."io\.containerd\.grpc\.v1\.cri"\.registry\.mirrors\]'
-{% endfor %}
+    - name: Create /etc/containerd/certs.d directory
+      file:
+        path: /etc/containerd/certs.d
+        state: directory
+        mode: '0755'
 
+    - name: Set containerd registry config_path
+      replace:
+        path: /etc/containerd/config.toml
+        after: "\\[plugins\\.'io\\.containerd\\.cri\\.v1\\.images'\\.registry\\]"
+        before: "\\[plugins\\.'io\\.containerd\\.cri\\.v1\\.images'\\.image_decryption\\]"
+        regexp: "config_path = ''"
+        replace: 'config_path = "/etc/containerd/certs.d"'
+
+{% for key, value in confvar.k8s_mirrors.items() %}
+    - name: Create mirror directory for {{ key }}
+      file:
+        path: /etc/containerd/certs.d/{{ key }}
+        state: directory
+        mode: '0755'
+
+    - name: Create hosts.toml for {{ key }}
+      copy:
+        dest: /etc/containerd/certs.d/{{ key }}/hosts.toml
+        content: |
+          server = "{% if key == 'docker.io' %}https://registry-1.docker.io{% else %}https://{{ key }}{% endif %}"
+
+          [host."{{ value }}"]
+            capabilities = ["pull", "resolve"]
+            override_path = true
+{% endfor %}

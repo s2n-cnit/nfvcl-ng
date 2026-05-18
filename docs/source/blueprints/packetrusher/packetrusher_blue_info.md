@@ -27,7 +27,6 @@ To instantiate a PacketRusher blueprint, send a POST request with the following 
           "key": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
           "op": "112233445566778899AABBCCDDEEFF00",
           "opType": "OPC",
-          "amf": 0,
           "configured_nssai": [
             {
               "sst": 1,

@@ -103,7 +103,7 @@ class PacketRusherConfigurator(VmResourceAnsibleConfiguration):
                 sim_sst = format(int(s.sst), '02X')
                 sim_sd = s.sd  # SDType: already a 6-char uppercase hex string
 
-            amf_val = format(sim.amf, '04X') if sim.amf else "8000"
+            amf_val = format(sim.amf, '04X') if sim.amf is not None else "8000"
             gnb_id = format(gnb_id_base + idx, '06X')
             controlif_port = BASE_CONTROLIF_PORT + idx
 

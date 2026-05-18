@@ -26,7 +26,7 @@ class UESim(NFVCLBaseModel):
     key: KEYType = Field()
     op: OPCType = Field()
     opType: OpType = Field()
-    amf: Optional[int] = Field(default=None)
+    amf: Optional[int] = Field(default=None, description="AMF value in DECIMAL FORMAT for the UE, default the HEX equivalent for 8000")
     configured_nssai: Optional[List[Slice5G]] = Field(default=None, min_length=1)
     default_nssai: Optional[List[Slice5G]] = Field(default=None, min_length=1)
     sessions: Optional[List[UESession]] = Field(default=None, min_length=1)

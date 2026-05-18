@@ -78,6 +78,9 @@ Here you find a list of all developed Blueprints, their type and the requirement
    * - :doc:`ueransim/ueransim_blue_index`
      - gNodeB and UE emulator
      - VIM
+   * - :doc:`packetrusher/packetrusher_blue_index`
+     - gNodeB and UE emulator
+     - VIM
    * - Ubuntu Blueprint
      - Creates a VM running Ubuntu 22/24
      - VIM

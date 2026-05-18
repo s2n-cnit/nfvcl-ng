@@ -119,6 +119,7 @@ For more details you can go to :doc:`prometheus/prometheus`
    blueprints/blueprint
    blueprints/k8s/k8s_blue_index
    blueprints/ueransim/ueransim_blue_index
+   blueprints/packetrusher/packetrusher_blue_index
    blueprints/5gcores/5gcore_blue_index
 
 .. toctree::

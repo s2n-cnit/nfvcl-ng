@@ -7,9 +7,10 @@ from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core.managers.getters import get_kubernetes_manager
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
+from nfvcl_core_models.network.network_models import PduType
 from nfvcl_core_models.resources import NetResource, NetResourcePool
 from nfvcl_models.blueprint_ng.blueprint_ueransim_model import UeransimConfig, UeransimNetworkEndpoints, UeransimArea, UeransimUe
-from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubConfig, NetworkEndPoints, NetworkEndPoint, NetworkEndPointWithType, SubDataNets, Pool, SubSliceProfiles, SubProfileParams, SubSubscribers, SubSnssai, SubArea, SubAreaNetwork, SubSlices
+from nfvcl_models.blueprint_ng.core5g.common import Create5gModel, SubConfig, NetworkEndPoints, NetworkEndPoint, NetworkEndPointWithType, SubDataNets, Pool, SubSliceProfiles, SubProfileParams, SubSubscribers, SubSnssai, SubArea, SubAreaNetwork, SubSlices, SubAreaGNB
 from nfvcl_models.blueprint_ng.g5.common5g import Slice5G
 from nfvcl_models.blueprint_ng.g5.custom_types_5g import PDUSessionType
 from nfvcl_models.blueprint_ng.g5.ue import UESim, OpType, UESession
@@ -250,6 +251,10 @@ class Simple5GBlueprint(BlueprintNG[Simple5GBlueprintNGState, Simple5GCreateMode
 
         for area in create_model.areas:
             area_id = area.id
+            for pdu in self.provider.find_pdus(area.id, PduType.GNB):
+                if self.state.ueransim_blueprint_id in pdu.name:
+                    found_pdu = pdu
+                    break
 
             subscribers: List[SubSubscribers] = []
             for ue in self.state.area_states[str(area_id)].ues:
@@ -303,6 +308,10 @@ class Simple5GBlueprint(BlueprintNG[Simple5GBlueprintNGState, Simple5GCreateMode
                             n3=NetworkEndPointWithType(net_name=self.net_name_n3),
                             n6=NetworkEndPointWithType(net_name=self.net_name_n6),
                             gnb=NetworkEndPointWithType(net_name=self.net_name_gnb),
+                        ),
+                        gnb=SubAreaGNB(
+                            configure=True,
+                            pduList=[found_pdu.name]
                         ),
                         slices=[SubSlices(sliceId=1, sliceType="EMBB")],
                     )

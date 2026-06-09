@@ -30,7 +30,6 @@ Initialize the topology by sending a POST request to `/v1/topology` with the fol
 ```json
 {
   "id": "topology",
-  "callback": null,
   "vims": [
     {
       "name": "openstack_test",
@@ -192,7 +191,6 @@ You can check the presence of the K8S cluster in the topology by sending a GET r
 ``` json
 {
   "id": "topology",
-  "callback": null,
   "vims": [
     {
       "name": "os_test_local",

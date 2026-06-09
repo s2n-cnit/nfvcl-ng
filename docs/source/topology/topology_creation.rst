@@ -12,7 +12,6 @@ The topology can be created with a ``POST /v1/topology/`` request, an example of
 
     {
        "id":"topology",
-       "callback":null,
        "vims":[
           {
              "name":"example_name",

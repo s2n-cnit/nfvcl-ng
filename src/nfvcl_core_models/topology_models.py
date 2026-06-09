@@ -20,7 +20,6 @@ class TopoK8SNotFoundException(Exception):
 
 class TopologyModel(NFVCLBaseModel):
     id: Optional[str] = Field(default='topology')
-    callback: Optional[HttpUrl] = Field(default=None)
     vims: List[VimModel] = Field(default_factory=list)
     kubernetes: List[TopologyK8sModel] = Field(default_factory=list)
     networks: List[NetworkModel] = Field(default_factory=list)

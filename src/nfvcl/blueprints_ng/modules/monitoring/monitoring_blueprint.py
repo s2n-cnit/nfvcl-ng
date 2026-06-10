@@ -15,8 +15,8 @@ from nfvcl_core_models.resources import VmResource, VmResourceImage, VmResourceA
 from nfvcl_models.blueprint_ng.monitoring.monitoring_rest_models import MonitoringCreateModel
 
 MONITORING_BLUE_TYPE = "monitoring"
-UBU24_IMAGE_NAME = "monitoring-v0.0.3-ubuntu2404"
-UBU24_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/monitoring/monitoring-v0.0.3-ubuntu2404.qcow2"
+UBU24_IMAGE_NAME = "monitoring-v0.0.4-ubuntu2404"
+UBU24_BASE_IMAGE_URL = "https://images.tnt-lab.unige.it/monitoring/monitoring-v0.0.4-ubuntu2404.qcow2"
 UBUNTU_DEFAULT_PASSWORD = "ubuntu"
 
 
@@ -26,7 +26,7 @@ class VmMonitoringConfigurator(VmResourceAnsibleConfiguration):
 
     def dump_playbook(self) -> str:
         # Grafana configuration block
-        self._ansible_builder.add_shell_task(f'grafana-cli --homepath "/usr/share/grafana" admin reset-admin-password {self.grafana_admin_password}')
+        self._ansible_builder.add_shell_task(f'grafana cli --homepath "/usr/share/grafana" admin reset-admin-password {self.grafana_admin_password}')
 
         return self._ansible_builder.build()
 

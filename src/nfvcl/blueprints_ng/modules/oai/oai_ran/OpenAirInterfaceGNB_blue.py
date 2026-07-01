@@ -42,7 +42,8 @@ class OpenAirInterfaceGnb(Generic5GGNBK8sBlueprintNG[OAIGnbBlueprintNGState, GNB
             chart="helm_charts/charts/oai-gnb-2.1.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.gnb_helm_chart)
 

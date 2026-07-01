@@ -174,7 +174,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         network_per_area = self.extract_unique_net_names(config_model)
         error = ""
         for area in network_per_area.keys():
-            ok, missing_net = self.provider.check_networks(int(area), network_per_area[area])
+            ok, missing_net = self.provider.check_networks_exist_on_vim(int(area), network_per_area[area])
             if not ok:
                 error += f"Missing nets {missing_net}, from area {area}\n"
         if len(error) > 0:

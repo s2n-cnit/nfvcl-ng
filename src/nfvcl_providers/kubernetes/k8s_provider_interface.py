@@ -5,12 +5,12 @@ from nfvcl_core.managers.topology_manager import TopologyManager
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 
 from nfvcl_core_models.network.network_models import MultusInterface
-from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderData, \
-    BlueprintNGProviderInterface
+from nfvcl_core_models.providers.providers import ProviderData
 from nfvcl_core_models.resources import HelmChartResource
+from nfvcl_providers.provider_interface import ProviderInterface
 
 
-class K8SProviderData(BlueprintNGProviderData):
+class K8SProviderData(ProviderData):
     pass
 
 
@@ -18,12 +18,12 @@ class K8SProviderException(Exception):
     pass
 
 
-class K8SProviderInterface(BlueprintNGProviderInterface):
+class K8SProviderInterface(ProviderInterface):
     data: K8SProviderData
 
-    def __init__(self, area: int, blueprint_id: str, topology_manager: TopologyManager, persistence_function: Optional[Callable] = None):
+    def __init__(self, topology_manager: TopologyManager, persistence_function: Optional[Callable] = None):
         self.topology_manager = topology_manager
-        super().__init__(area, blueprint_id, persistence_function)
+        super().__init__(persistence_function)
 
     @abc.abstractmethod
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
@@ -42,11 +42,11 @@ class K8SProviderInterface(BlueprintNGProviderInterface):
         pass
 
     @abc.abstractmethod
-    def reserve_k8s_multus_ip(self, area: int, network_name: str) -> MultusInterface:
+    def reserve_k8s_multus_ip(self, area: int, resource_group_id: str, network_name: str) -> MultusInterface:
         pass
 
     @abc.abstractmethod
-    def release_k8s_multus_ip(self, area: int, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
+    def release_k8s_multus_ip(self, area: int, resource_group_id: str, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
         pass
 
     @abc.abstractmethod
@@ -70,5 +70,5 @@ class K8SProviderInterface(BlueprintNGProviderInterface):
         pass
 
     @abc.abstractmethod
-    def check_lb_available(self, necessary_ip: int) -> bool:
+    def check_lb_available(self, area: int, necessary_ip: int) -> bool:
         pass

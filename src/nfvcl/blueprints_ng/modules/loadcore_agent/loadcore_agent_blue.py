@@ -62,6 +62,7 @@ class LoadCoreAgentBlueprintNG(BlueprintNG[LoadCoreAgentBlueprintNGState, LoadCo
             become_password="ixia",
             management_network=create_model.mgmt_net,
             additional_networks=create_model.additional_networks,
+            resource_group=self.id
         )
         self.register_resource(self.state.vm_loadcore_agent)
         self.provider.create_vm(self.state.vm_loadcore_agent)
@@ -69,7 +70,8 @@ class LoadCoreAgentBlueprintNG(BlueprintNG[LoadCoreAgentBlueprintNGState, LoadCo
         self.state.vm_loadcore_agent_configurator = LoadCoreAgentVmConfigurator(
             vm_resource=self.state.vm_loadcore_agent,
             mgmt_interface=self.state.vm_loadcore_agent.network_interfaces[self.state.vm_loadcore_agent.management_network][0].fixed.interface_name,
-            middleware_ip=self.create_config.middleware_ip
+            middleware_ip=self.create_config.middleware_ip,
+            resource_group=self.id
         )
         self.register_resource(self.state.vm_loadcore_agent_configurator)
         self.provider.configure_vm(self.state.vm_loadcore_agent_configurator)

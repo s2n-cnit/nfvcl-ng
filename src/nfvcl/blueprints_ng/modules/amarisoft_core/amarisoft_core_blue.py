@@ -211,7 +211,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
             password=self.state.current_config.config.default_password or "ubuntu",
             management_network=vm_networks.mgt.net_name,
             additional_networks=[vm_networks.n4.net_name, vm_networks.n3.net_name, vm_networks.n6.net_name],
-            require_port_security_disabled=True  # Required for UE NAT traffic
+            require_port_security_disabled=True,  # Required for UE NAT traffic
+            resource_group=self.id
         )
         self.state.core_vm = virtual_machine
         self.register_resource(virtual_machine)
@@ -230,7 +231,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         """
         installator = AmarisoftInstallator(
             vm_resource=virtual_machine,
-            amarisoft_tar_url="https://images.tnt-lab.unige.it/private/AmariSoft/amarisoft.2026-03-13.tar.gz"
+            amarisoft_tar_url="https://images.tnt-lab.unige.it/private/AmariSoft/amarisoft.2026-03-13.tar.gz",
+            resource_group=self.id
         )
         self.state.core_vm_installer = installator
         self.register_resource(installator)
@@ -345,7 +347,8 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
             license_server_addr=str(self.state.current_config.config.licence_server),
             gnb_cidr=router_info.gnb_cidr.with_prefixlen,
             n3_gateway=router_info.n3_ip.exploded,
-            n6_gateway=router_info.n6_ip.exploded
+            n6_gateway=router_info.n6_ip.exploded,
+            resource_group=self.id
         )
         self.state.core_vm_configurator = configurator
         self.register_resource(configurator)
@@ -354,6 +357,7 @@ class AmarisoftCore(Generic5GBlueprintNG[AmarisoftCoreBlueprintNGState, Create5g
         subscriber_configurator = AmarisoftSubscriberConfigurator(
             vm_resource=virtual_machine,
             amarisoft_5g_state=self.state,
+            resource_group=self.id
         )
         self.state.core_vm_subscriber_configurator = subscriber_configurator
         self.register_resource(subscriber_configurator)

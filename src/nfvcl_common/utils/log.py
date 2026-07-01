@@ -1,4 +1,6 @@
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from logging.handlers import RotatingFileHandler
 from typing import Dict
 from redis import Redis
@@ -7,9 +9,15 @@ import verboselogs
 from pathlib import Path
 
 _log_level = logging.DEBUG
+# This is thread safe: https://docs.python.org/3/library/contextvars.html
+_current_blueprint_id: ContextVar[str | None] = ContextVar("nfvcl_blueprint_id", default=None)
 LOG_FILE_PATH = "logs/nfvcl.log"
 Path('logs').mkdir(parents=True, exist_ok=True)
 Path(LOG_FILE_PATH).touch(exist_ok=True)
+
+# WebSocket handler will be imported dynamically to avoid circular imports
+_websocket_handler = None
+_websocket_handler_added = False
 
 def set_log_level(level):
     """
@@ -19,6 +27,68 @@ def set_log_level(level):
     """
     global _log_level
     _log_level = level
+
+
+@contextmanager
+def blueprint_log_context(blueprint_id: str | None):
+    """
+    This is used to give the blueprint_id as context to the logger
+    """
+    token = _current_blueprint_id.set(blueprint_id)
+    try:
+        yield
+    finally:
+        _current_blueprint_id.reset(token)
+
+
+def add_websocket_handler_to_loggers():
+    """
+    Add WebSocket handler to all existing loggers when clients connect
+    """
+    global _websocket_handler, _websocket_handler_added
+
+    if _websocket_handler_added:
+        return
+
+    try:
+        # Import here to avoid circular imports
+        from nfvcl_rest.logs_streamer import WebSocketLoggingHandler, is_websocket_enabled
+
+        if not is_websocket_enabled():
+            return
+
+        if _websocket_handler is None:
+            _websocket_handler = WebSocketLoggingHandler()
+            _websocket_handler.setLevel(_log_level)
+            _websocket_handler.setFormatter(formatter)
+
+        # Add to root logger to catch all logs
+        root_logger = logging.getLogger(ROOT_LOGGER_NAME)
+        if _websocket_handler not in root_logger.handlers:
+            root_logger.addHandler(_websocket_handler)
+            _websocket_handler_added = True
+
+    except ImportError:
+        # WebSocket module not available
+        pass
+
+
+def remove_websocket_handler_from_loggers():
+    """
+    Remove WebSocket handler from all loggers when no clients are connected
+    """
+    global _websocket_handler, _websocket_handler_added
+
+    if not _websocket_handler_added or _websocket_handler is None:
+        return
+
+    try:
+        root_logger = logging.getLogger(ROOT_LOGGER_NAME)
+        if _websocket_handler in root_logger.handlers:
+            root_logger.removeHandler(_websocket_handler)
+            _websocket_handler_added = False
+    except Exception:
+        pass
 
 
 coloredlog_format_string = "%(asctime)s [%(name)-20.20s][%(threadName)-10.10s] [%(levelname)8s] [%(blueprintid)s] %(message)s"
@@ -73,11 +143,12 @@ class BlueprintIDFilter(logging.Filter):
         handler.addFilter(cls(blueprintid))
 
     def filter(self, record):
-        record.blueprintid = self.blueprintid
+        record.blueprintid = _current_blueprint_id.get() or self.blueprintid
         return 1
 
 
 logger_dict: Dict[str, verboselogs.VerboseLogger] = {}
+handlers_to_add = []
 
 
 def create_logger(name: str, ov_log_level: int = None, blueprintid='SYSTEM') -> verboselogs.VerboseLogger:
@@ -120,6 +191,22 @@ def create_logger(name: str, ov_log_level: int = None, blueprintid='SYSTEM') -> 
     return logger
 
 
+def add_handler_to_all_loggers(handler: logging.Handler):
+    """
+    Add a handler to all existing loggers.
+    This is useful to add a new handler to all loggers without modifying each one.
+
+    Args:
+        handler: The logging handler to be added
+    """
+    global handlers_to_add
+    for logger in logger_dict.values():
+        if not isinstance(logger, verboselogs.VerboseLogger):
+            continue
+        if handler not in logger.handlers:
+            logger.addHandler(handler)
+    handlers_to_add = [handler]
+
 def mod_logger(logger: logging.Logger, blueprintid='SYSTEM', log_level=_log_level, remove_handlers=False, disable_propagate=False):
     """
     This method takes an existing logger and mod it.
@@ -151,6 +238,11 @@ def mod_logger(logger: logging.Logger, blueprintid='SYSTEM', log_level=_log_leve
     #     redis_handler.setLevel(log_level)
     #     redis_handler.setFormatter(formatter)
     #     logger.addHandler(redis_handler)
+
+    for handler in handlers_to_add:
+        if handler not in logger.handlers:
+            logger.addHandler(handler)
+
 
     coloredlogs.install(
         level=log_level,

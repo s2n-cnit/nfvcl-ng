@@ -171,7 +171,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             if self.create_config.config.network_endpoints.radio is None:
                 radio_network_name = f"radio_{self.id}_{area_id}"
                 # TODO doesn't always work with Proxmox due to possible overlapping CIDRs
-                network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{(int(area_id)%255) + 1}.0/24")
+                network = NetResource(area=int(area_id), name=radio_network_name, cidr=f"10.168.{(int(area_id)%255) + 1}.0/24", resource_group=self.id)
                 self.register_resource(network)
                 self.provider.create_net(network)
             else:
@@ -186,7 +186,8 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
                 password="ubuntu",
                 management_network=self.create_config.config.network_endpoints.mgt.net_name,
                 additional_networks=[self.create_config.config.network_endpoints.n2.net_name, self.create_config.config.network_endpoints.n3.net_name, radio_network_name],
-                require_port_security_disabled=True
+                require_port_security_disabled=True,
+                resource_group=self.id
             )
 
             self.register_resource(vm_gnb)
@@ -211,7 +212,8 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
                 username="ubuntu",
                 password="ubuntu",
                 management_network=self.create_config.config.network_endpoints.mgt.net_name,
-                additional_networks=[radio_network_name]
+                additional_networks=[radio_network_name],
+                resource_group=self.id
             )
             self.register_resource(vm_ue)
 
@@ -220,7 +222,8 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             vm_ue_configurator = UeransimUEConfigurator(
                 vm_resource=vm_ue,
                 sims=[],
-                gnbSearchList=[blue_ueransim_area.vm_gnb.network_interfaces[radio_network_name][0].fixed.ip]
+                gnbSearchList=[blue_ueransim_area.vm_gnb.network_interfaces[radio_network_name][0].fixed.ip],
+                resource_group=self.id
             )
             for sim in ue.sims:
                 vm_ue_configurator.sims.append(sim)
@@ -306,7 +309,8 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
             ngap_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n2.net_name][0].fixed.ip,
             gtp_addr=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3.net_name][0].fixed.ip,
             n3_nic_name=area.vm_gnb.network_interfaces[self.create_config.config.network_endpoints.n3.net_name][0].fixed.interface_name,
-            additional_routes=model.additional_routes
+            additional_routes=model.additional_routes,
+            resource_group=self.id
         )
 
         self.register_resource(area.vm_gnb_configurator)
@@ -317,6 +321,7 @@ class UeransimBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBlueprin
         area = self.state.areas[str(model.area)]
         vm_gnb_configurator = UeransimGNBConfiguratorDetach(
             vm_resource=area.vm_gnb,
+            resource_group=self.id
         )
         self.provider.configure_vm(vm_gnb_configurator)
 

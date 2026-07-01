@@ -41,7 +41,8 @@ class OpenAirInterfaceCucp(Generic5GCUCPK8sBlueprintNG[OAICucpBlueprintNGState, 
             chart="helm_charts/charts/oai-cu-cp-2.1.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.cucp_helm_chart)
 

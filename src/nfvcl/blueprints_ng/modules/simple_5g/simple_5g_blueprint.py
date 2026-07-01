@@ -93,7 +93,7 @@ class Simple5GBlueprint(BlueprintNG[Simple5GBlueprintNGState, Simple5GCreateMode
             vim = self.provider.topology_manager.get_vim_from_area_id_model(area.id)
             net_id = f"{vim.name}_{self.net_name_n3}"
             if net_id not in already_created_nets:
-                net_res = NetResource(area=area.id, name=self.net_name_n3, cidr=self.N3_NETWORK_TEMPLATE)
+                net_res = NetResource(area=area.id, name=self.net_name_n3, cidr=self.N3_NETWORK_TEMPLATE, resource_group=self.id)
                 self.register_resource(net_res)
                 self.provider.create_net(net_res)
                 already_created_nets.append(net_id)
@@ -102,7 +102,7 @@ class Simple5GBlueprint(BlueprintNG[Simple5GBlueprintNGState, Simple5GCreateMode
 
             net_id = f"{vim.name}_{self.net_name_n6}"
             if net_id not in already_created_nets:
-                net_res = NetResource(area=area.id, name=self.net_name_n6, cidr=self.N6_NETWORK_TEMPLATE)
+                net_res = NetResource(area=area.id, name=self.net_name_n6, cidr=self.N6_NETWORK_TEMPLATE, resource_group=self.id)
                 self.register_resource(net_res)
                 self.provider.create_net(net_res)
                 already_created_nets.append(net_id)
@@ -111,7 +111,7 @@ class Simple5GBlueprint(BlueprintNG[Simple5GBlueprintNGState, Simple5GCreateMode
 
             net_id = f"{vim.name}_{self.net_name_gnb}"
             if net_id not in already_created_nets:
-                net_res = NetResource(area=area.id, name=self.net_name_gnb, cidr=self.GNB_NETWORK_TEMPLATE)
+                net_res = NetResource(area=area.id, name=self.net_name_gnb, cidr=self.GNB_NETWORK_TEMPLATE, resource_group=self.id)
                 self.register_resource(net_res)
                 self.provider.create_net(net_res)
                 already_created_nets.append(net_id)
@@ -124,7 +124,8 @@ class Simple5GBlueprint(BlueprintNG[Simple5GBlueprintNGState, Simple5GCreateMode
                     area=area.id,
                     name=self.net_name_data,
                     cidr=self.DATA_NETWORK_TEMPLATE,
-                    allocation_pool=NetResourcePool(start=SerializableIPv4Address(self.DATA_NETWORK_POOL_START), end=SerializableIPv4Address(self.DATA_NETWORK_POOL_END))
+                    allocation_pool=NetResourcePool(start=SerializableIPv4Address(self.DATA_NETWORK_POOL_START), end=SerializableIPv4Address(self.DATA_NETWORK_POOL_END)),
+                    resource_group=self.id
                 )
                 self.register_resource(net_res)
                 self.provider.create_net(net_res)

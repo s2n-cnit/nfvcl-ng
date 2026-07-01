@@ -2,9 +2,11 @@ import time
 
 import pytest
 
-from blueprints.blue5g.parent5g_test import NFVCL5GTestSuite
-from blueprints.ueransim_utils import UeransimSSH
+from tests.blueprints.blue5g.parent5g_test import NFVCL5GTestSuite
+from tests.blueprints.ueransim_utils import UeransimSSH
 from nfvcl_models.blueprint_ng.g5.core import Core5GAddSubscriberModel
+
+pytestmark = pytest.mark.integration
 
 
 @pytest.mark.dependency(depends=["test_topology", "test_k8s", "test_ueransim"], scope="session")

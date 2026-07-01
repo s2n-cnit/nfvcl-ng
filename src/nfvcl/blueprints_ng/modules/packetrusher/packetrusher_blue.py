@@ -207,7 +207,8 @@ class PacketRusherBlueprintNG(BlueprintNG[PacketRusherBlueprintNGState, PacketRu
                 self.create_config.config.network_endpoints.n2.net_name,
                 self.create_config.config.network_endpoints.n3.net_name,
             ],
-            require_port_security_disabled=True
+            require_port_security_disabled=True,
+            resource_group=self.id
         )
         self.register_resource(vm)
         self.provider.create_vm(vm)
@@ -296,6 +297,7 @@ class PacketRusherBlueprintNG(BlueprintNG[PacketRusherBlueprintNGState, PacketRu
             n3_nic_name=n3_nic,
             sims=all_sims,
             additional_routes=model.additional_routes,
+            resource_group=self.id
         )
         area.pending_sims.clear()
 
@@ -309,6 +311,7 @@ class PacketRusherBlueprintNG(BlueprintNG[PacketRusherBlueprintNGState, PacketRu
             configurator = PacketRusherConfiguratorDetach(
                 vm_resource=area.vm,
                 sims=area.vm_configurator.sims,
+                resource_group=self.id
             )
             self.provider.configure_vm(configurator)
 

@@ -1,4 +1,4 @@
-from utils import get_unittest_config
+from tests.utils import get_unittest_config
 
 unittest_config = get_unittest_config()
 

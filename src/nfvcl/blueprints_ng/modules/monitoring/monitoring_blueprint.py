@@ -61,7 +61,8 @@ class MonitoringBlueprint(BlueprintNG[MonitoringBlueprintNGState, MonitoringCrea
             username="ubuntu",
             password=create_model.password,
             management_network=create_model.mgmt_net,
-            additional_networks=create_model.data_nets
+            additional_networks=create_model.data_nets,
+            resource_group=self.id
         )
 
         # Registering VM for Ubuntu
@@ -69,7 +70,7 @@ class MonitoringBlueprint(BlueprintNG[MonitoringBlueprintNGState, MonitoringCrea
         # Creating VM
         self.provider.create_vm(self.state.vm)
 
-        self.state.configurator = VmMonitoringConfigurator(vm_resource=self.state.vm)
+        self.state.configurator = VmMonitoringConfigurator(vm_resource=self.state.vm, resource_group=self.id)
         self.register_resource(self.state.configurator)
 
         self.provider.configure_vm(self.state.configurator)

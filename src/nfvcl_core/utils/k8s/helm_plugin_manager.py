@@ -91,6 +91,7 @@ class HelmPluginManager:
         self.logger.debug(f"Loading chart {chart_name} from local charts")
         helm_chart_res: HelmChartResource = HelmChartResource(
             area=-100,  # NOT IMPORTANT in this util it is not used.
+            resource_group="UNUSED",  # NOT IMPORTANT in this util it is not used.
             name=name,
             chart=chart_name,
             chart_as_path=True,

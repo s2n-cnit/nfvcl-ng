@@ -188,3 +188,7 @@ class RestartVmRequest(NFVCLBaseModel):
 
 class RestartAllVmsRequest(NFVCLBaseModel):
     hard: Optional[bool] = Field(default=False)
+
+class RpcapdRequest(NFVCLBaseModel):
+    vm_name: str = Field()
+    download_url: Optional[str] = Field(default=None)

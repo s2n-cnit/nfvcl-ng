@@ -1,10 +1,12 @@
 import pytest
-from blueprints.blue5g.day2_configs import GNB_CONFIGURATION
-from blueprints.blue5g.models.ueransim import GNBConfig, UEConfig, UeransimGNB
-from blueprints.blue5g.parent5g_test import NFVCL5GTestSuite
-from blueprints.ueransim_utils import UeransimSSH
+from tests.blueprints.blue5g.day2_configs import GNB_CONFIGURATION
+from tests.blueprints.blue5g.models.ueransim import GNBConfig, UEConfig, UeransimGNB
+from tests.blueprints.blue5g.parent5g_test import NFVCL5GTestSuite
+from tests.blueprints.ueransim_utils import UeransimSSH
 from nfvcl_common.utils.blue_utils import get_yaml_parser
 from nfvcl_core_models.pdu.gnb import GNBPDUConfigure
+
+pytestmark = pytest.mark.integration
 
 
 # def get_ueransim_tun_interface(ueransim: UeransimBlueprintNG) -> List[UeransimTunInterface]:

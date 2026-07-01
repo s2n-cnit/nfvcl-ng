@@ -1,30 +1,25 @@
 from __future__ import annotations
 
 import importlib
-from http import HTTPStatus
 from typing import Any, List, Optional, Dict, Callable, TYPE_CHECKING
 
-from keystoneauth1.exceptions import Unauthorized
-
-from nfvcl_core.database.blueprint_repository import BlueprintRepository
-from nfvcl_core.database.provider_repository import ProviderDataRepository
-from nfvcl_core.database.snapshot_repository import SnapshotRepository
-from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_common.base_model import NFVCLBaseModel
+from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
+from nfvcl_core.database.blueprint_repository import BlueprintRepository
+from nfvcl_core.database.snapshot_repository import SnapshotRepository
 from nfvcl_core.managers.generic_manager import GenericManager
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGBaseModel, CurrentOperation
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.event_types import BlueEventType, NFVCLEventTopics
 from nfvcl_core_models.performance import BlueprintPerformanceType
 from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
-from nfvcl_core_models.providers.providers import ProviderDataAggregate
 
 if TYPE_CHECKING:
     from nfvcl_core.managers.topology_manager import TopologyManager
     from nfvcl_core.managers.pdu_manager import PDUManager
     from nfvcl_core.managers.performance_manager import PerformanceManager
-    from nfvcl_core.managers.vim_clients_manager import VimClientsManager
     from nfvcl_core.managers.event_manager import EventManager
+    from nfvcl_core.managers.provider_manager import ProviderManager
 from nfvcl_core.blueprints.blueprint_ng import BlueprintNG
 from nfvcl_core.blueprints.blueprint_type_manager import blueprint_type
 from nfvcl_core_models.blueprints.blueprint import BlueprintNGStatus, RegisteredBlueprintCall, FunctionType
@@ -47,16 +42,25 @@ class BlueprintManager(GenericManager):
     """
     blueprint_dict: Dict[str, BlueprintNG] = {}
 
-    def __init__(self, blueprint_repository: BlueprintRepository, provider_repository: ProviderDataRepository, snapshot_repository: SnapshotRepository, topology_manager: TopologyManager, pdu_manager: PDUManager, performance_manager: PerformanceManager, event_manager: EventManager, vim_clients_manager: VimClientsManager):
+    def __init__(
+        self,
+        blueprint_repository: BlueprintRepository,
+        snapshot_repository: SnapshotRepository,
+        topology_manager: TopologyManager,
+        pdu_manager: PDUManager,
+        performance_manager: PerformanceManager,
+        event_manager: EventManager,
+        provider_manager: ProviderManager,
+    ):
         super().__init__()
         self._blueprint_repository = blueprint_repository
-        self._provider_repository = provider_repository
         self._snapshot_repository = snapshot_repository
         self._topology_manager = topology_manager
         self._pdu_manager = pdu_manager
         self._performance_manager = performance_manager
         self._event_manager = event_manager
-        self._vim_clients_manager = vim_clients_manager
+        self._provider_manager = provider_manager
+        self._provider_manager.set_blueprint_manager(self)
 
     def load(self):
         """
@@ -76,8 +80,7 @@ class BlueprintManager(GenericManager):
             blueprint: The blueprint to be saved
         """
         self.blueprint_dict[blueprint.id] = blueprint
-        self._blueprint_repository.save_blueprint(blueprint.base_model)
-        self._provider_repository.save_provider_data(blueprint.provider.get_provider_data_aggregate())
+        self._blueprint_repository.save_blueprint_dict(blueprint.serialize_base_model())
 
     def destroy_blueprint(self, blueprint: BlueprintNG) -> None:
         """
@@ -87,7 +90,6 @@ class BlueprintManager(GenericManager):
         """
         self.blueprint_dict.pop(blueprint.id)
         self._blueprint_repository.delete_blueprint(blueprint.id)
-        self._provider_repository.delete_by_blueprint_id(blueprint.id)
 
     def get_blueprint_instance(self, blueprint_id: str) -> Optional[BlueprintNG]:
         """
@@ -144,19 +146,13 @@ class BlueprintManager(GenericManager):
                 blueprint_instance.base_model.status.error = True
                 blueprint_instance.base_model.status.current_operation = CurrentOperation.IDLE
 
-            provider_data_aggregate = self._provider_repository.find_by_blueprint_id(blueprint_instance.id)
-            if provider_data_aggregate is None:
-                provider_data_aggregate = ProviderDataAggregate(blueprint_id=blueprint_instance.id)
-
             provider = ProvidersAggregator(
                 blueprint_id=blueprint_instance.id,
                 persistence_function=blueprint_instance.to_db,
+                provider_manager=self._provider_manager,
                 topology_manager=self._topology_manager,
                 blueprint_manager=self,
-                pdu_manager=self._pdu_manager,
                 performance_manager=self._performance_manager,
-                vim_clients_manager=self._vim_clients_manager,
-                provider_data_aggregate=provider_data_aggregate
             )
             blueprint_instance.provider = provider
             self.blueprint_dict[item['id']] = blueprint_instance
@@ -191,7 +187,14 @@ class BlueprintManager(GenericManager):
             # Instantiate the object (creation of services is done by the worker)
             created_blue: BlueprintNG = BlueClass(blue_id)
             with created_blue.lock:
-                created_blue.provider = ProvidersAggregator(blueprint_id=created_blue.id, persistence_function=created_blue.to_db, topology_manager=self._topology_manager, blueprint_manager=self, pdu_manager=self._pdu_manager, performance_manager=self._performance_manager, vim_clients_manager=self._vim_clients_manager)
+                created_blue.provider = ProvidersAggregator(
+                    blueprint_id=created_blue.id,
+                    persistence_function=created_blue.to_db,
+                    provider_manager=self._provider_manager,
+                    topology_manager=self._topology_manager,
+                    blueprint_manager=self,
+                    performance_manager=self._performance_manager,
+                )
                 created_blue.base_model.parent_blue_id = parent_id
                 if isinstance(msg, NFVCLBaseModel):
                     created_blue.base_model.day_2_call_history.append(RegisteredBlueprintCall(function_name=path, msg=msg.model_dump(), msg_type=get_class_path_str_from_obj(msg), function_type=FunctionType.DAY0))
@@ -206,6 +209,7 @@ class BlueprintManager(GenericManager):
                 self._performance_manager.add_blueprint(created_blue.id, path)
 
                 performance_operation_id = self._performance_manager.start_operation(created_blue.id, BlueprintPerformanceType.DAY0, "create")
+                duration = None
                 try:
                     created_blue.create(msg)
                 except Exception as e:
@@ -213,10 +217,12 @@ class BlueprintManager(GenericManager):
                     self.set_blueprint_status(blue_id, BlueprintNGStatus.error_state(str(e)))
                     self._performance_manager.set_error(blue_id, True)
                     raise e
+                finally:
+                    duration = self._performance_manager.end_operation(performance_operation_id)
                 self.set_blueprint_status(blue_id, BlueprintNGStatus.idle())
-                duration = self._performance_manager.end_operation(performance_operation_id)
                 self._event_manager.fire_event(NFVCLEventTopics.BLUEPRINT_TOPIC, BlueEventType.BLUE_CREATED, data=created_blue.base_model)
-                self.logger.success(f"Blueprint {blue_id} created successfully in {duration / 1000} seconds")
+                duration_message = f"{duration / 1000}" if duration is not None else "unknown"
+                self.logger.success(f"Blueprint {blue_id} created successfully in {duration_message} seconds")
             return blue_id
 
     def update_blueprint(self, blueprint_id: str, path: str, msg: Any = None, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> Any:
@@ -265,7 +271,8 @@ class BlueprintManager(GenericManager):
                 self.set_blueprint_status(blueprint.id, BlueprintNGStatus.error_state(str(e)))
                 self._performance_manager.set_error(blueprint.id, True)
                 raise e
-            self._performance_manager.end_operation(performance_operation_id)
+            finally:
+                self._performance_manager.end_operation(performance_operation_id)
 
             self.set_blueprint_status(blueprint.id, BlueprintNGStatus.idle())
             # EVENT FIRE
@@ -313,10 +320,12 @@ class BlueprintManager(GenericManager):
         with blueprint.lock:
             # BlueprintOperationCallbackModel
             performance_operation_id = self._performance_manager.start_operation(blueprint_id, BlueprintPerformanceType.CROSS_BLUEPRINT_FUNCTION_CALL, function_name)
-            call_msg = RegisteredBlueprintCall(function_name=function_name, extra={"args": f"{args}", "kwargs": f"{kwargs}"})
-            blueprint.base_model.day_2_call_history.append(call_msg)
-            result = getattr(blueprint, function_name)(*args, **kwargs)
-            self._performance_manager.end_operation(performance_operation_id)
+            try:
+                call_msg = RegisteredBlueprintCall(function_name=function_name, extra={"args": f"{args}", "kwargs": f"{kwargs}"})
+                blueprint.base_model.day_2_call_history.append(call_msg)
+                result = getattr(blueprint, function_name)(*args, **kwargs)
+            finally:
+                self._performance_manager.end_operation(performance_operation_id)
         return result
 
     def _validate_blueprint_for_deletion(self, blueprint_id: str, blueprint_instance: BlueprintNG, child_deletion: bool = False) -> None:
@@ -369,7 +378,6 @@ class BlueprintManager(GenericManager):
                 blueprint_instance.destroy()
                 self.blueprint_dict.pop(blueprint_id)
                 self._blueprint_repository.delete_blueprint(blueprint_id)
-                self._provider_repository.delete_by_blueprint_id(blueprint_id)
             except BlueprintProtectedException as e:
                 # This does NOT put Blueprint in error state!!!
                 raise e
@@ -379,13 +387,13 @@ class BlueprintManager(GenericManager):
                     self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
                     self.blueprint_dict.pop(blueprint_id)
                     self._blueprint_repository.delete_blueprint(blueprint_id)
-                    self._provider_repository.delete_by_blueprint_id(blueprint_id)
                 else:
                     self.logger.error(f"Error during deletion of blueprint {blueprint_id}. Error: {e}")
                     self.set_blueprint_status(blueprint_id, BlueprintNGStatus.error_state(str(e)))
                     self._performance_manager.set_error(blueprint_id, True)
                     raise e
-            self._performance_manager.end_operation(performance_operation_id)
+            finally:
+                self._performance_manager.end_operation(performance_operation_id)
             self.logger.success(f"Blueprint {blueprint_id} deleted successfully")
 
         return blueprint_id
@@ -411,8 +419,6 @@ class BlueprintManager(GenericManager):
                 self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped cause it is protected")
             except NFVCLCoreException as e:
                 self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped: {e}")
-            except Unauthorized:  # Client Openstack crash
-                self.logger.warning(f"The deletion of blueprint {blue_id} has been skipped cause Openstack Client Failed")
 
     def protect_blueprint(self, blueprint_id: str, protect: bool) -> dict:
         """

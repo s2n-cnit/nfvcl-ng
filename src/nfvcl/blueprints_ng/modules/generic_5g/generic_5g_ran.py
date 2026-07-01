@@ -69,7 +69,7 @@ class Generic5GRANBlueprintNG(BlueprintNG[Generic5GRANBlueprintNGState, RANBlueC
             config_model: Config model of which to check for feasibility
         """
         networks = self.extract_unique_net_names(config_model)
-        ok, missing_nets = self.provider.check_networks(config_model.area_id, networks)
+        ok, missing_nets = self.provider.check_networks_exist_on_vim(config_model.area_id, networks)
         if not ok:
             raise Exception(f"Missing nets {missing_nets}, from area {config_model.area_id}")
 

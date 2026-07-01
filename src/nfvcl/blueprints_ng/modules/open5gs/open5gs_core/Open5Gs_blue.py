@@ -63,7 +63,8 @@ class Open5Gs(Generic5GK8sBlueprintNG[Open5GsBlueprintNGState, Open5GsBlueCreate
             chart="helm_charts/charts/open5gs-2.7.6.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.core_helm_chart)
 

@@ -40,7 +40,8 @@ class OpenAirInterfaceCu(Generic5GCUK8sBlueprintNG[OAICuBlueprintNGState, CUBlue
             chart="helm_charts/charts/oai-cu-2.1.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.cu_helm_chart)
 

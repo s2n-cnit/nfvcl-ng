@@ -63,7 +63,8 @@ class SdCoreBlueprintNG(Generic5GK8sBlueprintNG[SdCoreBlueprintNGState, BlueSDCo
             name="sdcore", # TODO should this include the blueprint id? Can we deploy multiple cores on the same blueprint?
             chart="helm_charts/charts/sdcore-1.0.0.tgz",
             chart_as_path=True,
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.core_helm_chart)
         self.provider.install_helm_chart(self.state.core_helm_chart, self.state.sdcore_config_values.model_dump_for_helm())

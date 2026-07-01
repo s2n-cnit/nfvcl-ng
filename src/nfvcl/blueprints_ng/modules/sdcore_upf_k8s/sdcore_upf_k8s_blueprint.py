@@ -43,7 +43,8 @@ class SdCoreUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[SdCoreUPFK8sBlueprintNG
             name=f"sdcore-upf",
             chart="helm_charts/charts/bess-upf-1.0.0.tgz",
             chart_as_path=True,
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(upf_helm_chart)
 

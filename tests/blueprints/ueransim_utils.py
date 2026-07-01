@@ -3,7 +3,7 @@ import time
 from typing import Optional
 
 from nfvcl_common.utils.blue_utils import get_yaml_parser
-from utils import SSH
+from tests.utils import SSH
 
 
 class UeransimSSH(SSH):

@@ -11,7 +11,7 @@ from pyhelm3 import Client, ReleaseRevisionStatus
 from nfvcl_core.utils.k8s.kube_api_utils_class import KubeApiUtils
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import MultusInterface
-from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderData
+from nfvcl_core_models.providers.providers import ProviderData
 from nfvcl_providers.kubernetes.k8s_provider_interface import K8SProviderInterface, K8SProviderException
 from nfvcl_core_models.resources import HelmChartResource
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
@@ -20,9 +20,28 @@ from nfvcl_core.utils.k8s.k8s_utils import get_k8s_config_from_file_content
 from nfvcl_core.utils.k8s.helm_plugin_manager import build_helm_client_from_credential_file_content
 
 
-class K8SProviderDataNative(BlueprintNGProviderData):
-    namespaces: Optional[List[str]] = Field(default_factory=list)
-    reserved_ips: Optional[List[MultusInterface]] = Field(default_factory=list)
+class K8SProviderDataNative(ProviderData):
+    areas: Dict[str, AreaK8SProviderData] = Field(default_factory=dict)
+
+    def get_area_data(self, area: int) -> AreaK8SProviderData:
+        area_key = str(area)
+        if area_key not in self.areas:
+            self.areas[area_key] = AreaK8SProviderData()
+        return self.areas[area_key]
+
+
+class AreaK8SProviderData(ProviderData):
+    resource_groups: Dict[str, ResourceGroupK8SProviderData] = Field(default_factory=dict)
+
+    def get_resource_group_data(self, resource_group_name: str) -> ResourceGroupK8SProviderData:
+        if resource_group_name not in self.resource_groups:
+            self.resource_groups[resource_group_name] = ResourceGroupK8SProviderData()
+        return self.resource_groups[resource_group_name]
+
+
+class ResourceGroupK8SProviderData(ProviderData):
+    namespaces: List[str] = Field(default_factory=list)
+    reserved_ips: List[MultusInterface] = Field(default_factory=list)
 
 
 class K8SProviderNativeException(K8SProviderException):
@@ -36,9 +55,21 @@ class K8SProviderNative(K8SProviderInterface):
     def init(self):
         self.HELM_TMP_FOLDER_PATH = create_tmp_folder('helm')
         self.data: K8SProviderDataNative = K8SProviderDataNative()
-        self.k8s_cluster: TopologyK8sModel = self.topology_manager.get_k8s_cluster_by_area(self.area)
-        self.kube_utils = KubeApiUtils(get_k8s_config_from_file_content(self.k8s_cluster.credentials))
-        self.helm_client = self.get_helm_client_by_area(self.area)
+        self.kube_utils_by_area: Dict[int, KubeApiUtils] = {}
+        self.kube_utils_cluster_names_by_area: Dict[int, str] = {}
+
+    def get_k8s_cluster_by_area(self, area: int) -> TopologyK8sModel:
+        return self.topology_manager.get_k8s_cluster_by_area(area)
+
+    def get_kube_utils_by_area(self, area: int) -> KubeApiUtils:
+        k8s_cluster = self.get_k8s_cluster_by_area(area)
+        if (
+            area not in self.kube_utils_by_area
+            or self.kube_utils_cluster_names_by_area.get(area) != k8s_cluster.name
+        ):
+            self.kube_utils_by_area[area] = KubeApiUtils(get_k8s_config_from_file_content(k8s_cluster.credentials))
+            self.kube_utils_cluster_names_by_area[area] = k8s_cluster.name
+        return self.kube_utils_by_area[area]
 
     def get_helm_client_by_area(self, area: int) -> Client:
         """
@@ -63,8 +94,10 @@ class K8SProviderNative(K8SProviderInterface):
 
     def install_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         self.logger.info(f"Installing Helm chart {helm_chart_resource.name}")
+        helm_client = self.get_helm_client_by_area(helm_chart_resource.area)
+        kube_utils = self.get_kube_utils_by_area(helm_chart_resource.area)
 
-        chart = asyncio.run(self.helm_client.get_chart(
+        chart = asyncio.run(helm_client.get_chart(
             helm_chart_resource.get_chart_converted(),
             repo=helm_chart_resource.repo,
             version=helm_chart_resource.version
@@ -76,13 +109,13 @@ class K8SProviderNative(K8SProviderInterface):
         }
 
         self.logger.debug(f"Creating namespace for Helm chart {helm_chart_resource.name} with labels: {ns_labels}")
-        self.kube_utils.create_namespace(namespace_name=helm_chart_resource.namespace.lower(), labels=ns_labels)
+        kube_utils.create_namespace(namespace_name=helm_chart_resource.namespace.lower(), labels=ns_labels)
 
         self.logger.debug(f"Helm chart internal name: {chart.metadata.name}, version: {chart.metadata.version}")
 
         # Install or upgrade a release, if fails print debug cmd to reproduce locally the error with debug option. Pyhelm3 does not support debug option.
         try:
-            revision = asyncio.run(self.helm_client.install_or_upgrade_release(
+            revision = asyncio.run(helm_client.install_or_upgrade_release(
                 helm_chart_resource.name.lower(),
                 chart,
                 values,
@@ -95,36 +128,39 @@ class K8SProviderNative(K8SProviderInterface):
             self.logger.error(f"Helm chart deployment failed. You can debug installation in this way from nfvcl folder:\n{self._generate_debug_cmd_cli(helm_chart_resource, values, chart.metadata.version)}")
             raise helmError
 
-        if helm_chart_resource.namespace.lower() not in self.data.namespaces:
-            self.data.namespaces.append(helm_chart_resource.namespace.lower())
+        resource_group_data = self.data.get_area_data(helm_chart_resource.area).get_resource_group_data(helm_chart_resource.resource_group)
+        namespace = helm_chart_resource.namespace.lower()
+        if namespace not in resource_group_data.namespaces:
+            resource_group_data.namespaces.append(namespace)
 
         self.logger.debug(f"Helm chart installed name: {revision.release.name}, namespace: {revision.release.namespace}, revision: {revision.revision}, status: {str(revision.status)}")
 
         self.save_to_db()
 
-        if not self._check_helm_chart_status(revision.release.name, revision.release.namespace, ReleaseRevisionStatus.DEPLOYED):
+        if not self._check_helm_chart_status(helm_chart_resource.area, revision.release.name, revision.release.namespace, ReleaseRevisionStatus.DEPLOYED):
             self.logger.error(f"The helm chart '{helm_chart_resource.name}' is not in the DEPLOYED state")
             raise K8SProviderNativeException(f"The helm chart '{helm_chart_resource.name}' is not in the DEPLOYED state")
 
         # Adding this blueprint to the deployed list on the cluster
 
-        cluster = self.topology_manager.get_k8s_cluster_by_area(self.area)
-        cluster.deployed_blueprints.append(self.blueprint_id)
+        cluster = self.get_k8s_cluster_by_area(helm_chart_resource.area)
+        if helm_chart_resource.resource_group not in cluster.deployed_blueprints:
+            cluster.deployed_blueprints.append(helm_chart_resource.resource_group)
         self.topology_manager.update_kubernetes(cluster)
 
-        services = self.kube_utils.get_services(namespace=helm_chart_resource.namespace.lower())
-        deployments = self.kube_utils.get_deployments(namespace=helm_chart_resource.namespace.lower(), detailed=True)
-        statefulsets = self.kube_utils.get_statefulsets(namespace=helm_chart_resource.namespace.lower(), detailed=True)
+        services = kube_utils.get_services(namespace=helm_chart_resource.namespace.lower())
+        deployments = kube_utils.get_deployments(namespace=helm_chart_resource.namespace.lower(), detailed=True)
+        statefulsets = kube_utils.get_statefulsets(namespace=helm_chart_resource.namespace.lower(), detailed=True)
 
         deployments_pods: Dict[str, V1PodList] = {}
 
         for deployment in deployments.items:
-            deployment_pods = self.kube_utils.get_pods_for_namespace(namespace=helm_chart_resource.namespace.lower(), label_selector=','.join([f'{k}={v}' for k, v in deployment.spec.selector.match_labels.items()]))
+            deployment_pods = kube_utils.get_pods_for_namespace(namespace=helm_chart_resource.namespace.lower(), label_selector=','.join([f'{k}={v}' for k, v in deployment.spec.selector.match_labels.items()]))
             deployments_pods[deployment.metadata.name] = deployment_pods
 
         statefulsets_pods: Dict[str, V1PodList] = {}
         for statefulset in statefulsets.items:
-            statefulset_pods = self.kube_utils.get_pods_for_namespace(namespace=helm_chart_resource.namespace.lower(), label_selector=','.join([f'{k}={v}' for k, v in statefulset.spec.selector.match_labels.items()]))
+            statefulset_pods = kube_utils.get_pods_for_namespace(namespace=helm_chart_resource.namespace.lower(), label_selector=','.join([f'{k}={v}' for k, v in statefulset.spec.selector.match_labels.items()]))
             statefulsets_pods[statefulset.metadata.name] = statefulset_pods
 
         helm_chart_resource.set_services_from_k8s_api(services)
@@ -148,18 +184,21 @@ class K8SProviderNative(K8SProviderInterface):
         values_path = self.HELM_TMP_FOLDER_PATH / f"{helm_chart_resource.namespace.lower()}_{helm_chart_resource.name}.yaml"
         yaml_content = yaml.dump(values)
         values_path.write_text(yaml_content)
-        k8s_credential_path = self.HELM_TMP_FOLDER_PATH / f"k8s_credential_{self.k8s_cluster.name}"
+        k8s_cluster = self.get_k8s_cluster_by_area(helm_chart_resource.area)
+        k8s_credential_path = self.HELM_TMP_FOLDER_PATH / f"k8s_credential_{k8s_cluster.name}"
         return f"helm upgrade {helm_chart_resource.name} {helm_chart_resource.get_chart_converted()} --history-max 10 --install --output json --timeout 5m --values '{values_path.absolute()}' --debug --atomic --create-namespace --namespace {helm_chart_resource.namespace.lower()} --version {version} --wait --wait-for-jobs --kubeconfig {k8s_credential_path.absolute()}"
 
-    def _check_if_helm_chart_installed(self, release_name: str, release_namespace: str):
-        releases = asyncio.run(self.helm_client.list_releases(all=True, all_namespaces=True))
+    def _check_if_helm_chart_installed(self, area: int, release_name: str, release_namespace: str):
+        helm_client = self.get_helm_client_by_area(area)
+        releases = asyncio.run(helm_client.list_releases(all=True, all_namespaces=True))
         for release in releases:
             if release.name == release_name and release.namespace == release_namespace:
                 return True
         return False
 
-    def _check_helm_chart_status(self, release_name: str, release_namespace: str, desired_status: ReleaseRevisionStatus):
-        releases = asyncio.run(self.helm_client.list_releases(all=True, all_namespaces=True))
+    def _check_helm_chart_status(self, area: int, release_name: str, release_namespace: str, desired_status: ReleaseRevisionStatus):
+        helm_client = self.get_helm_client_by_area(area)
+        releases = asyncio.run(helm_client.list_releases(all=True, all_namespaces=True))
         for release in releases:
             revision = asyncio.run(release.current_revision())
             if release.name == release_name and release.namespace == release_namespace:
@@ -168,8 +207,9 @@ class K8SProviderNative(K8SProviderInterface):
 
     def update_values_helm_chart(self, helm_chart_resource: HelmChartResource, values: Dict[str, Any]):
         self.logger.info(f"Updating Helm chart {helm_chart_resource.name}")
+        helm_client = self.get_helm_client_by_area(helm_chart_resource.area)
 
-        chart = asyncio.run(self.helm_client.get_chart(
+        chart = asyncio.run(helm_client.get_chart(
             helm_chart_resource.get_chart_converted(),
             repo=helm_chart_resource.repo,
             version=helm_chart_resource.version
@@ -177,7 +217,7 @@ class K8SProviderNative(K8SProviderInterface):
         self.logger.debug(f"Helm chart {helm_chart_resource.name} metadata version: {chart.metadata.version}")
 
         # Install or upgrade a release
-        revision = asyncio.run(self.helm_client.install_or_upgrade_release(
+        revision = asyncio.run(helm_client.install_or_upgrade_release(
             helm_chart_resource.name.lower(),
             chart,
             values,
@@ -186,7 +226,7 @@ class K8SProviderNative(K8SProviderInterface):
             wait=True
         ))
 
-        if not self._check_helm_chart_status(revision.release.name, revision.release.namespace, ReleaseRevisionStatus.DEPLOYED):
+        if not self._check_helm_chart_status(helm_chart_resource.area, revision.release.name, revision.release.namespace, ReleaseRevisionStatus.DEPLOYED):
             self.logger.error(f"The helm chart '{helm_chart_resource.name}' is not in the DEPLOYED state")
             raise K8SProviderNativeException(f"The helm chart '{helm_chart_resource.name}' is not in the DEPLOYED state")
 
@@ -196,71 +236,84 @@ class K8SProviderNative(K8SProviderInterface):
 
     def uninstall_helm_chart(self, helm_chart_resource: HelmChartResource):
         self.logger.info(f"Uninstalling Helm chart {helm_chart_resource.name}")
+        helm_client = self.get_helm_client_by_area(helm_chart_resource.area)
 
-        asyncio.run(self.helm_client.uninstall_release(
+        asyncio.run(helm_client.uninstall_release(
             helm_chart_resource.name.lower(),
             namespace=helm_chart_resource.namespace.lower(),
             wait=True
         ))
         self.save_to_db()
 
-        if self._check_if_helm_chart_installed(helm_chart_resource.name.lower(), helm_chart_resource.namespace.lower()):
+        if self._check_if_helm_chart_installed(helm_chart_resource.area, helm_chart_resource.name.lower(), helm_chart_resource.namespace.lower()):
             self.logger.error(f"The helm chart '{helm_chart_resource.name}' was not uninstalled successfully")
             raise K8SProviderNativeException(f"The helm chart '{helm_chart_resource.name}' was not uninstalled successfully")
 
         # Removing this blueprint to the deployed list on the cluster
         try:
-            cluster = self.topology_manager.get_k8s_cluster_by_area(self.area)
-            cluster.deployed_blueprints.remove(self.blueprint_id)
+            cluster = self.get_k8s_cluster_by_area(helm_chart_resource.area)
+            cluster.deployed_blueprints.remove(helm_chart_resource.resource_group)
             self.topology_manager.update_kubernetes(cluster)
-        except ValueError as e:
+        except ValueError:
             self.logger.warning("Blueprint has not been found in the cluster deployed blueprints")
 
         self.logger.success(f"Uninstalled Helm chart {helm_chart_resource.name}")
 
-    def final_cleanup(self):
-        self.logger.info(f"Performing k8s final cleanup")
-        for ns in self.data.namespaces:
-            self.logger.debug(f"Deleting k8s namespace '{ns}'")
-            try:
-                self.kube_utils.delete_namespace(ns)
-            except Exception as e:
-                self.logger.error(f"Error deleting k8s namespace '{ns}': {str(e)}")
-        for reserved_ip in self.data.reserved_ips:
-            self.logger.debug(f"Releasing reserved IP '{reserved_ip.ip_address}'")
-            self.topology_manager.release_k8s_multus_ip(self.k8s_cluster.name, reserved_ip.network_name, reserved_ip.ip_address)
+    def cleanup_resource_group(self, resource_group_id: str):
+        self.logger.info("Performing k8s final cleanup")
+        for area, area_data in list(self.data.areas.items()):
+            resource_group_data = area_data.resource_groups.get(resource_group_id)
+            if resource_group_data is None:
+                continue
+
+            kube_utils = self.get_kube_utils_by_area(int(area))
+            for ns in resource_group_data.namespaces:
+                self._delete_namespace(kube_utils, ns)
+
+            k8s_cluster = self.get_k8s_cluster_by_area(int(area))
+            for reserved_ip in resource_group_data.reserved_ips:
+                self._release_reserved_ip(k8s_cluster.name, reserved_ip)
+
+            area_data.resource_groups.pop(resource_group_id, None)
+
+        self.save_to_db()
 
     def get_pod_log(self, helm_chart_resource: HelmChartResource, pod_name: str, tail_lines: Optional[int] = None) -> str:
-        return self.kube_utils.get_logs_for_pod(helm_chart_resource.namespace.lower(), pod_name, tail_lines=tail_lines)
+        return self.get_kube_utils_by_area(helm_chart_resource.area).get_logs_for_pod(helm_chart_resource.namespace.lower(), pod_name, tail_lines=tail_lines)
 
-    def reserve_k8s_multus_ip(self, area: int, network_name: str) -> MultusInterface:
-        multus_interface = self.topology_manager.reserve_k8s_multus_ip(self.k8s_cluster.name, network_name)
-        self.data.reserved_ips.append(multus_interface)
+    def reserve_k8s_multus_ip(self, area: int, resource_group_id: str, network_name: str) -> MultusInterface:
+        k8s_cluster = self.get_k8s_cluster_by_area(area)
+        multus_interface = self.topology_manager.reserve_k8s_multus_ip(k8s_cluster.name, network_name)
+        self.data.get_area_data(area).get_resource_group_data(resource_group_id).reserved_ips.append(multus_interface)
         self.logger.debug(f"Reserved IP: {multus_interface.ip_address}")
         return multus_interface
 
-    def release_k8s_multus_ip(self, area: int, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
-        release_ret = self.topology_manager.release_k8s_multus_ip(self.k8s_cluster.name, network_name, ip_address)
-        for reserved_ip in deepcopy(self.data.reserved_ips):
+    def release_k8s_multus_ip(self, area: int, resource_group_id: str, network_name: str, ip_address: SerializableIPv4Address) -> MultusInterface:
+        k8s_cluster = self.get_k8s_cluster_by_area(area)
+        release_ret = self.topology_manager.release_k8s_multus_ip(k8s_cluster.name, network_name, ip_address)
+        resource_group_data = self.data.get_area_data(area).get_resource_group_data(resource_group_id)
+        for reserved_ip in deepcopy(resource_group_data.reserved_ips):
             if reserved_ip.network_name == network_name and reserved_ip.ip_address == ip_address:
-                self.data.reserved_ips.remove(reserved_ip)
+                resource_group_data.reserved_ips.remove(reserved_ip)
                 break
         self.logger.debug(f"Released reserved IP: {ip_address}")
         return release_ret
 
     def restart_deployment(self, helm_chart_resource: HelmChartResource, deployment_name: str):
         self.logger.debug(f"Restarting deployment '{deployment_name}' in namespace '{helm_chart_resource.namespace.lower()}'")
-        updated_dep = self.kube_utils.restart_deployment(helm_chart_resource.namespace.lower(), deployment_name)
-        wait_res = self.kube_utils.wait_for_deployment_to_be_ready(updated_dep)
+        kube_utils = self.get_kube_utils_by_area(helm_chart_resource.area)
+        updated_dep = kube_utils.restart_deployment(helm_chart_resource.namespace.lower(), deployment_name)
+        wait_res = kube_utils.wait_for_deployment_to_be_ready(updated_dep)
         self.logger.debug(f"Restarted deployment: {deployment_name} in namespace '{helm_chart_resource.namespace.lower()}', ready wait result: {wait_res}")
         return wait_res
 
     def restart_all_deployments(self, helm_chart_resource: HelmChartResource, namespace: str):
         self.logger.debug(f"Restarting all deployments in namespace '{namespace}'")
-        updated_deps = self.kube_utils.restart_all_deployments(namespace)
+        kube_utils = self.get_kube_utils_by_area(helm_chart_resource.area)
+        updated_deps = kube_utils.restart_all_deployments(namespace)
         failed_deployments = []
         for dep in updated_deps:
-            wait_res = self.kube_utils.wait_for_deployment_to_be_ready(dep)
+            wait_res = kube_utils.wait_for_deployment_to_be_ready(dep)
             if wait_res:
                 self.logger.debug(f"Restarted deployment: {dep.metadata.name} in namespace '{namespace}' successful")
             else:
@@ -272,16 +325,31 @@ class K8SProviderNative(K8SProviderInterface):
 
     def exec_command_in_pod(self, helm_chart_resource: HelmChartResource, command: List[str], pod_name=None, container_name=None):
         self.logger.debug(f"Executing command '{" ".join(command)}' in pod {pod_name} namespace '{helm_chart_resource.namespace.lower()}'")
-        return self.kube_utils.exec_command_in_pod(helm_chart_resource.namespace.lower(), command, pod_name, container_name)
+        return self.get_kube_utils_by_area(helm_chart_resource.area).exec_command_in_pod(helm_chart_resource.namespace.lower(), command, pod_name, container_name)
 
     def spawn_ephemeral_container_in_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, container_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120):
         self.logger.debug(f"Spawning container '{container_name}' in pod '{pod_name}' namespace '{helm_chart_resource.namespace.lower()}'")
-        return self.kube_utils.spawn_ephemeral_container_in_pod(helm_chart_resource.namespace.lower(), pod_name, container_name, image, command, args, env, wait_for_completion, timeout)
+        return self.get_kube_utils_by_area(helm_chart_resource.area).spawn_ephemeral_container_in_pod(helm_chart_resource.namespace.lower(), pod_name, container_name, image, command, args, env, wait_for_completion, timeout)
 
     def spawn_pod(self, helm_chart_resource: HelmChartResource, pod_name: str, image: str, command: List[str], args: Optional[List[str]] = None, env: Optional[dict] = None, wait_for_completion: bool = True, timeout: int = 120) -> str:
         self.logger.debug(f"Spawning pod '{pod_name}' in namespace '{helm_chart_resource.namespace.lower()}'")
-        return self.kube_utils.spawn_pod(helm_chart_resource.namespace.lower(), pod_name, image, command, args, env, wait_for_completion, timeout)
+        return self.get_kube_utils_by_area(helm_chart_resource.area).spawn_pod(helm_chart_resource.namespace.lower(), pod_name, image, command, args, env, wait_for_completion, timeout)
 
-    def check_lb_available(self, necessary_ip: int) -> bool:
+    def check_lb_available(self, area: int, necessary_ip: int) -> bool:
         self.logger.debug(f"Checking if {necessary_ip} LoadBalancer IPs are available")
-        return self.kube_utils.check_lb_available(necessary_ip)
+        return self.get_kube_utils_by_area(area).check_lb_available(necessary_ip)
+
+    def _delete_namespace(self, kube_utils: KubeApiUtils, namespace: str) -> None:
+        self.logger.debug(f"Deleting k8s namespace '{namespace}'")
+        try:
+            kube_utils.delete_namespace(namespace)
+        except Exception as e:
+            self.logger.error(f"Error deleting k8s namespace '{namespace}': {str(e)}")
+
+    def _release_reserved_ip(self, k8s_cluster_name: str, reserved_ip: MultusInterface) -> None:
+        self.logger.debug(f"Releasing reserved IP '{reserved_ip.ip_address}'")
+        self.topology_manager.release_k8s_multus_ip(
+            k8s_cluster_name,
+            reserved_ip.network_name,
+            reserved_ip.ip_address,
+        )

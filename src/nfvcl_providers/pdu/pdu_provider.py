@@ -1,32 +1,42 @@
 import copy
-from typing import Optional, Any, List, Callable
+from typing import Optional, Any, List, Callable, Dict
 
 from pydantic import Field
 
-from nfvcl_providers.blueprint_ng_provider_interface import BlueprintNGProviderData, BlueprintNGProviderInterface
 from nfvcl_core_models.network.network_models import PduModel, PduLockType, PduLock
 from nfvcl_core_models.network.network_models import PduType
 from nfvcl_common.utils.blue_utils import get_class_from_path
+from nfvcl_core_models.providers.providers import ProviderData
+from nfvcl_providers.provider_interface import ProviderInterface
 
 
-class PDUProviderData(BlueprintNGProviderData):
-    locked_pdus: List[PduModel] = Field(default_factory=list)
+class PDUProviderData(ProviderData):
+    locked_pdus_by_blueprint: Dict[str, List[PduModel]] = Field(default_factory=dict)
 
 
 class PDUProviderException(Exception):
     pass
 
 
-class PDUProvider(BlueprintNGProviderInterface):
+class PDUProvider(ProviderInterface):
     data: PDUProviderData
 
-    def __init__(self, area: int, blueprint_id: str, topology_manager, pdu_manager, persistence_function: Optional[Callable] = None):
-        super().__init__(area, blueprint_id, persistence_function)
+    def __init__(self, topology_manager, pdu_manager, persistence_function: Optional[Callable] = None):
+        super().__init__(persistence_function)
         self.topology_manager = topology_manager
         self.pdu_manager = pdu_manager
 
     def init(self):
         self.data: PDUProviderData = PDUProviderData()
+
+    def _add_pdu_to_locked(self, blueprint_id: str, pdu: PduModel):
+        if blueprint_id not in self.data.locked_pdus_by_blueprint:
+            self.data.locked_pdus_by_blueprint[blueprint_id] = []
+        self.data.locked_pdus_by_blueprint[blueprint_id].append(pdu)
+
+    def _remove_pdu_from_locked(self, blueprint_id: str, pdu: PduModel):
+        if blueprint_id in self.data.locked_pdus_by_blueprint:
+            self.data.locked_pdus_by_blueprint[blueprint_id].remove(pdu)
 
     def find_pdu(self, area: int, pdu_type: PduType, instance_type: Optional[str] = None, name: Optional[str] = None) -> PduModel:
         """
@@ -95,36 +105,38 @@ class PDUProvider(BlueprintNGProviderInterface):
                 return True
         return False
 
-    def is_pdu_locked_by_current_blueprint(self, pdu_model: PduModel, lock_type: PduLockType) -> bool:
+    def is_pdu_locked_by_blueprint(self, pdu_model: PduModel, lock_type: PduLockType, blueprint_id: str) -> bool:
         """
         Check if a PDU is locked
         Args:
             lock_type: Lock type to check
             pdu_model: Model of the PDU to check
+            blueprint_id: Blueprint id
 
         Returns: True if the PDU is locked, False otherwise
         """
         for pdu in pdu_model.locked_list_by:
-            if pdu.blueprint_id == self.blueprint_id and pdu.type == lock_type:
+            if pdu.blueprint_id == blueprint_id and pdu.type == lock_type:
                 return True
         return False
 
-    def lock_pdu(self, pdu_model: PduModel, lock_type: PduLockType) -> PduModel:
+    def lock_pdu(self, pdu_model: PduModel, lock_type: PduLockType, blueprint_id: str) -> PduModel:
         """
         Lock a PDU
         Args:
             lock_type: Lock type to lock the PDU with
             pdu_model: Model of the PDU to lock
+            blueprint_id: Blueprint id
 
         Returns: Updated PDU model
         """
         if not self.is_pdu_locked(pdu_model, lock_type):
             lock = PduLock(
                 type=lock_type,
-                blueprint_id=self.blueprint_id
+                blueprint_id=blueprint_id
             )
             pdu_model.locked_list_by.append(lock)
-            self.data.locked_pdus.append(pdu_model)
+            self._add_pdu_to_locked(blueprint_id, pdu_model)
         else:
             for lock in pdu_model.locked_list_by:
                 if lock.type == lock_type:
@@ -134,22 +146,23 @@ class PDUProvider(BlueprintNGProviderInterface):
         self.save_to_db()
         return pdu_model
 
-    def unlock_pdu(self, pdu_model: PduModel, lock_type: PduLockType) -> PduModel:
+    def unlock_pdu(self, pdu_model: PduModel, lock_type: PduLockType, blueprint_id: str) -> PduModel:
         """
         Unlock a PDU, need to be locked by the blueprint requesting to unlock
         Args:
             lock_type: Lock type to unlock the PDU with
             pdu_model: Model of the PDU to unlock
+            blueprint_id: Blueprint id
 
         Returns: Updated PDU model
         """
         if self.is_pdu_locked(pdu_model, lock_type):
             for lock in pdu_model.locked_list_by:
                 if lock.type == lock_type:
-                    if lock.blueprint_id == self.blueprint_id:
+                    if lock.blueprint_id == blueprint_id:
                         pdu_model.locked_list_by.remove(lock)
                         if len(pdu_model.locked_list_by) == 0:
-                            self.data.locked_pdus.remove(pdu_model)
+                            self._remove_pdu_from_locked(blueprint_id, pdu_model)
                     else:
                         raise PDUProviderException(f"The PDU is locked by another blueprint: {lock.blueprint_id}")
         else:
@@ -159,17 +172,18 @@ class PDUProvider(BlueprintNGProviderInterface):
         self.save_to_db()
         return pdu_model
 
-    def get_pdu_configurator(self, pdu_model: PduModel, lock_type: PduLockType) -> Any:
+    def get_pdu_configurator(self, pdu_model: PduModel, lock_type: PduLockType, blueprint_id: str) -> Any:
         """
         Get an instance of the configurator for the PDU, the PDU need to be locked by the blueprint requesting the configurator
         Args:
             lock_type: Lock type to get the configurator for
             pdu_model: Model of the PDU to get the configurator for
+            blueprint_id: Blueprint id
 
         Returns: Instance of the configurator for the PDU (subclass of PDUConfigurator)
         """
         if self.is_pdu_locked(pdu_model, lock_type):
-            if self.is_pdu_locked_by_current_blueprint(pdu_model, lock_type):
+            if self.is_pdu_locked_by_blueprint(pdu_model, lock_type, blueprint_id):
                 return get_class_from_path(self.pdu_manager.get_implementation(pdu_model.instance_type))(pdu_model)
         raise PDUProviderException(f"The PDU is not locked or locked by another blueprint: {pdu_model.locked_list_by}")
 
@@ -192,12 +206,13 @@ class PDUProvider(BlueprintNGProviderInterface):
         """
         self.topology_manager.delete_pdu(pdu_id)
 
-    def final_cleanup(self):
-        for pdu_to_unlock in copy.copy(self.data.locked_pdus):
+    def cleanup_resource_group(self, blueprint_id: str):
+        for pdu_to_unlock in copy.copy(self.data.locked_pdus_by_blueprint.get(blueprint_id, [])):
             try:
                 updated_model = self.find_by_name(pdu_to_unlock.name)
                 for lock in updated_model.locked_list_by:
-                    self.unlock_pdu(updated_model, lock.type)
+                    self.unlock_pdu(updated_model, lock.type, blueprint_id)
             except Exception as e:
                 self.logger.warning(f"Error unlocking PDU '{pdu_to_unlock.name}': {e}")
+        self.data.locked_pdus_by_blueprint.pop(blueprint_id, None)
         self.save_to_db()

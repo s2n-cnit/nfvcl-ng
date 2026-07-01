@@ -2,18 +2,18 @@ from typing import Optional, List
 
 import pytest
 
-from blueprints.blue5g.create_configs import CORE_5G, UERANSIM1, UERANSIM2
-from blueprints.blue5g.models.ueransim import UeransimGNB
-from blueprints.ueransim_utils import UeransimSSH
+from tests.blueprints.blue5g.create_configs import CORE_5G, UERANSIM1, UERANSIM2
+from tests.blueprints.blue5g.models.ueransim import UeransimGNB
+from tests.blueprints.ueransim_utils import UeransimSSH
 from nfvcl.blueprints_ng.modules import UeransimBlueprintNG
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG
 from nfvcl_core.nfvcl_main import NFVCL
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
 from nfvcl_models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance
-from topology.test_topology import TestContextTopology
+from tests.topology.test_topology import TopologyTestContext
 
 
-class TestContext5G:
+class FiveGTestContext:
     def __init__(self):
         self.ueransim1_create_model: UeransimBlueprintRequestInstance = UeransimBlueprintRequestInstance.model_validate(UERANSIM1)
         self.ueransim2_create_model: UeransimBlueprintRequestInstance = UeransimBlueprintRequestInstance.model_validate(UERANSIM2)
@@ -35,8 +35,8 @@ class TestContext5G:
 
 
 @pytest.fixture(name="context_5g", scope="session")
-def context_5g_fixture(nfvcl: NFVCL, topology_context: TestContextTopology):
-    context_5g = TestContext5G()
+def context_5g_fixture(nfvcl: NFVCL, topology_context: TopologyTestContext):
+    context_5g = FiveGTestContext()
     yield context_5g
     # Teardown
     print("5G TEARDOWN")

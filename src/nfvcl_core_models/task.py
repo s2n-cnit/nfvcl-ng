@@ -32,6 +32,7 @@ class NFVCLTaskResult:
         return f"Result: {self.result}, Error: {self.error}, Exception: {self.exception}"
 
 class NFVCLTaskStatusType(str, Enum):
+    QUEUED = "queued"
     RUNNING = "running"
     DONE = "done"
 
@@ -41,3 +42,7 @@ class NFVCLTaskStatus(NFVCLBaseModel):
     result: Optional[Any] = Field(default=None)
     error: bool = Field(default=False)
     exception: Optional[str] = Field(default=None)
+
+class NFVCLTaskDeleteResult(NFVCLBaseModel):
+    task_id: str = Field()
+    deleted: bool = Field(default=True)

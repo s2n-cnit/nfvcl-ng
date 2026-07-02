@@ -36,7 +36,7 @@ from nfvcl_core_models.network.network_models import PduModel, NetworkModel, Rou
 from nfvcl_core_models.performance import BlueprintPerformance
 from nfvcl_core_models.plugin_k8s_model import K8sPluginsToInstall, K8sMonitoringConfig
 from nfvcl_core_models.response_model import OssCompliantResponse
-from nfvcl_core_models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskStatusType
+from nfvcl_core_models.task import NFVCLTaskResult, NFVCLTask, NFVCLTaskStatus, NFVCLTaskDeleteResult
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota, ProvidedBy
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.user import UserNoConfidence, UserCreateREST
@@ -59,7 +59,9 @@ class NFVCL:
     PERFORMANCE_SECTION = NFVCLPublicSectionModel(name="Performances", description="Operations related to the performance metrics", path="/performance/blue")
     K8S_SECTION = NFVCLPublicSectionModel(name="Kubernetes cluster management", description="Operations related to kubernetes clusters", path="/k8s")
     UTILS_SECTION = NFVCLPublicSectionModel(name="Utils", description="Utils", path="/v2/utils")
+    TASK_SECTION = NFVCLPublicSectionModel(name="Tasks", description="Operations related to tasks", path="/v1/tasks")
     USER_SECTION = NFVCLPublicSectionModel(name="Users", description="User management", path="/v2/users")
+    VISUALIZATION_SECTION = NFVCLPublicSectionModel(name="Visualization", description="Visualization of resources and relationships", path="/nfvcl/v1/api/visualization")
 
     def __init__(
         self,
@@ -72,7 +74,8 @@ class NFVCL:
         pdu_manager: PDUManager = Provide[NFVCLContainer.pdu_manager],
         kubernetes_manager: KubernetesManager = Provide[NFVCLContainer.kubernetes_manager],
         user_manager: UserManager = Provide[NFVCLContainer.user_manager],
-        monitoring_manager: Optional[MonitoringManager] = None
+        monitoring_manager: Optional[MonitoringManager] = None,
+        visualization_manager: VisualizationManager = Provide[NFVCLContainer.visualization_manager],
     ):
         self.logger = create_logger(self.__class__.__name__)
 
@@ -88,6 +91,7 @@ class NFVCL:
         self.event_manager = event_manager
         self.user_manager = user_manager
         self.monitoring_manager = monitoring_manager
+        self.visualization_manager = visualization_manager
 
         urllib3.disable_warnings()
 
@@ -185,7 +189,16 @@ class NFVCL:
     def get_module_routes(self, prefix) -> List[BlueprintDay2Route]:
         return blueprint_type.get_module_routes(prefix)
 
-    @NFVCLPublic(path="/get_task_status", section=UTILS_SECTION, method=HttpRequestType.GET, sync=True)
+    @NFVCLPublic(path="", section=TASK_SECTION, method=HttpRequestType.GET, sync=True)
+    def get_queued_running_tasks(self) -> List[NFVCLTaskStatus]:
+        """
+        Get the list of queued and running tasks.
+
+        Returns: List of NFVCLTaskStatus with "queued" or "running" status.
+        """
+        return self.task_manager.list_queued_running_tasks()
+
+    @NFVCLPublic(path="/{task_id}", section=TASK_SECTION, method=HttpRequestType.GET, sync=True)
     def get_task_status(self, task_id: str) -> NFVCLTaskStatus:
         """
         Get the status of a task given its task_id
@@ -195,16 +208,29 @@ class NFVCL:
         Args:
             task_id: ID of the task to get the status of
 
-        Returns: NFVCLTaskStatus, the "status" field can be "running" or "done"
+        Returns: NFVCLTaskStatus, the "status" field can be "queued", "running" or "done"
         """
-        if task_id not in self.task_manager.task_history:
+        task_status = self.task_manager.get_task_status(task_id)
+        if task_status is None:
             raise NFVCLCoreException(message="Task not found", http_equivalent_code=404)
-        else:
-            task = self.task_manager.task_history[task_id]
-            if task.result is None:
-                return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.RUNNING)
-            else:
-                return NFVCLTaskStatus(task_id=task_id, status=NFVCLTaskStatusType.DONE, result=task.result.result, error=task.result.error, exception=str(task.result.exception) if task.result.exception else None)
+        return task_status
+
+    @NFVCLPublic(path="/{task_id}", section=TASK_SECTION, method=HttpRequestType.DELETE, sync=True)
+    def delete_queued_task(self, task_id: str) -> NFVCLTaskDeleteResult:
+        """
+        Delete a task that has been queued but not started yet.
+
+        Args:
+            task_id: ID of the task to delete
+
+        Returns: NFVCLTaskDeleteResult for the deleted task
+        """
+        delete_result = self.task_manager.delete_queued_task(task_id)
+        if delete_result is None:
+            raise NFVCLCoreException(message="Task not found", http_equivalent_code=404)
+        if not delete_result:
+            raise NFVCLCoreException(message="Task already started and cannot be deleted", http_equivalent_code=409)
+        return NFVCLTaskDeleteResult(task_id=task_id)
 
     ############# Topology #############
 

@@ -57,13 +57,26 @@ class VimClientPool:
             raise ValueError(f"VIM {vim_name} has type {vim.vim_type}, expected {expected_type}")
         return vim
 
+    def _vim_fingerprint(self, vim: VimModel) -> dict:
+        # Maybe there is a better way?
+        return vim.model_dump(mode="json")
+
     def _get_client_for_vim(self, vim: VimModel) -> VimClient:
         with self._lock:
-            if vim.name not in self.clients:
+            client = self.clients.get(vim.name)
+            # This is used to update the VIM Model of an already initialized client
+            if client is not None and self._vim_fingerprint(client.vim) != self._vim_fingerprint(vim):
+                self.logger.info(f"Refreshing client for updated VIM {vim.name}")
+                client.close()
+                self.clients.pop(vim.name, None)
+                client = None
+
+            if client is None:
                 client_class = get_vim_client_class(vim.vim_type)
                 self.logger.verbose(f"Creating new client for VIM {vim.name}")
-                self.clients[vim.name] = client_class(vim)
-            return self.clients[vim.name]
+                client = client_class(vim)
+                self.clients[vim.name] = client
+            return client
 
     def get_client(self, area: int, expected_type: VimTypeEnum) -> VimClient:
         return self._get_client_for_vim(self.get_vim(area, expected_type))

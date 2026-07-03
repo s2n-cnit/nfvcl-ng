@@ -12,6 +12,7 @@ class NFVCLTask:
         self.task_id = str(uuid.uuid4())
         self.callable_function = callable_function
         self.args = args
+        self.on_cancel = kwargs.pop("_on_cancel", None)
         self.kwargs = kwargs
         self.callback_function = callback_function
 

@@ -17,7 +17,7 @@ from verboselogs import VerboseLogger
 from nfvcl_common.utils.log import mod_logger, create_logger, set_log_level  # Order 1
 from nfvcl_common.utils.nfvcl_public_utils import NFVCLPublicModel
 from nfvcl_core_models.custom_types import NFVCLCoreException
-from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.response_model import AsyncTaskResponse, AsyncTaskStatus
 from nfvcl_core_models.task import NFVCLTaskResult
 from nfvcl_providers_rest.config import NFVCLProvidersConfigModel, load_nfvcl_providers_config
 
@@ -100,9 +100,9 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
             response.status_code = status.HTTP_202_ACCEPTED
             # We need to set a dummy callback function for the function to be executed async
             function_return = function(**kwargs, callback=dummy_callback)
-            if isinstance(function_return, OssCompliantResponse):
-                function_return: OssCompliantResponse
-                if function_return.status == OssStatus.failed:
+            if isinstance(function_return, AsyncTaskResponse):
+                function_return: AsyncTaskResponse
+                if function_return.status == AsyncTaskStatus.failed:
                     response.status_code = status.HTTP_400_BAD_REQUEST
             return function_return
 
@@ -166,7 +166,7 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
         return_type = inspect.signature(function).return_annotation
         # If the return type is not specified we set it to OssCompliantResponse
         if return_type == inspect.Signature.empty:
-            return_type = OssCompliantResponse
+            return_type = AsyncTaskResponse
 
     # Set the new function signature
     new_fn.__signature__ = inspect.Signature(params, return_annotation=return_type)

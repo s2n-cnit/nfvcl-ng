@@ -1,4 +1,3 @@
-import inspect
 import threading
 from functools import partial
 from typing import Callable, Optional, Dict, Annotated, List
@@ -11,9 +10,8 @@ from nfvcl_common.utils.log import create_logger
 from nfvcl_common.utils.nfvcl_public_utils import NFVCLPublicSectionModel, NFVCLPublic
 from nfvcl_core.managers.task_manager import TaskManager
 from nfvcl_core_models.custom_types import NFVCLCoreException
-from nfvcl_core_models.pre_work import PreWorkCallbackResponse
 from nfvcl_core_models.resources import VmResource, NetResource
-from nfvcl_core_models.response_model import OssCompliantResponse
+from nfvcl_core_models.response_model import AsyncTaskResponse, AsyncTaskStatus
 from nfvcl_core_models.task import NFVCLTask, NFVCLTaskResult, NFVCLTaskStatus
 from nfvcl_core_models.vim.vim_models import VimModel
 from nfvcl_providers_rest.config import NFVCLProvidersConfigModel
@@ -28,10 +26,6 @@ def callback_function(event: threading.Event, namespace: Dict, msg: NFVCLTaskRes
     namespace["msg"] = msg
     event.set()
 
-
-def pre_work_callback_function(event: threading.Event, namespace: Dict, msg: PreWorkCallbackResponse):
-    namespace["msg"] = msg
-    event.set()
 
 class NFVCLProviders:
     RG_SECTION = NFVCLPublicSectionModel(name="Resource Groups", description="Operations related to the resource groups", path="/v1/rg")
@@ -79,31 +73,10 @@ class NFVCLProviders:
             raise task_result.exception
         return namespace["msg"]
 
-    def _add_task_async(self, function: Callable, *args, **kwargs) -> OssCompliantResponse:
+    def _add_task_async(self, function: Callable, *args, **kwargs) -> AsyncTaskResponse:
         callback: Optional[Callable] = kwargs.pop("callback", None)
-        # check if the callable function has a pre_work_callback parameter
-        function_args = inspect.getfullargspec(function).args
-        event: Optional[threading.Event] = None
-        namespace = {}
-
-        if "pre_work_callback" in function_args:
-            event = threading.Event()
-            kwargs["pre_work_callback"] = partial(pre_work_callback_function, event, namespace)
-
         task_id = self.task_manager.add_task(NFVCLTask(function, callback, *args, **kwargs))
-
-        async_response: OssCompliantResponse
-
-        if "pre_work_callback" in function_args and event:
-            event.wait()
-            pre_work_callback_response: PreWorkCallbackResponse = namespace["msg"]
-            async_response = pre_work_callback_response.async_return
-        else:
-            async_response = OssCompliantResponse(detail="Operation submitted")
-
-        async_response.task_id = task_id
-
-        return async_response
+        return AsyncTaskResponse(status=AsyncTaskStatus.processing, detail="Operation queued", task_id=task_id)
 
     def add_task(self, function, *args, **kwargs):
         callback: Optional[Callable] = kwargs.pop("callback", None)

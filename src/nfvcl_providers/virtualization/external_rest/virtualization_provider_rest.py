@@ -15,7 +15,7 @@ from nfvcl_core_models.resources import (
     NetResource,
     VmStatus, VmResourceAnsibleConfiguration,
 )
-from nfvcl_core_models.response_model import OssCompliantResponse
+from nfvcl_core_models.response_model import AsyncTaskResponse
 from nfvcl_core_models.task import NFVCLTaskStatus, NFVCLTaskStatusType
 from nfvcl_core_models.vim.vim_models import VimModel, VimTypeEnum
 from nfvcl_providers.vim_clients.rest_vim_client import RESTVimClient
@@ -117,7 +117,7 @@ class VirtualizationProviderRest(VirtualizationProviderInterface):
         }, params=query_params)
         self.logger.spam(f"Response received: {response.json()}, status code: {response.status_code}")
         response.raise_for_status()
-        nfvcl_compliant_response = OssCompliantResponse.model_validate(response.json())
+        nfvcl_compliant_response = AsyncTaskResponse.model_validate(response.json())
         elapsed_time = 0
         while True:
             self.logger.spam(f"Waiting for task completion, elapsed time: {elapsed_time}/{self.task_poll_timeout} seconds")

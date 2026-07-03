@@ -18,7 +18,7 @@ from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.k8s_management_models import Labels
 from nfvcl_core_models.plugin_k8s_model import K8sPluginName, K8sPluginsToInstall, K8sLoadBalancerPoolArea, \
     K8sPluginAdditionalData, K8sMonitoringConfig
-from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.response_model import AsyncTaskResponse, AsyncTaskStatus
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel, K8sQuota
 
 
@@ -320,7 +320,7 @@ class KubernetesManager(GenericManager):
 
         return pod_list.to_dict()
 
-    def create_k8s_namespace(self, cluster_id: str, name: str, labels: dict) -> OssCompliantResponse:
+    def create_k8s_namespace(self, cluster_id: str, name: str, labels: dict) -> AsyncTaskResponse:
         """
         Create a namespace on the target k8s cluster.
 
@@ -350,9 +350,9 @@ class KubernetesManager(GenericManager):
             self.logger.error(val_err, exc_info=val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
-        return OssCompliantResponse(status=OssStatus.ready, detail="Namespace created", result=created_namespace.to_dict())
+        return AsyncTaskResponse(status=AsyncTaskStatus.ready, detail="Namespace created", result=created_namespace.to_dict())
 
-    def delete_k8s_namespace(self, cluster_id: str, name: str = "") -> OssCompliantResponse:
+    def delete_k8s_namespace(self, cluster_id: str, name: str = "") -> AsyncTaskResponse:
         """
         Delete a namespace in the target k8s cluster.
 
@@ -372,7 +372,7 @@ class KubernetesManager(GenericManager):
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
-        resp = OssCompliantResponse(status=OssStatus.ready, detail="Namespace deleted", result=deleted_namespace.to_dict())
+        resp = AsyncTaskResponse(status=AsyncTaskStatus.ready, detail="Namespace deleted", result=deleted_namespace.to_dict())
         return resp
 
     def get_k8s_service_account(self, cluster_id: str, username: str = "", namespace: str = "") -> dict:
@@ -403,7 +403,7 @@ class KubernetesManager(GenericManager):
 
         return user_accounts.to_dict()
 
-    def get_k8s_roles(self, cluster_id: str, rolename: str = "", namespace: str = "") -> V1RoleList:
+    def get_k8s_roles(self, cluster_id: str, rolename: str | None = "", namespace: str | None = "") -> V1RoleList:
         """
         Returns a list of roles
 
@@ -433,7 +433,7 @@ class KubernetesManager(GenericManager):
 
         return role_list
 
-    def get_k8s_namespace_list(self, cluster_id: str, namespace: str = "") -> dict:
+    def get_k8s_namespace_list(self, cluster_id: str, namespace: str | None = "") -> dict:
         """
         Returns a list of namespaces
 
@@ -677,7 +677,7 @@ class KubernetesManager(GenericManager):
 
         return auth_response
 
-    def apply_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota) -> OssCompliantResponse:
+    def apply_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota) -> AsyncTaskResponse:
         """
         Add a quota reservation (for resources) to the namespace.
         Args:
@@ -698,13 +698,13 @@ class KubernetesManager(GenericManager):
                 namespace_name=namespace, quota_name=quota_name, quota=quota)
         except (ValueError, ApiException) as val_err:
             self.logger.error(val_err)
-            resp = OssCompliantResponse(status=OssStatus.failed, detail=str(val_err), result={})
+            resp = AsyncTaskResponse(status=AsyncTaskStatus.failed, detail=str(val_err), result={})
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
-        resp = OssCompliantResponse(status=OssStatus.ready, detail="Quota created", result=quota_resp.to_dict())
+        resp = AsyncTaskResponse(status=AsyncTaskStatus.ready, detail="Quota created", result=quota_resp.to_dict())
         return resp
 
-    def list_resource_quotas_namespace(self, cluster_id: str, namespace: str) -> OssCompliantResponse:
+    def list_resource_quotas_namespace(self, cluster_id: str, namespace: str) -> AsyncTaskResponse:
         """
         List all resource quotas in a namespace.
         Args:
@@ -722,10 +722,10 @@ class KubernetesManager(GenericManager):
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
-        resp = OssCompliantResponse(status=OssStatus.ready, detail="Quota list retrieved", result=quota_list.to_dict())
+        resp = AsyncTaskResponse(status=AsyncTaskStatus.ready, detail="Quota list retrieved", result=quota_list.to_dict())
         return resp
 
-    def delete_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str) -> OssCompliantResponse:
+    def delete_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str) -> AsyncTaskResponse:
         """
         Delete a resource quota from a namespace.
         Args:
@@ -745,10 +745,10 @@ class KubernetesManager(GenericManager):
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
-        resp = OssCompliantResponse(status=OssStatus.ready, detail=f"Quota '{quota_name}' deleted", result={})
+        resp = AsyncTaskResponse(status=AsyncTaskStatus.ready, detail=f"Quota '{quota_name}' deleted", result={})
         return resp
 
-    def update_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota) -> OssCompliantResponse:
+    def update_resource_quota_namespace(self, cluster_id: str, namespace: str, quota_name: str, quota: K8sQuota) -> AsyncTaskResponse:
         """
         Update (replace) a resource quota in a namespace.
         Args:
@@ -771,7 +771,7 @@ class KubernetesManager(GenericManager):
             self.logger.error(val_err)
             raise NFVCLCoreException(message=str(val_err), http_equivalent_code=500)
 
-        resp = OssCompliantResponse(status=OssStatus.ready, detail=f"Quota '{quota_name}' updated", result=updated_quota.to_dict())
+        resp = AsyncTaskResponse(status=AsyncTaskStatus.ready, detail=f"Quota '{quota_name}' updated", result=updated_quota.to_dict())
         return resp
 
     def get_nodes(self, cluster_id: str, detailed: bool = False):

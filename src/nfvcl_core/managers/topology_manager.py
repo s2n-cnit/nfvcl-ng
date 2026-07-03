@@ -12,7 +12,7 @@ from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface, IPv4ReservedRangeRequest
 from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
 from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
-from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus
+from nfvcl_core_models.response_model import AsyncTaskResponse, AsyncTaskStatus
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.vim.vim_models import VimModel
@@ -318,12 +318,8 @@ class TopologyManager(GenericManager):
         self.save_to_db()
         return k8s
 
-    def update_kubernetes(self, cluster: TopologyK8sModel, pre_work_callback: Optional[Callable[[PreWorkCallbackResponse], None]] = None) -> TopologyK8sModel:
-        try:
-            self.get_k8s_cluster_by_id(cluster.name)
-        except ValueError:
-            run_pre_work_callback(pre_work_callback, async_return=OssCompliantResponse(status=OssStatus.failed, detail="K8s cluster to update has not been found."))
-
+    def update_kubernetes(self, cluster: TopologyK8sModel) -> TopologyK8sModel:
+        self.get_k8s_cluster_by_id(cluster.name)
         self._topology.upd_k8s_cluster(cluster)
         self.save_to_db()
         return cluster

@@ -158,6 +158,8 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
 
         self.provider.configure_vm(self.state.upf_vm_configurator)
 
+        self.update_upf_info()
+
     def update_upf_info(self):
         vm_upf = next(iter(self.state.vm_resources.values()))
 

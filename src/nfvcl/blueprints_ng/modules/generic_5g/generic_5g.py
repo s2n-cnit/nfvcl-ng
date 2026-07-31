@@ -73,6 +73,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
     default_upf_implementation: Optional[str] = None
     REQUIRE_UPF_NRF_REGISTRATION = False
     NECESSARY_CORE_LB_IPS = 1
+    START_UPFS_BEFORE_CORE = True
 
     def __init__(self, blueprint_id: str, state_type: type[Generic5GBlueprintNGState] = StateTypeVar5G):
         super().__init__(blueprint_id, state_type)
@@ -90,7 +91,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
         # Prepare the network for the 5G core
         self.prepare_network()
         # Update the edge areas creating the router (if needed) and the UPFs
-        self.update_edge_areas()
+        self.update_edge_areas(start_upfs=self.START_UPFS_BEFORE_CORE)
         # Deploy the 5G core itself
         self.create_5g(create_model)
         # Wait for the core to be ready
@@ -223,7 +224,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
     ####                  START EDGE SECTION                    ####
     ################################################################
 
-    def update_edge_areas(self, force: bool = False):
+    def update_edge_areas(self, force: bool = False, start_upfs: bool = True):
         """
         Deploy new edge areas
         Delete edge areas not needed anymore
@@ -235,14 +236,18 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                 self.state.edge_areas[str(area.id)] = EdgeAreaInfo(area=area.id)
 
                 # UPF deployment for this area
-                upf_info = self.deploy_upf_blueprint(area.id, area.upf.type if area.upf.type else self.default_upf_implementation)
+                upf_info = self.deploy_upf_blueprint(
+                    area.id,
+                    area.upf.type if area.upf.type else self.default_upf_implementation,
+                    start_upfs,
+                )
                 self.state.edge_areas[str(area.id)].upf = upf_info
             else:
                 # The edge area is already deployed but MAY need to be updated with a new configuration
                 edge_info = self.state.edge_areas[str(area.id)]
 
                 # Updating UPF configuration (move to a new method in the future?)
-                updated_config = self._create_upf_config(area.id)
+                updated_config = self._create_upf_config(area.id, start_upfs)
                 if force or edge_info.upf.current_config != updated_config:
                     self.logger.info(f"Updating UPF for area {area.id}")
                     self.provider.call_blueprint_function(edge_info.upf.blue_id, "update", updated_config)
@@ -259,7 +264,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             # Delete edge area from state
             del self.state.edge_areas[edge_area_id]
 
-    def _create_upf_config(self, area_id: int) -> UPFBlueCreateModel:
+    def _create_upf_config(self, area_id: int, start_upf: bool = True) -> UPFBlueCreateModel:
         """
         Create the UPF configuration for a specific area and dnn
         Args:
@@ -281,14 +286,14 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
                 gnb=self.state.current_config.get_area(area_id).networks.gnb
             ),
             slices=slices,
-            start=True,
+            start=start_upf,
             nrf_ip=SerializableIPv4Address(self.get_nrf_ip()) if self.state.core_deployed and self.REQUIRE_UPF_NRF_REGISTRATION else None,
             smf_ip=SerializableIPv4Address(self.get_smf_ip()) if self.state.core_deployed else None,
             external_router=self.state.current_config.get_area(area_id).networks.external_router
         )
         return upf_create_model
 
-    def deploy_upf_blueprint(self, area_id: int, upf_type: str) -> UPFInfo:
+    def deploy_upf_blueprint(self, area_id: int, upf_type: str, start_upf: bool = True) -> UPFInfo:
         """
         Deploy a UPF in the given area
         Args:
@@ -296,7 +301,7 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
             upf_type: Type of the UPF blueprint to deploy
         """
         self.logger.info(f"Deploying UPF for area {area_id}")
-        upf_create_model = self._create_upf_config(area_id)
+        upf_create_model = self._create_upf_config(area_id, start_upf)
         upf_id = self.provider.create_blueprint(upf_type, upf_create_model)
         self.register_children(upf_id)
 
@@ -677,8 +682,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def add_slice(self, add_slice_model: SubSliceProfiles, oss: bool):
         self.update_edge_areas()
-        self.update_gnb_configs()
         self.update_core()
+        self.update_gnb_configs()
 
     @day2_function("/add_slice_oss", [HttpRequestType.PUT])
     def day2_add_slice_oss(self, add_slice_model: SubSliceProfiles):
@@ -723,8 +728,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
         self.update_edge_areas()
-        self.update_gnb_configs()
         self.update_core()
+        self.update_gnb_configs()
 
     @day2_function("/del_slice", [HttpRequestType.PUT])
     def day2_del_slice(self, del_slice_model: Core5GDelSliceModel):
@@ -761,8 +766,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def add_tac(self, add_area_model: Core5GAddTacModel):
         self.update_edge_areas()
-        self.update_gnb_configs()
         self.update_core()
+        self.update_gnb_configs()
 
     @day2_function("/add_tac", [HttpRequestType.PUT])
     def day2_add_tac(self, add_area_model: Core5GAddTacModel):
@@ -791,8 +796,8 @@ class Generic5GBlueprintNG(BlueprintNG[Generic5GBlueprintNGState, Create5gModel]
 
     def del_tac(self, del_area_model: Core5GDelTacModel):
         self.update_edge_areas()
-        self.update_gnb_configs()
         self.update_core()
+        self.update_gnb_configs()
 
     @day2_function("/del_tac", [HttpRequestType.PUT])
     def day2_del_tac(self, del_area_model: Core5GDelTacModel):

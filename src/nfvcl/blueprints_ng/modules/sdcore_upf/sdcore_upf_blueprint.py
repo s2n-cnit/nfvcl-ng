@@ -124,6 +124,11 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
             else:
                 ansible_builder.add_service_task("bess-datapath", ServiceState.STOPPED, False)
                 ansible_builder.add_service_task("sdcore-upf", ServiceState.RESTARTED, True)
+        else:
+            # A staged UPF must not try to connect before SD-Core has loaded
+            # the corresponding DNN and slice configuration.
+            ansible_builder.add_service_task("sdcore-upf", ServiceState.STOPPED, False)
+            ansible_builder.add_service_task("bess-datapath", ServiceState.STOPPED, False)
 
         return ansible_builder.build()
 

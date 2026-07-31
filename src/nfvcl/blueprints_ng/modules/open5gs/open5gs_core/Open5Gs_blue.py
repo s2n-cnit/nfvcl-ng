@@ -1,3 +1,5 @@
+import time
+
 import copy
 from typing import Optional, Dict, Tuple
 
@@ -134,7 +136,6 @@ class Open5Gs(Generic5GK8sBlueprintNG[Open5GsBlueprintNGState, Open5GsBlueCreate
             upf_list = self.state.edge_areas[str(sub_area.id)].upf.upf_list
             if not upf_list:
                 continue
-            deployed_upf_info = upf_list[0]
             slices = self.state.current_config.get_slices_profiles_for_area(sub_area.id)
 
             # SMF
@@ -169,7 +170,9 @@ class Open5Gs(Generic5GK8sBlueprintNG[Open5GsBlueprintNGState, Open5GsBlueCreate
                 )
                 for dnn in sub_slice.dnnList:
                     data_dnn = self.state.current_config.get_dnn(dnn)
-
+                    for upf in upf_list:
+                        if dnn in upf.served_dnns():
+                            deployed_upf_info = upf
                     # SMF
                     self.state.open5gs_config.smf.add_upf_addresses(deployed_upf_info.network_info.n4_ip.exploded, dnn)
                     self.state.open5gs_config.smf.add_subnet_item(data_dnn.pools[0].cidr, dnn)
@@ -180,6 +183,9 @@ class Open5Gs(Generic5GK8sBlueprintNG[Open5GsBlueprintNGState, Open5GsBlueCreate
             self.state.core_helm_chart,
             self.state.open5gs_config.model_dump(exclude_none=True, by_alias=True)
         )
+        # Here we wait for the core to be actually read to prevent ng-setup failure
+        # TODO Find a better way
+        time.sleep(15)
 
     def wait_core_ready(self):
         pass

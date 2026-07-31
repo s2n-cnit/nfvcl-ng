@@ -365,6 +365,8 @@ class HelmChartResource(ResourceDeployable):
 
 
 class PDUResourceAnsibleConfiguration(ResourceConfiguration):
+    resource_group: str = "NONE"
+
     @abc.abstractmethod
     def dump_playbook(self) -> str:
         pass

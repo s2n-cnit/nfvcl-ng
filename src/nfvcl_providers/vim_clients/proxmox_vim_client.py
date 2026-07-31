@@ -1,3 +1,4 @@
+import hashlib
 import re
 import time
 from pathlib import Path
@@ -21,6 +22,11 @@ from nfvcl_providers.virtualization.proxmox.models.models import ProxmoxZone, Su
 DEFAULT_PROXMOX_API_TIMEOUT = 10
 DEFAULT_PROXMOX_VMSTART_TIMEOUT = 180
 IMPORT_URL_VERSION = semantic_version.Version("9.0.17")
+
+
+def proxmox_sdn_vnet_identifier(vnet_name: str) -> str:
+    return f"N{hashlib.sha1(vnet_name.encode('utf-8')).hexdigest()[:7]}"
+
 
 class ProxmoxVimClient(VimClient):
     def __init__(self, vim: VimModel):
@@ -491,8 +497,10 @@ class ProxmoxVimClient(VimClient):
         self.apply_sdn()
         self.logger.success(f"Subnet {subnet.id} deleted")
 
-    def check_networks(self, networks_to_check: set[str]):
-        networks = set()
+    def check_networks(self, networks_to_check: set[str]) -> tuple[bool, set[str]]:
+        node_networks = set()
+        sdn_vnet_ids = set()
+        sdn_vnet_aliases = set()
         network_tmp = self.execute_proxmox_request(
             url=f'nodes/{self.get_node_name()}/network',
             r_type=HttpRequestType.GET,
@@ -501,7 +509,7 @@ class ProxmoxVimClient(VimClient):
         networks_tmp = ta.validate_python(network_tmp)
         for net in networks_tmp:
             if net.address:
-                networks.add(net.iface)
+                node_networks.add(net.iface)
 
         vnet_tmp = self.execute_proxmox_request(
             url='/cluster/sdn/vnets',
@@ -512,9 +520,17 @@ class ProxmoxVimClient(VimClient):
 
         for vnet in vnets:
             if vnet.zone == self.vim.proxmox_parameters().proxmox_sdn_zone:
-                networks.add(vnet.vnet)
+                sdn_vnet_ids.add(vnet.vnet)
+                sdn_vnet_aliases.add(vnet.alias)
 
-        return networks_to_check.issubset(networks), networks_to_check.difference(networks)
+        missing_networks = {
+            net
+            for net in networks_to_check
+            if net not in node_networks
+            and net not in sdn_vnet_aliases
+            and proxmox_sdn_vnet_identifier(net) not in sdn_vnet_ids
+        }
+        return len(missing_networks) == 0, missing_networks
 
     def _is_connected(self):
         """Check if SSH client is still connected"""

@@ -10,7 +10,7 @@ from nfvcl_common.utils.blue_utils import rel_path
 from nfvcl_core_models.providers.providers import ProviderData
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource, VmStatus, VmPowerStatus
 from nfvcl_core_models.vim.vim_models import VimTypeEnum
-from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient, IMPORT_URL_VERSION
+from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient, IMPORT_URL_VERSION, proxmox_sdn_vnet_identifier
 from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, NetplanInterface
 from nfvcl_providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
 from nfvcl_providers.virtualization.proxmox.models.models import ProxmoxNetsDevice, ProxmoxMac
@@ -397,7 +397,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
     def __create_sdn_vnet(self, client: ProxmoxVimClient, vnet: NetResource):
         rg_data = self._get_resource_group_data(client, vnet.resource_group)
-        identifier = f'N{vnet.name.split("_")[1]}'
+        identifier = proxmox_sdn_vnet_identifier(vnet.name)
         self.logger.info(f"Creating Vnet {vnet.name}")
         client.create_sdn_vnet(identifier, vnet.name)
         rg_data.proxmox_vnet[vnet.name] = identifier

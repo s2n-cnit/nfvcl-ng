@@ -11,8 +11,6 @@ from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel,
 from nfvcl_core_models.network.ipam_models import SerializableIPv4Address
 from nfvcl_core_models.network.network_models import IPv4ReservedRange, PoolAssignation, IPv4Pool, MultusInterface, IPv4ReservedRangeRequest
 from nfvcl_core_models.network.network_models import NetworkModel, RouterModel, PduModel
-from nfvcl_core_models.pre_work import PreWorkCallbackResponse, run_pre_work_callback
-from nfvcl_core_models.response_model import AsyncTaskResponse, AsyncTaskStatus
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
 from nfvcl_core_models.topology_models import TopologyModel
 from nfvcl_core_models.vim.vim_models import VimModel

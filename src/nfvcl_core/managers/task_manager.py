@@ -3,7 +3,6 @@ from threading import Lock, Thread
 from typing import Dict, List, Optional
 
 from nfvcl_core.managers.generic_manager import GenericManager
-from nfvcl_core_models.pre_work import PreWorkCallbackResponse
 from nfvcl_core_models.response_model import AsyncTaskResponse, AsyncTaskStatus
 from nfvcl_core_models.task import NFVCLTask, NFVCLTaskResult, NFVCLTaskStatus, NFVCLTaskStatusType
 
@@ -58,7 +57,6 @@ class TaskManager(GenericManager):
 
     def delete_queued_task(self, task_id: str) -> Optional[bool]:
         on_cancel = None
-        pre_work_callback = None
         with self._task_lock:
             task_history_element = self.task_history.get(task_id)
             if task_history_element is None:
@@ -68,12 +66,9 @@ class TaskManager(GenericManager):
             if not self._remove_task_from_queue(task_id):
                 return False
             on_cancel = task_history_element.task.on_cancel
-            pre_work_callback = task_history_element.task.kwargs.get("pre_work_callback")
             del self.task_history[task_id]
         if on_cancel:
             on_cancel()
-        if pre_work_callback:
-            pre_work_callback(PreWorkCallbackResponse(async_return=AsyncTaskResponse(status=AsyncTaskStatus.failed, detail=f"Task {task_id} deleted before it started")))
         return True
 
     @staticmethod

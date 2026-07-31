@@ -1,3 +1,4 @@
+import time
 from typing import List, Dict, Set, Tuple, Optional, cast
 
 from openstack.compute.v2.server import Server
@@ -68,6 +69,8 @@ class VmInfoGathererConfigurator(VmResourceAnsibleConfiguration):
 class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
     provider_vim_type = VimTypeEnum.OPENSTACK
     data: VirtualizationProviderDataOpenstack
+    _ATTACHED_NETWORKS_WAIT_TIMEOUT = 60
+    _ATTACHED_NETWORKS_WAIT_INTERVAL = 2
 
     def init(self):
         self.data: VirtualizationProviderDataOpenstack = VirtualizationProviderDataOpenstack()
@@ -231,10 +234,31 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         # Run an Ansible playbook to gather information
         self.__gather_info_from_vm(vm_resource)
 
+    def __wait_for_server_networks(self, vim_client: OpenStackVimClient, server_id: str, network_names: List[str]) -> Server:
+        deadline = time.monotonic() + min(vim_client.request_timeout, self._ATTACHED_NETWORKS_WAIT_TIMEOUT)
+        missing_networks = set(network_names)
+
+        while time.monotonic() <= deadline:
+            server_obj: Server = vim_client.client.get_server(server_id)
+            if server_obj is None:
+                raise VirtualizationProviderOpenstackException(f"VM with id {server_id} not found on VIM")
+
+            missing_networks = {net for net in network_names if not server_obj.addresses.get(net)}
+            if not missing_networks:
+                return server_obj
+
+            time.sleep(self._ATTACHED_NETWORKS_WAIT_INTERVAL)
+
+        raise VirtualizationProviderOpenstackException(
+            f"Attached networks {sorted(missing_networks)} did not appear on VM with id {server_id}"
+        )
+
     def attach_nets(self, vm_resource: VmResource, nets_name: List[str]) -> List[str]:
         vim_client = self._get_client(vm_resource.area)
         rg_data = self._get_resource_group_data(vim_client, vm_resource.resource_group)
         server_obj: Server = vim_client.client.get_server(rg_data.os_dict[vm_resource.id])
+        if server_obj is None:
+            raise VirtualizationProviderOpenstackException(f"VM {vm_resource.name} not found on VIM")
 
         new_interfaces: List[ServerInterface] = []
 
@@ -254,6 +278,8 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         for net in to_attach:
             # Get the OS SDK network object
             network = vim_client.get_network(net)
+            if network is None:
+                raise VirtualizationProviderOpenstackException(f"Network {net} not found on VIM")
             # Connect the network to the instance
             new_server_interface: ServerInterface = vim_client.client.compute.create_server_interface(rg_data.os_dict[vm_resource.id], net_id=network.id)
             self.logger.debug(f"OS network '{net}' attached to VM {vm_resource.name}")
@@ -261,12 +287,17 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
             vm_resource.additional_networks.append(net)
             new_interfaces.append(new_server_interface)
 
+        server_obj = self.__wait_for_server_networks(vim_client, rg_data.os_dict[vm_resource.id], to_attach)
         self.__update_net_info_vm(vim_client, vm_resource, server_obj)
         vim_client.disable_port_security_all_ports(vm_resource, server_obj)
 
         nics: List[NetplanInterface] = []
         for net in new_interfaces:
             net_intf = vm_resource.get_network_interface_by_fixed_mac(net.mac_addr)
+            if net_intf is None:
+                raise VirtualizationProviderOpenstackException(
+                    f"Attached interface with MAC {net.mac_addr} not found on VM {vm_resource.name}"
+                )
             nics.append(NetplanInterface(nic_name=net_intf.fixed.interface_name, mac_address=net.mac_addr))
             ips.append(net_intf.fixed.ip)
 

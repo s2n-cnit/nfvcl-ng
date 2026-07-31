@@ -45,9 +45,6 @@ class PacketRusherBlueprintRequestInstance(BlueprintNGCreateModel):
     config: PacketRusherConfig
     areas: List[PacketRusherArea] = Field(..., description='List of areas to instantiate the Blueprint', min_length=1)
 
-    class Config:
-        use_enum_values = True
-
 
 class PacketRusherBlueprintRequestAddDelArea(NFVCLBaseModel):
     area_id: str = Field()

@@ -2,6 +2,7 @@ import copy
 
 import pytest
 
+from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.network.network_models import PduModel
 from nfvcl_core_models.monitoring.prometheus_model import PrometheusServerModel
 from nfvcl_core_models.topology_k8s_model import TopologyK8sModel
@@ -25,18 +26,25 @@ class TopologyTestContext:
 
 @pytest.mark.dependency(name="test_topology", depends=["TestInit"], scope="session")
 class TestGroupTopology(NFVCLTestSuite):
-    def test_delete(self, topology_context: TopologyTestContext):
-        self.nfvcl.delete_topology()
-
-    def test_get_after_delete(self, topology_context: TopologyTestContext):
-        with pytest.raises(Exception):  # noqa: B017
-            self.nfvcl.get_topology()
+    def test_delete_uninitialized_topology(self, topology_context: TopologyTestContext):
+        with pytest.raises(NFVCLCoreException, match="Topology has not been initialized yet") as exc_info:
+            self.nfvcl.delete_topology()
+        assert exc_info.value.http_equivalent_code == 404
 
     def test_create(self, topology_context: TopologyTestContext):
         self.nfvcl.create_topology(topology_context.topology_model)
 
     def test_get_after_create(self, topology_context: TopologyTestContext):
         assert self.nfvcl.get_topology() == topology_context.topology_model
+
+    def test_delete(self, topology_context: TopologyTestContext):
+        assert self.nfvcl.delete_topology() == topology_context.topology_model
+
+    def test_get_after_delete(self, topology_context: TopologyTestContext):
+        with pytest.raises(NFVCLCoreException, match="Topology has not been initialized yet") as exc_info:
+            self.nfvcl.get_topology()
+        assert exc_info.value.http_equivalent_code == 404
+        self.nfvcl.create_topology(topology_context.topology_model)
 
     # Test VIMs
 
@@ -125,7 +133,7 @@ class TestGroupTopology(NFVCLTestSuite):
 
     def test_delete_prometheus(self, topology_context: TopologyTestContext):
         # Should fail because there are configured targets
-        with pytest.raises(ValueError):
+        with pytest.raises(NFVCLCoreException):
             self.nfvcl.delete_prometheus(topology_context.prometheus_model.id)
 
         # Delete targets

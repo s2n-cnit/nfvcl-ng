@@ -7,7 +7,6 @@ from tests.blueprints.blue5g.models.ueransim import UeransimGNB
 from tests.blueprints.ueransim_utils import UeransimSSH
 from nfvcl.blueprints_ng.modules import UeransimBlueprintNG
 from nfvcl.blueprints_ng.modules.generic_5g.generic_5g import Generic5GBlueprintNG
-from nfvcl_core.nfvcl_main import NFVCL
 from nfvcl_models.blueprint_ng.core5g.common import Create5gModel
 from nfvcl_models.blueprint_ng.g5.ueransim import UeransimBlueprintRequestInstance
 from tests.topology.test_topology import TopologyTestContext
@@ -32,13 +31,13 @@ class FiveGTestContext:
 
         self.ueransim_ue_ssh: Optional[UeransimSSH] = None
         self.ueransim_gnb_ssh: Optional[UeransimSSH] = None
+        self.ueransim2_ue_ssh: Optional[UeransimSSH] = None
+        self.ueransim2_gnb_ssh: Optional[UeransimSSH] = None
 
 
 @pytest.fixture(name="context_5g", scope="session")
-def context_5g_fixture(nfvcl: NFVCL, topology_context: TopologyTestContext):
+def context_5g_fixture(topology_context: TopologyTestContext):
     context_5g = FiveGTestContext()
     yield context_5g
     # Teardown
     print("5G TEARDOWN")
-    nfvcl.delete_blueprint(context_5g.core_bp_id)
-    nfvcl.delete_blueprint(context_5g.ueransim1_bp_id)

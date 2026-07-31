@@ -3,8 +3,8 @@ from typing import Optional
 import pytest
 
 from tests.blueprints.blue5g.create_configs import K8S_CLUSTER_5G
-from nfvcl_core.nfvcl_main import NFVCL
 from nfvcl_models.blueprint_ng.k8s.k8s_rest_models import K8sCreateModel
+from tests.topology.test_topology import TopologyTestContext
 from tests.parent_test import NFVCLTestSuite
 
 pytestmark = pytest.mark.integration
@@ -15,11 +15,10 @@ class K8STestContext:
         self.k8s_blue_id: Optional[str] = None
 
 @pytest.fixture(name="context_k8s", scope="session")
-def context_k8s(nfvcl: NFVCL):
+def context_k8s(topology_context: TopologyTestContext):
     context_k8s = K8STestContext()
     yield context_k8s
     print("K8S TEARDOWN")
-    nfvcl.delete_blueprint(context_k8s.k8s_blue_id)
 
 @pytest.mark.dependency(name="test_k8s", depends=["test_topology"], scope="session")
 class TestGroupK8s(NFVCLTestSuite):

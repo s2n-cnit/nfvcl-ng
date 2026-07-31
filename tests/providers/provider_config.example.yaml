@@ -30,6 +30,26 @@ vims:
     create_network:
       name: nfvcl-provider-test-net
       cidr: 10.250.0.0/24
+    # Enable this block to run the full destructive VirtualizationProviderInterface lifecycle:
+    # create_net, create_vm, check_vm_status, configure_vm, attach_nets, reboot_vm,
+    # destroy_vm, and cleanup_resource_group.
+    # vm_lifecycle:
+    #   name: nfvcl-provider-test-vm
+    #   image:
+    #     name: ubuntu-22.04
+    #     # url: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+    #   flavor:
+    #     vcpu_count: "1"
+    #     memory_mb: "1024"
+    #     storage_gb: "10"
+    #   username: ubuntu
+    #   password: change-me
+    #   management_network: mgmt-net
+    #   require_floating_ip: false
+    #   hard_reboot: false
+    #   attach_network:
+    #     name: nfvcl-provider-test-attach-net
+    #     cidr: 10.251.0.0/24
 
   # - area: 2
   #   resource_group: provider_test

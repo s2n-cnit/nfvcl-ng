@@ -8,11 +8,15 @@ TOPOLOGY_OK = {
         {
             "name": "OSLAB",
             "vim_type": "openstack",
-            "schema_version": "1.0",
             "vim_url": unittest_config.config.vim.url,
-            "vim_tenant_name": unittest_config.config.vim.tenant, # TODO refactor after vim change
             "vim_user": unittest_config.config.vim.user,
             "vim_password": unittest_config.config.vim.password,
+            "vim_openstack_parameters": {
+                "region_name": "RegionOne",
+                "project_name": unittest_config.config.vim.tenant,
+                "user_domain_name": "Default",
+                "project_domain_name": "Default"
+            },
             "config": {
                 "insecure": True,
                 "APIversion": "v3.3",
@@ -110,11 +114,15 @@ TOPOLOGY_OK = {
 VIM_TO_ADD1 = {
     "name": "OSLAB1",
     "vim_type": "openstack",
-    "schema_version": "1.0",
     "vim_url": "http://os-lab2.maas:5000/v3",
-    "vim_tenant_name": "user", # TODO refactor after vim change
     "vim_user": "user",
     "vim_password": "pwd",
+    "vim_openstack_parameters": {
+        "region_name": "RegionOne",
+        "project_name": "user",
+        "user_domain_name": "Default",
+        "project_domain_name": "Default"
+    },
     "config": {
         "insecure": True,
         "APIversion": "v3.3",
@@ -137,11 +145,15 @@ VIM_TO_ADD1 = {
 VIM_TO_ADD2 = {
     "name": "OSLAB2",
     "vim_type": "openstack",
-    "schema_version": "1.0",
     "vim_url": "http://os-lab2.maas:5000/v3",
-    "vim_tenant_name": "user", # TODO refactor after vim change
     "vim_user": "user",
     "vim_password": "pwd",
+    "vim_openstack_parameters": {
+        "region_name": "RegionOne",
+        "project_name": "user",
+        "user_domain_name": "Default",
+        "project_domain_name": "Default"
+    },
     "config": {
         "insecure": True,
         "APIversion": "v3.3",

@@ -32,10 +32,10 @@ def pytest_collection_modifyitems(config, items):
     # read the class names from default items
     class_mapping = {item: item.cls.__name__ if item.cls is not None else "" for item in items}
 
-    # Iteratively move tests of each class to the end of the test queue
+    # Iteratively move tests of each class group to the end of the test queue.
     for class_ in CLASS_ORDER:
-        sorted_items = [it for it in sorted_items if class_mapping[it] != class_] + [
-            it for it in sorted_items if class_mapping[it] == class_
+        sorted_items = [it for it in sorted_items if not class_mapping[it].startswith(class_)] + [
+            it for it in sorted_items if class_mapping[it].startswith(class_)
         ]
 
     items[:] = sorted_items

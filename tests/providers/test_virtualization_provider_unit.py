@@ -1,6 +1,7 @@
 from nfvcl_common.utils.api_utils import HttpRequestType
-from nfvcl_core_models.resources import VmPowerStatus
+from nfvcl_core_models.resources import NetResource, VmPowerStatus
 from nfvcl_core_models.vim.vim_models import VimTypeEnum
+from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient, proxmox_sdn_vnet_identifier
 from nfvcl_providers.virtualization.openstack import virtualization_provider_openstack as openstack_module
 from nfvcl_providers.virtualization.openstack.virtualization_provider_openstack import (
     VirtualizationProviderOpenstack,
@@ -94,6 +95,90 @@ def test_openstack_provider_cleanup_deletes_tracked_resources():
     assert save.calls == 1
 
 
+def test_openstack_provider_attach_nets_refreshes_server_before_mapping_nics(monkeypatch):
+    monkeypatch.setattr(
+        openstack_module,
+        "configure_vm_ansible",
+        lambda *args, **kwargs: {"interfaces_mac": "eth0: 00:00:00:00:00:01\neth1: 00:00:00:00:00:02"},
+    )
+
+    vm = build_vm_resource()
+    vim = build_vim("os-vim", VimTypeEnum.OPENSTACK, area=vm.area)
+    stale_server = namespace(
+        id="server-id",
+        addresses={
+            "mgmt": [
+                {
+                    "OS-EXT-IPS:type": "fixed",
+                    "addr": "192.0.2.20",
+                    "OS-EXT-IPS-MAC:mac_addr": "00:00:00:00:00:01",
+                }
+            ],
+        },
+    )
+    refreshed_server = namespace(
+        id="server-id",
+        addresses={
+            "mgmt": [
+                {
+                    "OS-EXT-IPS:type": "fixed",
+                    "addr": "192.0.2.20",
+                    "OS-EXT-IPS-MAC:mac_addr": "00:00:00:00:00:01",
+                }
+            ],
+            "data": [
+                {
+                    "OS-EXT-IPS:type": "fixed",
+                    "addr": "10.0.0.20",
+                    "OS-EXT-IPS-MAC:mac_addr": "00:00:00:00:00:02",
+                }
+            ],
+        },
+    )
+    sdk = namespace(attached=False, get_server_calls=0)
+
+    def get_server(server_id: str):
+        assert server_id == "server-id"
+        sdk.get_server_calls += 1
+        return refreshed_server if sdk.attached else stale_server
+
+    def create_server_interface(server_id: str, net_id: str):
+        assert server_id == "server-id"
+        assert net_id == "data-id"
+        sdk.attached = True
+        return namespace(mac_addr="00:00:00:00:00:02")
+
+    sdk.get_server = get_server
+    sdk.compute = namespace(create_server_interface=create_server_interface)
+
+    def get_network(network_name: str):
+        return namespace(id=f"{network_name}-id", subnet_ids=[f"{network_name}-subnet"])
+
+    def get_network_details(network_names: list[str]):
+        cidrs = {"mgmt": "192.0.2.0/24", "data": "10.0.0.0/24"}
+        return {network_name: namespace(cidr=cidrs[network_name]) for network_name in network_names}
+
+    disabled_port_security_for: list[str] = []
+    client = namespace(
+        vim=vim,
+        client=sdk,
+        request_timeout=1,
+        get_network=get_network,
+        get_network_details=get_network_details,
+        disable_port_security_all_ports=lambda vm_resource, server_obj: disabled_port_security_for.append(server_obj.id),
+    )
+    provider = VirtualizationProviderOpenstack(vim_client_pool=FakeVimClientPool(client))
+    provider.data.get_vim_data(vim.name).get_resource_group_data(vm.resource_group).os_dict[vm.id] = "server-id"
+
+    ips = provider.attach_nets(vm, ["data"])
+
+    assert ips == ["10.0.0.20"]
+    assert vm.additional_networks == ["data"]
+    assert vm.network_interfaces["data"][0].fixed.interface_name == "eth1"
+    assert disabled_port_security_for == ["server-id"]
+    assert sdk.get_server_calls == 2
+
+
 class FakeProxmoxClient:
     def __init__(self, vim):
         self.vim = vim
@@ -101,6 +186,8 @@ class FakeProxmoxClient:
         self.requests: list[tuple[str, HttpRequestType]] = []
         self.deleted_vms: list[tuple[str, str]] = []
         self.rebooted_vms: list[tuple[str, bool]] = []
+        self.created_vnets: list[tuple[str, str]] = []
+        self.created_subnets: list[tuple[str, str, str, str, str]] = []
 
     def ensure_nfvcl_runtime_ready(self, script_content: str) -> None:
         self.runtime_ready_calls += 1
@@ -117,6 +204,12 @@ class FakeProxmoxClient:
 
     def delete_vm(self, vmid: str, resource_group: str) -> None:
         self.deleted_vms.append((vmid, resource_group))
+
+    def create_sdn_vnet(self, identifier: str, name: str) -> None:
+        self.created_vnets.append((identifier, name))
+
+    def create_sdn_subnet(self, vnet_id: str, cidr: str, start_dhcp: str, end_dhcp: str, gateway: str) -> None:
+        self.created_subnets.append((vnet_id, cidr, start_dhcp, end_dhcp, gateway))
 
 
 def test_proxmox_provider_maps_vm_status_and_checks_ssh(monkeypatch):
@@ -161,6 +254,69 @@ def test_proxmox_provider_destroy_vm_uses_client_delete_vm():
 
     assert client.deleted_vms == [("100", vm.resource_group)]
     assert rg_data.proxmox_dict == {}
+
+
+def test_proxmox_provider_create_net_uses_sha1_vnet_identifier():
+    vim = build_vim("pve-vim", VimTypeEnum.PROXMOX)
+    client = FakeProxmoxClient(vim)
+    save = SaveSpy()
+    provider = VirtualizationProviderProxmox(
+        vim_client_pool=FakeVimClientPool(client),
+        persistence_function=save,
+    )
+    net = NetResource(
+        resource_group="rg",
+        area=1,
+        name="nfvcl-provider-test-attach-net-with-a-long-name",
+        cidr="10.251.0.0/24",
+    )
+    expected_identifier = proxmox_sdn_vnet_identifier(net.name)
+
+    provider.create_net(net)
+
+    assert len(expected_identifier) == 8
+    assert expected_identifier[0] == "N"
+    assert client.created_vnets == [(expected_identifier, net.name)]
+    assert client.created_subnets == [(expected_identifier, net.cidr, "10.251.0.2", "10.251.0.253", "10.251.0.254")]
+    assert provider.data.get_vim_data(vim.name).get_resource_group_data(net.resource_group).proxmox_vnet[net.name] == expected_identifier
+    assert save.calls == 2
+
+
+def test_proxmox_vim_client_check_networks_matches_full_vnet_names_to_hashed_ids():
+    full_vnet_name = "nfvcl-provider-test-attach-net-with-a-long-name"
+    hashed_vnet_id = proxmox_sdn_vnet_identifier(full_vnet_name)
+    client = ProxmoxVimClient.__new__(ProxmoxVimClient)
+    client.vim = build_vim("pve-vim", VimTypeEnum.PROXMOX)
+    client.closed = False
+    client.get_node_name = lambda: "pve"
+
+    def execute_proxmox_request(url: str, r_type: HttpRequestType, **kwargs):
+        if url == "nodes/pve/network":
+            return [
+                {
+                    "iface": "vmbr0",
+                    "address": "192.0.2.10",
+                }
+            ]
+        if url == "/cluster/sdn/vnets":
+            return [
+                {
+                    "vnet": hashed_vnet_id,
+                    "alias": "different-alias",
+                    "zone": client.vim.proxmox_parameters().proxmox_sdn_zone,
+                }
+            ]
+        raise AssertionError(f"Unexpected Proxmox request: {r_type} {url}")
+
+    client.execute_proxmox_request = execute_proxmox_request
+
+    ok, missing_networks = client.check_networks({"vmbr0", full_vnet_name})
+    assert ok is True
+    assert missing_networks == set()
+
+    ok, missing_networks = client.check_networks({"vmbr0", full_vnet_name, "missing-net"})
+    assert ok is False
+    assert missing_networks == {"missing-net"}
 
 
 def test_proxmox_provider_cleanup_deletes_leftover_vms():

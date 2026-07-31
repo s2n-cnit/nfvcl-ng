@@ -140,22 +140,22 @@ UERANSIM2 = {
                             "configured_nssai": [
                                 {
                                     "sst": 1,
-                                    "sd": 1
+                                    "sd": 3
                                 }
                             ],
                             "default_nssai": [
                                 {
                                     "sst": 1,
-                                    "sd": 1
+                                    "sd": 3
                                 }
                             ],
                             "sessions": [
                                 {
                                     "type": "IPv4",
-                                    "apn": "dnn",
+                                    "apn": "dnn3",
                                     "slice": {
                                         "sst": 1,
-                                        "sd": 1
+                                        "sd": 3
                                     }
                                 }
                             ]
@@ -163,6 +163,37 @@ UERANSIM2 = {
                     ]
                 }
             ]
+        }
+    ]
+}
+
+UERANSIM_DAY2_SLICE_SIM = {
+    "imsi": "001014000000004",
+    "plmn": "00101",
+    "key": "814BCB2AEBDA557AEEF021BB21BEFE25",
+    "op": "9B5DA0D4EC1E2D091A6B47E3B91D2496",
+    "opType": "OPC",
+    "amf": "8000",
+    "configured_nssai": [
+        {
+            "sst": 1,
+            "sd": 2
+        }
+    ],
+    "default_nssai": [
+        {
+            "sst": 1,
+            "sd": 2
+        }
+    ],
+    "sessions": [
+        {
+            "type": "IPv4",
+            "apn": "dnn2",
+            "slice": {
+                "sst": 1,
+                "sd": 2
+            }
         }
     ]
 }
@@ -256,6 +287,10 @@ CORE_5G = {
                 "n3": unittest_config.config.networks.n3.name,
                 "n6": unittest_config.config.networks.n6.name,
                 "gnb": unittest_config.config.networks.gnb.name
+            },
+            "gnb": {
+                "configure": True,
+                "pduList": []
             },
             "slices": [{
                 "sliceType": "EMBB",

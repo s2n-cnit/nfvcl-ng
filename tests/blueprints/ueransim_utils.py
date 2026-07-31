@@ -18,9 +18,14 @@ class UeransimSSH(SSH):
             output = re.search("successful", output).group()
             if output == "successful" or time.time() > timeout:
                 return output == "successful"
+            self.restart_gnb_service()
+            time.sleep(5)
 
     def restart_ue_service(self, imsi):
         self.execute_ssh_command(f"systemctl restart ueransim-ue-sim-{imsi}.service", sudo=True)
+
+    def restart_gnb_service(self):
+        self.execute_ssh_command(f"systemctl restart ueransim-gnb.service", sudo=True)
 
     def run_command_with_nr_cli(self, imsi: str, command: str) -> dict:
         stdout = "\n".join(self.execute_ssh_command(f"/opt/UERANSIM/nr-cli imsi-{imsi} -e '{command}'", sudo=False).readlines()).strip()
@@ -45,7 +50,7 @@ class UeransimSSH(SSH):
         raise Exception("PDU Session not active, reached timeout")
 
     def get_ue_tun_name(self, imsi) -> str:
-        self.wait_for_active_pdu_session(imsi)
+        self.wait_for_active_pdu_session(imsi, timeout=20)
         ip = self.run_command_with_nr_cli(imsi, "ps-list")["PDU Session1"]["address"]
         return self.get_interface_by_ip(ip)
 

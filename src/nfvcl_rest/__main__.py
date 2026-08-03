@@ -21,13 +21,20 @@ from starlette.responses import RedirectResponse, PlainTextResponse, Response, J
 from starlette.staticfiles import StaticFiles
 from verboselogs import VerboseLogger
 
+from nfvcl_common.utils.api_utils import HttpRequestType
+from nfvcl_common.utils.file_utils import create_folder
+from nfvcl_common.utils.log import (
+    set_log_level,
+    LOG_FILE_PATH,
+    mod_logger,
+    create_logger,
+)
 from nfvcl_common.utils.nfvcl_public_utils import NFVCLPublicModel
 from nfvcl_core.global_ref import get_nfvcl_config  # Order 1
 from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config  # Order 1
 from nfvcl_core_models.custom_types import NFVCLCoreException  # Order 1
 from nfvcl_core_models.response_model import AsyncTaskResponse, AsyncTaskStatus  # Order 1
 from nfvcl_core_models.task import NFVCLTaskResult  # Order 1
-from nfvcl_rest.ws import WebsocketConnectionManager, WebsocketMessage
 
 #### BEFORE IMPORTING ANYTHING FROM NFVCL() main file ####
 nfvcl_rest_config: NFVCLConfigModel

@@ -100,13 +100,14 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
             password="ubuntu",
             management_network=self.state.current_config.networks.mgt.net_name,
             additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name],
-            require_port_security_disabled=True
+            require_port_security_disabled=True,
+            resource_group=self.id
         )
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)
         self.state.vm_resources[upf_vm.id] = upf_vm
 
-        self.state.upf_vm_configurator = Free5gcUpfConfigurator(vm_resource=upf_vm)
+        self.state.upf_vm_configurator = Free5gcUpfConfigurator(vm_resource=upf_vm, resource_group=self.id)
         self.register_resource(self.state.upf_vm_configurator)
         self.update_upf()
 
@@ -156,6 +157,8 @@ class Free5GCUpf(Generic5GUPFVMBlueprintNG[Free5GCUpfBlueprintNGState, UPFBlueCr
         self.state.upf_vm_configurator.n6_gateway = self.state.current_config.n6_gateway_ip.exploded
 
         self.provider.configure_vm(self.state.upf_vm_configurator)
+
+        self.update_upf_info()
 
     def update_upf_info(self):
         vm_upf = next(iter(self.state.vm_resources.values()))

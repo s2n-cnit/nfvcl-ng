@@ -13,5 +13,11 @@ class BlueprintRepository(DatabaseRepository[BlueprintNGBaseModel]):
         else:
             self.collection.insert_one(blueprint.model_dump())
 
+    def save_blueprint_dict(self, blueprint_dict: dict):
+        if self.collection.find_one({'id': blueprint_dict["id"]}):
+            self.collection.update_one({'id': blueprint_dict["id"]}, {'$set': blueprint_dict})
+        else:
+            self.collection.insert_one(blueprint_dict)
+
     def delete_blueprint(self, blueprint_id: str):
         self.collection.delete_one({'id': blueprint_id})

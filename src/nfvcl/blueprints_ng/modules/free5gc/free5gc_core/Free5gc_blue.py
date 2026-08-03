@@ -94,7 +94,8 @@ class Free5gc(Generic5GK8sBlueprintNG[Free5gcBlueprintNGState, Free5gcBlueCreate
             chart="helm_charts/charts/free5gc-4.0.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.core_helm_chart)
 

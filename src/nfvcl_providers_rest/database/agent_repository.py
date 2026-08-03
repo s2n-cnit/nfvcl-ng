@@ -20,4 +20,4 @@ class NFVCLProviderAgentRepository(DatabaseRepository[NFVCLProviderAgent]):
 
     def update_all(self, agent_data_list: List[NFVCLProviderAgent]):
         for agent_data in agent_data_list:
-            self.collection.update_one({'uuid': agent_data.uuid}, {'$set': agent_data.model_dump()})
+            self.collection.update_one({'uuid': agent_data.uuid}, {'$set': agent_data.model_dump()}, upsert=True)

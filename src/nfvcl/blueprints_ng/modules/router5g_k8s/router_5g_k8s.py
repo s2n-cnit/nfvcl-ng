@@ -47,7 +47,8 @@ class Router5GK8sBlueprintNG(BlueprintNG[Router5GK8sBlueprintNGState, Router5GCr
             name=f"router5g",
             chart="helm_charts/charts/router-0.1.1.tgz",
             chart_as_path=True,
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.router_chart_resources)
 

@@ -1,6 +1,8 @@
 import pytest
 
-from parent_test import NFVCLTestSuite
+from tests.parent_test import NFVCLTestSuite
+
+pytestmark = pytest.mark.integration
 
 @pytest.mark.dependency(name="TestInit", scope="session")
 class TestInit(NFVCLTestSuite):

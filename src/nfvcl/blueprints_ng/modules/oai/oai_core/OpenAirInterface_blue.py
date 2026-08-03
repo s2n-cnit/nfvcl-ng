@@ -1,4 +1,5 @@
 import copy
+import time
 from typing import Optional, List, Dict, Tuple
 
 from pydantic import Field
@@ -85,7 +86,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
             chart="helm_charts/charts/oai-5g-basic-v2.1.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.core_helm_chart)
 
@@ -350,6 +352,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
     def add_slice(self, add_slice_model: Core5GAddSliceModel, oss: bool):
         super().add_slice(add_slice_model, oss)
         self.update_edge_areas(force=True)
+        self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments[self.network_functions_dictionary()[NF5GType.SMF][0]].name)
+        self.update_gnb_configs()
 
     def del_slice(self, del_slice_model: Core5GDelSliceModel):
         """
@@ -365,6 +369,8 @@ class OpenAirInterface(Generic5GK8sBlueprintNG[OAIBlueprintNGState, OAIBlueCreat
 
         super().del_slice(del_slice_model)
         self.update_edge_areas(force=True)
+        self.provider.restart_deployment(self.state.core_helm_chart, self.state.core_helm_chart.deployments[self.network_functions_dictionary()[NF5GType.SMF][0]].name)
+        self.update_gnb_configs()
 
     def add_tac(self, area: Core5GAddTacModel):
         """

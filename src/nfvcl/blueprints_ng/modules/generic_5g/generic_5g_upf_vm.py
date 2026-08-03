@@ -80,7 +80,6 @@ class Generic5GUPFVMBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFVMBlueprintN
 
     def pre_create_upf(self):
         self.update_router_deployment()
-        self.update_router_routes()
 
     @abstractmethod
     def create_upf(self):
@@ -96,7 +95,6 @@ class Generic5GUPFVMBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFVMBlueprintN
         self.state.current_config.n3_gateway_ip = self.state.router.network.n3_ip
         self.state.current_config.n6_gateway_ip = self.state.router.network.n6_ip
         self.state.current_config.gnb_cidr = self.state.router.network.gnb_cidr
-        self.update_router_routes()
 
     @abstractmethod
     def update_upf(self):
@@ -106,3 +104,4 @@ class Generic5GUPFVMBlueprintNG(Generic5GUPFBlueprintNG[Generic5GUPFVMBlueprintN
         if self.router_needed:
             for upf in self.state.upf_list:
                 upf.router_gnb_ip = self.state.router.network.gnb_ip
+        self.update_router_routes()

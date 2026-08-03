@@ -61,7 +61,8 @@ class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
             username="vyos",
             password="vyos",
             management_network=create_model.mgmt_net,
-            additional_networks=create_model.data_nets
+            additional_networks=create_model.data_nets,
+            resource_group=self.id
         )
         # When a Resource is added it also need to be registered
         # This is MANDATORY
@@ -75,11 +76,11 @@ class VyOSBlueprint(BlueprintNG[VyOSBlueprintNGState, VyOSCreateModel]):
         self.provider.create_vm(self.state.vm_vyos) # TODO should retrieve ansible info from
 
         # To configure a VM create a new configurator object and pass the VmResource as the 'vm_resource' arg
-        self.state.vm_vyos_configurator = VmVyOSDay0Configurator(vm_resource=self.state.vm_vyos)
+        self.state.vm_vyos_configurator = VmVyOSDay0Configurator(vm_resource=self.state.vm_vyos, resource_group=self.id)
         self.register_resource(self.state.vm_vyos_configurator)
 
         # To configure a VM create a new configurator object and pass the VmResource as the 'vm_resource' arg
-        self.state.vm_vyos_nat_configurator = VmVyOSNatConfigurator(vm_resource=self.state.vm_vyos)
+        self.state.vm_vyos_nat_configurator = VmVyOSNatConfigurator(vm_resource=self.state.vm_vyos, resource_group=self.id)
         self.register_resource(self.state.vm_vyos_nat_configurator)
 
         self.state.vm_vyos_configurator.initial_setup()

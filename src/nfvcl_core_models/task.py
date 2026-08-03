@@ -12,6 +12,7 @@ class NFVCLTask:
         self.task_id = str(uuid.uuid4())
         self.callable_function = callable_function
         self.args = args
+        self.on_cancel = kwargs.pop("_on_cancel", None)
         self.kwargs = kwargs
         self.callback_function = callback_function
 
@@ -32,6 +33,7 @@ class NFVCLTaskResult:
         return f"Result: {self.result}, Error: {self.error}, Exception: {self.exception}"
 
 class NFVCLTaskStatusType(str, Enum):
+    QUEUED = "queued"
     RUNNING = "running"
     DONE = "done"
 
@@ -41,3 +43,7 @@ class NFVCLTaskStatus(NFVCLBaseModel):
     result: Optional[Any] = Field(default=None)
     error: bool = Field(default=False)
     exception: Optional[str] = Field(default=None)
+
+class NFVCLTaskDeleteResult(NFVCLBaseModel):
+    task_id: str = Field()
+    deleted: bool = Field(default=True)

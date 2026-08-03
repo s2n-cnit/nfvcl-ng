@@ -49,7 +49,8 @@ class UeransimK8sBlueprintNG(BlueprintNG[UeransimBlueprintNGState, UeransimBluep
             chart="helm_charts/charts/ueransimk8s-2.0.17.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.ueransim_helm_chart[area_id])
 

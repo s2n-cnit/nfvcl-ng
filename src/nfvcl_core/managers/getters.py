@@ -5,7 +5,7 @@ from .task_manager import TaskManager
 from .event_manager import EventManager
 from .blueprint_manager import BlueprintManager
 from .performance_manager import PerformanceManager
-from .vim_clients_manager import VimClientsManager
+from .provider_manager import ProviderManager
 from .kubernetes_manager import KubernetesManager
 from .monitoring_manager import MonitoringManager
 from nfvcl_core.containers.nfvcl_container import NFVCLContainer
@@ -20,6 +20,10 @@ def get_performance_manager(_performance_manager: PerformanceManager = Provide[N
     return _performance_manager
 
 @inject
+def get_provider_manager(_provider_manager: ProviderManager = Provide[NFVCLContainer.provider_manager]) -> ProviderManager:
+    return _provider_manager
+
+@inject
 def get_task_manager(_task_manager: TaskManager = Provide[NFVCLContainer.task_manager]) -> TaskManager:
     return _task_manager
 
@@ -30,10 +34,6 @@ def get_event_manager(_event_manager: EventManager = Provide[NFVCLContainer.even
 @inject
 def get_persistence_manager(_persistence_manager: PersistenceManager = Provide[NFVCLContainer.persistence_manager]) -> PersistenceManager:
     return _persistence_manager
-
-@inject
-def get_vim_clients_manager(_vim_clients_manager: VimClientsManager = Provide[NFVCLContainer.vim_clients_manager]) -> VimClientsManager:
-    return _vim_clients_manager
 
 @inject
 def get_kubernetes_manager(_kubernetes_manager: KubernetesManager = Provide[NFVCLContainer.kubernetes_manager]) -> KubernetesManager:

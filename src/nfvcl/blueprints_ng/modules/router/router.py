@@ -191,7 +191,8 @@ class RouterBlueprintNG(BlueprintNG[RouterBlueprintNGState, RouterCreateModel]):
             password="ubuntu",
             management_network=create_model.management_network,
             additional_networks=create_model.additional_networks,
-            require_port_security_disabled=True
+            require_port_security_disabled=True,
+            resource_group=self.id
         )
         self.register_resource(self.state.router_vm)
         self.provider.create_vm(self.state.router_vm)
@@ -203,6 +204,7 @@ class RouterBlueprintNG(BlueprintNG[RouterBlueprintNGState, RouterCreateModel]):
             static_routes=create_model.static_routes,
             nftables_tables=create_model.nftables_tables,
             enable_forwarding=create_model.enable_forwarding,
+            resource_group=self.id
         )
         self.register_resource(self.state.router_vm_configurator)
         self.provider.configure_vm(self.state.router_vm_configurator)

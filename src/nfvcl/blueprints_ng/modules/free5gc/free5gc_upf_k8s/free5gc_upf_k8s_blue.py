@@ -39,7 +39,8 @@ class Free5GCUpfK8s(Generic5GUPFK8SBlueprintNG[Free5gcUpfK8sBlueprintNGState, UP
             name=f"free5gc-upf",
             chart="helm_charts/charts/free5gc-upf-4.0.0.tgz",
             chart_as_path=True,
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(upf_helm_chart)
 

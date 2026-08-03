@@ -14,11 +14,12 @@ from nfvcl_core.blueprints.provider_aggregator import ProvidersAggregator
 from nfvcl_common.utils.blue_utils import get_class_path_str_from_obj, get_class_from_path
 from nfvcl_common.utils.log import create_logger
 from nfvcl_core.utils.metrics.grafana_utils import replace_all_datasources, update_queries_in_panels
-from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest, RestartVmRequest, RestartAllVmsRequest
+from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNGBaseModel, BlueprintNGException, RegisteredResource, MonitoringState, EnableMonitoringRequest, DisableMonitoringRequest, RestartVmRequest, RestartAllVmsRequest, RpcapdRequest
 from nfvcl_core_models.http_models import BlueprintNotFoundException
 from nfvcl_core_models.monitoring.grafana_model import GrafanaFolderModel
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition
 from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource, VmStatus
+from nfvcl_core_models.providers.diagnostic import RpcapdVmStatus
 
 StateTypeVar = TypeVar("StateTypeVar")
 CreateConfigTypeVar = TypeVar("CreateConfigTypeVar")
@@ -153,7 +154,7 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
 
         for children_id in self.base_model.children_blue_ids.copy():
             try:
-                self.provider.blueprint_manager.delete_blueprint(children_id, child_deletion=True)
+                self.provider.delete_blueprint(children_id)
             except BlueprintNotFoundException:
                 self.logger.warning(f"The children blueprint {children_id} has not been found. Could be deleted before, skipping...")
             self.deregister_children(children_id)
@@ -510,3 +511,36 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
                 self.logger.debug(f"VM {vm_status.vm_name} status check completed: power={vm_status.power_status}, ssh_reachable={vm_status.ssh_reachable}")
 
         return vm_status_list
+
+    def _find_vm_by_name(self, vm_name: str) -> VmResource:
+        for resource in self.base_model.registered_resources.values():
+            if isinstance(resource.value, VmResource) and resource.value.name == vm_name:
+                return resource.value
+        raise BlueprintNGException(f"VM {vm_name} not found in blueprint {self.id}")
+
+    @day2_function("/install_rpcapd", [HttpRequestType.PUT])
+    def install_rpcapd(self, request: RpcapdRequest) -> RpcapdVmStatus:
+        self.logger.info(f"Installing rpcapd on VM {request.vm_name} in blueprint {self.id}")
+        vm_resource = self._find_vm_by_name(request.vm_name)
+        kwargs = {}
+        if request.download_url:
+            kwargs["download_url"] = request.download_url
+        result = self.provider.install_rpcapd(vm_resource, **kwargs)
+        self.logger.info(f"Installed rpcapd on VM {request.vm_name} in blueprint {self.id}")
+        return result
+
+    @day2_function("/start_rpcapd", [HttpRequestType.PUT])
+    def start_rpcapd(self, request: RpcapdRequest) -> RpcapdVmStatus:
+        self.logger.info(f"Starting rpcapd on VM {request.vm_name} in blueprint {self.id}")
+        vm_resource = self._find_vm_by_name(request.vm_name)
+        result = self.provider.start_rpcapd(vm_resource)
+        self.logger.info(f"Started rpcapd on VM {request.vm_name} in blueprint {self.id}")
+        return result
+
+    @day2_function("/get_rpcapd_status", [HttpRequestType.GET])
+    def get_rpcapd_status(self, request: RpcapdRequest) -> RpcapdVmStatus:
+        self.logger.info(f"Getting rpcapd status on VM {request.vm_name} in blueprint {self.id}")
+        vm_resource = self._find_vm_by_name(request.vm_name)
+        result = self.provider.get_rpcapd_status(vm_resource)
+        self.logger.debug(f"rpcapd status on VM {request.vm_name}: installed={result.installed}, running={result.running}")
+        return result

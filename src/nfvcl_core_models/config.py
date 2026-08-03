@@ -18,9 +18,6 @@ class NFVCLParameters(NFVCLBaseModel):
     mounted_folder: str = Field(default="mounted_folder", description="The folder in which files are generated to be exposed in API 'NFVCL_URL:NFVCL_PORT/files/'")
     tmp_folder: str = Field(default="/tmp/nfvcl", description="The folder in which the tmp files are saved")
 
-    class Config:
-        validate_assignment = True
-
     @field_validator('ip', mode='before')
     def validate_ip(cls, ip: str):
         try:
@@ -48,9 +45,6 @@ class MongoParameters(NFVCLBaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
 
-    class Config:
-        validate_assignment = True
-
     @field_validator('port', mode='before')
     def validate_mongo_port(cls, port: int):
         if isinstance(port, str):
@@ -75,13 +69,10 @@ class MongoParameters(NFVCLBaseModel):
         return db
 
 
-class RedisParameters(BaseModel):
+class RedisParameters(NFVCLBaseModel):
     host: str
     port: int
     password: Optional[str] = None
-
-    class Config:
-        validate_assignment = True
 
     @field_validator('port', mode='before')
     def validate_redis_port(cls, port: int):

@@ -23,6 +23,7 @@ class VmPowerStatus(str, Enum):
 
 class Resource(NFVCLBaseModel):
     id: Optional[str] = Field(default=None)
+    resource_group: str = Field()
     type: Literal['Resource'] = "Resource"
 
 
@@ -364,6 +365,8 @@ class HelmChartResource(ResourceDeployable):
 
 
 class PDUResourceAnsibleConfiguration(ResourceConfiguration):
+    resource_group: str = "NONE"
+
     @abc.abstractmethod
     def dump_playbook(self) -> str:
         pass

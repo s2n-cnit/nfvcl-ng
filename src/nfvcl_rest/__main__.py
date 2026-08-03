@@ -21,15 +21,20 @@ from starlette.responses import RedirectResponse, PlainTextResponse, Response, J
 from starlette.staticfiles import StaticFiles
 from verboselogs import VerboseLogger
 
+from nfvcl_common.utils.api_utils import HttpRequestType
+from nfvcl_common.utils.file_utils import create_folder
+from nfvcl_common.utils.log import (
+    set_log_level,
+    LOG_FILE_PATH,
+    mod_logger,
+    create_logger,
+)
 from nfvcl_common.utils.nfvcl_public_utils import NFVCLPublicModel
-from nfvcl_core_models.custom_types import NFVCLCoreException # Order 1
-from nfvcl_common.utils.api_utils import HttpRequestType # Order 1
-from nfvcl_core_models.response_model import OssCompliantResponse, OssStatus # Order 1
-from nfvcl_core_models.task import NFVCLTaskResult # Order 1
-from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config # Order 1
-from nfvcl_core.global_ref import get_nfvcl_config # Order 1
-from nfvcl_common.utils.file_utils import create_folder # Order 1
-from nfvcl_common.utils.log import mod_logger, create_logger, LOG_FILE_PATH, set_log_level # Order 1
+from nfvcl_core.global_ref import get_nfvcl_config  # Order 1
+from nfvcl_core_models.config import NFVCLConfigModel, load_nfvcl_config  # Order 1
+from nfvcl_core_models.custom_types import NFVCLCoreException  # Order 1
+from nfvcl_core_models.response_model import AsyncTaskResponse, AsyncTaskStatus  # Order 1
+from nfvcl_core_models.task import NFVCLTaskResult  # Order 1
 
 #### BEFORE IMPORTING ANYTHING FROM NFVCL() main file ####
 nfvcl_rest_config: NFVCLConfigModel
@@ -147,9 +152,9 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
             response.status_code = status.HTTP_202_ACCEPTED
             # We need to set a dummy callback function for the function to be executed async
             function_return = function(**kwargs, callback=callback_function if callback_function else dummy_callback)
-            if isinstance(function_return, OssCompliantResponse):
-                function_return: OssCompliantResponse
-                if function_return.status == OssStatus.failed:
+            if isinstance(function_return, AsyncTaskResponse):
+                function_return: AsyncTaskResponse
+                if function_return.status == AsyncTaskStatus.failed:
                     response.status_code = status.HTTP_400_BAD_REQUEST
             return function_return
 
@@ -205,7 +210,7 @@ def generate_function_signature(function: Callable, sync=False, override_name=No
         return_type = inspect.signature(function).return_annotation
         # If the return type is not specified we set it to OssCompliantResponse
         if return_type == inspect.Signature.empty:
-            return_type = OssCompliantResponse
+            return_type = AsyncTaskResponse
 
     # Set the new function signature
     new_fn.__signature__ = inspect.Signature(params, return_annotation=return_type)

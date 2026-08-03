@@ -122,25 +122,26 @@ class OranScBlueprint(Generic5GRICVMBlueprintNG[OranScBlueprintNGState, RICBlueC
             username="ubuntu",
             password="ubuntu",
             management_network=self.state.current_config.mgt.net_name,
-            additional_networks=[self.state.current_config.e2.net_name]
+            additional_networks=[self.state.current_config.e2.net_name],
+            resource_group=self.id
         )
         self.register_resource(ric_vm)
         self.provider.create_vm(ric_vm)
         self.state.vm_resources[ric_vm.id] = ric_vm
 
-        self.state.ric_vm_configurators = OranScRicConfigurator(vm_resource=ric_vm)
+        self.state.ric_vm_configurators = OranScRicConfigurator(vm_resource=ric_vm, resource_group=self.id)
         self.register_resource(self.state.ric_vm_configurators)
 
-        self.state.ric_vm_xapp_configurators = OranXappConfigurator(vm_resource=ric_vm)
+        self.state.ric_vm_xapp_configurators = OranXappConfigurator(vm_resource=ric_vm, resource_group=self.id)
         self.register_resource(self.state.ric_vm_xapp_configurators)
 
-        self.state.ric_vm_xapp_run_configurators = OranRunXappConfigurator(vm_resource=ric_vm)
+        self.state.ric_vm_xapp_run_configurators = OranRunXappConfigurator(vm_resource=ric_vm, resource_group=self.id)
         self.register_resource(self.state.ric_vm_xapp_run_configurators)
 
-        self.state.ric_vm_delete_xapp_configurators = OranDeleteXappConfigurator(vm_resource=ric_vm)
+        self.state.ric_vm_delete_xapp_configurators = OranDeleteXappConfigurator(vm_resource=ric_vm, resource_group=self.id)
         self.register_resource(self.state.ric_vm_delete_xapp_configurators)
 
-        self.state.ric_vm_logs_configurators = OranLogsReaderConfigurator(vm_resource=ric_vm)
+        self.state.ric_vm_logs_configurators = OranLogsReaderConfigurator(vm_resource=ric_vm, resource_group=self.id)
         self.register_resource(self.state.ric_vm_logs_configurators)
 
         self.update_ric()

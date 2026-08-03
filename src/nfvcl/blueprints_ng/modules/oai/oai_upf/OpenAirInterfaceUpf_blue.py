@@ -81,13 +81,14 @@ class OpenAirInterfaceUpf(Generic5GUPFVMBlueprintNG[OAIUpfBlueprintNGState, UPFB
             username="ubuntu",
             password="ubuntu",
             management_network=self.state.current_config.networks.mgt.net_name,
-            additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name]
+            additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name],
+            resource_group=self.id
         )
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)
         self.state.vm_resources[upf_vm.id] = upf_vm
 
-        self.state.upf_vm_configurator = OpenAirInterfaceUpfConfigurator(vm_resource=upf_vm)
+        self.state.upf_vm_configurator = OpenAirInterfaceUpfConfigurator(vm_resource=upf_vm, resource_group=self.id)
         self.register_resource(self.state.upf_vm_configurator)
         self.update_upf()
 

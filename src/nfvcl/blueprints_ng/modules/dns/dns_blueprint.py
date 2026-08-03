@@ -48,7 +48,8 @@ class DNSBlueprint(BlueprintNG[DNSBlueprintNGState, DNSCreateModel]):
             username="ubuntu",
             password=create_model.password,
             management_network=create_model.mgmt_net,
-            additional_networks=create_model.data_nets
+            additional_networks=create_model.data_nets,
+            resource_group=self.id
         )
 
         #Registering VM for DNS

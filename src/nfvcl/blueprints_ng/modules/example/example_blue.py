@@ -121,7 +121,8 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
             username="ubuntu",
             password="ubuntu",
             management_network=create_model.mgmt_net,
-            additional_networks=[create_model.data_net]
+            additional_networks=[create_model.data_net],
+            resource_group=self.id
         )
         # When a Resource is added it also need to be registered
         # This is MANDATORY
@@ -135,7 +136,8 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
             username="ubuntu",
             password="ubuntu",
             management_network=create_model.mgmt_net,
-            additional_networks=[create_model.data_net]
+            additional_networks=[create_model.data_net],
+            resource_group=self.id
         )
         self.register_resource(self.state.vm_ubuntu2)
 
@@ -148,11 +150,11 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
         self.provider.create_vm(self.state.vm_ubuntu2)
 
         # To configure a VM create a new configurator object and pass the VmResource as the 'vm_resource' arg
-        self.state.vm_ubuntu1_configurator = ExampleVmUbuntuConfigurator(vm_resource=self.state.vm_ubuntu1, file_content="This file is in VM 1", value1=self.state.vm_ubuntu2.access_ip, value_list=["Test1", "Test2"])
+        self.state.vm_ubuntu1_configurator = ExampleVmUbuntuConfigurator(vm_resource=self.state.vm_ubuntu1, file_content="This file is in VM 1", value1=self.state.vm_ubuntu2.access_ip, value_list=["Test1", "Test2"], resource_group=self.id)
         self.register_resource(self.state.vm_ubuntu1_configurator)
 
         # You can use values taken from other resources to configure a VM
-        self.state.vm_ubuntu2_configurator = ExampleVmUbuntuConfigurator(vm_resource=self.state.vm_ubuntu2, file_content="This file is in VM 2", value1=self.state.vm_ubuntu1.access_ip, value_list=["Test1", "Test2"])
+        self.state.vm_ubuntu2_configurator = ExampleVmUbuntuConfigurator(vm_resource=self.state.vm_ubuntu2, file_content="This file is in VM 2", value1=self.state.vm_ubuntu1.access_ip, value_list=["Test1", "Test2"], resource_group=self.id)
         self.register_resource(self.state.vm_ubuntu2_configurator)
 
         # The same need to be done to apply the configuration to the VMs
@@ -176,7 +178,8 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
             chart="helm_charts/charts/mqttbroker-0.0.3.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.mqtt_helm_chart)
         # In the chart installation a dict containing the values overrides can be passed
@@ -200,11 +203,12 @@ class ExampleBlueprintNG(BlueprintNG[ExampleBlueprintNGState, ExampleCreateModel
             username="ubuntu",
             password="ubuntu",
             management_network=model.mgmt_net,
-            additional_networks=[model.data_net]
+            additional_networks=[model.data_net],
+            resource_group=self.id
         )
         self.register_resource(new_vm)
 
-        new_vm_configurator = ExampleVmUbuntuConfigurator(vm_resource=new_vm, file_content="This file is in VM 3", value1=self.state.vm_ubuntu1.access_ip, value_list=["TTest1", "TTest2"])
+        new_vm_configurator = ExampleVmUbuntuConfigurator(vm_resource=new_vm, file_content="This file is in VM 3", value1=self.state.vm_ubuntu1.access_ip, value_list=["TTest1", "TTest2"], resource_group=self.id)
         self.register_resource(new_vm_configurator)
 
         self.state.additional_vms.append(new_vm)

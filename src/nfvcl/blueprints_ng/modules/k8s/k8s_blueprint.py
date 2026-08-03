@@ -289,15 +289,16 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             password=self.state.password,
             management_network=area.mgmt_net,
             additional_networks=area.additional_networks,
-            require_port_security_disabled=self.state.require_port_security_disabled
+            require_port_security_disabled=self.state.require_port_security_disabled,
+            resource_group=self.id
         )
         # Registering master node
         self.register_resource(self.state.vm_master)
         # Creating the VM
         self.provider.create_vm(self.state.vm_master)
         # Creating the configurator for the master
-        self.state.day_0_master_configurator = VmK8sDay0Configurator(vm_resource=self.state.vm_master, vm_number=0)
-        self.state.day_2_master_configurator = VmK8sDay2Configurator(vm_resource=self.state.vm_master)
+        self.state.day_0_master_configurator = VmK8sDay0Configurator(vm_resource=self.state.vm_master, vm_number=0, resource_group=self.id)
+        self.state.day_2_master_configurator = VmK8sDay2Configurator(vm_resource=self.state.vm_master, resource_group=self.id)
         self.register_resource(self.state.day_0_master_configurator)
         self.register_resource(self.state.day_2_master_configurator)
 
@@ -314,7 +315,8 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
                 password=self.state.password,
                 management_network=area.mgmt_net,
                 additional_networks=area.additional_networks,
-                require_port_security_disabled=self.state.require_port_security_disabled
+                require_port_security_disabled=self.state.require_port_security_disabled,
+                resource_group=self.id
             )
             self.state.vm_workers.append(vm)
             # Registering master node
@@ -322,7 +324,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             # Creating the VM
             self.provider.create_vm(vm)
 
-            configurator = VmK8sDay0Configurator(vm_resource=vm, vm_number=worker_number)
+            configurator = VmK8sDay0Configurator(vm_resource=vm, vm_number=worker_number, resource_group=self.id)
             self.state.day_0_workers_configurators.append(configurator)
             self.state.day_0_workers_configurators_tobe_exec.append(configurator)
             self.register_resource(configurator)
@@ -493,7 +495,7 @@ class K8sBlueprint(BlueprintNG[K8sBlueprintNGState, K8sCreateModel]):
             return
 
 
-        day_n_conf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master)  # Removing the nodes on a cluster requires actions performed on the master node.
+        day_n_conf = VmK8sDayNConfigurator(vm_resource=self.state.vm_master, resource_group=self.id)  # Removing the nodes on a cluster requires actions performed on the master node.
         for node in model.node_names:
             target_vm = [vm for vm in self.state.vm_workers if vm.name == node]  # Checking that the node to be removed EXISTS
             if len(target_vm) >= 1:

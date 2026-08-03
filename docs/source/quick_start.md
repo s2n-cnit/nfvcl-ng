@@ -184,7 +184,7 @@ Post request to `/nfvcl/v2/api/blue/k8s` with the following body:
 ```
 
 After the creation has been finished, the K8S cluster will be added to the topology. You can check the status of the Blueprint creation by sending a GET request to `/nfvcl/v2/api/blue`
-or by obtaining the status of the task (task ID is in the creation response) from the NFVCL API GET `/v2/utils/get_task_status?task_id=::TASK_ID::`.
+or by obtaining the status of the task (task ID is in the creation response) from the NFVCL API GET `/v1/tasks/::TASK_ID::`.
 
 You can check the presence of the K8S cluster in the topology by sending a GET request to `/v1/topology`.
 
@@ -251,4 +251,3 @@ You can check the presence of the K8S cluster in the topology by sending a GET r
 
 ## Deploy a Blueprint
 You can choose from the list of available Blueprints the one you want to deploy. Refer to the Blueprints documentation for more details.
-

@@ -199,7 +199,8 @@ class MultiPathUPFBlueprintNG(Generic5GUPFBlueprintNG[MultiPathUPFBlueprintNGSta
             password="ubuntu",
             management_network=self.state.current_config.networks.mgt.net_name,
             additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name],
-            require_port_security_disabled=True
+            require_port_security_disabled=True,
+            resource_group=self.id
         )
         self.register_resource(self.state.pfcpagent_vm)
         self.provider.create_vm(self.state.pfcpagent_vm)
@@ -304,6 +305,7 @@ class MultiPathUPFBlueprintNG(Generic5GUPFBlueprintNG[MultiPathUPFBlueprintNGSta
         self.state.pfcpagent_configurator = PFCPAgentConfigurator(
             vm_resource=self.state.pfcpagent_vm,
             configuration=pfcpagent_config,
+            resource_group=self.id
         )
         self.register_resource(self.state.pfcpagent_configurator)
         self.provider.configure_vm(self.state.pfcpagent_configurator)

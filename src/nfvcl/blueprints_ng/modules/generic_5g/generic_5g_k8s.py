@@ -106,7 +106,7 @@ class Generic5GK8sBlueprintNG(Generic5GBlueprintNG[Generic5GK8sBlueprintNGState,
         self.logger.info(f"Scaling {nf_scaling.nf} to {nf_scaling.replica_count} replicas")
 
         # TODO this function should be available directly from the provider
-        self.provider.get_k8s_provider(list(filter(lambda x: x.core, self.state.current_config.areas))[0].id).kube_utils.scale_k8s_deployment(
+        self.provider._get_k8s_provider(list(filter(lambda x: x.core, self.state.current_config.areas))[0].id).kube_utils.scale_k8s_deployment(
             namespace=self.state.core_helm_chart.namespace.lower(),
             deployment_name=self.state.k8s_network_functions[nf_scaling.nf].deployment.name,
             replica_num=nf_scaling.replica_count

@@ -110,7 +110,8 @@ class Router5GBlueprintNG(BlueprintNG[Router5GBlueprintNGState, Router5GCreateMo
             password="ubuntu",
             management_network=create_model.networks.mgt.net_name,
             additional_networks=[create_model.networks.gnb.net_name, create_model.networks.core.net_name, create_model.networks.n3.net_name, create_model.networks.n6.net_name],
-            require_port_security_disabled=True
+            require_port_security_disabled=True,
+            resource_group=self.id
         )
         self.register_resource(self.state.router_vm)
         self.provider.create_vm(self.state.router_vm)
@@ -119,7 +120,8 @@ class Router5GBlueprintNG(BlueprintNG[Router5GBlueprintNGState, Router5GCreateMo
             vm_resource=self.state.router_vm,
             n6_net_name=create_model.networks.n6.net_name,
             mgt_net_name=create_model.networks.mgt.net_name,
-            additional_routes=create_model.additional_routes
+            additional_routes=create_model.additional_routes,
+            resource_group=self.id
         )
         self.register_resource(self.state.router_vm_configurator)
         self.provider.configure_vm(self.state.router_vm_configurator)

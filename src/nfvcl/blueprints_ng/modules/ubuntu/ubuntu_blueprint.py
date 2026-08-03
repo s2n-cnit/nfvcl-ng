@@ -62,6 +62,7 @@ class UbuntuBlueprint(BlueprintNG[UbuntuBlueprintNGState, UbuntuCreateModel]):
 
         self.state.vm = VmResource(
             area=create_model.area,
+            resource_group=self.id,
             name=f"{self.id}_VM_UBUNTU",
             image=VmResourceImage(name=image_name, url=image_url, check_sha512sum=False),
             flavor=create_model.flavor,
@@ -77,7 +78,7 @@ class UbuntuBlueprint(BlueprintNG[UbuntuBlueprintNGState, UbuntuCreateModel]):
         self.provider.create_vm(self.state.vm)
         # No need for configuration, at least for now.
 
-        self.state.configurator = VmUbuntuConfigurator(vm_resource=self.state.vm)
+        self.state.configurator = VmUbuntuConfigurator(vm_resource=self.state.vm, resource_group=self.id)
         self.register_resource(self.state.configurator)
 
     @day2_function("/apt_install", [HttpRequestType.PUT])

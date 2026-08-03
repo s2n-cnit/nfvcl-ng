@@ -111,7 +111,8 @@ class Open5GsUpf(Generic5GUPFVMBlueprintNG[Open5GsUpfBlueprintNGState, UPFBlueCr
             password="ubuntu",
             management_network=self.state.current_config.networks.mgt.net_name,
             additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name],
-            require_port_security_disabled=True
+            require_port_security_disabled=True,
+            resource_group=self.id
         )
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)
@@ -159,7 +160,8 @@ class Open5GsUpf(Generic5GUPFVMBlueprintNG[Open5GsUpfBlueprintNGState, UPFBlueCr
             gnb_cidr=self.state.current_config.gnb_cidr.exploded,
             n3_gateway=self.state.current_config.n3_gateway_ip.exploded,
             n6_gateway=self.state.current_config.n6_gateway_ip.exploded,
-            n6=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name
+            n6=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name,
+            resource_group=self.id
         )
 
         self.register_resource(upf_vm_configurator)

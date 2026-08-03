@@ -9,7 +9,6 @@ from nfvcl_core.managers.performance_manager import PerformanceManager
 from nfvcl_core.managers.persistence_manager import PersistenceManager
 from nfvcl_core.managers.task_manager import TaskManager
 from nfvcl_core.managers.topology_manager import TopologyManager
-from nfvcl_core.managers.vim_clients_manager import VimClientsManager
 from nfvcl_core_models.config import NFVCLConfigModel
 from nfvcl_core.database.topology_repository import TopologyRepository
 from nfvcl_core.database.blueprint_repository import BlueprintRepository
@@ -17,7 +16,9 @@ from nfvcl_core.database.performance_repository import PerformanceRepository
 from nfvcl_core.database.user_repository import  UserRepository
 from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
+from nfvcl_core.managers.provider_manager import ProviderManager
 from nfvcl_core.managers.user_manager import UserManager
+from nfvcl_core.managers.visualization_manager import VisualizationManager
 
 
 class NFVCLContainer(containers.DeclarativeContainer):
@@ -80,11 +81,6 @@ class NFVCLContainer(containers.DeclarativeContainer):
         topology_repository=topology_repository
     )
 
-    vim_clients_manager = providers.Singleton(
-        VimClientsManager,
-        topology_manager=topology_manager
-    )
-
     monitoring_manager = providers.Singleton(
         MonitoringManager,
         topology_manager=topology_manager
@@ -100,16 +96,22 @@ class NFVCLContainer(containers.DeclarativeContainer):
         blueprint_repository=blueprint_repository
     )
 
+    provider_manager = providers.Singleton(
+        ProviderManager,
+        provider_data_repository=provider_repository,
+        topology_manager=topology_manager,
+        pdu_manager=pdu_manager
+    )
+
     blueprint_manager = providers.Singleton(
         BlueprintManager,
-        provider_repository=provider_repository,
         snapshot_repository=snapshot_repository,
         blueprint_repository=blueprint_repository,
         topology_manager=topology_manager,
         pdu_manager=pdu_manager,
         performance_manager=performance_manager,
         event_manager=event_manager,
-        vim_clients_manager=vim_clients_manager
+        provider_manager=provider_manager
     )
 
     kubernetes_manager = providers.Singleton(
@@ -124,6 +126,9 @@ class NFVCLContainer(containers.DeclarativeContainer):
         user_repository=user_repository
     )
 
-
-
+    visualization_manager = providers.Singleton(
+        VisualizationManager,
+        blueprint_manager=blueprint_manager,
+        topology_manager=topology_manager
+    )
 

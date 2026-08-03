@@ -1,5 +1,5 @@
 import copy
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional, Set
 
 from pydantic import Field
 
@@ -20,6 +20,7 @@ SDCORE_UPF_K8S_BLUE_TYPE = "sdcore_upf_k8s"
 class SdCoreUPFK8sBlueprintNGState(Generic5GUPFK8SBlueprintNGState):
     upf_values: Dict[str, SdcoreK8sUpfConfig] = Field(default_factory=dict)
     currently_deployed_dnns: Dict[str, DeployedUPFInfo] = Field(default_factory=dict)
+    staged_dnns: Set[str] = Field(default_factory=set)
     router: Optional[Router5GInfo] = Field(default=None)
 
 
@@ -40,10 +41,11 @@ class SdCoreUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[SdCoreUPFK8sBlueprintNG
 
         upf_helm_chart = HelmChartResource(
             area=self.state.current_config.area_id,
-            name=f"sdcore-upf",
+            name="sdcore-upf",
             chart="helm_charts/charts/bess-upf-1.0.0.tgz",
             chart_as_path=True,
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(upf_helm_chart)
 
@@ -66,7 +68,13 @@ class SdCoreUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[SdCoreUPFK8sBlueprintNG
         # self.state.upf_values[dnn].config.upf.cfg_files.upf_jsonc.cpiface.hostname = f"upf-{self.state.current_config.area_id}-{dnn}"
 
         self.add_route_to_router(ue_ip_pool, self.state.multus_network_info.n6.ip_address.exploded)
-        self.provider.install_helm_chart(upf_helm_chart, self.state.upf_values[dnn].model_dump(exclude_none=True, by_alias=True))
+        if self.state.current_config.start:
+            self.provider.install_helm_chart(
+                upf_helm_chart,
+                self.state.upf_values[dnn].model_dump(exclude_none=True, by_alias=True),
+            )
+        else:
+            self.state.staged_dnns.add(dnn)
 
         return DeployedUPFInfo(
             area=self.state.current_config.area_id,
@@ -84,12 +92,27 @@ class SdCoreUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[SdCoreUPFK8sBlueprintNG
             )
         )
 
+    def start_upf(self, dnn: str):
+        upf_info = self.state.currently_deployed_dnns[dnn]
+        upf_helm_chart = self.state.helm_chart_resources[upf_info.helm_chart_resource_id]
+        values = self.state.upf_values[dnn].model_dump(exclude_none=True, by_alias=True)
+
+        if dnn in self.state.staged_dnns:
+            self.provider.install_helm_chart(upf_helm_chart, values)
+            self.state.staged_dnns.remove(dnn)
+        else:
+            self.provider.update_values_helm_chart(upf_helm_chart, values)
+
     def stop_upf(self, dnn: str):
         self.logger.info(f"Stopping SdCoreK8sBlueprintNG blueprint for dnn: {dnn}")
         upf_info = self.state.currently_deployed_dnns[dnn]
 
-        self.provider.uninstall_helm_chart(self.state.helm_chart_resources[upf_info.helm_chart_resource_id])
-        self.deregister_resource(self.state.helm_chart_resources[upf_info.helm_chart_resource_id])
+        upf_helm_chart = self.state.helm_chart_resources[upf_info.helm_chart_resource_id]
+        if dnn not in self.state.staged_dnns:
+            self.provider.uninstall_helm_chart(upf_helm_chart)
+        self.state.staged_dnns.discard(dnn)
+        self.deregister_resource(upf_helm_chart)
+        del self.state.helm_chart_resources[upf_info.helm_chart_resource_id]
         self.logger.info(f"SdCoreK8sBlueprintNG blueprint dnn: {dnn} stopped")
 
         return upf_info
@@ -108,11 +131,15 @@ class SdCoreUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[SdCoreUPFK8sBlueprintNG
                 deployed_info = self.spawn_upf(dnn)
                 self.state.upf_list.append(deployed_info)
                 self.state.currently_deployed_dnns[dnn] = deployed_info
+            elif self.state.current_config.start:
+                self.start_upf(dnn)
+                self.state.currently_deployed_dnns[dnn].served_slices = self.get_slices_for_dnn(dnn)
         dnn_to_undeploy = set(self.state.currently_deployed_dnns) - set(dnns_to_deploy)
-        for dnn in set(dnn_to_undeploy):
-            deployed_info = self.stop_upf(dnn)
-            self.state.upf_list.remove(deployed_info)
-            del self.state.currently_deployed_dnns[dnn]
+        if self.state.current_config.start:
+            for dnn in set(dnn_to_undeploy):
+                deployed_info = self.stop_upf(dnn)
+                self.state.upf_list.remove(deployed_info)
+                del self.state.currently_deployed_dnns[dnn]
 
     def update_upf_info(self):
         deployed_upf_info = DeployedUPFInfo(

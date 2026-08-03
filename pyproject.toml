@@ -66,7 +66,7 @@ docs = [
 [tool.uv]
 
 [tool.uv.sources]
-pyhelm3 = { git = "https://github.com/s2n-cnit/pyhelm3.git", rev = "5c25193" }
+pyhelm3 = { git = "https://github.com/s2n-cnit/pyhelm3.git", rev = "b84df4b" }
 proxmoxer = { git = "https://github.com/s2n-cnit/proxmoxer.git", rev = "2862ef8" }
 
 [tool.hatch.build.targets.sdist]
@@ -77,6 +77,9 @@ include = [
     "src/nfvcl_horse",
     "src/nfvcl_models",
     "src/nfvcl",
+    "src/nfvcl_common",
+    "src/nfvcl_providers",
+    "src/nfvcl_providers_rest",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -87,6 +90,9 @@ include = [
     "src/nfvcl_horse",
     "src/nfvcl_models",
     "src/nfvcl",
+    "src/nfvcl_common",
+    "src/nfvcl_providers",
+    "src/nfvcl_providers_rest",
 ]
 
 [tool.hatch.build.targets.wheel.sources]
@@ -96,6 +102,9 @@ include = [
 "src/nfvcl_horse" = "nfvcl_horse"
 "src/nfvcl_models" = "nfvcl_models"
 "src/nfvcl" = "nfvcl"
+"src/nfvcl_common" = "nfvcl_common"
+"src/nfvcl_providers" = "nfvcl_providers"
+"src/nfvcl_providers_rest" = "nfvcl_providers_rest"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -108,4 +117,3 @@ fallback-version = "0.4.1"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/nfvcl/_version.py"
-

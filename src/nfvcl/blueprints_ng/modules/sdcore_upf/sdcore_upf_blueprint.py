@@ -124,6 +124,11 @@ class SDCoreUPFConfigurator(VmResourceAnsibleConfiguration):
             else:
                 ansible_builder.add_service_task("bess-datapath", ServiceState.STOPPED, False)
                 ansible_builder.add_service_task("sdcore-upf", ServiceState.RESTARTED, True)
+        else:
+            # A staged UPF must not try to connect before SD-Core has loaded
+            # the corresponding DNN and slice configuration.
+            ansible_builder.add_service_task("sdcore-upf", ServiceState.STOPPED, False)
+            ansible_builder.add_service_task("bess-datapath", ServiceState.STOPPED, False)
 
         return ansible_builder.build()
 
@@ -252,7 +257,8 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             password="ubuntu",
             management_network=self.state.current_config.networks.mgt.net_name,
             additional_networks=[self.state.current_config.networks.n4.net_name, self.state.current_config.networks.n3.net_name, self.state.current_config.networks.n6.net_name],
-            require_port_security_disabled=True
+            require_port_security_disabled=True,
+            resource_group=self.id
         )
         self.register_resource(upf_vm)
         self.provider.create_vm(upf_vm)
@@ -279,7 +285,7 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
             n4_ip=n4_ip,
             ue_ip_pool_cidr=self.get_dnn_ip_pool(dnn),
             nrf=nrf_registration,
-        ))
+        ), resource_group=self.id)
         self.register_resource(upf_vm_configurator)
         fact_cache = self.provider.configure_vm(upf_vm_configurator)
 
@@ -377,7 +383,8 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         green_configurator = SDCoreUPFGreenQueueConfigurator(
             vm_resource=upf_vm,
             n6_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name,
-            configuration=model
+            configuration=model,
+            resource_group=self.id
         )
         self.provider.configure_vm(green_configurator)
         self.state.currently_enabled_green_modules[model.dnn] = str(model.module_class)
@@ -389,7 +396,8 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         upf_vm = self.state.vm_resources[upf_info.vm_resource_id]
         green_configurator = SDCoreUPFGreenQueueRemoveConfigurator(
             vm_resource=upf_vm,
-            n6_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name
+            n6_nic_name=upf_vm.network_interfaces[self.state.current_config.networks.n6.net_name][0].fixed.interface_name,
+            resource_group=self.id
         )
         self.provider.configure_vm(green_configurator)
         del self.state.currently_enabled_green_modules[model.dnn]
@@ -401,7 +409,8 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         green_configurator = SDCoreUPFGreenQueueAddIPConfigurator(
             vm_resource=upf_vm,
             configuration=model,
-            module_name=self.state.currently_enabled_green_modules[model.dnn]
+            module_name=self.state.currently_enabled_green_modules[model.dnn],
+            resource_group=self.id
         )
         self.provider.configure_vm(green_configurator)
 
@@ -412,6 +421,7 @@ class SdCoreUPFBlueprintNG(Generic5GUPFVMBlueprintNG[SdCoreUPFBlueprintNGState, 
         green_configurator = SDCoreUPFGreenQueueReleaseIPConfigurator(
             vm_resource=upf_vm,
             configuration=model,
-            module_name=self.state.currently_enabled_green_modules[model.dnn]
+            module_name=self.state.currently_enabled_green_modules[model.dnn],
+            resource_group=self.id
         )
         self.provider.configure_vm(green_configurator)

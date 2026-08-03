@@ -4,16 +4,16 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class OssStatus(str, Enum):
-    ready: str = 'ready'
-    deploying: str = 'deploying'
-    processing: str = 'processing'
-    failed: str = 'failed'
-    unknown: str = 'unknown'
+class AsyncTaskStatus(str, Enum):
+    ready = 'ready'
+    deploying = 'deploying'
+    processing = 'processing'
+    failed = 'failed'
+    unknown = 'unknown'
 
 
-class OssCompliantResponse(BaseModel):
-    status: OssStatus = Field(default=OssStatus.ready)
+class AsyncTaskResponse(BaseModel):
+    status: AsyncTaskStatus = Field(default=AsyncTaskStatus.ready)
     blueprint_id: Optional[str] = Field(default=None)
     detail: str = Field(default="")
     result: dict = Field(default_factory=dict)

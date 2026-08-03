@@ -34,7 +34,8 @@ class OpenAirInterfaceUE(Generic5GUEBlueprintNG[OAIUEBlueprintNGState, UEBlueCre
             name="oai-ue",
             chart="helm_charts/charts/oai-nr-ue-2.1.0.tgz",
             chart_as_path=True,
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.ue_helm_chart)
 

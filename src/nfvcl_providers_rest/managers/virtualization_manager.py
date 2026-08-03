@@ -1,13 +1,13 @@
 import threading
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from nfvcl_core.managers.generic_manager import GenericManager
 from nfvcl_core.managers.task_manager import TaskManager
 from nfvcl_core_models.custom_types import NFVCLCoreException
 from nfvcl_core_models.resources import VmResource, VmStatus, NetResource
 from nfvcl_core_models.vim.vim_models import VimModel
-from nfvcl_providers.vim_clients.vim_client import VimClient
-from nfvcl_providers.virtualization import vim_type_to_vim_client_mapping, vim_type_to_provider_mapping
+from nfvcl_providers.vim_clients.vim_context import VimClientPool
+from nfvcl_providers.virtualization import vim_type_to_provider_mapping
 from nfvcl_providers.virtualization.common.utils import wait_for_ssh_to_be_ready, configure_machine_ansible
 from nfvcl_providers.virtualization.virtualization_provider_interface import VirtualizationProviderInterface
 from nfvcl_providers_rest.database.agent_repository import NFVCLProviderAgentRepository
@@ -16,14 +16,30 @@ from nfvcl_providers_rest.models.db import NFVCLProviderAgent, NFVCLProviderReso
 from nfvcl_providers_rest.models.virtualization import VmResourceAnsibleConfigurationSerialized, AttachNetPayload, NetworkCheckPayload, NetworkCheckResponse
 
 
+ProviderCacheKey = Tuple[str, str, str]
+
+
+class SingleVimModelResolver:
+    def __init__(self, vim: VimModel):
+        self._vim = vim
+
+    def get_vim_by_area(self, area: int) -> VimModel:
+        return self._vim
+
+    def get_vim_by_name(self, vim_name: str) -> VimModel:
+        if self._vim.name != vim_name:
+            raise ValueError(f"VIM {vim_name} is not available in this provider context")
+        return self._vim
+
+
 class VirtualizationManager(GenericManager):
     def __init__(self, task_manager: TaskManager, vim_repository: NFVCLProviderVimRepository, agent_repository: NFVCLProviderAgentRepository):
         super().__init__()
         self.task_manager = task_manager
         self.vim_repository = vim_repository
         self._agent_repository = agent_repository
-        self.loaded_providers: Dict[str, Dict[str, VirtualizationProviderInterface]] = {}
-        self.vim_clients: Dict[str, VimClient] = {}
+        self.loaded_providers: Dict[ProviderCacheKey, VirtualizationProviderInterface] = {}
+        self.vim_client_pools: Dict[str, VimClientPool] = {}
         self.cached_vims: Dict[str, VimModel] = {}
 
         # We keep a copy of the data here to avoid multiple db calls and race conditions
@@ -48,51 +64,43 @@ class VirtualizationManager(GenericManager):
                 agent_data.resource_groups[rg_id] = NFVCLProviderResourceGroup(id=rg_id)
             return agent_data.resource_groups[rg_id]
 
-    def _get_vim_client(self, vim: VimModel) -> VimClient:
-        if vim.name not in self.vim_clients:
-            self.vim_clients[vim.name] = vim_type_to_vim_client_mapping[vim.vim_type](vim)
-        return self.vim_clients[vim.name]
+    def _get_vim_client_pool(self, vim: VimModel) -> VimClientPool:
+        if vim.name not in self.vim_client_pools:
+            self.vim_client_pools[vim.name] = VimClientPool(SingleVimModelResolver(vim))
+        return self.vim_client_pools[vim.name]
 
     def get_virtualization_provider(self, vim_name: str, resource_group_id: str, agent_uuid: str) -> VirtualizationProviderInterface:
         if vim_name not in self.cached_vims:
             self.cached_vims[vim_name] = self.vim_repository.get_vim(vim_name)
         vim: VimModel = self.cached_vims[vim_name]
+        provider_key = (agent_uuid, vim.name, resource_group_id)
 
-        # Check if vim name exists in loaded_providers
-        if vim.name not in self.loaded_providers:
-            self.loaded_providers[vim.name] = {}
-
-        # Check if resource_group_id exists for this vim
-        if resource_group_id not in self.loaded_providers[vim.name]:
+        if provider_key not in self.loaded_providers:
             # Create persistence function to save provider data
             def persistence_function():
-                provider = self.loaded_providers[vim.name][resource_group_id]
+                provider = self.loaded_providers[provider_key]
 
                 current_rg = self._get_or_create_resource_group(resource_group_id, agent_uuid)
                 current_rg.provider_data[vim.name] = provider.data
                 self.update_agent_data_db()
 
-            vim_client = self._get_vim_client(vim)
             ProviderClass: type[VirtualizationProviderInterface] = vim_type_to_provider_mapping[vim.vim_type]
             provider = ProviderClass(
-                area=0,
-                blueprint_id=resource_group_id,
-                vim_client=vim_client,
-                persistence_function=persistence_function
+                vim_client_pool=self._get_vim_client_pool(vim),
+                persistence_function=persistence_function,
             )
-            provider.init()
             saved_rg = self._get_or_create_resource_group(resource_group_id, agent_uuid)
             saved_data = None
             if saved_rg:
                 saved_data = saved_rg.provider_data.get(vim.name)
                 if saved_data:
                     provider.data = provider.data.model_validate(saved_data.model_dump())
-            self.loaded_providers[vim.name][resource_group_id] = provider
+            self.loaded_providers[provider_key] = provider
             self.logger.info(
-                f"Created new provider for resource_group_id={resource_group_id} for vim={vim.name}, from_db={saved_rg is not None and saved_data is not None}"
+                f"Created new provider for agent_uuid={agent_uuid}, resource_group_id={resource_group_id} for vim={vim.name}, from_db={saved_rg is not None and saved_data is not None}"
             )
 
-        return self.loaded_providers[vim.name][resource_group_id]
+        return self.loaded_providers[provider_key]
 
     def get_vm_resource(self, resource_group_id: str, vm_id: str, agent_uuid: str) -> VmResource:
         rg = self._get_or_create_resource_group(resource_group_id, agent_uuid)
@@ -102,12 +110,12 @@ class VirtualizationManager(GenericManager):
         provider = self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
         rg = self._get_or_create_resource_group(resource_group_id, agent_uuid)
         rg.vm_resources[vm_resource.id] = vm_resource
-        self.update_agent_data_db()
         provider.create_vm(vm_resource)
+        self.update_agent_data_db()
         return vm_resource
 
     def list_vms(self, vim_name: str, resource_group_id: str, agent_uuid: str) -> List[VmResource]:
-        provider = self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
+        self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
         rg = self._get_or_create_resource_group(resource_group_id, agent_uuid)
         return list(rg.vm_resources.values())
 
@@ -121,15 +129,16 @@ class VirtualizationManager(GenericManager):
     def destroy_vm(self, vim_name: str, resource_group_id: str, vm_id: str, agent_uuid: str):
         rg = self._get_or_create_resource_group(resource_group_id, agent_uuid)
         provider = self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
-        ret = rg.vm_resources.pop(vm_id, None)
+        ret = rg.vm_resources.get(vm_id)
         if not ret:
             raise NFVCLCoreException(f"VM {vm_id} not found in resource group {resource_group_id}", http_equivalent_code=404)
         provider.destroy_vm(ret)
+        rg.vm_resources.pop(vm_id, None)
         self.update_agent_data_db()
         return ret
 
     def configure_vm(self, vim_name: str, resource_group_id: str, vm_id: str, vm_resource_configuration: VmResourceAnsibleConfigurationSerialized, agent_uuid: str) -> dict:
-        provider = self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
+        self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
 
         if vm_id not in self._get_or_create_resource_group(resource_group_id, agent_uuid).vm_resources:
             raise NFVCLCoreException(f"VM {vm_id} not found in resource group {resource_group_id}", http_equivalent_code=404)
@@ -164,7 +173,9 @@ class VirtualizationManager(GenericManager):
 
     def attach_net(self, vim_name: str, resource_group_id: str, vm_id: str, body: AttachNetPayload, agent_uuid: str) -> List[str]:
         provider = self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
-        return provider.attach_nets(self.get_vm_resource(resource_group_id, vm_id, agent_uuid), body.net_names)
+        attached_nets = provider.attach_nets(self.get_vm_resource(resource_group_id, vm_id, agent_uuid), body.net_names)
+        self.update_agent_data_db()
+        return attached_nets
 
     def list_attached_nets(self, vim_name: str, resource_group_id: str, vm_id: str, agent_uuid: str) -> List[NetResource]:
         raise NotImplementedError("Function not implemented yet")
@@ -189,7 +200,7 @@ class VirtualizationManager(GenericManager):
         raise NotImplementedError("Function not implemented yet")
 
     def net_info(self, vim_name: str, resource_group_id: str, net_name: str, agent_uuid: str) -> NetResource:
-        provider = self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
+        self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
         rg = self._get_or_create_resource_group(resource_group_id, agent_uuid)
 
         # Find the network resource
@@ -204,13 +215,15 @@ class VirtualizationManager(GenericManager):
 
     def final_cleanup(self, vim_name: str, resource_group_id: str, agent_uuid: str):
         provider = self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
-        provider.final_cleanup()
+        provider.cleanup_resource_group(resource_group_id)
 
         with self.agent_data_lock:
             self.agents_data[agent_uuid].resource_groups.pop(resource_group_id, None)
+        vim = self.cached_vims[vim_name]
+        self.loaded_providers.pop((agent_uuid, vim.name, resource_group_id), None)
         self.update_agent_data_db()
 
     def check_networks(self, vim_name: str, resource_group_id: str, network_check_payload: NetworkCheckPayload ,agent_uuid: str) -> NetworkCheckResponse:
         provider = self.get_virtualization_provider(vim_name, resource_group_id, agent_uuid)
-        ok, missing_nets = provider.check_networks(set(network_check_payload.net_names))
+        ok, missing_nets = provider.check_networks_exist_on_vim(0, set(network_check_payload.net_names), resource_group_id)
         return NetworkCheckResponse(ok=ok, missing_nets=list(missing_nets))

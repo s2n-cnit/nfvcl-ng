@@ -1,15 +1,15 @@
 import pytest
 
-from blueprints.blue5g.context_5g import TestContext5G
-from parent_test import NFVCLTestSuite
-from topology.test_topology import TestContextTopology
+from tests.blueprints.blue5g.context_5g import FiveGTestContext
+from tests.parent_test import NFVCLTestSuite
+from tests.topology.test_topology import TopologyTestContext
 
 
 class NFVCL5GTestSuite(NFVCLTestSuite):
     @pytest.fixture(autouse=True)
-    def _topology_context(self, topology_context: TestContextTopology):
-        self.topology_context: TestContextTopology = topology_context
+    def _topology_context(self, topology_context: TopologyTestContext):
+        self.topology_context: TopologyTestContext = topology_context
 
     @pytest.fixture(autouse=True)
-    def _context_5g(self, context_5g: TestContext5G):
-        self.context_5g: TestContext5G = context_5g
+    def _context_5g(self, context_5g: FiveGTestContext):
+        self.context_5g: FiveGTestContext = context_5g

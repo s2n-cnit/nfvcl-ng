@@ -42,7 +42,8 @@ class Open5GsUPFK8SBlueprintNG(Generic5GUPFK8SBlueprintNG[Open5GsUPFK8sBlueprint
             name=f"open5gs-upf",
             chart="helm_charts/charts/open5gs-upf-2.7.6.tgz",
             chart_as_path=True,
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(upf_helm_chart)
 

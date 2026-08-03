@@ -1,0 +1,75 @@
+---
+vims:
+  - area: 1
+    resource_group: provider_test
+    existing_networks:
+      - mgmt-net
+    missing_networks:
+      - nfvcl-provider-test-missing-network
+    vim:
+      name: openstack_lab
+      vim_type: openstack
+      vim_url: http://openstack.example:5000/v3
+      vim_user: demo
+      vim_password: change-me
+      vim_timeout: 15
+      vim_openstack_parameters:
+        project_name: demo
+        user_domain_name: Default
+        project_domain_name: Default
+        region_name: RegionOne
+      config:
+        insecure: true
+        APIversion: v3.3
+        use_floating_ip: false
+      networks:
+        - mgmt-net
+      routers: []
+      areas:
+        - 1
+    create_network:
+      name: nfvcl-provider-test-net
+      cidr: 10.250.0.0/24
+    # Enable this block to run the full destructive VirtualizationProviderInterface lifecycle:
+    # create_net, create_vm, check_vm_status, configure_vm, attach_nets, reboot_vm,
+    # destroy_vm, and cleanup_resource_group.
+    # vm_lifecycle:
+    #   name: nfvcl-provider-test-vm
+    #   image:
+    #     name: ubuntu-22.04
+    #     # url: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+    #   flavor:
+    #     vcpu_count: "1"
+    #     memory_mb: "1024"
+    #     storage_gb: "10"
+    #   username: ubuntu
+    #   password: change-me
+    #   management_network: mgmt-net
+    #   require_floating_ip: false
+    #   hard_reboot: false
+    #   attach_network:
+    #     name: nfvcl-provider-test-attach-net
+    #     cidr: 10.251.0.0/24
+
+  # - area: 2
+  #   resource_group: provider_test
+  #   existing_networks:
+  #     - vmbr0
+  #   vim:
+  #     name: proxmox_lab
+  #     vim_type: proxmox
+  #     vim_url: 192.0.2.50
+  #     vim_user: root
+  #     vim_password: change-me
+  #     vim_timeout: 15
+  #     vim_proxmox_parameters:
+  #       proxmox_realm: pam
+  #       proxmox_node: pve
+  #       proxmox_images_volume: local
+  #       proxmox_vm_volume: local-lvm
+  #       proxmox_sdn_zone: nfvcl
+  #     networks:
+  #       - vmbr0
+  #     routers: []
+  #     areas:
+  #       - 2

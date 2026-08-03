@@ -40,7 +40,8 @@ class OpenAirInterfaceCuup(Generic5GCUUPK8sBlueprintNG[OAICuupBlueprintNGState, 
             chart="helm_charts/charts/oai-cu-up-2.1.0.tgz",
             chart_as_path=True,
             # version="9.19.1",
-            namespace=self.id
+            namespace=self.id,
+            resource_group=self.id
         )
         self.register_resource(self.state.cuup_helm_chart)
 

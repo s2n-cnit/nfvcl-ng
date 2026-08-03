@@ -873,7 +873,7 @@ requires-dist = [
     { name = "pydantic", extras = ["email"], specifier = ">=2.12.3" },
     { name = "pydantic-extra-types", specifier = ">=2.10.6" },
     { name = "pydantic-settings", specifier = ">=2.11.0" },
-    { name = "pyhelm3", git = "https://github.com/s2n-cnit/pyhelm3.git?rev=5c25193" },
+    { name = "pyhelm3", git = "https://github.com/s2n-cnit/pyhelm3.git?rev=b84df4b" },
     { name = "pymongo", specifier = ">=4.15.3" },
     { name = "pyopenssl", specifier = "==25.3.0" },
     { name = "python-jose", specifier = ">=3.5.0" },
@@ -1201,8 +1201,8 @@ wheels = [
 
 [[package]]
 name = "pyhelm3"
-version = "0.1.dev36+g5c25193b2"
-source = { git = "https://github.com/s2n-cnit/pyhelm3.git?rev=5c25193#5c25193b215f567c0e6ddef21f118b8bc5bf92c7" }
+version = "0.1.dev37+gb84df4b5f"
+source = { git = "https://github.com/s2n-cnit/pyhelm3.git?rev=b84df4b#b84df4b5f35ce61b879867179af938342d235635" }
 dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },

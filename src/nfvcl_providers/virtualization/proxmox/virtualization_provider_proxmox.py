@@ -1,207 +1,91 @@
 import ipaddress
-import math
 import re
-import time
 import uuid
-from pathlib import Path
-from time import sleep
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Optional, cast
 
-import httpx
-import proxmoxer
-import semantic_version
-from proxmoxer import ResourceException
-from pydantic import Field, TypeAdapter
+from pydantic import Field
 
-from nfvcl_common.cloudinit_builder import CloudInit, CloudInitNetworkRoot, create_cloud_init_iso
-from nfvcl_common.utils.api_utils import HttpRequestType
+from nfvcl_common.cloudinit_builder import CloudInit, CloudInitNetworkRoot
 from nfvcl_common.utils.blue_utils import rel_path
-from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, \
-    VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource, VmStatus, VmPowerStatus
-from nfvcl_core_models.vim.vim_models import ProxmoxPrivilegeEscalationTypeEnum
-from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient
-from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, \
-    NetplanInterface
+from nfvcl_core_models.providers.providers import ProviderData
+from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource, VmStatus, VmPowerStatus
+from nfvcl_core_models.vim.vim_models import VimTypeEnum
+from nfvcl_providers.vim_clients.proxmox_vim_client import ProxmoxVimClient, IMPORT_URL_VERSION, proxmox_sdn_vnet_identifier
+from nfvcl_providers.virtualization.common.models.netplan import VmAddNicNetplanConfigurator, NetplanInterface
 from nfvcl_providers.virtualization.common.utils import configure_vm_ansible, check_ssh_ready
-from nfvcl_providers.virtualization.proxmox.models.models import ProxmoxZone, Subnet, \
-    ProxmoxNetsDevice, ProxmoxMac, ProxmoxTicket, ProxmoxNode, Vnet, Network
-from nfvcl_providers.virtualization.virtualization_provider_interface import \
-    VirtualizationProviderException, \
-    VirtualizationProviderInterface, VirtualizationProviderData
+from nfvcl_providers.virtualization.proxmox.models.models import ProxmoxNetsDevice, ProxmoxMac
+from nfvcl_providers.virtualization.virtualization_provider_interface import VirtualizationProviderException, VirtualizationProviderInterface, VirtualizationProviderData
 
 cloud_init_packages = ['qemu-guest-agent']
 # cloud_init_runcmd = ["systemctl start qemu-guest-agent.service", "systemctl enable qemu-guest-agent.service"]
 cloud_init_runcmd = ["systemctl start qemu-guest-agent.service"]
 
-DEFAULT_PROXMOX_TIMEOUT = 180
-IMPORT_URL_VERSION = semantic_version.Version("9.0.17")
 
-
-class VirtualizationProviderDataProxmox(VirtualizationProviderData):
+class ResourceGroupVirtualizationProviderDataProxmox(ProviderData):
     proxmox_dict: Dict[str, str] = Field(default_factory=dict)
     proxmox_macs: Dict[str, List[ProxmoxMac]] = Field(default_factory=dict)
     proxmox_net_device: ProxmoxNetsDevice = ProxmoxNetsDevice()
     proxmox_vnet: Dict[str, str] = Field(default_factory=dict)
-    proxmox_node_name: str = ""
-    proxmox_credentials: ProxmoxTicket = ProxmoxTicket()
 
+
+class ProxmoxVimProviderData(ProviderData):
+    resource_groups: Dict[str, ResourceGroupVirtualizationProviderDataProxmox] = Field(default_factory=dict)
+
+    def get_resource_group_data(self, resource_group: str) -> ResourceGroupVirtualizationProviderDataProxmox:
+        if resource_group not in self.resource_groups:
+            self.resource_groups[resource_group] = ResourceGroupVirtualizationProviderDataProxmox()
+        return self.resource_groups[resource_group]
+
+
+class VirtualizationProviderDataProxmox(VirtualizationProviderData):
+    vims: Dict[str, ProxmoxVimProviderData] = Field(default_factory=dict)
+
+    def get_vim_data(self, vim_name: str) -> ProxmoxVimProviderData:
+        if vim_name not in self.vims:
+            self.vims[vim_name] = ProxmoxVimProviderData()
+        return self.vims[vim_name]
 
 class VirtualizationProviderProxmoxException(VirtualizationProviderException):
     pass
 
 
 class VirtualizationProviderProxmox(VirtualizationProviderInterface):
-    vim_client: ProxmoxVimClient
+    provider_vim_type = VimTypeEnum.PROXMOX
     data: VirtualizationProviderDataProxmox
 
     def init(self):
         self.data: VirtualizationProviderDataProxmox = VirtualizationProviderDataProxmox()
-        self.path = self.__get_storage_path(self.vim.proxmox_parameters().proxmox_images_volume)
-        if self.vim_client.version < IMPORT_URL_VERSION:
-            self.__create_ci_qcow_folders()
-            self.__load_scripts()
-        if len(self.data.proxmox_node_name) == 0:
-            if self.vim.proxmox_parameters().proxmox_node:
-                self.data.proxmox_node_name = self.vim.proxmox_parameters().proxmox_node
-            else:
-                self.data.proxmox_node_name = self.get_node_by_ip()
-        self.__check_storage_content()
 
-    def get_node_by_ip(self):
-        response = self.__execute_proxmox_request(
-            url="nodes",
-            r_type=HttpRequestType.GET
-        )
-        ta = TypeAdapter(List[ProxmoxNode])
-        nodes = ta.validate_python(response)
-        for node in nodes:
-            node_details = self.__execute_proxmox_request(url=f"nodes/{node.node}/network", r_type=HttpRequestType.GET)
-            for interface in node_details:
-                if "address" in interface and interface["address"] == self.vim.vim_url:
-                    return node.node
-        raise VirtualizationProviderProxmoxException(f"Node with ip {self.vim.vim_url} not found")
+    def _get_client(self, area: int) -> ProxmoxVimClient:
+        vim_client = cast(ProxmoxVimClient, self.get_vim_client(area))
+        with open(rel_path('scripts/image_script.sh'), 'r') as script_file:
+            vim_client.ensure_nfvcl_runtime_ready(script_file.read())
+        return vim_client
 
-    def __check_storage_content(self):
-        response = self.__execute_proxmox_request(
-            url=f"nodes/{self.data.proxmox_node_name}/storage",
-            r_type=HttpRequestType.GET
-        )
-        for storage in response:
-            if storage["storage"] == self.vim.proxmox_parameters().proxmox_images_volume:
-                contents = storage["content"].split(",")
-                if "import" and "iso" and "snippets" in contents:
-                    return
-        raise Exception(f"IMPORT, SNIPPETS and ISO must be enable on storage {self.vim.proxmox_parameters().proxmox_images_volume}")
+    def _get_resource_group_data(self, client: ProxmoxVimClient, resource_group: str) -> ResourceGroupVirtualizationProviderDataProxmox:
+        return self.data.get_vim_data(client.vim.name).get_resource_group_data(resource_group)
 
-    def __patch_vm_config(self, node, vmid, new_config):
-        self.__execute_proxmox_request(
-            url=f"nodes/{node}/qemu/{vmid}/config",
-            r_type=HttpRequestType.PUT,
-            parameters=new_config
-        )
-
-    def __upload_cnit_iso(self, meta, user, vendor, network, filename):
-        file_content, checksum = create_cloud_init_iso(
-            meta_data=meta,
-            user_data=user,
-            vendor_data=vendor,
-            network_config=network
-        )
-        file = Path(f"/tmp/{filename}.iso")
-        with open(file, "wb") as f:
-            f.write(file_content.getbuffer())
-        with open(file, "rb") as f:
-            self.__execute_proxmox_request(
-                url=f"nodes/{self.data.proxmox_node_name}/storage/{self.vim.proxmox_parameters().proxmox_images_volume}/upload",
-                r_type=HttpRequestType.POST,
-                parameters={"content": "iso", "filename": f},
-                node_name=self.data.proxmox_node_name
-            )
-        file.unlink()
-
-    def __delete_volume(self, node, storage, content, file_name):
-        self.__execute_proxmox_request(
-            url=f"/nodes/{node}/storage/{storage}/content/{content}/{file_name}",
-            r_type=HttpRequestType.DELETE
-        )
-
-    def __get_permission(self):
-        permissions = self.__execute_proxmox_request(
-            url=f"/access/acl",
-            r_type=HttpRequestType.GET
-        )
-        return permissions
-
-    def __get_groups(self):
-        groups = self.__execute_proxmox_request(
-            url=f"/access/groups",
-            r_type=HttpRequestType.GET
-        )
-        user = f"{self.vim.vim_user}@{self.vim.proxmox_parameters().proxmox_realm}"
-        user_groups = [g["groupid"] for g in groups if user in g.get("users", [])]
-        return user_groups
-
-    def __get_pools(self):
-        user_pools = []
-        user = f"{self.vim.vim_user}@{self.vim.proxmox_parameters().proxmox_realm}"
-        group_list = self.__get_groups()
-        acl_list = self.__get_permission()
-        for acl in acl_list:
-            path = acl["path"]
-            if path.startswith("/pool/"):
-                poolid = path.split("/pool/")[1]
-
-                if user in acl.get("ugid", []):
-                    user_pools.append(poolid)
-
-                for g in group_list:
-                    if g in acl.get("ugid", []):
-                        user_pools.append(poolid)
-        return list(set(user_pools))
-
-    def __pre_creation_check(self, networks: List[str]):
-        response = self.__execute_proxmox_request(
-            url=f"cluster/sdn/vnets",
-            r_type=HttpRequestType.GET
-        )
-        ta = TypeAdapter(List[Vnet])
-        vnets = ta.validate_python(response)
-
-        # Check if subnet has gateway set, no gateway = DHCP doesn't work in proxmox
-        for vnet in vnets:
-            if vnet.vnet in networks:
-                response = self.__execute_proxmox_request(
-                    url=f"cluster/sdn/vnets/{vnet.vnet}/subnets",
-                    r_type=HttpRequestType.GET
-                )
-                ta = TypeAdapter(List[Subnet])
-                subnets = ta.validate_python(response)
-                if len(subnets) == 1:
-                    if subnets[0].gateway is None:
-                        raise VirtualizationProviderProxmoxException(f"Error Subnet of Vnet {vnet.vnet} has no gateway defined")
-                else:
-                    raise VirtualizationProviderProxmoxException(f"Error Vnet {vnet.vnet} has no subnets or more than 1 subnet")
-
-        if self.vim.vim_proxmox_parameters.proxmox_resource_pool:
-            pools = self.__get_pools()
-            if self.vim.vim_proxmox_parameters.proxmox_resource_pool not in pools:
-                raise VirtualizationProviderProxmoxException(f"Error Pool {self.vim.vim_proxmox_parameters.proxmox_resource_pool} does not exist or you do not have access to it")
+    def _delete_resource_group_data(self, client: ProxmoxVimClient, resource_group: str):
+        return self.data.get_vim_data(client.vim.name).resource_groups.pop(resource_group, None)
 
     def create_vm(self, vm_resource: VmResource):
+        client = self._get_client(vm_resource.area)
+        rg_data = self._get_resource_group_data(client, vm_resource.resource_group)
+
         tmp_networks = vm_resource.additional_networks.copy()
         tmp_networks.append(vm_resource.management_network)
-        self.__pre_creation_check(tmp_networks)
-        self.logger.info(f"Creating VM {vm_resource.name} on node {self.data.proxmox_node_name}")
-        self.__download_cloud_image(f'{vm_resource.image.url}', f'{vm_resource.image.name}')
+        client.pre_creation_check(tmp_networks)
+        self.logger.info(f"Creating VM {vm_resource.name} on node {client.get_node_name()}")
+        client.download_cloud_image(f"{vm_resource.image.url}", f"{vm_resource.image.name}")
 
         ssh_keys = []
-        ssh_keys.extend(self.vim.ssh_keys)
+        ssh_keys.extend(client.vim.ssh_keys or [])
         if vm_resource.flavor.ssh_keys:
             ssh_keys.extend(vm_resource.flavor.ssh_keys)
 
-        vmid = self.__get_free_vmid()
+        vmid = client.get_free_vmid()
 
-        interface0 = self.data.proxmox_net_device.add_net_device(str(vmid))
+        interface0 = rg_data.proxmox_net_device.add_net_device(str(vmid))
         vm_to_create = {
             "vmid": vmid,
             "name": vm_resource.get_name_k8s_format(),
@@ -213,34 +97,29 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
             "tags": "nfvcl",  # If you want add more tags, you have to separate them with ";"
             "agent": 1
         }
-        vm_to_create[interface0] = f"virtio,bridge={self.data.proxmox_vnet[vm_resource.management_network]},firewall=0" if vm_resource.management_network in self.data.proxmox_vnet.keys() else f"virtio,bridge={vm_resource.management_network},firewall=0"
+        vm_to_create[interface0] = f"virtio,bridge={rg_data.proxmox_vnet[vm_resource.management_network]},firewall=0" if vm_resource.management_network in rg_data.proxmox_vnet.keys() else f"virtio,bridge={vm_resource.management_network},firewall=0"
 
-        if self.vim.proxmox_parameters().proxmox_resource_pool:
-            vm_to_create["pool"] = self.vim.proxmox_parameters().proxmox_resource_pool
+        if client.vim.proxmox_parameters().proxmox_resource_pool:
+            vm_to_create["pool"] = client.vim.proxmox_parameters().proxmox_resource_pool
 
         for net in vm_resource.additional_networks:
-            interface = self.data.proxmox_net_device.add_net_device(str(vmid))
-            vm_to_create[interface] = f"virtio,bridge={self.data.proxmox_vnet[net]},firewall=0" if net in self.data.proxmox_vnet.keys() else f"virtio,bridge={net},firewall=0"
+            interface = rg_data.proxmox_net_device.add_net_device(str(vmid))
+            vm_to_create[interface] = f"virtio,bridge={rg_data.proxmox_vnet[net]},firewall=0" if net in rg_data.proxmox_vnet.keys() else f"virtio,bridge={net},firewall=0"
 
-        if self.vim_client.version >= IMPORT_URL_VERSION:
-            vm_to_create["scsi0"] = f"file={vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters().proxmox_vm_volume}:0,import-from=local:import/{vm_resource.image.name}.qcow2,iothread=on",
+        if client.version >= IMPORT_URL_VERSION:
+            vm_to_create["scsi0"] = f"file={vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else client.vm_volume}:0,import-from=local:import/{vm_resource.image.name}.qcow2,iothread=on",
             vm_to_create["boot"] = "order=scsi0"
         else:
-            vm_to_create["scsi0"] = f"file={vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters().proxmox_vm_volume}:0,import-from=local:0/{vm_resource.image.name}.qcow2,iothread=on",
+            vm_to_create["scsi0"] = f"file={vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else client.vm_volume}:0,import-from=local:0/{vm_resource.image.name}.qcow2,iothread=on",
             vm_to_create["boot"] = "order=scsi0"
 
-        self.__execute_proxmox_request(
-            url=f"nodes/{self.data.proxmox_node_name}/qemu",
-            parameters=vm_to_create,
-            r_type=HttpRequestType.POST,
-            node_name=self.data.proxmox_node_name
-        )
+        client.create_vm(vm_to_create)
 
-        self.data.proxmox_dict[vm_resource.id] = str(vmid)
+        rg_data.proxmox_dict[vm_resource.id] = str(vmid)
         self.save_to_db()
-        self.resize_disk(vmid, int(vm_resource.flavor.storage_gb), "scsi0")
+        client.resize_disk(vmid, int(vm_resource.flavor.storage_gb), "scsi0")
 
-        self.__get_macs(vmid)
+        self.__get_macs(client, vmid, vm_resource.resource_group)
 
         c_init = CloudInit(hostname=vm_resource.name,
                            packages=cloud_init_packages,
@@ -250,50 +129,46 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         netwotk_cloud_init: CloudInitNetworkRoot = CloudInitNetworkRoot()
 
-        for mac in self.data.proxmox_macs[str(vmid)]:
+        for mac in rg_data.proxmox_macs[str(vmid)]:
             if mac.net_name == vm_resource.management_network:
                 netwotk_cloud_init.add_device(mac.interface_name, mac.mac)
             else:
                 netwotk_cloud_init.add_device(mac.interface_name, mac.mac, override=True)
 
-        if self.vim_client.version >= IMPORT_URL_VERSION:
-            self.__upload_cnit_iso(
-                meta=f"#cloud-config\ninstance-id: {str(uuid.uuid4()).replace("-", "")}",
+        if client.version >= IMPORT_URL_VERSION:
+            client.upload_cnit_iso(
+                meta=f"#cloud-config\ninstance-id: {str(uuid.uuid4()).replace('-', '')}",
                 user=c_init.build_cloud_config(),
                 vendor={},
                 network=netwotk_cloud_init.build_cloud_config(),
-                filename=f"{vmid}_{self.blueprint_id}"
+                filename=f"{vmid}_{vm_resource.resource_group}"
             )
-            self.__patch_vm_config(
-                node=self.data.proxmox_node_name,
+            client.patch_vm_config(
+                node=client.get_node_name(),
                 vmid=vmid,
                 new_config={
-                    "ide2": f"{self.vim.proxmox_parameters().proxmox_images_volume}:iso/{vmid}_{self.blueprint_id}.iso,media=cdrom"
+                    "ide2": f"{client.images_volume}:iso/{vmid}_{vm_resource.resource_group}.iso,media=cdrom"
                 }
             )
         else:
-            user_cloud_init_path = f"{self.path}/snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml"
-            network_cloud_init_path = f"{self.path}/snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml"
-            self.__load_cloud_init(cloud_init=c_init.build_cloud_config(), cloud_init_path=user_cloud_init_path)
-            self.__load_cloud_init(cloud_init=netwotk_cloud_init.build_cloud_config(), cloud_init_path=network_cloud_init_path)
-            self.__patch_vm_config(
-                node=self.data.proxmox_node_name,
+            user_cloud_init_path = f"{client.storage_path}/snippets/user_cloud_init_{vmid}_{vm_resource.resource_group}.yaml"
+            network_cloud_init_path = f"{client.storage_path}/snippets/network_cloud_init_{vmid}_{vm_resource.resource_group}.yaml"
+            client.load_cloud_init(cloud_init=c_init.build_cloud_config(), cloud_init_path=user_cloud_init_path)
+            client.load_cloud_init(cloud_init=netwotk_cloud_init.build_cloud_config(), cloud_init_path=network_cloud_init_path)
+            client.patch_vm_config(
+                node=client.get_node_name(),
                 vmid=vmid,
                 new_config={
-                    "ide2": f"{vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else self.vim.proxmox_parameters().proxmox_vm_volume}:cloudinit",
-                    "cicustom": f"user=local:snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml,network=local:snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml"
+                    "ide2": f"{vm_resource.flavor.vm_volume if vm_resource.flavor.vm_volume else client.vm_volume}:cloudinit",
+                    "cicustom": f"user=local:snippets/user_cloud_init_{vmid}_{vm_resource.resource_group}.yaml,network=local:snippets/network_cloud_init_{vmid}_{vm_resource.resource_group}.yaml"
                 }
             )
 
-        self.__execute_proxmox_request(
-            url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/start",
-            node_name=self.data.proxmox_node_name,
-            r_type=HttpRequestType.POST
-        )
+        client.start_vm(vmid)
 
         # Loop until qemu-agent is ready
-        self.qemu_guest_agent_ready(vmid)
-        self.__parse_proxmox_addresses(vm_resource, vmid)
+        client.qemu_guest_agent_ready(vmid)
+        self.__parse_proxmox_addresses(client, vm_resource, int(vmid))
 
         # Find the IP to use for configuring the VMte
         if vm_resource.management_network in vm_resource.network_interfaces.keys() and len(vm_resource.network_interfaces[vm_resource.management_network]) > 0:
@@ -308,23 +183,12 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.save_to_db()
 
     def reboot_vm(self, vm_resource: VmResource, hard: bool = False):
+        client = self._get_client(vm_resource.area)
+        rg_data = self._get_resource_group_data(client, vm_resource.resource_group)
         self.logger.info(f"Restarting VM {vm_resource.name}")
-        if vm_resource.id in self.data.proxmox_dict.keys():
-            vmid = self.data.proxmox_dict[vm_resource.id]
-            if hard:
-                self.logger.debug(f"Hard restarting VM {vmid}")
-                self.__execute_proxmox_request(
-                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/reset",
-                    node_name=self.data.proxmox_node_name,
-                    r_type=HttpRequestType.POST
-                )
-            else:
-                self.logger.debug(f"Soft restarting VM {vmid}")
-                self.__execute_proxmox_request(
-                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/reboot",
-                    node_name=self.data.proxmox_node_name,
-                    r_type=HttpRequestType.POST
-                )
+        if vm_resource.id in rg_data.proxmox_dict.keys():
+            vmid = rg_data.proxmox_dict[vm_resource.id]
+            client.reboot_vm(vmid, hard)
             self.logger.success(f"VM {vmid} restarted")
         else:
             raise VirtualizationProviderProxmoxException(f"VM {vm_resource.name} not found")
@@ -340,16 +204,15 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         """
         self.logger.info(f"Checking status of VM {vm_resource.name}")
 
-        if vm_resource.id not in self.data.proxmox_dict:
+        client = self._get_client(vm_resource.area)
+        rg_data = self._get_resource_group_data(client, vm_resource.resource_group)
+
+        if vm_resource.id not in rg_data.proxmox_dict:
             raise VirtualizationProviderProxmoxException(f"VM {vm_resource.name} not found on VIM")
 
-        vmid = self.data.proxmox_dict[vm_resource.id]
+        vmid = rg_data.proxmox_dict[vm_resource.id]
 
-        # Get VM status from Proxmox
-        vm_status_response = self.__execute_proxmox_request(
-            url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/current",
-            r_type=HttpRequestType.GET
-        )
+        vm_status_response = client.get_vm_status(vmid)
 
         proxmox_status = vm_status_response["status"]
 
@@ -391,7 +254,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         # Different handlers for different configuration types
         if isinstance(vm_resource_configuration, VmResourceAnsibleConfiguration):  # VmResourceNativeConfiguration
-            configurator_facts = configure_vm_ansible(vm_resource_configuration, self.blueprint_id, logger_override=self.logger)
+            configurator_facts = configure_vm_ansible(vm_resource_configuration, vm_resource_configuration.resource_group, logger_override=self.logger)
 
         self.logger.success(f"Configuring VM {vm_resource_configuration.vm_resource.name} finished")
         self.save_to_db()
@@ -399,61 +262,64 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         return configurator_facts
 
     def destroy_vm(self, vm_resource: VmResource):
+        client = self._get_client(vm_resource.area)
+        rg_data = self._get_resource_group_data(client, vm_resource.resource_group)
         self.logger.info(f"Destroying VM {vm_resource.name}")
-        if vm_resource.id in self.data.proxmox_dict.keys():
-            vmid = self.data.proxmox_dict[vm_resource.id]
-            self.logger.debug(f"Stopping VM {vmid}")
-            self.__execute_proxmox_request(
-                url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/status/stop",
-                node_name=self.data.proxmox_node_name,
-                r_type=HttpRequestType.POST
-            )
-            self.logger.debug(f"Destroying VM {vmid}")
-            self.__execute_proxmox_request(
-                url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}",
-                parameters={"purge": 1},
-                node_name=self.data.proxmox_node_name,
-                r_type=HttpRequestType.DELETE
-            )
-            if self.vim_client.version >= IMPORT_URL_VERSION:
-                self.__delete_volume(
-                    node=self.data.proxmox_node_name,
-                    storage=self.vim.proxmox_parameters().proxmox_images_volume,
-                    content="local:iso",
-                    file_name=f"{vmid}_{self.blueprint_id}.iso"
-                )
-            else:
-                self.__execute_ssh_command(f"rm {self.path}/snippets/user_cloud_init_{vmid}_{self.blueprint_id}.yaml")
-                self.__execute_ssh_command(f"rm {self.path}/snippets/network_cloud_init_{vmid}_{self.blueprint_id}.yaml")
-            del self.data.proxmox_dict[vm_resource.id]
-            self.logger.success(f"VM {vmid} destroyed")
+        if vm_resource.id in rg_data.proxmox_dict.keys():
+            vmid = rg_data.proxmox_dict[vm_resource.id]
+            client.delete_vm(vmid, vm_resource.resource_group)
+            del rg_data.proxmox_dict[vm_resource.id]
 
-    def final_cleanup(self):
-        for vnet in list(self.data.proxmox_vnet.keys()).copy():
-            self.__delete_sdn_vnet(vnet)
+    def cleanup_resource_group(self, resource_group: str):
+        for vim_name, vim_data in list(self.data.vims.items()):
+            rg_data = vim_data.resource_groups.get(resource_group)
+            if rg_data is None:
+                continue
+
+            client = cast(
+                ProxmoxVimClient,
+                self.vim_client_pool.get_client_by_vim_name(vim_name, self.provider_vim_type),
+            )
+            # Delete leftover VMs
+            # This shouldn't be needed because VMs are deleted by the generic blueprint cleanup so we'll log a warning
+            for vm_resource_id, vm in list(rg_data.proxmox_dict.items()):
+                try:
+                    self.logger.warning(f"Deleting leftover VM {vm}, something did go wrong in the blueprint deletion")
+                    client.delete_vm(vm, resource_group)
+                    del rg_data.proxmox_dict[vm_resource_id]
+                except Exception as e:
+                    self.logger.error(f"Unable to delete leftover VM {vm} on VIM: {e}")
+
+            for vnet in list(rg_data.proxmox_vnet.keys()).copy():
+                self.__delete_sdn_vnet(client, vnet, resource_group)
+
+            self._delete_resource_group_data(client, resource_group)
+        self.save_to_db()
 
     def create_net(self, net_resource: NetResource):
-        self.__create_sdn_vnet(net_resource)
-        self.__create_sdn_subnet(net_resource)
+        client = self._get_client(net_resource.area)
+        self.__create_sdn_vnet(client, net_resource)
+        self.save_to_db()
+        self.__create_sdn_subnet(client, net_resource)
+        self.save_to_db()
 
     def attach_nets(self, vm_resource: VmResource, nets_name: List[str]) -> List[str]:
+        client = self._get_client(vm_resource.area)
+        rg_data = self._get_resource_group_data(client, vm_resource.resource_group)
         netplan_interfaces: List[NetplanInterface] = []
         interfaces = []
-        vmid = self.data.proxmox_dict[vm_resource.id]
+        vmid = rg_data.proxmox_dict[vm_resource.id]
 
         for net in nets_name:
             vm_resource.additional_networks.append(net)
-            interface = self.data.proxmox_net_device.add_net_device(str(vmid))
+            interface = rg_data.proxmox_net_device.add_net_device(str(vmid))
             interfaces.append(interface)
-            self.__execute_proxmox_request(
-                url=f'nodes/{self.data.proxmox_node_name}/qemu/{vmid}/config',
-                parameters={f"{interface}": f"virtio,bridge={self.data.proxmox_vnet[net]},firewall=0"},
-                r_type=HttpRequestType.PUT)
+            client.attach_vm_net(vmid, interface, rg_data.proxmox_vnet[net])
 
-        self.__get_macs(int(vmid))
+        self.__get_macs(client, int(vmid), vm_resource.resource_group)
 
         for interface in interfaces:
-            for mac in self.data.proxmox_macs[vmid]:
+            for mac in rg_data.proxmox_macs[vmid]:
                 if mac.hw_interface_name == interface:
                     tmp = NetplanInterface(
                         nic_name=mac.interface_name,
@@ -461,9 +327,9 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     )
                     netplan_interfaces.append(tmp)
 
-        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces), self.blueprint_id, logger_override=self.logger)
+        configure_vm_ansible(VmAddNicNetplanConfigurator(vm_resource=vm_resource, nics=netplan_interfaces, resource_group=vm_resource.resource_group), vm_resource.resource_group, logger_override=self.logger)
 
-        self.__parse_proxmox_addresses(vm_resource, vmid)
+        self.__parse_proxmox_addresses(client, vm_resource, int(vmid))
 
         self.logger.success(f"Network {', '.join(nets_name)} attached to VM {vm_resource.name}")
         self.save_to_db()
@@ -477,65 +343,9 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
 
         return ips
 
-    def __get_free_vmid(self) -> int:
-        nfvcl_vmid = list(range(10000, 11000))
-        for _id in nfvcl_vmid:
-            try:
-                response = self.__execute_proxmox_request(
-                    url="cluster/nextid",
-                    parameters={"vmid": _id},
-                    r_type=HttpRequestType.GET
-                )
-                if response == str(_id):
-                    return _id
-            except ResourceException as e:
-                pass
-        raise Exception(f"No free vmid available")
-
-    def __get_storage_path(self, storage_id: str):
-        storages = self.__execute_proxmox_request(
-            url="storage",
-            r_type=HttpRequestType.GET
-        )
-        for item in storages:
-            if item['storage'] == storage_id and 'iso' in item['content']:
-                return item['path']
-        return None
-
-    def __create_ci_qcow_folders(self):
-        self.__execute_ssh_command(f'mkdir -p {self.path}/snippets')
-        self.__execute_ssh_command(f'mkdir -p {self.path}/images/0')
-        self.__execute_ssh_command(f'mkdir -p /root/scripts')
-
-    def __load_scripts(self) -> None:
-        with open(rel_path('scripts/image_script.sh'), 'r') as script_file:
-            script_content = script_file.read()
-            self.__execute_ssh_command(f"echo '{script_content}' > /root/scripts/image_script.sh")
-        self.__execute_ssh_command("chmod +x /root/scripts/image_script.sh")
-
-    def __load_cloud_init(self, cloud_init: str, cloud_init_path: str) -> None:
-        self.__execute_ssh_command(f"echo '{cloud_init}' > {cloud_init_path}")
-
-    def __download_cloud_image(self, image_url, image_name):
-        # TODO seems to be supported on 9.x: https://bugzilla.proxmox.com/show_bug.cgi?id=2424
-        if self.vim_client.version >= IMPORT_URL_VERSION:
-            response = httpx.get(f"{image_url}.SHA256SUM")
-            checksum = response.content.split()[0]
-            download_args = {"url": image_url, "content": "import", "filename": f"{image_name}.qcow2", "checksum": checksum, "checksum-algorithm": "sha256"}
-            self.__execute_proxmox_request(
-                url=f"nodes/{self.data.proxmox_node_name}/storage/{self.vim.proxmox_parameters().proxmox_images_volume}/download-url",
-                r_type=HttpRequestType.POST,
-                node_name=self.data.proxmox_node_name,
-                parameters=download_args
-            )
-        else:
-            self.__execute_ssh_command(f'/root/scripts/image_script.sh {image_url} {self.path}/images/0/{image_name}.qcow2')
-
-    def __get_macs(self, vmid: int):
-        config = self.__execute_proxmox_request(
-            url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/config",
-            r_type=HttpRequestType.GET
-        )
+    def __get_macs(self, client: ProxmoxVimClient, vmid: int, resource_group: str):
+        config = client.get_vm_config(vmid)
+        resource_group_macs = self._get_resource_group_data(client, resource_group).proxmox_macs
         for key in config.keys():
             if re.match("^net[0-9]+$", key):
                 tmp = config[key].split(",")
@@ -545,20 +355,18 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                     hw_interface_name=key,
                     interface_name=f"eth{key.split('net')[1]}"
                 )
-                if not str(vmid) in self.data.proxmox_macs.keys():
-                    self.data.proxmox_macs[str(vmid)] = []
-                if mac not in self.data.proxmox_macs[str(vmid)]:
-                    self.data.proxmox_macs[str(vmid)].append(mac)
+                if str(vmid) not in resource_group_macs.keys():
+                    resource_group_macs[str(vmid)] = []
+                if mac not in resource_group_macs[str(vmid)]:
+                    resource_group_macs[str(vmid)].append(mac)
 
-    def __parse_proxmox_addresses(self, vm_resource: VmResource, vmid):
-        net_informations = self.__execute_proxmox_request(
-            url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces",
-            r_type=HttpRequestType.GET
-        )
-        self.__get_macs(vmid)
+    def __parse_proxmox_addresses(self, client: ProxmoxVimClient, vm_resource: VmResource, vmid: int):
+        net_informations = client.get_qemu_agent_interfaces(vmid)
+        self.__get_macs(client, vmid, vm_resource.resource_group)
+        rg_data = self._get_resource_group_data(client, vm_resource.resource_group)
         for interface in net_informations["result"]:
             mac = interface["hardware-address"]
-            for p_mac in self.data.proxmox_macs[str(vmid)]:
+            for p_mac in rg_data.proxmox_macs[str(vmid)]:
                 if mac == p_mac.mac:
                     interface_name = interface['name']
                     ip = None
@@ -569,7 +377,7 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                         base_network = ipaddress.IPv4Network(f'{ip}/{prefix}', strict=False).network_address
                         cidr = f'{base_network}/{prefix}'
                     fixed = VmResourceNetworkInterfaceAddress(interface_name=interface_name, ip=ip, mac=mac, cidr=cidr)
-                    key = next((key for key, value in self.data.proxmox_vnet.items() if value == p_mac.net_name), None)
+                    key = next((key for key, value in rg_data.proxmox_vnet.items() if value == p_mac.net_name), None)
 
                     if key and key not in vm_resource.network_interfaces.keys():
                         vm_resource.network_interfaces[key] = []
@@ -583,257 +391,39 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
                         vm_resource.network_interfaces[p_mac.net_name].append(ni)
                     continue
 
-    def __get_disks_memory(self, vmid: int):
-        """
-        Retrieves disk memory space
-        Args:
-            vmid: id of virtual machine
-
-        Returns: Positional array of disk memory
-
-        """
-        config = self.__execute_proxmox_request(
-            url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/config",
-            r_type=HttpRequestType.GET
-        )
-        disks = list(filter(lambda x: re.match('scsi[0-9]+', x), config.keys()))
-        if disks is not None:
-            disks_memory = list()
-            for disk in disks:
-                size: str = config[disk].split("size=")[1]  # 10G or 10M
-                if size:
-                    disks_memory.append((size, disk))
-                else:
-                    raise VirtualizationProviderProxmoxException(f"Disk size unit not supported: {size}")
-            return disks_memory
-        else:
-            raise VirtualizationProviderProxmoxException(f"Non disk devices found for VM-ID: {vmid}")
-
-    def resize_disk(self, vmid: int, desidered_size: int, disk: str):
-        disks = self.__get_disks_memory(vmid)
-        desidered_size = desidered_size * 1024
-        for d in disks:
-            if d[1] == disk:
-                if "M" in d[0]:
-                    size = int(d[0].split("M")[0])
-                else:
-                    size = int(d[0].split("G")[0]) * 1024
-                if desidered_size > size:
-                    size_to_add = math.ceil((desidered_size - size))
-                    self.__execute_proxmox_request(
-                        url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/resize",
-                        parameters={
-                            "disk": f"{d[1]}",
-                            "size": f"+{size_to_add}M"
-                        },
-                        node_name=self.data.proxmox_node_name,
-                        r_type=HttpRequestType.PUT
-                    )
-                else:
-                    self.logger.warning(f"Disk of VM: {vmid}, is already larger than the desired size")
-
-    def qemu_guest_agent_ready(self, vmid: int):
-        self.logger.info("Waiting qemu guest agent")
-        exit_status = 1
-        timeout = time.time() + (DEFAULT_PROXMOX_TIMEOUT if self.vim.vim_timeout is None else self.vim.vim_timeout)
-        while exit_status != 0 and time.time() < timeout:
-            try:
-                response = self.__execute_proxmox_request(
-                    url=f"nodes/{self.data.proxmox_node_name}/qemu/{vmid}/agent/ping",
-                    r_type=HttpRequestType.POST,
-                    logger=False
-                )
-                if response is not None:
-                    exit_status = 0
-                    return
-            except Exception as e:
-                self.logger.debug(f"Waiting qemu guest agent... ({e})")
-                sleep(3)
-        raise VirtualizationProviderProxmoxException(f"Timeout waiting for qemu guest agent")
-
-    def __execute_ssh_command(self, command: str):
-        if self.vim.proxmox_parameters().proxmox_privilege_escalation == ProxmoxPrivilegeEscalationTypeEnum.SUDO_WITHOUT_PASSWORD:
-            # Needed to escape single quotes: https://stackoverflow.com/a/1250279
-            command = command.replace("'", """'"'"'""")
-            command = f"sudo sh -c '{command}'"
-        stdin, stdout, stderr = self.vim_client.exec_command(command)
-        exit_status = stdout.channel.recv_exit_status()
-        if exit_status != 0:
-            raise VirtualizationProviderProxmoxException(f"Error executing command: {command}")
-        else:
-            return stdout
-
-    def __execute_proxmox_request(self, url: str, r_type: HttpRequestType, node_name=None, parameters=None, logger=True):
-        connection_attempts = 0
-        max_retries = 5
-        while connection_attempts < max_retries:
-            try:
-                match r_type:
-                    case HttpRequestType.GET:
-                        response = self.vim_client.proxmoxer(url).get(**parameters if parameters else {})
-                    case HttpRequestType.POST:
-                        response = self.vim_client.proxmoxer(url).post(**parameters if parameters else {})
-                    case HttpRequestType.PUT:
-                        response = self.vim_client.proxmoxer(url).put(**parameters if parameters else {})
-                    case HttpRequestType.DELETE:
-                        response = self.vim_client.proxmoxer(url).delete(**parameters if parameters else {})
-                    case _:
-                        raise VirtualizationProviderProxmoxException("Api request type not supported")
-
-                if node_name:
-                    data = {"status": ""}
-                    exit_status = ""
-                    while data["status"] != "stopped":
-                        output = f"{response.split(':')[5]}, VMid {response.split(':')[6]}" if response.split(':')[6] else f"{response.split(':')[5]}"
-                        self.logger.debug(f"Waiting for task: {output}")
-                        data = self.vim_client.proxmoxer(f"nodes/{node_name}/tasks/{response}/status").get()
-                        if data["status"] == "stopped":
-                            exit_status = data["exitstatus"]
-                        sleep(3)
-                    if exit_status == "OK":
-                        pass
-                    else:
-                        raise Exception(f"{exit_status}")
-                return response
-            except (proxmoxer.core.AuthenticationError, proxmoxer.core.ResourceException) as e:  # TODO add other possible exceptions
-                if isinstance(e, proxmoxer.core.ResourceException) and not e.status_code == 401:
-                    # If the error is not an authentication error, we raise it immediately
-                    if logger:
-                        self.logger.error(f"{e}")
-                    raise e
-                connection_attempts += 1
-                self.logger.error(f"Error executing Proxmox request: {e}, attempt {connection_attempts}/{max_retries}")
-                self.logger.debug("Forcing proxmox client to re-authenticate")
-                self.vim_client.force_token_refresh()
-                if connection_attempts >= max_retries:
-                    raise VirtualizationProviderProxmoxException(f"Failed to execute Proxmox request after {max_retries} attempts")
-                sleep(2)
-        return None
-
-    def __get_nfvcl_sdn_zone(self) -> ProxmoxZone:
-        response = self.__execute_proxmox_request(
-            url="cluster/sdn/zones",
-            r_type=HttpRequestType.GET
-        )
-        ta = TypeAdapter(List[ProxmoxZone])
-        zones = ta.validate_python(response)
-        for zone in zones:
-            if zone.zone == self.vim.proxmox_parameters().proxmox_sdn_zone:
-                return zone
-        # for zone in zones:
-        #     if zone.zone == "nfvcl":
-        #         return zone
-        raise VirtualizationProviderProxmoxException("NFVCL sdn zone not found, you must create a zone called 'nfvcl' with DHCP enabled (case sensitive)")
-
     def __get_ips_for_subnets(self, cidr: str) -> Tuple[str, str, str]:
         ips = ipaddress.ip_network(cidr)
         return ips[-2].__format__('s'), ips[2].__format__('s'), ips[-3].__format__('s')
 
-    def __apply_sdn(self):
-        self.logger.info("Applying sdn configuration")
-        self.__execute_proxmox_request(
-            url="cluster/sdn",
-            node_name=self.data.proxmox_node_name,
-            r_type=HttpRequestType.PUT
-        )
-
-    # def __create_sdn_zone(self, zone: NetResource):
-    #     stdout = self.__execute_ssh_command(f'pvesh create /cluster/sdn/zones --type simple --zone {zone.name}')
-    #     self.__create_sdn_vnet("Vprova", zone)
-    #     print("Ciao")
-    #     stdout = self.__execute_ssh_command(f'pvesh delete /cluster/sdn/zones/{zone.name}')
-    #     pass
-    def __create_sdn_vnet(self, vnet: NetResource):
-        identifier = f'N{vnet.name.split("_")[1]}'
+    def __create_sdn_vnet(self, client: ProxmoxVimClient, vnet: NetResource):
+        rg_data = self._get_resource_group_data(client, vnet.resource_group)
+        identifier = proxmox_sdn_vnet_identifier(vnet.name)
         self.logger.info(f"Creating Vnet {vnet.name}")
-        nfvcl_zone = self.__get_nfvcl_sdn_zone()
-        self.__execute_proxmox_request(
-            url=f'cluster/sdn/vnets',
-            r_type=HttpRequestType.POST,
-            parameters={'vnet': f'{identifier}', 'zone': f'{nfvcl_zone.zone}', 'alias': f'{vnet.name}'}
-        )
-        self.__apply_sdn()
-        self.data.proxmox_vnet[vnet.name] = identifier
+        client.create_sdn_vnet(identifier, vnet.name)
+        rg_data.proxmox_vnet[vnet.name] = identifier
 
-    # def __get_sdn_vnet(self, vnet_name: str):
-    #     response = self.__execute_rest_request(f'cluster/sdn/vnets/{vnet_name}', {}, HttpRequestType.GET)
-    #     data = response.json()
-    #     if data['data'] is not None:
-    #         raise VirtualizationProviderProxmoxException(f"Vnet {vnet_name} already exists")
-
-    def __delete_sdn_vnet(self, vnet: str):
+    def __delete_sdn_vnet(self, client: ProxmoxVimClient, vnet: str, resource_group: str):
+        rg_data = self._get_resource_group_data(client, resource_group)
         self.logger.info(f"Deleting Vnet: {vnet}")
-        tmp = self.__execute_proxmox_request(
-            url=f"cluster/sdn/vnets/{self.data.proxmox_vnet[vnet]}/subnets",
-            r_type=HttpRequestType.GET
-        )
-        ta = TypeAdapter(List[Subnet])
-        subnets = ta.validate_python(tmp)
-        for subnet in subnets:
-            self.logger.info(f"Deleting {vnet} subnets: {subnet.id}")
-            self.__delete_sdn_subnet(subnet)
-        self.__execute_proxmox_request(
-            url=f"/cluster/sdn/vnets/{self.data.proxmox_vnet[vnet]}",
-            r_type=HttpRequestType.DELETE
-        )
-        self.__apply_sdn()
-        del self.data.proxmox_vnet[vnet]
+        client.delete_sdn_vnet(rg_data.proxmox_vnet[vnet])
+        del rg_data.proxmox_vnet[vnet]
         self.logger.success(f"Vnet {vnet} deleted")
 
-    def __create_sdn_subnet(self, vnet: NetResource):
+    def __create_sdn_subnet(self, client: ProxmoxVimClient, vnet: NetResource):
+        rg_data = self._get_resource_group_data(client, vnet.resource_group)
         self.logger.info(f"Creating Vnet Subnet {vnet.cidr}")
         gateway, start_dhcp, end_dhcp = self.__get_ips_for_subnets(vnet.cidr)
         if vnet.allocation_pool:
             start_dhcp = vnet.allocation_pool.start.exploded
             end_dhcp = vnet.allocation_pool.end.exploded
-        self.__execute_proxmox_request(
-            url=f"cluster/sdn/vnets/{self.data.proxmox_vnet[vnet.name]}/subnets",
-            r_type=HttpRequestType.POST,
-            parameters={
-                'subnet': f'{vnet.cidr}',
-                'type': 'subnet',
-                'gateway': f'{gateway}',
-                'dhcp-range': f'start-address={start_dhcp},end-address={end_dhcp}'
-            }
+        client.create_sdn_subnet(
+            vnet_id=rg_data.proxmox_vnet[vnet.name],
+            cidr=vnet.cidr,
+            start_dhcp=start_dhcp,
+            end_dhcp=end_dhcp,
+            gateway=gateway
         )
-        self.__apply_sdn()
 
-    # def __get_sdn_subnet(self, vnet: NetResource):
-    #     subnet_id = f"nfvcl-{vnet.cidr.replace('/', '-')}"
-    #     response = self.__execute_rest_request(f'cluster/sdn/vnets/{vnet.name}/subnets/{subnet_id}', {}, HttpRequestType.GET)
-    #     data = response.json()
-    #     if data['data'] is not None:
-    #         raise VirtualizationProviderProxmoxException(f"Subent {subnet_id} in Vnet {vnet.name} already exists")
-
-    def __delete_sdn_subnet(self, subnet: Subnet):
-        self.__execute_proxmox_request(
-            url=f'/cluster/sdn/vnets/{subnet.vnet}/subnets/{subnet.id}',
-            r_type=HttpRequestType.DELETE
-        )
-        self.__apply_sdn()
-        self.logger.success(f"Subnet {subnet.id} deleted")
-
-    def check_networks(self, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
-        networks = set()
-        network_tmp = self.__execute_proxmox_request(
-            url=f'nodes/{self.data.proxmox_node_name}/network',
-            r_type=HttpRequestType.GET,
-        )
-        ta = TypeAdapter(List[Network])
-        networks_tmp = ta.validate_python(network_tmp)
-        for net in networks_tmp:
-            if net.address:
-                networks.add(net.iface)
-
-        vnet_tmp = self.__execute_proxmox_request(
-            url=f'/cluster/sdn/vnets',
-            r_type=HttpRequestType.GET,
-        )
-        ta = TypeAdapter(List[Vnet])
-        vnets = ta.validate_python(vnet_tmp)
-
-        for vnet in vnets:
-            if vnet.zone == self.vim.proxmox_parameters().proxmox_sdn_zone:
-                networks.add(vnet.vnet)
-
-        return networks_to_check.issubset(networks), networks_to_check.difference(networks)
+    def check_networks_exist_on_vim(self, area: int, networks_to_check: set[str], resource_group: Optional[str] = None) -> Tuple[bool, Set[str]]:
+        client = self._get_client(area)
+        return client.check_networks(networks_to_check)

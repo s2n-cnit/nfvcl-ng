@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from threading import RLock
 from typing import Dict, Optional, List, Tuple
 
 from nfvcl_core.database.blueprint_repository import BlueprintRepository
@@ -17,11 +18,13 @@ class PerformanceManager(GenericManager):
     pending_operations: Dict[str, str] # blueprint_id: operation_id
     operations: Dict[str, BlueprintPerformanceOperation]
     provider_calls: Dict[str, BlueprintPerformanceProviderCall]
+    _performance_lock: RLock
 
     def __init__(self, performance_repository: PerformanceRepository, blueprint_repository: BlueprintRepository):
         super().__init__()
         self._performance_repository = performance_repository
         self._blueprint_repository = blueprint_repository
+        self._performance_lock = RLock()
         self.performance_dict = {}
         self.pending_operations = {}
         self.operations = {}
@@ -37,17 +40,12 @@ class PerformanceManager(GenericManager):
         for blueprint_to_load in self._blueprint_repository.get_all_dict():
             element = self._performance_repository.find_by_blueprint_id(blueprint_to_load['id']) # TODO doppia query al database
             if element:
-                self.performance_dict[element.blueprint_id] = BlueprintPerformance.model_validate(element)
+                blueprint_performance = BlueprintPerformance.model_validate(element)
+                with self._performance_lock:
+                    self.performance_dict[element.blueprint_id] = blueprint_performance
                 self.logger.debug(f"Loaded performances for blueprint {blueprint_to_load['id']}")
             else:
                 self.logger.warning(f"Unable to load performances for blueprint {blueprint_to_load['id']}")
-
-    def _persist_to_db(self):
-        """
-        Persist the collected metrics to the mongo db
-        """
-        for blueid in self.performance_dict.keys():
-            self._performance_repository.update_blueprint_performance(self.performance_dict[blueid])
 
     def get_blue_performance(self, blueprint_id: str) -> BlueprintPerformance:
         """
@@ -76,9 +74,8 @@ class PerformanceManager(GenericManager):
 
         Returns: The pending operation id
         """
-        if blueprint_id in self.pending_operations:
-            return self.pending_operations[blueprint_id]
-        return None
+        with self._performance_lock:
+            return self.pending_operations.get(blueprint_id)
 
     def add_blueprint(self, blueprint_id: str, blueprint_type: str):
         """
@@ -88,7 +85,8 @@ class PerformanceManager(GenericManager):
             blueprint_type: The type of the blueprint
         """
         blueprint_performance = BlueprintPerformance(blueprint_id=blueprint_id, start=datetime.now(timezone.utc), blueprint_type=blueprint_type)
-        self.performance_dict[blueprint_id] = blueprint_performance
+        with self._performance_lock:
+            self.performance_dict[blueprint_id] = blueprint_performance
 
     def start_operation(self, blueprint_id: str, operation_type: BlueprintPerformanceType, op_name: str) -> Optional[str]:
         """
@@ -100,18 +98,19 @@ class PerformanceManager(GenericManager):
 
         Returns: The operation id
         """
-        if blueprint_id not in self.performance_dict:
-            self.logger.warning("Skipping operation performance for unknown blueprint")
-            return None
-        op_id = str(uuid.uuid4())
-        blueprint_operation = BlueprintPerformanceOperation(id=op_id, op_name=op_name, type=operation_type, start=datetime.now(timezone.utc))
-        self.performance_dict[blueprint_id].operations.append(blueprint_operation)
-        self.operations[op_id] = blueprint_operation
-        if blueprint_id in self.pending_operations:
-            #raise Exception("Multiple operation pending")
-            self.logger.error("Multiple operation pending, replacing with newer one")
-        self.pending_operations[blueprint_id] = op_id
-        return op_id
+        with self._performance_lock:
+            if blueprint_id not in self.performance_dict:
+                self.logger.warning("Skipping operation performance for unknown blueprint")
+                return None
+            if blueprint_id in self.pending_operations:
+                pending_operation_id = self.pending_operations[blueprint_id]
+                raise RuntimeError(f"Cannot start operation '{op_name}' for blueprint '{blueprint_id}', operation '{pending_operation_id}' is already pending")
+            op_id = str(uuid.uuid4())
+            blueprint_operation = BlueprintPerformanceOperation(id=op_id, op_name=op_name, type=operation_type, start=datetime.now(timezone.utc))
+            self.performance_dict[blueprint_id].operations.append(blueprint_operation)
+            self.operations[op_id] = blueprint_operation
+            self.pending_operations[blueprint_id] = op_id
+            return op_id
 
     def set_error(self, blueprint_id: str, error_state: bool):
         """
@@ -120,33 +119,66 @@ class PerformanceManager(GenericManager):
             blueprint_id: The blueprint id
             error_state: The error state
         """
-        if blueprint_id in self.performance_dict:
-            self.performance_dict[blueprint_id].error = error_state
-        else:
-            self.logger.warning("Skipping operation performance for unknown blueprint")
+        with self._performance_lock:
+            if blueprint_id in self.performance_dict:
+                self.performance_dict[blueprint_id].error = error_state
+            else:
+                self.logger.warning("Skipping operation performance for unknown blueprint")
 
-    def _find_operation(self, operation_id: str) -> Tuple[BlueprintPerformanceOperation, str]:
-        for blueprint_performance in self.performance_dict.values():
-            for blueprint_operation in blueprint_performance.operations:
-                if blueprint_operation.id == operation_id:
-                    return blueprint_operation, blueprint_performance.blueprint_id
-        return None, None
+    def _find_operation(self, operation_id: str) -> Tuple[Optional[BlueprintPerformanceOperation], Optional[str]]:
+        with self._performance_lock:
+            for blueprint_performance in self.performance_dict.values():
+                for blueprint_operation in blueprint_performance.operations:
+                    if blueprint_operation.id == operation_id:
+                        return blueprint_operation, blueprint_performance.blueprint_id
+            return None, None
 
-    def end_operation(self, operation_id: str) -> int:
+    def end_operation(self, operation_id: Optional[str]) -> Optional[int]:
         """
         Log the end of an operation on a blueprint
         Args:
             operation_id: The operation id
         """
-        operation, blueprint_id = self._find_operation(operation_id)
-        if operation is None:
-            self.logger.warning("Skipping operation performance for unknown operation or blueprint")
-            return
-        operation.end = datetime.now(timezone.utc)
-        operation.duration = round((operation.end - operation.start).total_seconds() * 1000)
-        del self.pending_operations[blueprint_id]
-        self._persist_to_db()
-        return operation.duration
+        with self._performance_lock:
+            if operation_id is None:
+                self.logger.warning("Skipping operation performance for unknown operation")
+                return None
+            operation, blueprint_id = self._find_operation(operation_id)
+            if operation is None or blueprint_id is None:
+                self.logger.warning("Skipping operation performance for unknown operation or blueprint")
+                return None
+            operation.end = datetime.now(timezone.utc)
+            operation.duration = round((operation.end - operation.start).total_seconds() * 1000)
+            if self.pending_operations.get(blueprint_id) == operation_id:
+                self.pending_operations.pop(blueprint_id, None)
+            elif blueprint_id in self.pending_operations:
+                self.logger.warning(f"Ended operation '{operation_id}' for blueprint '{blueprint_id}', but pending operation is '{self.pending_operations[blueprint_id]}'")
+            duration = operation.duration
+            performance_to_persist = self.performance_dict[blueprint_id].model_copy(deep=True)
+
+        self._performance_repository.update_blueprint_performance(performance_to_persist)
+        return duration
+
+    def _start_provider_call_locked(self, operation_id: Optional[str], method_name: str, info: Dict[str, str]) -> Optional[str]:
+        if operation_id is None or operation_id not in self.operations:
+            self.logger.warning("Skipping provider call performance for unknown operation")
+            return None
+        provider_call_id = str(uuid.uuid4())
+        operation = self.operations[operation_id]
+        blueprint_performance_provider_call = BlueprintPerformanceProviderCall(id=provider_call_id, method_name=method_name, info=info, start=datetime.now(timezone.utc))
+        self.provider_calls[provider_call_id] = blueprint_performance_provider_call
+        operation.provider_calls.append(blueprint_performance_provider_call)
+        return provider_call_id
+
+    def start_provider_call_for_blueprint(self, blueprint_id: str, method_name: str, info: Dict[str, str]) -> Optional[str]:
+        """
+        Log a provider operation call for the current pending operation of a blueprint.
+
+        Resolving the pending operation and appending the provider call must happen
+        under the same lock to keep the provider call attached to the right operation.
+        """
+        with self._performance_lock:
+            return self._start_provider_call_locked(self.pending_operations.get(blueprint_id), method_name, info)
 
     def start_provider_call(self, operation_id: Optional[str], method_name: str, info: Dict[str, str]) -> Optional[str]:
         """
@@ -158,15 +190,8 @@ class PerformanceManager(GenericManager):
 
         Returns: Provider call id
         """
-        if operation_id is None or operation_id not in self.operations:
-            self.logger.warning("Skipping provider call performance for unknown operation")
-            return None
-        provider_call_id = str(uuid.uuid4())
-        operation = self.operations[operation_id]
-        blueprint_performance_provider_call = BlueprintPerformanceProviderCall(id=provider_call_id, method_name=method_name, info=info, start=datetime.now(timezone.utc))
-        self.provider_calls[provider_call_id] = blueprint_performance_provider_call
-        operation.provider_calls.append(blueprint_performance_provider_call)
-        return provider_call_id
+        with self._performance_lock:
+            return self._start_provider_call_locked(operation_id, method_name, info)
 
     def end_provider_call(self, provider_call_id: str):
         """
@@ -174,12 +199,13 @@ class PerformanceManager(GenericManager):
         Args:
             provider_call_id: The id of the provider call
         """
-        if provider_call_id not in self.provider_calls:
-            self.logger.warning("Skipping provider call performance for unknown operation")
-            return
-        provider_call = self.provider_calls[provider_call_id]
-        provider_call.end = datetime.now(timezone.utc)
-        provider_call.duration = round((provider_call.end - provider_call.start).total_seconds() * 1000)
+        with self._performance_lock:
+            if provider_call_id not in self.provider_calls:
+                self.logger.warning("Skipping provider call performance for unknown operation")
+                return
+            provider_call = self.provider_calls[provider_call_id]
+            provider_call.end = datetime.now(timezone.utc)
+            provider_call.duration = round((provider_call.end - provider_call.start).total_seconds() * 1000)
 
     def delete_performance(self, blueprint_id: str):
         """
@@ -187,8 +213,15 @@ class PerformanceManager(GenericManager):
         Args:
             blueprint_id: The blueprint id
         """
-        if blueprint_id in self.performance_dict:
-            del self.performance_dict[blueprint_id]
-            self._performance_repository.delete_by_blueprint_id(blueprint_id)
-        else:
-            raise ValueError(f"No performance metrics found for blueprint '{blueprint_id}'")
+        with self._performance_lock:
+            blueprint_performance = self.performance_dict.pop(blueprint_id, None)
+            if blueprint_performance is None:
+                raise ValueError(f"No performance metrics found for blueprint '{blueprint_id}'")
+
+            self.pending_operations.pop(blueprint_id, None)
+            for operation in blueprint_performance.operations:
+                self.operations.pop(operation.id, None)
+                for provider_call in operation.provider_calls:
+                    self.provider_calls.pop(provider_call.id, None)
+
+        self._performance_repository.delete_by_blueprint_id(blueprint_id)

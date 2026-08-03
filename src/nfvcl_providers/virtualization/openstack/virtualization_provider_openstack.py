@@ -8,6 +8,8 @@ from pydantic import Field
 
 from nfvcl_common.ansible_builder import AnsiblePlaybookBuilder
 from nfvcl_common.cloudinit_builder import CloudInit
+from nfvcl_core_models.network.ipam_models import SerializableIPv4Address, SerializableIPv4Network
+from nfvcl_core_models.network.network_models import NetworkModel, NetworkTypeEnum, IPv4Pool
 from nfvcl_core_models.providers.providers import ProviderData
 from nfvcl_core_models.resources import VmResourceAnsibleConfiguration, VmResourceNetworkInterface, \
     VmResourceNetworkInterfaceAddress, VmResource, VmResourceConfiguration, NetResource, VmStatus, VmPowerStatus
@@ -327,6 +329,125 @@ class VirtualizationProviderOpenstack(VirtualizationProviderInterface):
         self.save_to_db()
 
         self.logger.success(f"Creating NET {net_resource.name} finished")
+
+    def _convert_openstack_network_to_network_model(self, client: OpenStackVimClient, net_obj) -> Optional[NetworkModel]:
+        """
+        Converts an OpenStack network object to a `NetworkModel` instance. This transformation involves
+        extracting and adapting attributes such as CIDR, DNS servers, gateway IP, allocation pools, and
+        network type from the provided OpenStack network and subnet objects.
+
+        Args:
+            client: An `OpenStackVimClient` instance to interact with OpenStack resources and to
+                fetch additional subnet details.
+            net_obj: The network object representing an OpenStack network, which contains attributes
+                like `subnet_ids`, `provider_network_type`, `name`, and `is_external`.
+
+        Returns:
+            Optional[NetworkModel]: A `NetworkModel` instance that encapsulates the information of
+                the OpenStack network if the conversion is successful. Returns `None` if the necessary
+                attributes are unavailable or in case of errors during the transformation.
+        """
+        if not net_obj or not getattr(net_obj, "subnet_ids", None):
+            return None
+        try:
+            subnet = client.client.get_subnet(net_obj.subnet_ids[0])
+            if not subnet or not getattr(subnet, "cidr", None):
+                return None
+
+            allocation_pools = []
+            if getattr(subnet, "allocation_pools", None):
+                for pool in subnet.allocation_pools:
+                    if isinstance(pool, dict) and "start" in pool and "end" in pool:
+                        allocation_pools.append(IPv4Pool(start=pool["start"], end=pool["end"]))
+
+            dns_servers = []
+            if getattr(subnet, "dns_nameservers", None):
+                for dns in subnet.dns_nameservers:
+                    try:
+                        dns_servers.append(SerializableIPv4Address(dns))
+                    except Exception:
+                        pass
+
+            gateway_ip = None
+            if getattr(subnet, "gateway_ip", None):
+                try:
+                    gateway_ip = SerializableIPv4Address(subnet.gateway_ip)
+                except Exception:
+                    gateway_ip = None
+
+            net_type = NetworkTypeEnum.vlan
+            provider_type = getattr(net_obj, "provider_network_type", None)
+            if provider_type:
+                try:
+                    net_type = NetworkTypeEnum(provider_type)
+                except ValueError:
+                    net_type = NetworkTypeEnum.vlan
+
+            return NetworkModel(
+                name=net_obj.name,
+                cidr=SerializableIPv4Network(subnet.cidr),
+                gateway_ip=gateway_ip,
+                allocation_pool=allocation_pools,
+                dns_nameservers=dns_servers,
+                dhcp=getattr(subnet, "enable_dhcp", True) if getattr(subnet, "enable_dhcp", None) is not None else True,
+                external=bool(getattr(net_obj, "is_external", False)),
+                type=net_type,
+            )
+        except Exception as e:
+            self.logger.warning(f"Error converting OpenStack network {net_obj.name} to NetworkModel: {e}")
+            return None
+
+    def get_networks(self, area: int = 1) -> List[NetworkModel]:
+        """
+        Retrieves available networks in a specified area and converts them to NetworkModel
+        objects for further use.
+
+        This method communicates with the OpenStack client to fetch a list of available
+        networks in the provided area and transforms the raw network objects into
+        NetworkModel instances.
+
+        Args:
+            area (int): The network area identifier to fetch available networks. Defaults
+                to 1.
+
+        Returns:
+            List[NetworkModel]: A list of NetworkModel instances representing available
+            networks in the specified area.
+        """
+        client = self._get_client(area)
+        available_networks = client.get_available_networks()
+        network_models = []
+        for net_obj in available_networks.values():
+            model = self._convert_openstack_network_to_network_model(client, net_obj)
+            if model:
+                network_models.append(model)
+        return network_models
+
+    def get_net(self, net_name: str, area: int = 1) -> NetworkModel | None:
+        """
+        Retrieves a network model object based on the given network name and area.
+
+        Args:
+            net_name (str): The name of the network to retrieve.
+            area (int): The area identifier to determine which client to use for
+                fetching the network. Defaults to 1.
+
+        Returns:
+            NetworkModel | None: The network model object if found and converted
+                successfully, or None if the network is not found.
+
+        Raises:
+            VirtualizationProviderOpenstackException: If the network exists but
+                lacks a valid subnet or could not be converted into a network model.
+        """
+        client = self._get_client(area)
+        net_obj = client.get_network(net_name)
+        if not net_obj:
+            return None
+        model = self._convert_openstack_network_to_network_model(client, net_obj)
+        if not model:
+            raise VirtualizationProviderOpenstackException(f"Network '{net_name}' has no valid subnet or could not be converted")
+        return model
 
     def __gather_info_from_vm(self, vm_resource: VmResource):
         self.logger.info("Starting VM info gathering")

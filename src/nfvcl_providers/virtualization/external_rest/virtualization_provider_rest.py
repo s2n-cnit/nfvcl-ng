@@ -8,6 +8,7 @@ from pydantic import Field
 
 from nfvcl_common.base_model import NFVCLBaseModel
 from nfvcl_common.utils.api_utils import HttpRequestType
+from nfvcl_core_models.network.network_models import NetworkModel
 from nfvcl_core_models.providers.providers import ProviderData
 from nfvcl_core_models.resources import (
     VmResource,
@@ -178,6 +179,12 @@ class VirtualizationProviderRest(VirtualizationProviderInterface):
         self.logger.info(f"Creating NET {net_resource.name}")
         self.__http_request(ctx, f"{ctx.virtualization_api_base}/nets", HttpRequestType.POST, net_resource)
         self.logger.success(f"Creating NET {net_resource.name} finished")
+
+    def get_networks(self, area: int = 1) -> List[NetworkModel]:
+        pass
+
+    def get_net(self, net_name: str, area: int = 1) -> NetworkModel | None:
+        pass
 
     def destroy_vm(self, vm_resource: VmResource):
         ctx = self._get_context(vm_resource.area, vm_resource.resource_group)

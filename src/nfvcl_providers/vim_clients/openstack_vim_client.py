@@ -84,6 +84,11 @@ class OpenStackVimClient(VimClient):
         super().close()
 
     def get_available_networks(self) -> Dict[str, Network]:
+        """
+        Get all available networks that the user can access.
+        Returns:
+            Dict[str, Network]: A dictionary of network names and their corresponding Network objects.
+        """
         shared_networks = list(self.client.network.networks(shared=True))
         project_networks = list(self.client.network.networks(project_id=self.project_id))
         all_networks: Dict[str, Network] = {network.name: network for network in shared_networks}

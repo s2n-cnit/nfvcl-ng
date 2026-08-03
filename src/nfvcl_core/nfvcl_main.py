@@ -1,9 +1,11 @@
 import threading
 from functools import partial
+from http import HTTPStatus
 from typing import Callable, Dict, List, Any, Optional, Annotated
 
 import urllib3
 from dependency_injector.wiring import Provide
+from pydantic import Field
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations import register_pdu_implementations
 from nfvcl_common.utils.api_utils import HttpRequestType
@@ -19,6 +21,7 @@ from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.monitoring_manager import MonitoringManager
 from nfvcl_core.managers.pdu_manager import PDUManager
 from nfvcl_core.managers.performance_manager import PerformanceManager
+from nfvcl_core.managers.provider_manager import ProviderManager
 from nfvcl_core.managers.task_manager import TaskManager
 from nfvcl_core.managers.topology_manager import TopologyManager
 from nfvcl_core.managers.user_manager import UserManager
@@ -56,13 +59,13 @@ class NFVCL:
     UTILS_SECTION = NFVCLPublicSectionModel(name="Utils", description="Utils", path="/v2/utils")
     TASK_SECTION = NFVCLPublicSectionModel(name="Tasks", description="Operations related to tasks", path="/v1/tasks")
     USER_SECTION = NFVCLPublicSectionModel(name="Users", description="User management", path="/v2/users")
-
     def __init__(
         self,
         config: NFVCLConfigModel = Provide[NFVCLContainer.config],
         task_manager: TaskManager = Provide[NFVCLContainer.task_manager],
         event_manager: EventManager = Provide[NFVCLContainer.event_manager],
         topology_manager: TopologyManager = Provide[NFVCLContainer.topology_manager],
+        provider_manager: ProviderManager = Provide[NFVCLContainer.provider_manager],
         blueprint_manager: BlueprintManager = Provide[NFVCLContainer.blueprint_manager],
         performance_manager: PerformanceManager = Provide[NFVCLContainer.performance_manager],
         pdu_manager: PDUManager = Provide[NFVCLContainer.pdu_manager],
@@ -77,6 +80,7 @@ class NFVCL:
         set_nfvcl_mounted_folder(global_ref.nfvcl_config.nfvcl.mounted_folder)
 
         self.topology_manager = topology_manager
+        self.provider_manager = provider_manager
         self.blueprint_manager = blueprint_manager
         self.performance_manager = performance_manager
         self.kubernetes_manager = kubernetes_manager
@@ -96,12 +100,13 @@ class NFVCL:
 
         # TODO rework plugin loading
         from nfvcl_core.plugins.plugin import NFVCLPlugin
-        from nfvcl_horse.horse import NFVCLHorsePlugin
 
-        self.plugins: List[NFVCLPlugin] = [NFVCLHorsePlugin(self)]
+        self.plugins: List[NFVCLPlugin] = []
 
         for plugin in self.plugins:
             plugin.load()
+
+    VIM_SECTION = NFVCLPublicSectionModel(name="Virtualization provider", description="User management", path="/v2/vim")
 
     def get_ordered_public_methods(self) -> List[Callable]:
         """
@@ -160,6 +165,14 @@ class NFVCL:
     def get_module_routes(self, prefix) -> List[BlueprintDay2Route]:
         return blueprint_type.get_module_routes(prefix)
 
+    ##################################################################
+    ######################## REST API ################################
+    ##################################################################
+
+    ##################################################################
+    ##################      TASK SECTION      ########################
+    ##################################################################
+
     @NFVCLPublic(path="", section=TASK_SECTION, method=HttpRequestType.GET, sync=True)
     def get_queued_running_tasks(self) -> List[NFVCLTaskStatus]:
         """
@@ -203,7 +216,9 @@ class NFVCL:
             raise NFVCLCoreException(message="Task already started and cannot be deleted", http_equivalent_code=409)
         return NFVCLTaskDeleteResult(task_id=task_id)
 
-    ############# Topology #############
+    ##################################################################
+    ##################      TOPOLOGY SECTION      ####################
+    ##################################################################
 
     @NFVCLPublic(path="", section=TOPOLOGY_SECTION, method=HttpRequestType.GET, sync=True)
     def get_topology(self) -> TopologyModel:
@@ -330,9 +345,48 @@ class NFVCL:
     def delete_kubernetes(self, cluster_id: str, force_deletion: bool = False) -> TopologyK8sModel:
         return self.topology_manager.delete_kubernetes(cluster_id, force_deletion=force_deletion)
 
-    ######################
-    # Prometheus Section #
-    ######################
+    ##################################################################
+    ##################      VIM   SECTION    #########################
+    ##################################################################
+
+    @NFVCLPublic(path="/networks/{area}", section=VIM_SECTION, method=HttpRequestType.GET, sync=True)
+    def get_vim_networks(self, area: Annotated[int,Field(gt=0)]) -> List[NetworkModel]:
+        """
+        Returns a list of networks for the given area, retrieved directly from the Hypervisor.
+        Args:
+            area: The area identifier for which to retrieve the networks.
+
+        Returns:
+            A list of NetworkModel objects representing the networks in the specified area.
+        """
+        provider = self.provider_manager.get_virtualization_provider_for_area(area)
+        return provider.get_networks()
+
+    @NFVCLPublic(path="/networks/{area}/{network_name}", section=VIM_SECTION, method=HttpRequestType.GET, sync=True)
+    def get_network(self, area: Annotated[int,Field(gt=0)], network_name: str) -> NetworkModel:
+        """
+        Fetches the network information for a given network name and area from the hypervisor.
+
+        This method interacts with the virtualization provider associated with the
+        specified area to retrieve details about the requested network. It allows the
+        caller to retrieve network metadata and properties.
+
+        Args:
+            network_name (str): The unique identifier of the network to fetch.
+            area (int): The area identifier, constrained to positive integers.
+
+        Returns:
+            NetworkModel: An object representing the network's details and properties.
+        """
+        provider = self.provider_manager.get_virtualization_provider_for_area(area)
+        network = provider.get_net(network_name, area)
+        if network is None:
+            raise NFVCLCoreException(f"Network '{network_name}' not found in area {area}", http_equivalent_code=HTTPStatus.NOT_FOUND)
+        return network
+
+    ##################################################################
+    ##################      PROMETHEUS SECTION    ####################
+    ##################################################################
 
     @NFVCLPublic(path="/prometheus",section=TOPOLOGY_SECTION,method=HttpRequestType.GET,sync=True,summary=GET_PROM_LIST_SRV_SUMMARY,description=GET_PROM_LIST_SRV_DESCRIPTION)
     def get_prometheus_list(self) -> List[PrometheusServerModel]:

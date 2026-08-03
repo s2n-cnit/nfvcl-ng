@@ -1,6 +1,8 @@
 import abc
 from typing import List, Tuple, Set, Optional, Callable
 
+from nfvcl_core_models.network.network_models import NetworkModel
+
 from nfvcl_core_models.providers.providers import ProviderData, ProviderException
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, NetResource, VmStatus
 from nfvcl_core_models.vim.vim_models import VimModel, VimTypeEnum
@@ -37,6 +39,14 @@ class VirtualizationProviderInterface(ProviderInterface):
         super().__init__(persistence_function)
 
     def get_vim_client(self, area: int) -> VimClient:
+        """
+        Gets the unique VimClient for the given area and provider VIM type.
+        Args:
+            area: The area for which to retrieve the VimClient.
+
+        Returns:
+            VimClient: The VimClient for the given area and provider VIM type.
+        """
         return self.vim_client_pool.get_client(area, self.provider_vim_type)
 
     def get_vim_info(self, area: int) -> VimModel:
@@ -68,6 +78,30 @@ class VirtualizationProviderInterface(ProviderInterface):
 
         Returns:
              the ip that has been set in that network
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_networks(self, area: int) -> List[NetworkModel]:
+        """
+        Get the list of networks available on the VIM
+
+        Returns:
+            List of network objects
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_net(self, net_name: str, area: int) -> NetworkModel | None:
+        """
+        Get the network object for the given network name
+
+        Args:
+            area:
+            net_name: Name of the network
+
+        Returns:
+            Network object
         """
         pass
 

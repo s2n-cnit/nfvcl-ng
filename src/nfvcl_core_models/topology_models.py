@@ -359,7 +359,7 @@ class TopologyModel(NFVCLBaseModel):
         vim = next((item for item in self.vims if area_id in item.areas), None)
         if vim is None:
             msg_err = "The VIM of area ->{}<- was not found in the topology.".format(area_id)
-            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.CONFLICT)
+            raise NFVCLCoreException(msg_err, http_equivalent_code=HTTPStatus.NOT_FOUND)
 
         return vim
 

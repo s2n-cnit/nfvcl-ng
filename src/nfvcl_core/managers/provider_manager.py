@@ -74,6 +74,15 @@ class ProviderManager(GenericManager):
             self.get_pdu_provider()
 
     def get_virtualization_provider(self, vim_type: VimTypeEnum | str) -> VirtualizationProviderInterface:
+        """
+        Get virtualization provider for given vim type. Area is not needed because it is managed by the provider itself.
+
+        Args:
+            vim_type: Vim type for which the provider is requested.
+
+        Returns:
+            Virtualization provider for given vim type.
+        """
         vim_type = self._normalize_vim_type(vim_type)
         if vim_type not in self._virtualization_providers:
             provider_class = vim_type_to_provider_mapping[vim_type]
@@ -132,7 +141,16 @@ class ProviderManager(GenericManager):
         self.get_blueprint_provider()
 
     def get_virtualization_provider_for_area(self, area: int) -> VirtualizationProviderInterface:
-        vim = self._topology_manager.get_topology().get_vim_by_area(area)
+        """
+        Returns the virtualization provider for the given area.
+
+        Args:
+            area: The area for which to retrieve the virtualization provider.
+
+        Returns:
+            The virtualization provider for the given area.
+        """
+        vim = self._topology_manager.get_topology().get_vim_by_area(area) # Throws Exception
         return self.get_virtualization_provider(vim.vim_type)
 
     def get_virtualization_providers(self) -> list[VirtualizationProviderInterface]:

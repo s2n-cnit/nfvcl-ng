@@ -86,6 +86,7 @@ class VimClientPool:
             if client is None:
                 client_class = get_vim_client_class(vim.vim_type)
                 self.logger.verbose(f"Creating new client for VIM {vim.name}")
+                # Gets the VIM class and then creates a new client [e.g., OpenStackVimClient(vim)]
                 client = client_class(vim)
                 self.clients[vim.name] = client
             return client

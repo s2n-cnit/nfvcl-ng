@@ -335,3 +335,85 @@ def test_proxmox_provider_cleanup_deletes_leftover_vms():
     assert client.deleted_vms == [("100", "rg")]
     assert provider.data.get_vim_data(vim.name).resource_groups == {}
     assert save.calls == 1
+
+
+def test_openstack_provider_get_networks_and_get_net():
+    import pytest
+    from nfvcl_core_models.network.network_models import NetworkModel, NetworkTypeEnum
+    from nfvcl_providers.virtualization.openstack.virtualization_provider_openstack import VirtualizationProviderOpenstackException
+
+    vim = build_vim("os-vim", VimTypeEnum.OPENSTACK)
+
+    net1 = namespace(name="net-1", subnet_ids=["sub-1"], is_external=False, provider_network_type="vlan")
+    net2 = namespace(name="net-2", subnet_ids=["sub-2"], is_external=True, provider_network_type="vxlan")
+    subnet1 = namespace(
+        cidr="192.168.1.0/24",
+        gateway_ip="192.168.1.1",
+        allocation_pools=[{"start": "192.168.1.10", "end": "192.168.1.100"}],
+        dns_nameservers=["8.8.8.8"],
+        enable_dhcp=True,
+    )
+    subnet2 = namespace(
+        cidr="10.0.0.0/16",
+        gateway_ip="10.0.0.1",
+        allocation_pools=[],
+        dns_nameservers=[],
+        enable_dhcp=False,
+    )
+
+    subnets_map = {"sub-1": subnet1, "sub-2": subnet2}
+    sdk = namespace(get_subnet=lambda sub_id: subnets_map.get(sub_id))
+
+    class FakeOpenStackVimClient:
+        def __init__(self):
+            self.vim = vim
+            self.client = sdk
+
+        def get_available_networks(self):
+            return {"net-1": net1, "net-2": net2}
+
+        def get_network(self, net_name: str):
+            return {"net-1": net1, "net-2": net2}.get(net_name)
+
+    client = FakeOpenStackVimClient()
+    provider = VirtualizationProviderOpenstack(vim_client_pool=FakeVimClientPool(client))
+
+    networks = provider.get_networks()
+    assert len(networks) == 2
+    assert isinstance(networks[0], NetworkModel)
+    assert networks[0].name == "net-1"
+    assert str(networks[0].cidr) == "192.168.1.0/24"
+    assert str(networks[0].gateway_ip) == "192.168.1.1"
+    assert len(networks[0].allocation_pool) == 1
+    assert networks[0].dhcp is True
+    assert networks[0].external is False
+    assert networks[0].type == NetworkTypeEnum.vlan
+
+    assert networks[1].name == "net-2"
+    assert networks[1].type == NetworkTypeEnum.vxlan
+    assert networks[1].external is True
+
+    single_net = provider.get_net("net-1")
+    assert isinstance(single_net, NetworkModel)
+    assert single_net.name == "net-1"
+
+    with pytest.raises(VirtualizationProviderOpenstackException):
+        provider.get_net("nonexistent-net")
+
+
+def test_proxmox_and_rest_provider_get_networks_get_net_pass():
+    from nfvcl_providers.virtualization.external_rest.virtualization_provider_rest import VirtualizationProviderRest
+
+    pve_vim = build_vim("pve-vim", VimTypeEnum.PROXMOX)
+    pve_client = FakeProxmoxClient(pve_vim)
+    pve_provider = VirtualizationProviderProxmox(vim_client_pool=FakeVimClientPool(pve_client))
+
+    assert pve_provider.get_networks() is None
+    assert pve_provider.get_net("net-1") is None
+
+    rest_vim = build_vim("rest-vim", VimTypeEnum.EXTERNAL_REST)
+    rest_client = namespace(vim=rest_vim)
+    rest_provider = VirtualizationProviderRest(vim_client_pool=FakeVimClientPool(rest_client))
+
+    assert rest_provider.get_networks() is None
+    assert rest_provider.get_net("net-1") is None

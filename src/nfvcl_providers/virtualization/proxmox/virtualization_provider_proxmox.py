@@ -7,6 +7,7 @@ from pydantic import Field
 
 from nfvcl_common.cloudinit_builder import CloudInit, CloudInitNetworkRoot
 from nfvcl_common.utils.blue_utils import rel_path
+from nfvcl_core_models.network.network_models import NetworkModel
 from nfvcl_core_models.providers.providers import ProviderData
 from nfvcl_core_models.resources import VmResource, VmResourceConfiguration, VmResourceNetworkInterfaceAddress, VmResourceNetworkInterface, VmResourceAnsibleConfiguration, NetResource, VmStatus, VmPowerStatus
 from nfvcl_core_models.vim.vim_models import VimTypeEnum
@@ -302,6 +303,12 @@ class VirtualizationProviderProxmox(VirtualizationProviderInterface):
         self.save_to_db()
         self.__create_sdn_subnet(client, net_resource)
         self.save_to_db()
+
+    def get_networks(self, area: int = 1) -> List[NetworkModel]:
+        pass
+
+    def get_net(self, net_name: str, area: int = 1) -> NetworkModel | None:
+        pass
 
     def attach_nets(self, vm_resource: VmResource, nets_name: List[str]) -> List[str]:
         client = self._get_client(vm_resource.area)

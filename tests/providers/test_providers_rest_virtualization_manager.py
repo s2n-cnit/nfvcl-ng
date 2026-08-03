@@ -65,6 +65,12 @@ class FakeVirtualizationProvider(VirtualizationProviderInterface):
     def create_net(self, net_resource: NetResource):
         pass
 
+    def get_networks(self, area: int = 1) -> list:
+        return []
+
+    def get_net(self, net_name: str, area: int = 1):
+        pass
+
     def destroy_vm(self, vm_resource: VmResource):
         if self.fail_destroy:
             raise RuntimeError("destroy failed")

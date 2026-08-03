@@ -25,6 +25,12 @@ IMPORT_URL_VERSION = semantic_version.Version("9.0.17")
 
 
 def proxmox_sdn_vnet_identifier(vnet_name: str) -> str:
+    """
+    Generate a name to use for vnet, this is needed because of the length limitation and to prevent overlap with a simple truncation
+    Args:
+        vnet_name: Original name of the vnet
+    Returns: Truncated sha1 of the name
+    """
     return f"N{hashlib.sha1(vnet_name.encode('utf-8')).hexdigest()[:7]}"
 
 

@@ -40,7 +40,8 @@ class TopologyVimModelResolver:
 
 class ProviderManager(GenericManager):
     """
-    This class is used to manage the providers
+    This class is used to load and store references to all the providers
+    It also handles the database data save and load
     """
 
     def __init__(

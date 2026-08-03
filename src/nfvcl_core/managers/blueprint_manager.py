@@ -65,6 +65,10 @@ class BlueprintManager(GenericManager):
         self._pending_blueprint_ids_lock = Lock()
 
     def reserve_blueprint_id(self) -> str:
+        """
+        Generate and reserve a blueprint ID, useful for the REST async calls
+        Returns: Generated ID
+        """
         with self._pending_blueprint_ids_lock:
             while True:
                 blueprint_id = generate_blueprint_id()
@@ -174,6 +178,17 @@ class BlueprintManager(GenericManager):
             self.blueprint_dict[item['id']] = blueprint_instance
 
     def precheck_create_blueprint(self, path: str, msg: Any, parent_id: str | None = None) -> AsyncTaskResponse:
+        """
+        Validate that the blueprint can be created before enqueueing the creation task.
+        Checks that the requested blueprint type is registered and reserves a blueprint ID for the upcoming async task.
+        Args:
+            path: The blueprint-specific path, the last part of the URL for the creation request
+            msg: The message received from the user
+            parent_id: ID of the parent blueprint
+
+        Returns:
+            An AsyncTaskResponse with the reserved blueprint ID on success, or a failed response on error
+        """
         try:
             blueprint_type.get_blueprint_class(path)
             blueprint_id = self.reserve_blueprint_id()
@@ -182,6 +197,17 @@ class BlueprintManager(GenericManager):
             return AsyncTaskResponse(status=AsyncTaskStatus.failed, detail=str(e))
 
     def precheck_update_blueprint(self, blueprint_id: str, path: str, msg: Any = None) -> AsyncTaskResponse:
+        """
+        Validate that a day2 update can be executed on the blueprint before enqueueing the task.
+        Checks that the requested function exists, that the blueprint exists, and that it is of the expected type.
+        Args:
+            blueprint_id: The ID of the blueprint to be updated
+            path: The blueprint-specific path for the day2 function
+            msg: The message received from the user
+
+        Returns:
+            An AsyncTaskResponse with a processing status on success, or a failed response on error
+        """
         b_type = path.split("/")[0]
         try:
             blueprint_module = blueprint_type.get_blueprint_module(b_type)
@@ -199,6 +225,17 @@ class BlueprintManager(GenericManager):
         return AsyncTaskResponse(blueprint_id=blueprint_id, status=AsyncTaskStatus.processing, detail=f"Blueprint day2 message for {blueprint_id} given to the worker...")
 
     def precheck_delete_blueprint(self, blueprint_id: str, force_deletion: Optional[bool] = False, child_deletion: bool = False) -> AsyncTaskResponse:
+        """
+        Validate that the blueprint can be deleted before enqueueing the deletion task.
+        Checks that the blueprint exists and that it is eligible for deletion (not a protected, child, or deploying blueprint).
+        Args:
+            blueprint_id: The ID of the blueprint to be deleted
+            force_deletion: Force deletion without ensuring that resources are deleted from remote VIMs or K8S Clusters
+            child_deletion: If True, skip the parent check (used when a parent blueprint deletes its children)
+
+        Returns:
+            An AsyncTaskResponse with a processing status on success, or a failed response on error
+        """
         blueprint_instance = self.get_blueprint_instance(blueprint_id)
         if blueprint_instance is None:
             return AsyncTaskResponse(blueprint_id=blueprint_id, status=AsyncTaskStatus.failed, detail=f"Blueprint {blueprint_id} not found")
@@ -211,9 +248,23 @@ class BlueprintManager(GenericManager):
         return AsyncTaskResponse(blueprint_id=blueprint_id, status=AsyncTaskStatus.processing, detail=f"Blueprint deletion message for {blueprint_id} given to the worker...")
 
     def precheck_delete_all_blueprints(self) -> AsyncTaskResponse:
+        """
+        Validate that all blueprints can be deleted before enqueueing the deletion task.
+        Returns:
+            An AsyncTaskResponse with a processing status
+        """
         return AsyncTaskResponse(status=AsyncTaskStatus.processing, detail="Blueprints are being deleted...")
 
     def precheck_snapshot_restore(self, snapshot_name: str) -> AsyncTaskResponse:
+        """
+        Validate that the snapshot can be restored before enqueueing the restore task.
+        Checks that the snapshot exists and that it contains exactly one creation request.
+        Args:
+            snapshot_name: The name of the snapshot to be restored
+
+        Returns:
+            An AsyncTaskResponse with a processing status on success, or a failed response on error
+        """
         snapshot = self._snapshot_repository.get_snapshot(snapshot_name)
         if snapshot is None:
             return AsyncTaskResponse(status=AsyncTaskStatus.failed, detail=f"Snapshot {snapshot_name} not found")
@@ -225,6 +276,16 @@ class BlueprintManager(GenericManager):
         return AsyncTaskResponse(status=AsyncTaskStatus.processing, detail=f"Snapshot {snapshot_name} is being restored...")
 
     def precheck_snapshot_and_delete(self, snapshot_name: str, blueprint_id: str) -> AsyncTaskResponse:
+        """
+        Validate that the blueprint can be snapshotted and deleted before enqueueing the task.
+        Checks that the blueprint exists, is in idle state, and passes the deletion precheck.
+        Args:
+            snapshot_name: The name of the snapshot to be created
+            blueprint_id: The ID of the blueprint to be snapshotted and deleted
+
+        Returns:
+            An AsyncTaskResponse with a processing status on success, or a failed response on error
+        """
         try:
             blueprint = self.get_blueprint_instance(blueprint_id)
             if blueprint is None:

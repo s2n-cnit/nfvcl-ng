@@ -9,6 +9,11 @@ from nfvcl_providers.vim_clients.vim_client import VimClient
 
 
 class VimModelResolver(Protocol):
+    """
+    Protocol that describe methods of a VimModel resolver
+
+    TODO: can this be a normal class and the resolver extend this?
+    """
     def get_vim_by_area(self, area: int) -> VimModel:
         ...
 
@@ -17,6 +22,9 @@ class VimModelResolver(Protocol):
 
 
 def get_vim_client_class(vim_type: VimTypeEnum) -> type[VimClient]:
+    """
+    Map the VimType to its implementation class
+    """
     match vim_type:
         case VimTypeEnum.OPENSTACK:
             from nfvcl_providers.vim_clients.openstack_vim_client import OpenStackVimClient
@@ -35,6 +43,10 @@ def get_vim_client_class(vim_type: VimTypeEnum) -> type[VimClient]:
 
 
 class VimClientPool:
+    """
+    This pool holds references to all the created VIM clients
+    This also handle the updated of the VIM model by reinitializing the client if needed, see _get_client_for_vim
+    """
     def __init__(
         self,
         vim_model_resolver: VimModelResolver,

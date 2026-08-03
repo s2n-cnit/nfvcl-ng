@@ -365,6 +365,8 @@ class HelmChartResource(ResourceDeployable):
 
 
 class PDUResourceAnsibleConfiguration(ResourceConfiguration):
+    # Needed because it is mandatory in the Resource
+    # Not really used for PDUs at the moment
     resource_group: str = "NONE"
 
     @abc.abstractmethod

@@ -374,9 +374,14 @@ class NFVCL:
     def create_blueprint(self, blue_type: str, msg: BlueprintNGCreateModel, callback=None):
         if callback is None:
             return self.add_task(self.blueprint_manager.create_blueprint, blue_type, msg, callback=callback)
+        # Here we get the response that will be sent to the user, we need to do this mainly to have the blueprint ID in there
         async_response = self.blueprint_manager.precheck_create_blueprint(blue_type, msg)
         if async_response.status == AsyncTaskStatus.failed:
             return async_response
+        # We call the actual create_blueprint passing the pregenerated blueprint ID
+        # The _on_cancel is used to release the allocated blueprint ID in case of task cancellation
+        # The async_response, callback and _on_cancel are passed to _add_task_async and to the task object while blueprint_id to create_blueprint
+        # TODO Find a way to not mix caller and called function parameters for better readability
         return self._add_task_async(
             self.blueprint_manager.create_blueprint,
             blue_type,

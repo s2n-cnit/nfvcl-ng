@@ -18,7 +18,6 @@ from nfvcl_core.managers.kubernetes_manager import KubernetesManager
 from nfvcl_core.managers.pdu_manager import PDUManager
 from nfvcl_core.managers.provider_manager import ProviderManager
 from nfvcl_core.managers.user_manager import UserManager
-from nfvcl_core.managers.visualization_manager import VisualizationManager
 
 
 class NFVCLContainer(containers.DeclarativeContainer):
@@ -126,9 +125,4 @@ class NFVCLContainer(containers.DeclarativeContainer):
         user_repository=user_repository
     )
 
-    visualization_manager = providers.Singleton(
-        VisualizationManager,
-        blueprint_manager=blueprint_manager,
-        topology_manager=topology_manager
-    )
 

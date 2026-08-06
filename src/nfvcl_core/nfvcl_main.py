@@ -254,6 +254,10 @@ class NFVCL:
     def delete_vim(self, vim_id: str):
         self.topology_manager.delete_vim(vim_id)
 
+    @NFVCLPublic(path="/network", section=TOPOLOGY_SECTION, method=HttpRequestType.GET, sync=True)
+    def get_networks(self) -> List[NetworkModel]:
+        return self.topology_manager.get_networks()
+
     @NFVCLPublic(path="/network/{network_id}", section=TOPOLOGY_SECTION, method=HttpRequestType.GET, sync=True)
     def get_network(self, network_id: str) -> NetworkModel:
         return self.topology_manager.get_network(network_id)
@@ -363,7 +367,7 @@ class NFVCL:
         return provider.get_networks()
 
     @NFVCLPublic(path="/networks/{area}/{network_name}", section=VIM_SECTION, method=HttpRequestType.GET, sync=True)
-    def get_network(self, area: Annotated[int,Field(gt=0)], network_name: str) -> NetworkModel:
+    def get_vim_network(self, area: Annotated[int,Field(gt=0)], network_name: str) -> NetworkModel:
         """
         Fetches the network information for a given network name and area from the hypervisor.
 

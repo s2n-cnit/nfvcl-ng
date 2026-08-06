@@ -94,6 +94,10 @@ class TopologyManager(GenericManager):
     ############################ Network ########################################
 
     @require_topology
+    def get_networks(self) -> List[NetworkModel]:
+        return self._topology.get_networks()
+
+    @require_topology
     def get_network(self, network_id: str) -> NetworkModel:
         return self._topology.get_network(network_id)
 

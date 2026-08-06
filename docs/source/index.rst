@@ -99,6 +99,7 @@ For more details you can go to :doc:`prometheus/prometheus`
    quick_start
    helm
    docker
+   building
 
 .. toctree::
    :caption: Topology
@@ -121,6 +122,14 @@ For more details you can go to :doc:`prometheus/prometheus`
    blueprints/ueransim/ueransim_blue_index
    blueprints/packetrusher/packetrusher_blue_index
    blueprints/5gcores/5gcore_blue_index
+   blueprints/authoring
+
+.. toctree::
+   :caption: Python API reference
+   :maxdepth: 4
+   :hidden:
+
+   api/source
 
 .. toctree::
    :caption: K8s Management

@@ -42,8 +42,24 @@ release = get_version_from_git()
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["myst_parser",
-              'sphinxemoji.sphinxemoji']
+extensions = [
+    "myst_parser",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinxemoji.sphinxemoji",
+]
+
+autodoc_member_order = "bysource"
+autodoc_typehints = "description"
+autodoc_mock_imports = [
+    "ansible",
+    "ansible_runner",
+    "kubernetes",
+    "openstack",
+    "pyhelm3",
+    "proxmoxer",
+]
 
 templates_path = ['_templates']
 exclude_patterns = []
@@ -60,7 +76,6 @@ html_theme_options = {
     #'analytics_id': 'G-XXXXXXXXXX',  #  Provided by Google in your dashboard
     #'analytics_anonymize_ip': False,
     #'logo_only': False,
-    'display_version': True,
     #'prev_next_buttons_location': 'bottom',
     #'style_external_links': False,
     #'vcs_pageview_mode': '',

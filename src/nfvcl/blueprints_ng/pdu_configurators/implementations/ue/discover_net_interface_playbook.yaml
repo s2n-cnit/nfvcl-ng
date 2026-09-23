@@ -1,0 +1,68 @@
+---
+- name: Discover modem network interface
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Validate modem vendor variables
+      ansible.builtin.assert:
+        that:
+          - (vendor_id | default('') | string) is match('^[0-9A-Fa-f]{4}$')
+          - (vendor_name | default('') | string | length) > 0
+        fail_msg: >-
+          vendor_id must be a four-digit hexadecimal USB vendor ID,
+          and vendor_name must not be empty.
+
+    - name: Find modem network interface
+      ansible.builtin.shell: |
+        set -eu
+
+        wanted_vendor_id="$(
+          printf '%s' "$MODEM_VENDOR_ID" |
+          tr '[:upper:]' '[:lower:]'
+        )"
+
+        for net_path in /sys/class/net/*; do
+          [ -e "$net_path" ] || continue
+
+          iface="${net_path##*/}"
+          device_path="$(readlink -f "$net_path/device" 2>/dev/null || true)"
+          [ -n "$device_path" ] || continue
+
+          current_path="$device_path"
+
+          while [ "$current_path" != "/" ]; do
+            if [ -r "$current_path/idVendor" ]; then
+              actual_vendor_id="$(
+                tr '[:upper:]' '[:lower:]' < "$current_path/idVendor"
+              )"
+
+              if [ "$actual_vendor_id" = "$wanted_vendor_id" ]; then
+                printf '%s\n' "$iface"
+                exit 0
+              fi
+            fi
+
+            current_path="${current_path%/*}"
+            [ -n "$current_path" ] || current_path="/"
+          done
+        done
+
+        exit 0
+      environment:
+        MODEM_VENDOR_ID: "{{ vendor_id }}"
+      register: iface_result
+      changed_when: false
+      check_mode: false
+
+    - name: Verify that modem interface was found
+      ansible.builtin.assert:
+        that:
+          - iface_result.stdout | trim | length > 0
+        fail_msg: >-
+          No network interface associated with a {{ vendor_name }} modem
+          (vendor ID {{ vendor_id }}) was found.
+
+    - name: Expose discovered interface name
+      ansible.builtin.set_fact:
+        net_interface_name: "{{ iface_result.stdout | trim }}"

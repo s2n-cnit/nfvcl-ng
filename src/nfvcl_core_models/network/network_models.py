@@ -400,6 +400,7 @@ class PduType(str, Enum):
     RU: str = 'RU'
     CUDU: str = 'CUDU'
     CORE5G: str = 'CORE5G'
+    UE: str = 'UE'
 
 
 class PduLockType(str, Enum):

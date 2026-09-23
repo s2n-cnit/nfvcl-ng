@@ -1,3 +1,4 @@
+from nfvcl.blueprints_ng.pdu_configurators.implementations.ue.atpy_ue_pdu_configurator import AtpyUePDUConfigurator
 from nfvcl_core.managers.pdu_manager import PDUManager
 
 from nfvcl.blueprints_ng.pdu_configurators.implementations.gnb.amari_pdu_configurator import AmariPDUConfigurator
@@ -19,3 +20,4 @@ def register_pdu_implementations(pdu_manager: PDUManager):
     pdu_manager.register_implementation("AthonetCore", AthonetCorePDUConfigurator.get_class_path())
     pdu_manager.register_implementation("AthonetUPF", AthonetUPFPDUConfigurator.get_class_path())
     pdu_manager.register_implementation("AmarisoftGNB", AmariPDUConfigurator.get_class_path())
+    pdu_manager.register_implementation("ATPY_UE", AtpyUePDUConfigurator.get_class_path())

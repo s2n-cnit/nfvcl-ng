@@ -1,0 +1,117 @@
+---
+- hosts: all
+  become: yes
+
+  tasks:
+    - name: Ensure experiment results directory exists in container
+      shell: incus exec {{ container_name }} -- mkdir -p /root/ExperimentsResults
+      changed_when: false
+
+    - name: Kill any stale tcpdump processes inside container
+      shell: incus exec {{ container_name }} -- pkill tcpdump || true
+      when: tcpdump
+      changed_when: false
+
+    - name: Start tcpdump capture in background inside container
+      shell: |
+        incus exec {{ container_name }} -- bash -c '
+          nohup tcpdump -i {{ modem_interface }} -w /root/ExperimentsResults/capture.pcap > /root/ExperimentsResults/tcpdump.log 2>&1 &
+          echo $! > /root/ExperimentsResults/tcpdump.pid
+        '
+      when: tcpdump
+
+    - name: Write docker env file on host
+      copy:
+        content: |
+          {% for key, value in env_vars.items() %}
+          {{ key }}={{ value }}
+          {% endfor %}
+        dest: /tmp/docker.env
+        mode: 644
+
+    - name: Push docker env file to container
+      command: >
+        incus file push --mode 644
+        /tmp/docker.env
+        {{ container_name }}/root/ExperimentsResults/docker.env
+
+    - name: Record experiment start timestamp in container
+      shell: |
+        incus exec {{ container_name }} -- bash -c '
+          date +%s%3N > /root/ExperimentsResults/.start_epoch
+          date -u +%Y-%m-%dT%H:%M:%S.%3NZ > /root/ExperimentsResults/.start_iso
+        '
+      changed_when: false
+
+    - name: Run experiment Docker container
+      shell: |
+        incus exec {{ container_name }} -- bash -c '
+          docker run --rm \
+            --network host \
+            --env-file /root/ExperimentsResults/docker.env \
+            -v /root/ExperimentsResults:/root/ExperimentsResults \
+            {{ container_image_name }} \
+            > /root/ExperimentsResults/stdout 2> /root/ExperimentsResults/stderr
+        '
+      register: docker_result
+      ignore_errors: true
+
+    - name: Stop tcpdump capture if running
+      shell: |
+        incus exec {{ container_name }} -- bash -c '
+          if [ -f /root/ExperimentsResults/tcpdump.pid ]; then
+            kill $(cat /root/ExperimentsResults/tcpdump.pid) 2>/dev/null || true
+            rm -f /root/ExperimentsResults/tcpdump.pid
+          fi
+        '
+      when: tcpdump
+      changed_when: false
+
+    - name: Write experiment metadata JSON
+      shell: |
+        incus exec {{ container_name }} -- bash -c '
+          END_EPOCH=$(date +%s%3N)
+          END_ISO=$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)
+          START_EPOCH=$(cat /root/ExperimentsResults/.start_epoch)
+          START_ISO=$(cat /root/ExperimentsResults/.start_iso)
+          DURATION=$((END_EPOCH - START_EPOCH))
+          echo "{
+            \"start_timestamp\": \"${START_ISO}\",
+            \"end_timestamp\": \"${END_ISO}\",
+            \"duration_ms\": ${DURATION}
+          }" > /root/ExperimentsResults/metadata.json
+          rm -f /root/ExperimentsResults/.start_epoch /root/ExperimentsResults/.start_iso
+        '
+      changed_when: false
+
+    - name: Write results summary in env format
+      copy:
+        content: |
+          DOCKER_EXIT_CODE={{ docker_result.rc }}
+          CAPTURE_FILE=/root/ExperimentsResults/capture.pcap
+          STDOUT_FILE=/root/ExperimentsResults/stdout
+          STDERR_FILE=/root/ExperimentsResults/stderr
+        dest: /tmp/experiment.env
+
+    - name: Push results env file to container
+      command: >
+        incus file push --mode 644
+        /tmp/experiment.env
+        {{ container_name }}/root/ExperimentsResults/experiment.env
+
+    - name: Archive experiment results into timestamped zip and clean up
+      shell: |
+        incus exec {{ container_name }} -- bash -c '
+          TIMESTAMP=$(date +%Y_%m_%d_%H_%M_%S)
+          cd /root/ExperimentsResults
+          tar czf ${TIMESTAMP}.tar.gz capture.pcap stdout stderr experiment.env metadata.json tcpdump.log docker.env
+          rm -f capture.pcap stdout stderr experiment.env metadata.json tcpdump.log docker.env
+        '
+
+    - name: Remove temporary env files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/experiment.env
+        - /tmp/docker.env

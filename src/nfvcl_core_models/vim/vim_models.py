@@ -12,6 +12,7 @@ logger: Logger = create_logger('Vim model')
 class VimTypeEnum(str, Enum):
     OPENSTACK = 'openstack'
     PROXMOX = 'proxmox'
+    INCUS = 'incus'
     EXTERNAL_REST = 'external_rest'
 
 class ProxmoxPrivilegeEscalationTypeEnum(str, Enum):
@@ -41,6 +42,12 @@ class RESTParameters(NFVCLBaseModel):
     remote_vim_name: Optional[str] = Field(default="default")
     local_agent_uuid: Optional[str] = Field(default="default")
 
+class IncusParameters(NFVCLBaseModel):
+    cert_file: Optional[str] = Field(default='')
+    key_file: Optional[str] = Field(default='')
+    ssl_ca_cert: Optional[str] = Field(default='')
+    incus_port: Optional[int] = Field(default=8443)
+
 class VimModel(NFVCLBaseModel):
     """
     """
@@ -60,6 +67,7 @@ class VimModel(NFVCLBaseModel):
     vim_openstack_parameters: Optional[OpenstackParameters] = Field(default=None)
     vim_proxmox_parameters: Optional[ProxmoxParameters] = Field(default=None)
     vim_rest_parameters: Optional[RESTParameters] = Field(default=None)
+    vim_incus_parameters: Optional[IncusParameters] = Field(default=None)
 
     config: VimConfigModel = Field(default=VimConfigModel())
     networks: List[str] = Field(default_factory=list)
@@ -80,6 +88,11 @@ class VimModel(NFVCLBaseModel):
         if self.vim_rest_parameters is None:
             self.vim_rest_parameters = RESTParameters()
         return self.vim_rest_parameters
+
+    def incus_parameters(self) -> IncusParameters:
+        if self.vim_incus_parameters is None:
+            self.vim_incus_parameters = IncusParameters()
+        return self.vim_incus_parameters
 
     def __eq__(self, other):
         """

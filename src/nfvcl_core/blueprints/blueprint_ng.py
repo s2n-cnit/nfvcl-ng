@@ -18,7 +18,7 @@ from nfvcl_core_models.blueprints.blueprint import BlueprintNGState, BlueprintNG
 from nfvcl_core_models.http_models import BlueprintNotFoundException
 from nfvcl_core_models.monitoring.grafana_model import GrafanaFolderModel
 from nfvcl_core_models.monitoring.monitoring import BlueprintMonitoringDefinition
-from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource, VmStatus
+from nfvcl_core_models.resources import Resource, ResourceConfiguration, ResourceDeployable, VmResource, HelmChartResource, VmStatus, ContainerResource
 from nfvcl_core_models.providers.diagnostic import RpcapdVmStatus
 
 StateTypeVar = TypeVar("StateTypeVar")
@@ -171,6 +171,8 @@ class BlueprintNG(Generic[StateTypeVar, CreateConfigTypeVar]):
         for key, value in self.base_model.registered_resources.items():
             if isinstance(value.value, VmResource):
                 self.provider.destroy_vm(value.value)
+            elif isinstance(value.value, ContainerResource):
+                self.provider.destroy_container(value.value)
             elif isinstance(value.value, HelmChartResource):
                 self.provider.uninstall_helm_chart(value.value)
             # TODO this is not implemented, currently the NetResource are destroyed by the provider in the final_cleanup

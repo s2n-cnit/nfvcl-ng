@@ -63,6 +63,20 @@ class VmStatus(NFVCLBaseModel):
     ssh_reachable: bool = Field(description="Whether SSH connection is reachable")
 
 
+class ContainerStatus(NFVCLBaseModel):
+    """
+    Represents the status of a VM including power state and SSH connectivity
+
+    Attributes:
+        vm_name (str): The name of the VM
+        power_status (VmPowerStatus): The power status of the VM using standardized enum values
+        ssh_reachable (bool): Whether SSH connection is reachable on the VM
+    """
+    vm_name: str = Field(description="The name of the VM")
+    power_status: VmPowerStatus = Field(description="VM power status using standardized enum values")
+    ssh_reachable: bool = Field(description="Whether SSH connection is reachable")
+
+
 class VmResourceImage(NFVCLBaseModel):
     """
     Represents a VM Image
@@ -75,6 +89,32 @@ class VmResourceImage(NFVCLBaseModel):
     name: str = Field()
     url: Optional[str] = Field(default=None)
     check_sha512sum: bool = Field(default=False, description="If true the provider should check if the image at URL has the same hash, if not a new image with different name is created.")
+
+
+class LXCImageArchitecture(str, Enum):
+    """Architecture identifiers accepted by Incus for an LXC image."""
+    X86_64 = "x86_64"
+    AARCH64 = "aarch64"
+
+
+class LXCImage(NFVCLBaseModel):
+    name: str
+    url: Optional[str] = None
+    architecture: LXCImageArchitecture = Field(default=LXCImageArchitecture.X86_64, description="Image architecture, used when downloading from url")
+    os: str = Field(default="ubuntu", description="Image OS name (Incus value, e.g. 'ubuntu'), used when downloading from url")
+    release: str = Field(default="noble", description="Image release (e.g. 'noble', 'jammy'), used when downloading from url")
+
+
+class OCIImage(NFVCLBaseModel):
+    repository: str
+    tag: str = "latest"
+    digest: Optional[str] = None
+
+    @property
+    def full_name(self):
+        if self.digest:
+            return f"{self.repository}@{self.digest}"
+        return f"{self.repository}:{self.tag}"
 
 
 class VmResourceFlavor(NFVCLBaseModel):
@@ -128,9 +168,11 @@ class VmResourceNetworkInterface(NFVCLBaseModel):
     fixed: VmResourceNetworkInterfaceAddress = Field()
     floating: Optional[VmResourceNetworkInterfaceAddress] = Field(default=None)
 
+
 class NetResourcePool(NFVCLBaseModel):
     start: SerializableIPv4Address = Field()
     end: SerializableIPv4Address = Field()
+
 
 class NetResource(ResourceDeployable):
     cidr: str = Field()
@@ -276,6 +318,93 @@ class VmResourceNativeConfiguration(VmResourceConfiguration):
     @abc.abstractmethod
     def run_code(self):
         pass
+
+
+class NetworkInterfaceAddress(NFVCLBaseModel):
+    interface_name: str = ""
+    mac: str
+    ip: str
+    cidr: str
+
+    def get_prefix(self):
+        return self.cidr.split("/")[-1]
+
+    def get_ip_prefix(self):
+        return f"{self.ip}/{self.get_prefix()}"
+
+
+class NetworkInterface(NFVCLBaseModel):
+    fixed: NetworkInterfaceAddress
+    floating: Optional[NetworkInterfaceAddress] = None
+
+
+class ContainerResourceFlavor(NFVCLBaseModel):
+    cpu_count: int = Field(default=4, description="Number of CPUs the container is limited to")
+    memory_mb: int = Field(default=4096, description="RAM memory limit in MB")
+    storage_gb: int = Field(default=10, description="Root disk size in GB")
+
+
+class ContainerResource(ResourceDeployable):
+    created: bool = False
+    state: Optional[str] = None
+
+
+class LXCContainerResource(ContainerResource):
+    image: LXCImage
+    flavor: ContainerResourceFlavor = Field(default_factory=ContainerResourceFlavor)
+    docker: bool = Field(default=False, description="If true the container is configured to run Docker inside (nesting + syscall interception)")
+    privileged: bool = Field(default=False, description="If true the container runs in privileged mode")
+
+    # TODO Create a generic class shared by the VMs.
+    username: str
+    password: str
+    become_password: Optional[str] = None
+    management_network: str
+    additional_networks: List[str] = Field(default_factory=list)
+    access_ip: Optional[str] = None
+    network_interfaces: Dict[str, List[NetworkInterface]] = Field(default_factory=dict)
+    created: bool = False
+    state: Optional[str] = None
+
+    def model_post_init(self, __context):
+
+        self.additional_networks = list(set(self.additional_networks))
+
+        if self.management_network in self.additional_networks:
+            self.additional_networks.remove(self.management_network)
+
+    def get_all_connected_network_names(self):
+
+        return [self.management_network] + self.additional_networks
+
+    def get_management_interface(self):
+
+        return self.network_interfaces[self.management_network][0]
+
+    def get_additional_interfaces(self):
+
+        interfaces = []
+
+        for net in self.additional_networks:
+            interfaces.extend(self.network_interfaces.get(net, []))
+
+        return interfaces
+
+
+class VolumeMount(NFVCLBaseModel):
+    host_path: str
+    container_path: str
+    read_only: bool = False
+
+
+class OCIContainerResource(ContainerResource):
+    image: OCIImage
+    command: List[str] = Field(default_factory=list)
+    args: List[str] = Field(default_factory=list)
+    environment: Dict[str, str] = Field(default_factory=dict)
+    ports: List[int] = Field(default_factory=list)
+    volumes: List[VolumeMount] = Field(default_factory=list)
+    restart_policy: str = "Always"
 
 
 class HelmChartResource(ResourceDeployable):

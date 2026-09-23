@@ -12,7 +12,10 @@ from nfvcl_core_models.network.network_models import (
     PduType,
 )
 from nfvcl_core_models.resources import (
+    ContainerResource,
+    ContainerStatus,
     HelmChartResource,
+    LXCContainerResource,
     NetResource,
     VmResource,
     VmResourceConfiguration,
@@ -30,6 +33,9 @@ if TYPE_CHECKING:
     from nfvcl_providers.pdu.pdu_provider import PDUProvider
     from nfvcl_providers.virtualization.virtualization_provider_interface import (
         VirtualizationProviderInterface,
+    )
+    from nfvcl_providers.containerization.containerization_provider_interface import (
+        ContainerizationProviderInterface,
     )
 
 
@@ -102,6 +108,7 @@ class ProvidersAggregator:
         self.logger = create_logger(self.__class__.__name__)
 
         self._virt_provider_areas: Set[int] = set()
+        self._container_provider_areas: Set[int] = set()
 
     def _get_virt_provider(self, area: int) -> VirtualizationProviderInterface:
         self._virt_provider_areas.add(area)
@@ -109,6 +116,10 @@ class ProvidersAggregator:
 
     def _get_k8s_provider(self, area: int) -> K8SProviderInterface:
         return self.provider_manager.get_kubernetes_provider(area)
+
+    def _get_container_provider(self, area: int) -> ContainerizationProviderInterface:
+        self._container_provider_areas.add(area)
+        return self.provider_manager.get_containerization_provider_for_area(area)
 
     def _get_pdu_provider(self) -> PDUProvider:
         return self.provider_manager.get_pdu_provider()
@@ -188,6 +199,24 @@ class ProvidersAggregator:
         self._get_pdu_provider().cleanup_resource_group(self.blueprint_id)
         self._get_blueprint_provider().cleanup_resource_group(self.blueprint_id)
         self._get_diagnostic_provider().cleanup_resource_group(self.blueprint_id)
+
+        container_providers: list = []
+        for area in self._container_provider_areas:
+            container_provider = self._get_container_provider(area)
+            if container_provider not in container_providers:
+                container_providers.append(container_provider)
+
+        if container_providers:
+            for container_provider in container_providers:
+                container_provider.cleanup_resource_group(self.blueprint_id)
+        else:
+            for container_provider in self.provider_manager.get_containerization_providers():
+                try:
+                    container_provider.cleanup_resource_group(self.blueprint_id)
+                except ValueError as exc:
+                    self.logger.debug(
+                        f"Skipping area-less final cleanup for {container_provider.__class__.__name__}: {exc}"
+                    )
 
     @add_blueprint_log_context()
     @register_performance(params_to_info=[(1, "release_name", lambda x: x.name)])
@@ -375,3 +404,53 @@ class ProvidersAggregator:
     @add_blueprint_log_context()
     def check_lb_available(self, area: int, necessary_ip: int) -> bool:
         return self._get_k8s_provider(area).check_lb_available(area, necessary_ip)
+
+    @add_blueprint_log_context()
+    @register_performance(params_to_info=[(1, "container_name", lambda x: x.name)])
+    def create_container(self, container_resource: ContainerResource):
+        return self._get_container_provider(container_resource.area).create_container(container_resource)
+
+    @add_blueprint_log_context()
+    @register_performance(params_to_info=[(1, "container_name", lambda x: x.name)])
+    def destroy_container(self, container_resource: ContainerResource):
+        return self._get_container_provider(container_resource.area).destroy_container(container_resource)
+
+    @add_blueprint_log_context()
+    @register_performance(params_to_info=[(1, "container_name", lambda x: x.name)])
+    def reboot_container(self, container_resource: ContainerResource, hard: bool = False):
+        return self._get_container_provider(container_resource.area).reboot_container(container_resource, hard=hard)
+
+    @add_blueprint_log_context()
+    @register_performance(params_to_info=[(1, "container_name", lambda x: x.name)])
+    def check_container_status(self, container_resource: ContainerResource) -> ContainerStatus:
+        return self._get_container_provider(container_resource.area).check_container_status(container_resource)
+
+    @add_blueprint_log_context()
+    @register_performance()
+    def create_container_net(self, net_resource: NetResource):
+        return self._get_container_provider(net_resource.area).create_net(net_resource)
+
+    @add_blueprint_log_context()
+    @register_performance()
+    def check_container_networks_exist(self, area: int, networks_to_check: set[str]) -> Tuple[bool, Set[str]]:
+        return self._get_container_provider(area).check_networks_exist(area, networks_to_check)
+
+    @add_blueprint_log_context()
+    @register_performance(params_to_info=[(1, "container_name", lambda x: x.name)])
+    def container_attach_nets(self, container_resource: ContainerResource, nets_name: List[str]) -> List[str]:
+        return self._get_container_provider(container_resource.area).attach_nets(container_resource, nets_name)
+
+    @add_blueprint_log_context()
+    @register_performance(params_to_info=[(1, "container_name", lambda x: x.name), (2, "parent_interface")])
+    def get_container_interface_name_from_parent(self, container_resource: LXCContainerResource, parent_interface: str) -> Optional[str]:
+        """
+        Resolve the container-side interface name attached to a given parent interface.
+
+        Args:
+            container_resource: The container whose interfaces are examined.
+            parent_interface: Name of the host-side interface/network.
+
+        Returns:
+            The interface name as seen inside the container, or ``None`` if not found.
+        """
+        return self._get_container_provider(container_resource.area).get_container_interface_name_from_parent(container_resource, parent_interface)

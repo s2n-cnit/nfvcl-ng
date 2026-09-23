@@ -66,8 +66,8 @@ class MatchType(NFVCLBaseModel):
 class InterfaceCloudInit(NFVCLBaseModel):
     dhcp4: bool = Field(default=True)
     dhcp4_overrides: Optional[CloudInitDhcpOverride] = Field(default=None, alias="dhcp4-overrides")
-    match: MatchType = Field()
-    set_name: str = Field(alias="set-name")
+    match: Optional[MatchType] = Field(default=None)
+    set_name: Optional[str] = Field(default=None, alias="set-name")
 
 
 class CloudInitNetwork(NFVCLBaseModel):
@@ -86,6 +86,13 @@ class CloudInitNetworkRoot(NFVCLBaseModel):
             match=MatchType(macaddress=macaddress),
             set_name=iface
         )
+        if override:
+            tmp.dhcp4_overrides = CloudInitDhcpOverride()
+        self.network.ethernets[iface] = tmp
+
+    def add_device_by_name(self, iface: str, dhcp4: bool = True, override=False):
+        tmp = InterfaceCloudInit(dhcp4=dhcp4)
+        self.network.ethernets[iface] = tmp
         if override:
             tmp.dhcp4_overrides = CloudInitDhcpOverride()
         self.network.ethernets[iface] = tmp

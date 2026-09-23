@@ -48,12 +48,14 @@ dependencies = [
     "pycdlib>=1.14.0",
     "requests-toolbelt>=1.0.0",
     "json5>=0.14.0",
+    "atpy-client",
+    "pyincusd>=7.2.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
-    "pytest-dependency>=0.6.0,<0.7",
+    "pytest-dependency>=0.6.1,<0.7",
     "mypy>=1.18.2",
 ]
 docs = [
@@ -68,6 +70,7 @@ docs = [
 [tool.uv.sources]
 pyhelm3 = { git = "https://github.com/s2n-cnit/pyhelm3.git", rev = "b84df4b" }
 proxmoxer = { git = "https://github.com/s2n-cnit/proxmoxer.git", rev = "2862ef8" }
+atpy-client = { git = "https://gitlab.tnt-lab.unige.it/python-libs/atpyclient.git" }
 
 [tool.hatch.build.targets.sdist]
 include = [

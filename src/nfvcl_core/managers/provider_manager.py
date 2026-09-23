@@ -11,6 +11,8 @@ from nfvcl_core_models.vim.vim_models import VimModel, VimTypeEnum
 from nfvcl_providers.provider_interface import ProviderInterface
 from nfvcl_providers.virtualization import vim_type_to_provider_mapping
 from nfvcl_providers.virtualization.virtualization_provider_interface import VirtualizationProviderInterface
+from nfvcl_providers.containerization import vim_type_to_containerization_provider_mapping
+from nfvcl_providers.containerization.containerization_provider_interface import ContainerizationProviderInterface
 from nfvcl_providers.vim_clients.vim_context import VimClientPool
 
 if TYPE_CHECKING:
@@ -58,6 +60,7 @@ class ProviderManager(GenericManager):
         self._pdu_manager = pdu_manager
         self._vim_client_pool = VimClientPool(TopologyVimModelResolver(topology_manager))
         self._virtualization_providers: dict[VimTypeEnum, VirtualizationProviderInterface] = {}
+        self._containerization_providers: dict[VimTypeEnum, ContainerizationProviderInterface] = {}
         self._blueprint_provider: BlueprintProvider | None = None
         self._diagnostic_provider: DiagnosticProvider | None = None
         self._kubernetes_provider: K8SProviderInterface | None = None
@@ -67,6 +70,8 @@ class ProviderManager(GenericManager):
     def load(self):
         for vim_type in vim_type_to_provider_mapping:
             self.get_virtualization_provider(vim_type)
+        for vim_type in vim_type_to_containerization_provider_mapping:
+            self.get_containerization_provider(vim_type)
         if self._blueprint_manager is not None:
             self.get_blueprint_provider()
         self.get_diagnostic_provider()
@@ -156,6 +161,27 @@ class ProviderManager(GenericManager):
     def get_virtualization_providers(self) -> list[VirtualizationProviderInterface]:
         return list(self._virtualization_providers.values())
 
+    def get_containerization_provider(self, vim_type: VimTypeEnum | str) -> ContainerizationProviderInterface:
+        vim_type = self._normalize_vim_type(vim_type)
+        if vim_type not in self._containerization_providers:
+            provider_class = vim_type_to_containerization_provider_mapping[vim_type]
+            provider = provider_class(
+                vim_client_pool=self._vim_client_pool,
+                persistence_function=lambda vim_type=vim_type: self.save_containerization_provider_data(vim_type)
+            )
+
+            self._load_provider_data(self._get_provider_type_key(vim_type), provider)
+
+            self._containerization_providers[vim_type] = provider
+        return self._containerization_providers[vim_type]
+
+    def get_containerization_provider_for_area(self, area: int) -> ContainerizationProviderInterface:
+        vim = self._topology_manager.get_topology().get_vim_by_area(area)
+        return self.get_containerization_provider(vim.vim_type)
+
+    def get_containerization_providers(self) -> list[ContainerizationProviderInterface]:
+        return list(self._containerization_providers.values())
+
     def get_pdu_provider(self) -> PDUProvider:
         if self._pdu_manager is None:
             raise ValueError("PDUProvider requires a PDUManager")
@@ -186,6 +212,9 @@ class ProviderManager(GenericManager):
     def get_pdu_provider_data(self) -> ProviderData:
         return self.get_pdu_provider().data
 
+    def get_containerization_provider_data(self, vim_type: VimTypeEnum | str) -> ProviderData:
+        return self.get_containerization_provider(vim_type).data
+
     def save_virtualization_provider_data(self, vim_type: VimTypeEnum | str):
         vim_type = self._normalize_vim_type(vim_type)
         provider = self.get_virtualization_provider(vim_type)
@@ -204,6 +233,11 @@ class ProviderManager(GenericManager):
     def save_pdu_provider_data(self):
         self._save_provider_data(PDU_PROVIDER_TYPE, self.get_pdu_provider())
 
+    def save_containerization_provider_data(self, vim_type: VimTypeEnum | str):
+        vim_type = self._normalize_vim_type(vim_type)
+        provider = self.get_containerization_provider(vim_type)
+        self._save_provider_data(self._get_provider_type_key(vim_type), provider)
+
     def save_all(self):
         for vim_type in self._virtualization_providers:
             self.save_virtualization_provider_data(vim_type)
@@ -215,6 +249,8 @@ class ProviderManager(GenericManager):
             self.save_kubernetes_provider_data()
         if self._pdu_provider is not None:
             self.save_pdu_provider_data()
+        for vim_type in self._containerization_providers:
+            self.save_containerization_provider_data(vim_type)
 
     def _normalize_vim_type(self, vim_type: VimTypeEnum | str) -> VimTypeEnum:
         if isinstance(vim_type, VimTypeEnum):

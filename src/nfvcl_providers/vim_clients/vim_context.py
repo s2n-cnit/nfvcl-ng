@@ -38,6 +38,10 @@ def get_vim_client_class(vim_type: VimTypeEnum) -> type[VimClient]:
             from nfvcl_providers.vim_clients.rest_vim_client import RESTVimClient
 
             return RESTVimClient
+        case VimTypeEnum.INCUS:
+            from nfvcl_providers.vim_clients.incus_vim_client import IncusVimClient
+
+            return IncusVimClient
         case _:
             raise KeyError(vim_type)
 
